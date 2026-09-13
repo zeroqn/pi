@@ -35,9 +35,10 @@
 
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { Type, type Static } from "typebox";
 
 const SEARCH_TIMEOUT_MS = 10 * 60 * 1000;
@@ -50,6 +51,74 @@ type CliStyle = "modern" | "legacy";
 
 function zgBinary(): string {
 	return process.env.ZVEC_GREP_BIN?.trim() || "zg";
+}
+
+/**
+ * Ensure a workspace index covers nested git repositories.
+ *
+ * zg's scanner skips any directory that contains a `.git` entry unless the
+ * root path carries an explicit `include` pattern matching it. The CLI only
+ * ever writes the query-side `globs` field, so `include: ["**"]` has to be
+ * seeded in the workspace manifest. Pre-seed it before the first index and
+ * backfill existing manifests that have no include yet. An explicit include
+ * set by the user is left untouched.
+ */
+function ensureNestedRepoInclude(root: string): void {
+	if (!existsSync(root)) {
+		// Never create a workspace for a missing root; zg will report it.
+		return;
+	}
+	const home = join(root, ".zvec-grep");
+	const manifestPath = join(home, "manifest.json");
+	if (!existsSync(manifestPath)) {
+		const now = Date.now();
+		const manifest = {
+			manifestVersion: 1,
+			id: randomUUID(),
+			name: basename(root) || "workspace",
+			path: home,
+			rootPaths: [{ absolutePath: root, recursive: true, include: ["**"] }],
+			indexPolicy: "enabled",
+			embedding: null,
+			indexVersion: null,
+			createdTime: now,
+			updatedTime: now,
+			embeddingRuntime: {},
+		};
+		try {
+			mkdirSync(home, { recursive: true, mode: 0o700 });
+			writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, {
+				mode: 0o600,
+			});
+		} catch {
+			// Fall back to letting zg create the manifest itself.
+		}
+		return;
+	}
+	try {
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+			rootPaths?: Array<{ include?: unknown }>;
+			updatedTime?: number;
+		};
+		if (!Array.isArray(manifest.rootPaths)) {
+			return;
+		}
+		let changed = false;
+		for (const rootPath of manifest.rootPaths) {
+			if (rootPath && rootPath.include === undefined) {
+				rootPath.include = ["**"];
+				changed = true;
+			}
+		}
+		if (changed) {
+			manifest.updatedTime = Date.now();
+			writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, {
+				mode: 0o600,
+			});
+		}
+	} catch {
+		// Invalid manifest: leave it for zg to report.
+	}
 }
 
 function statusEnabled(): boolean {
@@ -591,6 +660,7 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 				: (configuredWorkspaceRoot(ctx.cwd) ?? ctx.cwd);
 			const style = await resolveStyle(ctx.cwd);
 
+			ensureNestedRepoInclude(targetRoot);
 			ctx.ui.setStatus("zvec-grep", `indexing ${targetRoot}…`);
 			const indexArgs = style === "legacy" ? ["index"] : ["--index"];
 			if (model) indexArgs.push("--embedding", model);
@@ -646,6 +716,10 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 				}
 			}
 
+			if (!drop) {
+				ensureNestedRepoInclude(targetRoot);
+			}
+
 			const style = await resolveStyle(ctx.cwd);
 			const cliArgs: string[] =
 				style === "legacy" ? ["index"] : ["--index"];
@@ -699,6 +773,7 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 			const style = await resolveStyle(ctx.cwd);
 			let failures = 0;
 			for (const [index, root] of roots.entries()) {
+				ensureNestedRepoInclude(root);
 				ctx.ui.setStatus("zvec-grep", `indexing ${index + 1}/${roots.length}: ${root}`);
 				const cliArgs = style === "legacy" ? ["index"] : ["--index"];
 				if (model) cliArgs.push("--embedding", model);
