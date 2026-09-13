@@ -14,6 +14,7 @@
  *   /zg-index [--rebuild] [--drop] [--root <path>] [embedding-model]
  *   /zg-index-all        (strategy B escalation only)
  *   /zg-status
+ *   /zg-status-all [<scan-root>]   (list every indexed workspace + last-index time)
  *   /zg-server [on|off|status]
  *
  * Default strategy (A): a single parent workspace that contains the related
@@ -36,9 +37,9 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { Type, type Static } from "typebox";
 
 const SEARCH_TIMEOUT_MS = 10 * 60 * 1000;
@@ -124,6 +125,103 @@ function ensureNestedRepoInclude(root: string): void {
 function statusEnabled(): boolean {
 	const value = process.env.ZVEC_GREP_PI_STATUS?.trim().toLowerCase();
 	return value !== "0" && value !== "false" && value !== "off";
+}
+
+type IndexedWorkspace = {
+	root: string;
+	name: string;
+	updatedTime: number;
+	embedding?: string;
+};
+
+/** Read `<root>/.zvec-grep/manifest.json` and describe the indexed workspace, if any. */
+function readIndexedWorkspace(root: string): IndexedWorkspace | undefined {
+	const manifestPath = join(root, ".zvec-grep", "manifest.json");
+	if (!existsSync(manifestPath)) return undefined;
+	try {
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+			name?: unknown;
+			updatedTime?: unknown;
+			embedding?: { model?: unknown } | null;
+		};
+		const model =
+			manifest.embedding && typeof manifest.embedding.model === "string"
+				? manifest.embedding.model
+				: undefined;
+		return {
+			root,
+			name:
+				typeof manifest.name === "string" && manifest.name.trim()
+					? manifest.name.trim()
+					: basename(root),
+			updatedTime: typeof manifest.updatedTime === "number" ? manifest.updatedTime : 0,
+			embedding: model,
+		};
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Discover indexed workspaces at `scanRoot` and its immediate children.
+ *
+ * zg keeps no workspace registry, so the portable signal is each workspace's
+ * `<root>/.zvec-grep/manifest.json`. Explicit `extraRoots` (configured strategy
+ * B roots) are checked even when they live outside the scan root.
+ */
+function discoverIndexedWorkspaces(
+	scanRoot: string,
+	extraRoots: readonly string[] = [],
+): IndexedWorkspace[] {
+	const candidates: string[] = [scanRoot, ...extraRoots];
+	try {
+		for (const entry of readdirSync(scanRoot, { withFileTypes: true })) {
+			if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+			if (entry.name === ".git" || entry.name === ".zvec-grep" || entry.name === "node_modules") {
+				continue;
+			}
+			candidates.push(join(scanRoot, entry.name));
+		}
+	} catch {
+		// Unreadable scan root: still probe the explicit roots.
+	}
+	const seen = new Set<string>();
+	const found: IndexedWorkspace[] = [];
+	for (const candidate of candidates.map((entry) => resolve(entry))) {
+		if (seen.has(candidate)) continue;
+		seen.add(candidate);
+		const workspace = readIndexedWorkspace(candidate);
+		if (workspace) found.push(workspace);
+	}
+	return found.sort((a, b) => b.updatedTime - a.updatedTime);
+}
+
+/** Compact age such as `12m ago`; `never` for a missing timestamp. */
+function formatAge(from: number, now = Date.now()): string {
+	if (!from) return "never";
+	const seconds = Math.max(0, Math.round((now - from) / 1000));
+	if (seconds < 60) return `${seconds}s ago`;
+	const minutes = Math.round(seconds / 60);
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.round(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	return `${Math.round(hours / 24)}d ago`;
+}
+
+function formatWorkspaceList(
+	workspaces: readonly IndexedWorkspace[],
+	scanRoot: string,
+	now = Date.now(),
+): string {
+	if (workspaces.length === 0) {
+		return `No indexed workspaces found under ${scanRoot}.\nRun /zg-index (or /zg-enable) to create one.`;
+	}
+	const lines = workspaces.map((workspace, index) => {
+		const model = workspace.embedding ? ` · ${workspace.embedding}` : "";
+		const age = workspace.updatedTime ? formatAge(workspace.updatedTime, now) : "never indexed";
+		return `${String(index + 1).padStart(2)}. ${workspace.name}  ${workspace.root}  updated ${age}${model}`;
+	});
+	return [`Indexed workspaces under ${scanRoot} (${workspaces.length})`, "", ...lines].join("\n");
 }
 
 /** Compare a parsed semver against 0.2.1 (the first "modern" CLI shape). */
@@ -824,6 +922,24 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerCommand("zg-status-all", {
+		description:
+			"List every indexed workspace under a scan root with its last-index time: /zg-status-all [<scan-root>] [--root <path>]",
+		handler: async (args, ctx) => {
+			const tokens = args.trim().split(/\s+/).filter(Boolean);
+			const rootFlag = tokens.indexOf("--root");
+			const flagValue = rootFlag === -1 ? undefined : tokens[rootFlag + 1]?.trim() || undefined;
+			const positional = tokens.find(
+				(token, index) => !token.startsWith("-") && index !== rootFlag + 1,
+			);
+			const scanRoot = resolve(
+				flagValue ?? positional ?? dirname(configuredWorkspaceRoot(ctx.cwd) ?? ctx.cwd),
+			);
+			const workspaces = discoverIndexedWorkspaces(scanRoot, configuredRoots(ctx.cwd));
+			ctx.ui.notify(formatWorkspaceList(workspaces, scanRoot), "info");
+		},
+	});
+
 	pi.registerCommand("zg-server", {
 		description: "Manage the shared zvec-grep MCP daemon: /zg-server [on|off|status]",
 		handler: async (args, ctx) => {
@@ -881,4 +997,8 @@ export {
 	configuredWorkspaceRoot,
 	parseIndexArgs,
 	formatRootResults,
+	readIndexedWorkspace,
+	discoverIndexedWorkspaces,
+	formatAge,
+	formatWorkspaceList,
 };
