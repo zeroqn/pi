@@ -4,27 +4,38 @@
  * A background loop learns reusable skills from sessions and maintains them
  * over time, in an agent-owned store surfaced to pi only by this extension's
  * `resources_discover` handler. Phase 1 built the store, config and surfacing;
- * phase 2 adds telemetry: usage is observed from skill reads and `/skill:name`
- * expansions, recorded in the ledger under a short lock, and shown by
- * `/rsi status`.
+ * phase 2 telemetry; phase 3 the trigger, gate and pass lock; phase 4 the pass
+ * itself: a deterministic digest plus the rendered transcript, handed to an
+ * in-process fork whose only tool is the store API, in observe-only mode by
+ * default.
  *
- * Spec: `~/.pi/.scratch/rsi/spec.md` (§2 shape, §4.7 telemetry, §4.8 config,
- * §7 acceptance). The store's governance invariants (§4.5) are enforced by
- * `store.ts`; nothing here writes outside the configured store root.
+ * Spec: `~/.pi/.scratch/rsi/spec.md` (§3 flow, §4.2 evidence, §4.3 the pass,
+ * §4.4 content standard, §4.5 invariants). The store and `skill-actions.ts`
+ * enforce the governance invariants; nothing here writes outside the store.
  */
 
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { getAgentDir, parseSkillBlock } from "@earendil-works/pi-coding-agent";
+import { buildSessionContext, convertToLlm, getAgentDir, parseSkillBlock, serializeConversation } from "@earendil-works/pi-coding-agent";
 import { loadConfig } from "./config.ts";
+import { buildDigest } from "./digest.ts";
+import { runLearningFork, type ForkSession } from "./fork.ts";
 import { discoverSkillNames } from "./frontmatter.ts";
 import { readLedger, recordUsage, takeStatusSnapshot } from "./ledger.ts";
+import { buildReport, emptyTally, formatPassNotification, tallyChanged } from "./pass.ts";
 import { projectKeyFor } from "./project-key.ts";
 import { toScanMessages } from "./prescan.ts";
-import { PassScheduler } from "./scheduler.ts";
+import { buildReviewPrompt } from "./prompt.ts";
+import type { PassOutcome } from "./scheduler.ts";
+import { PassScheduler, type PassReason } from "./scheduler.ts";
+import type { SkillActionDeps } from "./skill-actions.ts";
 import { SkillStore, type Scope } from "./store.ts";
-import { bashReadCandidates, formatStatus, summarizeStatus, UsageTracker } from "./telemetry.ts";
+import { bashReadCandidates, formatStatus, scopeKey, summarizeStatus, UsageTracker } from "./telemetry.ts";
+
+/** Bound on the rendered transcript, so one huge session cannot blow the fork's budget. */
+const MAX_TRANSCRIPT_CHARS = 120_000;
 
 export default function rsiExtension(pi: ExtensionAPI): void {
 	const agentDir = getAgentDir();
@@ -41,6 +52,8 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	let currentCwd = process.cwd();
 	// The pass fires on a timer, outside any handler, so it needs a live ctx.
 	let currentCtx: ExtensionContext | undefined;
+	// The running fork, so a session shutdown can abort it.
+	let activeFork: ForkSession | undefined;
 
 	const scheduler = new PassScheduler({
 		root: store.root,
@@ -48,9 +61,8 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		getActiveTools: () => pi.getActiveTools(),
 		getScanMessages: () => (currentCtx ? toScanMessages(currentCtx.sessionManager.getEntries()) : []),
 		runPass: async (reason) => {
-			// Phase 4 replaces this with the in-process learner fork.
-			if (reason === "learn") currentCtx?.ui.notify("rsi: the learner lands in phase 4; the trigger chain ran", "info");
-			return { ok: true, toolActions: 0 };
+			if (!currentCtx) return { ok: false, toolActions: 0 };
+			return executePass(reason, currentCtx);
 		},
 	});
 
@@ -81,7 +93,7 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 			store.ensureLayout();
 			store.sweepStaging();
 		} catch (error) {
-			ctx.ui.notify(`rsi: store unavailable at ${config.storePath} (${error instanceof Error ? error.message : String(error)})`, "warning");
+			ctx.ui.notify(`rsi: store unavailable at ${config.storePath} (${message(error)})`, "warning");
 		}
 	});
 
@@ -117,6 +129,21 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_shutdown", async () => {
 		scheduler.shutdown();
+		const fork = activeFork;
+		activeFork = undefined;
+		if (fork) {
+			try {
+				await fork.abort();
+			} catch {
+				// The fork is going away with the process either way.
+			}
+		}
+		// Aborting can strand a staged write; the next session sweeps it.
+		try {
+			store.sweepStaging();
+		} catch {
+			// Best effort, as on session start.
+		}
 		return undefined;
 	});
 
@@ -140,7 +167,7 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		return undefined;
 	});
 
-	// -- operator surface (only `status` exists until phase 6) -----------------
+	// -- operator surface (status and learn until phase 6) ---------------------
 
 	pi.registerCommand("rsi", {
 		description: "RSI: learned-skill status",
@@ -152,14 +179,11 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 			}
 			if (subcommand === "learn") {
 				const result = await scheduler.learnNow();
-				if (!result.ran) {
-					ctx.ui.notify(`rsi: learn skipped (${result.skipped})`, "info");
-				} else {
-					ctx.ui.notify(result.outcome.ok ? "rsi: learn pass complete" : "rsi: learn pass failed", result.outcome.ok ? "info" : "warning");
-				}
+				// A ran pass reports its own outcome; only a skip needs saying here.
+				if (!result.ran) ctx.ui.notify(`rsi: learn skipped (${result.skipped})`, "info");
 				return;
 			}
-			ctx.ui.notify(`rsi: unknown subcommand "${subcommand}"; phases 1–3 implement /rsi status and /rsi learn`, "warning");
+			ctx.ui.notify(`rsi: unknown subcommand "${subcommand}"; phases 1–4 implement /rsi status and /rsi learn`, "warning");
 		},
 	});
 
@@ -182,11 +206,100 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 			"info",
 		);
 	}
+
+	// -- the pass (spec §4.2–§4.4) ---------------------------------------------
+
+	async function executePass(reason: PassReason, ctx: ExtensionContext): Promise<PassOutcome> {
+		const entries = ctx.sessionManager.getEntries();
+
+		let transcript: string;
+		try {
+			const context = buildSessionContext(entries, ctx.sessionManager.getLeafId());
+			transcript = serializeConversation(convertToLlm(context.messages)).slice(0, MAX_TRANSCRIPT_CHARS);
+		} catch (error) {
+			transcript = `(transcript unavailable: ${message(error)})`;
+		}
+
+		const digest = buildDigest(toScanMessages(entries), { gitStat: gitDiffStat(ctx.cwd) });
+		const projectKey = projectKeyFor(ctx.cwd);
+		const scope: Scope = projectKey ? { project: projectKey } : "general";
+		const mode = config.observeOnly ? "observe" : "write";
+
+		const tally = emptyTally();
+		const softAttempts = new Map<string, number>();
+		const deps: SkillActionDeps = {
+			store,
+			root: store.root,
+			scope,
+			mode,
+			softAttempts,
+			onAction: (action, _name, held) => {
+				if (held) tally.proposed++;
+				else if (action === "create") tally.created++;
+				else if (action === "patch") tally.patched++;
+				else if (action === "archive") tally.archived++;
+			},
+			onHardHit: (hits) => {
+				tally.hardHits.push(...hits);
+			},
+			now: () => new Date(),
+		};
+
+		const prompt = buildReviewPrompt({ scope: scopeKey(scope), mode, digest, transcript });
+		const outcome = await runLearningFork({
+			cwd: ctx.cwd,
+			agentDir,
+			config,
+			prompt,
+			deps,
+			fallbackModel: ctx.model,
+			onSession: (session) => {
+				activeFork = session;
+			},
+		});
+		activeFork = undefined;
+		tally.error = outcome.error;
+
+		let reportNote = "";
+		if (tallyChanged(tally) > 0 || tally.hardHits.length > 0 || outcome.error) {
+			try {
+				const dir = store.writeReport(
+					buildReport(tally, {
+						at: new Date().toISOString(),
+						reason,
+						scope: scopeKey(scope),
+						mode,
+						model: outcome.modelLabel,
+					}),
+				);
+				reportNote = ` (${path.relative(store.root, dir)})`;
+			} catch {
+				// The report is best effort; a pass never fails over its audit record.
+			}
+		}
+
+		const notification = formatPassNotification(tally);
+		if (notification) ctx.ui.notify(`${notification.line}${reportNote}`, notification.type);
+
+		return { ok: outcome.ok, toolActions: outcome.toolActions };
+	}
 }
 
 function absoluteAgainst(target: string, cwd: string): string {
 	if (target.length === 0) return "";
 	return path.isAbsolute(target) ? target : path.resolve(cwd, target);
+}
+
+function gitDiffStat(cwd: string): string | undefined {
+	try {
+		const out = execFileSync("git", ["-C", cwd, "diff", "--stat"], {
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"],
+		}).trim();
+		return out.length > 0 ? out.slice(0, 4_000) : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function countEntries(dir: string): number {
@@ -195,4 +308,8 @@ function countEntries(dir: string): number {
 	} catch {
 		return 0;
 	}
+}
+
+function message(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }

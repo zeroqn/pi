@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { ensureLedger, ledgerLockPath, ledgerPath, readLedger, recordUsage, setLastPassAt, takeStatusSnapshot, withLedgerLock, writeLedger } from "../ledger.ts";
+import { ensureLedger, ensureSkillEntry, ledgerLockPath, ledgerPath, readLedger, recordUsage, setLastPassAt, setSkillState, takeStatusSnapshot, withLedgerLock, writeLedger } from "../ledger.ts";
 
 function tempRoot(t) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "rsi-ledger-"));
@@ -133,4 +133,23 @@ test("setLastPassAt advances and restores the interval clock", async (t) => {
 
 	assert.equal(await setLastPassAt(root, null), true);
 	assert.equal(readLedger(root).ledger.last_pass_at, null);
+});
+
+test("ensureSkillEntry records a skill without counting a use", async (t) => {
+	const root = tempRoot(t);
+	await ensureSkillEntry(root, { name: "fresh", scope: "github.com/acme/app", at: "2026-09-14T00:00:00.000Z" });
+	const entry = readLedger(root).ledger.skills.fresh;
+	assert.equal(entry.first_seen_at, "2026-09-14T00:00:00.000Z");
+	assert.equal(entry.scope, "github.com/acme/app");
+	assert.equal(entry.state, "active");
+	assert.equal(entry.use_count, undefined);
+
+	await ensureSkillEntry(root, { name: "fresh", scope: "general", at: "2027-01-01T00:00:00.000Z" });
+	assert.equal(readLedger(root).ledger.skills.fresh.first_seen_at, "2026-09-14T00:00:00.000Z", "first_seen_at is not rewritten");
+});
+
+test("setSkillState flips the lifecycle state", async (t) => {
+	const root = tempRoot(t);
+	await setSkillState(root, "retired", "archived");
+	assert.equal(readLedger(root).ledger.skills.retired.state, "archived");
 });

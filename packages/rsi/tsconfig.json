@@ -16,13 +16,19 @@
 	"include": [
 		"index.ts",
 		"config.ts",
+		"content-scan.ts",
+		"digest.ts",
+		"fork.ts",
 		"frontmatter.ts",
 		"ledger.ts",
 		"pass-lock.ts",
+		"pass.ts",
 		"paths.ts",
 		"prescan.ts",
 		"project-key.ts",
+		"prompt.ts",
 		"scheduler.ts",
+		"skill-actions.ts",
 		"store.ts",
 		"telemetry.ts"
 	]

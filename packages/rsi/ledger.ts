@@ -189,6 +189,37 @@ export async function recordUsage(root: string, usage: UsageRecord): Promise<boo
 	return written ?? false;
 }
 
+/**
+ * Record that a skill exists without counting a use: called when the learner
+ * publishes one, so the ledger knows it before it is ever read.
+ */
+export async function ensureSkillEntry(root: string, entry: { name: string; scope: string; at?: string }): Promise<boolean> {
+	const written = await withLedgerLock(root, () => {
+		const { ledger } = readLedger(root);
+		const existing = ledger.skills[entry.name] ?? {};
+		existing.first_seen_at ??= entry.at ?? new Date().toISOString();
+		existing.scope = entry.scope;
+		existing.state ??= "active";
+		ledger.skills[entry.name] = existing;
+		writeLedger(root, ledger);
+		return true;
+	});
+	return written ?? false;
+}
+
+/** Mark a skill active or archived in the ledger after a store move. */
+export async function setSkillState(root: string, name: string, state: "active" | "archived"): Promise<boolean> {
+	const written = await withLedgerLock(root, () => {
+		const { ledger } = readLedger(root);
+		const entry = ledger.skills[name] ?? {};
+		entry.state = state;
+		ledger.skills[name] = entry;
+		writeLedger(root, ledger);
+		return true;
+	});
+	return written ?? false;
+}
+
 export interface StatusSnapshot {
 	previous?: StatusCounts;
 	lastStatusAt?: string;

@@ -18,6 +18,8 @@ export interface ScanToolCall {
 export interface ScanToolResult {
 	toolName: string;
 	isError: boolean;
+	/** Result text, kept for the digest's error excerpts. */
+	text?: string;
 }
 
 /** A session message reduced to what the scan needs, so it is testable alone. */
@@ -78,7 +80,11 @@ export function toScanMessages(entries: readonly unknown[]): ScanMessage[] {
 		if (role === "toolResult") {
 			messages.push({
 				role,
-				toolResult: { toolName: typeof message.toolName === "string" ? message.toolName : "", isError: message.isError === true },
+				toolResult: {
+					toolName: typeof message.toolName === "string" ? message.toolName : "",
+					isError: message.isError === true,
+					text: textOf(message.content),
+				},
 			});
 		}
 	}

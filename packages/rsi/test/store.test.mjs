@@ -244,3 +244,74 @@ test("ensureLayout creates the documented directories and ledger", (t) => {
 	}
 	assert.equal(fs.existsSync(path.join(store.root, "index.json")), true);
 });
+
+// ---------------------------------------------------------------------------
+// Proposals, patches and retirement — the store API's other write paths.
+// ---------------------------------------------------------------------------
+
+test("propose writes a reviewable directory and leaves the live store empty", (t) => {
+	const store = tempStore(t);
+	const result = store.propose(
+		{ ...basic("held-skill"), files: [{ path: "scripts/run.sh", content: "#!/bin/sh\ntrue\n" }] },
+		{ reason: "ships a script", mode: "write" },
+	);
+	assert.equal(result.ok, true);
+
+	assert.equal(fs.existsSync(path.join(result.dir, "skill", "SKILL.md")), true);
+	assert.equal(fs.existsSync(path.join(result.dir, "skill", "scripts", "run.sh")), true);
+	const record = JSON.parse(fs.readFileSync(path.join(result.dir, "proposal.json"), "utf8"));
+	assert.equal(record.name, "held-skill");
+	assert.equal(record.reason, "ships a script");
+	assert.equal(record.mode, "write");
+	assert.equal(store.findByName("held-skill"), undefined, "a proposal is not a live skill");
+});
+
+test("readSkillContent returns the document and its payload paths", (t) => {
+	const store = tempStore(t);
+	store.create({ ...basic("readable-skill"), files: [{ path: "references/notes.md", content: "# Notes\n" }] });
+
+	const found = store.readSkillContent("readable-skill");
+	assert.ok(found);
+	assert.match(found.content, /name: "readable-skill"/);
+	assert.deepEqual(found.files, ["references/notes.md"]);
+	assert.deepEqual(store.findByName("readable-skill").metadata.files, ["references/notes.md"], "frontmatter declares the payload");
+	assert.equal(store.readSkillContent("missing"), undefined);
+});
+
+test("patch rewrites a skill and keeps the previous directory in the archive", (t) => {
+	const store = tempStore(t);
+	const created = store.create(basic("patchable-skill"));
+	assert.equal(created.ok, true);
+	const createdAt = store.findByName("patchable-skill").metadata.created_at;
+
+	const patched = store.patch("patchable-skill", { description: "updated description", body: "## How\n\nNew body.\n" });
+	assert.equal(patched.ok, true);
+
+	const skill = store.findByName("patchable-skill");
+	assert.equal(skill.description, "updated description");
+	assert.equal(skill.metadata.created_at, createdAt, "created_at survives a patch");
+	assert.match(fs.readFileSync(skill.filePath, "utf8"), /New body\./);
+
+	const archived = fs.readdirSync(store.archiveRoot);
+	assert.equal(archived.length, 1, "the old directory is preserved, not deleted");
+});
+
+test("archive moves a skill out of every surfaced path", (t) => {
+	const store = tempStore(t);
+	const created = store.create(basic("retire-me"));
+	assert.equal(created.ok, true);
+
+	const result = store.archive("retire-me");
+	assert.equal(result.ok, true);
+	assert.equal(fs.existsSync(result.dir), true);
+	assert.equal(store.findByName("retire-me"), undefined);
+	assert.equal(fs.existsSync(path.join(store.generalDir(), "retire-me")), false);
+	assert.equal(store.archive("retire-me").ok, false, "archiving again is refused");
+});
+
+test("writeReport writes an audit record under reports", (t) => {
+	const store = tempStore(t);
+	const dir = store.writeReport("# report\n");
+	assert.equal(isInside(path.join(store.root, "reports"), dir), true);
+	assert.equal(fs.readFileSync(path.join(dir, "REPORT.md"), "utf8"), "# report\n");
+});

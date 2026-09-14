@@ -65,6 +65,23 @@ export interface StagedSkill {
 export type StageResult = { ok: true; staged: StagedSkill } | { ok: false; reason: string };
 export type PublishResult = { ok: true; skill: LearnedSkill } | { ok: false; reason: string };
 export type CreateResult = PublishResult;
+export type ProposeResult = { ok: true; dir: string } | { ok: false; reason: string };
+export type ArchiveResult = { ok: true; dir: string } | { ok: false; reason: string };
+
+export interface ProposalMeta {
+	reason: string;
+	kind?: string;
+	mode?: string;
+	createdAt?: string;
+}
+
+export interface SkillContent {
+	skill: LearnedSkill;
+	/** The raw SKILL.md text. */
+	content: string;
+	/** Payload files relative to the skill directory, sorted. */
+	files: string[];
+}
 
 export const MAX_SKILL_NAME_LENGTH = 64;
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -74,6 +91,26 @@ const SKILL_FILE_NAME = "SKILL.md";
 /** True when `name` satisfies the Agent Skills name rules. */
 export function isValidSkillName(name: string): boolean {
 	return name.length >= 1 && name.length <= MAX_SKILL_NAME_LENGTH && SKILL_NAME.test(name);
+}
+
+/** The frontmatter a learned skill ships with; shared by every write path. */
+export function buildSkillFrontmatter(input: {
+	name: string;
+	description: string;
+	scope: Scope;
+	metadata?: Record<string, unknown>;
+	createdAt?: string;
+	/** Payload paths the skill ships, declared in frontmatter so a reader sees them. */
+	files?: readonly string[];
+}): Record<string, unknown> {
+	const metadata: Record<string, unknown> = { ...(input.metadata ?? {}) };
+	metadata.origin = "learned";
+	if (typeof metadata.created_at !== "string") {
+		metadata.created_at = input.createdAt ?? new Date().toISOString();
+	}
+	metadata.scope = input.scope === "general" ? "general" : input.scope.project;
+	if (input.files && input.files.length > 0) metadata.files = [...input.files];
+	return { name: input.name, description: input.description, metadata };
 }
 
 export class SkillStore {
@@ -187,24 +224,7 @@ export class SkillStore {
 
 		try {
 			fs.mkdirSync(stagingDir, { recursive: true });
-			const frontmatter: Record<string, unknown> = {
-				name: input.name,
-				description: input.description,
-				metadata: {
-					...(input.metadata ?? {}),
-					origin: "learned",
-					created_at: new Date().toISOString(),
-					scope: input.scope === "general" ? "general" : input.scope.project,
-				},
-			};
-			fs.writeFileSync(path.join(stagingDir, SKILL_FILE_NAME), serializeFrontmatter(frontmatter, input.body));
-
-			for (const file of input.files ?? []) {
-				const target = path.join(stagingDir, file.path);
-				assertInside(stagingDir, target);
-				fs.mkdirSync(path.dirname(target), { recursive: true });
-				fs.writeFileSync(target, file.content);
-			}
+			this.writeSkillFiles(stagingDir, buildSkillFrontmatter({ name: input.name, description: input.description, scope: input.scope, metadata: input.metadata, files: (input.files ?? []).map((file) => file.path) }), input.body, input.files);
 		} catch (error) {
 			this.removeQuietly(path.join(this.stagingRoot, token));
 			return { ok: false, reason: `staging write failed: ${error instanceof Error ? error.message : String(error)}` };
@@ -270,6 +290,142 @@ export class SkillStore {
 			removed++;
 		}
 		return removed;
+	}
+
+	// -- proposals, patches, retirement ---------------------------------------
+
+	/**
+	 * Write a pending change under `proposals/` instead of the live store: what
+	 * observe-only produces, and what a script-bearing skill is held as. The
+	 * directory holds the exact files that would be published plus `proposal.json`.
+	 */
+	propose(input: NewSkillInput, meta: ProposalMeta): ProposeResult {
+		if (!isValidSkillName(input.name)) return { ok: false, reason: `invalid skill name "${input.name}"` };
+		if (input.description.trim().length === 0) return { ok: false, reason: "description must not be empty" };
+		if (input.body.trim().length === 0) return { ok: false, reason: "body must not be empty" };
+		for (const file of input.files ?? []) {
+			const fileError = validateProposalPath(file.path);
+			if (fileError) return { ok: false, reason: fileError };
+		}
+
+		this.ensureLayout();
+		const proposalsDir = path.join(this.root, "proposals");
+		const dir = this.uniqueChildDir(proposalsDir, input.name);
+		assertInside(proposalsDir, dir);
+
+		try {
+			this.writeSkillFiles(path.join(dir, "skill"), buildSkillFrontmatter({ name: input.name, description: input.description, scope: input.scope, metadata: input.metadata, files: (input.files ?? []).map((file) => file.path) }), input.body, input.files);
+			const record = {
+				kind: meta.kind ?? "skill",
+				name: input.name,
+				scope: input.scope === "general" ? "general" : input.scope.project,
+				reason: meta.reason,
+				mode: meta.mode,
+				created_at: meta.createdAt ?? new Date().toISOString(),
+			};
+			fs.writeFileSync(path.join(dir, "proposal.json"), `${JSON.stringify(record, null, 2)}\n`);
+		} catch (error) {
+			this.removeQuietly(dir);
+			return { ok: false, reason: `proposal write failed: ${error instanceof Error ? error.message : String(error)}` };
+		}
+		return { ok: true, dir };
+	}
+
+	/** Read a skill's SKILL.md and list its payload files, for the store API. */
+	readSkillContent(name: string): SkillContent | undefined {
+		const skill = this.findByName(name);
+		if (!skill) return undefined;
+		let content: string;
+		try {
+			content = fs.readFileSync(skill.filePath, "utf8");
+		} catch {
+			return undefined;
+		}
+		const files = this.listFiles(skill.dir).filter((file) => file !== SKILL_FILE_NAME).sort();
+		return { skill, content, files };
+	}
+
+	/**
+	 * Rewrite a skill in place, staged and published atomically. The previous
+	 * directory is moved into `.archive/` first, so a patch is never destructive
+	 * and can be reverted even before the curator's snapshots exist.
+	 */
+	patch(name: string, changes: { description?: string; body?: string; files?: SkillFile[] }): PublishResult {
+		const existing = this.findByName(name);
+		if (!existing) return { ok: false, reason: `no learned skill named "${name}"` };
+
+		const current = this.readSkillContent(name);
+		if (!current) return { ok: false, reason: `could not read "${name}"` };
+		const parsed = parseFrontmatter(current.content);
+		const body = changes.body ?? parsed.body;
+		const description =
+			changes.description ?? (typeof parsed.frontmatter.description === "string" ? parsed.frontmatter.description : existing.description);
+		const metadata = isPlainObject(parsed.frontmatter.metadata) ? parsed.frontmatter.metadata : existing.metadata;
+		const files = changes.files ?? this.readPayloadFiles(existing.dir);
+
+		if (description.trim().length === 0) return { ok: false, reason: "description must not be empty" };
+		if (body.trim().length === 0) return { ok: false, reason: "body must not be empty" };
+		for (const file of files) {
+			const fileError = validatePayloadPath(file.path);
+			if (fileError) return { ok: false, reason: fileError };
+		}
+
+		this.ensureLayout();
+		const token = randomUUID();
+		const stagingDir = path.join(this.stagingRoot, token, name);
+		assertInside(this.stagingRoot, stagingDir);
+		try {
+			this.writeSkillFiles(stagingDir, buildSkillFrontmatter({ name, description, scope: existing.scope, metadata, files: files.map((file) => file.path) }), body, files);
+		} catch (error) {
+			this.removeQuietly(path.join(this.stagingRoot, token));
+			return { ok: false, reason: `staging write failed: ${error instanceof Error ? error.message : String(error)}` };
+		}
+
+		const backup = this.uniqueChildDir(this.archiveRoot, name);
+		try {
+			fs.mkdirSync(this.archiveRoot, { recursive: true });
+			fs.renameSync(existing.dir, backup);
+			fs.renameSync(stagingDir, existing.dir);
+		} catch (error) {
+			try {
+				if (!fs.existsSync(existing.dir) && fs.existsSync(backup)) fs.renameSync(backup, existing.dir);
+			} catch {
+				// Leave the backup in the archive; nothing was lost either way.
+			}
+			this.removeQuietly(path.join(this.stagingRoot, token));
+			return { ok: false, reason: `patch failed: ${error instanceof Error ? error.message : String(error)}` };
+		}
+
+		this.removeQuietly(path.join(this.stagingRoot, token));
+		const skill = this.readSkill(existing.dir, existing.scope);
+		return skill ? { ok: true, skill } : { ok: false, reason: "patched skill could not be read back" };
+	}
+
+	/** Move a skill out of every surfaced path. Never deletes. */
+	archive(name: string): ArchiveResult {
+		const skill = this.findByName(name);
+		if (!skill) return { ok: false, reason: `no learned skill named "${name}"` };
+		const target = this.uniqueChildDir(this.archiveRoot, name);
+		assertInside(this.archiveRoot, target);
+		try {
+			fs.mkdirSync(this.archiveRoot, { recursive: true });
+			fs.renameSync(skill.dir, target);
+		} catch (error) {
+			return { ok: false, reason: `archive failed: ${error instanceof Error ? error.message : String(error)}` };
+		}
+		return { ok: true, dir: target };
+	}
+
+	/** Write an audit record under `reports/<timestamp>/REPORT.md`. Returns its directory. */
+	writeReport(content: string): string {
+		this.ensureLayout();
+		const reportsDir = path.join(this.root, "reports");
+		const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..*$/, "").replace("T", "-");
+		const dir = this.uniqueChildDir(reportsDir, stamp);
+		assertInside(reportsDir, dir);
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(path.join(dir, "REPORT.md"), content);
+		return dir;
 	}
 
 	// -- internals ------------------------------------------------------------
@@ -353,6 +509,60 @@ export class SkillStore {
 		};
 	}
 
+	private writeSkillFiles(dir: string, frontmatter: Record<string, unknown>, body: string, files: readonly SkillFile[] | undefined): void {
+		assertInside(this.root, dir);
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(path.join(dir, SKILL_FILE_NAME), serializeFrontmatter(frontmatter, body));
+		for (const file of files ?? []) {
+			const target = path.join(dir, file.path);
+			assertInside(dir, target);
+			fs.mkdirSync(path.dirname(target), { recursive: true });
+			fs.writeFileSync(target, file.content);
+		}
+	}
+
+	/** Relative paths of every non-hidden file beneath `dir`, recursively. */
+	private listFiles(dir: string, prefix = ""): string[] {
+		let entries: fs.Dirent[];
+		try {
+			entries = fs.readdirSync(path.join(dir, prefix), { withFileTypes: true });
+		} catch {
+			return [];
+		}
+		const files: string[] = [];
+		for (const entry of entries) {
+			if (entry.name.startsWith(".")) continue;
+			const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+			if (entry.isDirectory()) files.push(...this.listFiles(dir, relative));
+			else if (entry.isFile()) files.push(relative);
+		}
+		return files;
+	}
+
+	private readPayloadFiles(dir: string): SkillFile[] {
+		const files: SkillFile[] = [];
+		for (const relative of this.listFiles(dir)) {
+			if (relative === SKILL_FILE_NAME) continue;
+			try {
+				files.push({ path: relative, content: fs.readFileSync(path.join(dir, relative), "utf8") });
+			} catch {
+				// Unreadable payloads are omitted from a patch rather than fatal.
+			}
+		}
+		return files;
+	}
+
+	/** A child directory that does not collide: `<name>`, then `<name>-<stamp>`, then a token. */
+	private uniqueChildDir(parent: string, name: string): string {
+		const base = path.join(parent, name);
+		assertInside(parent, base);
+		if (!fs.existsSync(base)) return base;
+		const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..*$/, "").replace("T", "-");
+		const dated = path.join(parent, `${name}-${stamp}`);
+		if (!fs.existsSync(dated)) return dated;
+		return path.join(parent, `${name}-${randomUUID().slice(0, 8)}`);
+	}
+
 	private removeQuietly(target: string): void {
 		try {
 			fs.rmSync(target, { recursive: true, force: true });
@@ -389,4 +599,21 @@ export function validatePayloadPath(relative: string): string | undefined {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * A payload path destined for a proposal rather than the live store. Looser than
+ * {@link validatePayloadPath} on purpose: an out-of-whitelist file is exactly
+ * what a proposal exists to carry, so only traversal, dotfiles and absolute
+ * paths are refused here.
+ */
+export function validateProposalPath(relative: string): string | undefined {
+	if (relative.trim().length === 0) return "payload path must not be empty";
+	if (path.isAbsolute(relative) || relative.includes("\\")) return `payload path must be relative: ${relative}`;
+	const segments = relative.split("/");
+	if (segments.some((segment) => segment.length === 0 || segment === "." || segment === "..")) {
+		return `payload path contains an empty or traversing segment: ${relative}`;
+	}
+	if (segments.some((segment) => segment.startsWith("."))) return `payload path may not contain dotfiles: ${relative}`;
+	return undefined;
 }
