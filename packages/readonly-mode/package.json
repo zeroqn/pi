@@ -1,0 +1,25 @@
+{
+	"name": "readonly-mode",
+	"version": "0.1.0",
+	"description": "Query-only mode for pi: a /readonly toggle that removes the writer tools, gates bash commands, and injects a read-only prompt.",
+	"type": "module",
+	"scripts": {
+		"test": "node --test"
+	},
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"extension",
+		"read-only"
+	],
+	"license": "MIT",
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*"
+	},
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	}
+}
