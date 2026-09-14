@@ -67,12 +67,25 @@ export type PublishResult = { ok: true; skill: LearnedSkill } | { ok: false; rea
 export type CreateResult = PublishResult;
 export type ProposeResult = { ok: true; dir: string } | { ok: false; reason: string };
 export type ArchiveResult = { ok: true; dir: string } | { ok: false; reason: string };
+export type PatchPlan = { ok: true; input: NewSkillInput } | { ok: false; reason: string };
+
+/** What a proposal is waiting for: a new skill, an edit, a retirement, or a promotion. */
+export type ProposalKind = "skill" | "patch" | "archive" | "promotion";
 
 export interface ProposalMeta {
 	reason: string;
-	kind?: string;
+	kind?: ProposalKind;
 	mode?: string;
 	createdAt?: string;
+}
+
+/** A proposal may carry content (a skill or a patch) or just an operation (archive, promotion). */
+export interface ProposalInput {
+	name: string;
+	description?: string;
+	body?: string;
+	scope?: Scope;
+	files?: SkillFile[];
 }
 
 export interface SkillContent {
@@ -191,6 +204,11 @@ export class SkillStore {
 		return this.reservedNames.has(name) || this.findByName(name) !== undefined;
 	}
 
+	/** Names reserved in the human tier, so a pass can propose instead of colliding. */
+	humanTierNames(): string[] {
+		return [...this.reservedNames];
+	}
+
 	// -- writes ---------------------------------------------------------------
 
 	/**
@@ -299,13 +317,18 @@ export class SkillStore {
 	 * observe-only produces, and what a script-bearing skill is held as. The
 	 * directory holds the exact files that would be published plus `proposal.json`.
 	 */
-	propose(input: NewSkillInput, meta: ProposalMeta): ProposeResult {
+	propose(input: ProposalInput, meta: ProposalMeta): ProposeResult {
 		if (!isValidSkillName(input.name)) return { ok: false, reason: `invalid skill name "${input.name}"` };
-		if (input.description.trim().length === 0) return { ok: false, reason: "description must not be empty" };
-		if (input.body.trim().length === 0) return { ok: false, reason: "body must not be empty" };
-		for (const file of input.files ?? []) {
-			const fileError = validateProposalPath(file.path);
-			if (fileError) return { ok: false, reason: fileError };
+
+		const hasContent = typeof input.body === "string" && input.body.trim().length > 0;
+		if (hasContent) {
+			if (typeof input.description !== "string" || input.description.trim().length === 0) {
+				return { ok: false, reason: "a proposed skill needs a description" };
+			}
+			for (const file of input.files ?? []) {
+				const fileError = validateProposalPath(file.path);
+				if (fileError) return { ok: false, reason: fileError };
+			}
 		}
 
 		this.ensureLayout();
@@ -314,11 +337,20 @@ export class SkillStore {
 		assertInside(proposalsDir, dir);
 
 		try {
-			this.writeSkillFiles(path.join(dir, "skill"), buildSkillFrontmatter({ name: input.name, description: input.description, scope: input.scope, metadata: input.metadata, files: (input.files ?? []).map((file) => file.path) }), input.body, input.files);
+			fs.mkdirSync(dir, { recursive: true });
+			if (hasContent) {
+				const scope: Scope = input.scope ?? "general";
+				this.writeSkillFiles(
+					path.join(dir, "skill"),
+					buildSkillFrontmatter({ name: input.name, description: input.description as string, scope, files: (input.files ?? []).map((file) => file.path) }),
+					input.body as string,
+					input.files,
+				);
+			}
 			const record = {
-				kind: meta.kind ?? "skill",
+				kind: meta.kind ?? (hasContent ? "skill" : "archive"),
 				name: input.name,
-				scope: input.scope === "general" ? "general" : input.scope.project,
+				scope: input.scope ? (input.scope === "general" ? "general" : input.scope.project) : undefined,
 				reason: meta.reason,
 				mode: meta.mode,
 				created_at: meta.createdAt ?? new Date().toISOString(),
@@ -346,14 +378,14 @@ export class SkillStore {
 	}
 
 	/**
-	 * Rewrite a skill in place, staged and published atomically. The previous
-	 * directory is moved into `.archive/` first, so a patch is never destructive
-	 * and can be reverted even before the curator's snapshots exist.
+	 * Resolve the content a patch would produce, without writing anything. Shared
+	 * by {@link patch} and by observe-only, which proposes the result instead of
+	 * applying it. Pins are enforced at apply time, so a pinned skill can still be
+	 * *proposed* for a change.
 	 */
-	patch(name: string, changes: { description?: string; body?: string; files?: SkillFile[] }): PublishResult {
+	planPatch(name: string, changes: { description?: string; body?: string; files?: SkillFile[] }): PatchPlan {
 		const existing = this.findByName(name);
 		if (!existing) return { ok: false, reason: `no learned skill named "${name}"` };
-
 		const current = this.readSkillContent(name);
 		if (!current) return { ok: false, reason: `could not read "${name}"` };
 		const parsed = parseFrontmatter(current.content);
@@ -369,13 +401,34 @@ export class SkillStore {
 			const fileError = validatePayloadPath(file.path);
 			if (fileError) return { ok: false, reason: fileError };
 		}
+		return { ok: true, input: { name, description, body, scope: existing.scope, metadata, files } };
+	}
+
+	/**
+	 * Rewrite a skill in place, staged and published atomically. The previous
+	 * directory is moved into `.archive/` first, so a patch is never destructive
+	 * and can be reverted even before the curator's snapshots exist.
+	 */
+	patch(name: string, changes: { description?: string; body?: string; files?: SkillFile[] }): PublishResult {
+		const existing = this.findByName(name);
+		if (!existing) return { ok: false, reason: `no learned skill named "${name}"` };
+		if (existing.pinned) return { ok: false, reason: `"${name}" is pinned and may not be patched` };
+
+		const planned = this.planPatch(name, changes);
+		if (!planned.ok) return { ok: false, reason: planned.reason };
+		const { input } = planned;
 
 		this.ensureLayout();
 		const token = randomUUID();
 		const stagingDir = path.join(this.stagingRoot, token, name);
 		assertInside(this.stagingRoot, stagingDir);
 		try {
-			this.writeSkillFiles(stagingDir, buildSkillFrontmatter({ name, description, scope: existing.scope, metadata, files: files.map((file) => file.path) }), body, files);
+			this.writeSkillFiles(
+				stagingDir,
+				buildSkillFrontmatter({ name: input.name, description: input.description, scope: input.scope, metadata: input.metadata, files: (input.files ?? []).map((file) => file.path) }),
+				input.body,
+				input.files,
+			);
 		} catch (error) {
 			this.removeQuietly(path.join(this.stagingRoot, token));
 			return { ok: false, reason: `staging write failed: ${error instanceof Error ? error.message : String(error)}` };
@@ -405,6 +458,7 @@ export class SkillStore {
 	archive(name: string): ArchiveResult {
 		const skill = this.findByName(name);
 		if (!skill) return { ok: false, reason: `no learned skill named "${name}"` };
+		if (skill.pinned) return { ok: false, reason: `"${name}" is pinned and may not be archived` };
 		const target = this.uniqueChildDir(this.archiveRoot, name);
 		assertInside(this.archiveRoot, target);
 		try {
@@ -416,14 +470,32 @@ export class SkillStore {
 		return { ok: true, dir: target };
 	}
 
-	/** Write an audit record under `reports/<timestamp>/REPORT.md`. Returns its directory. */
-	writeReport(content: string): string {
+	/** Copy a skill's directory into `destParent`, for the exact revert a merge needs. */
+	snapshot(name: string, destParent: string): string | undefined {
+		const skill = this.findByName(name);
+		if (!skill) return undefined;
+		const dest = path.join(destParent, name);
+		assertInside(this.root, dest);
+		assertInside(this.root, destParent);
+		fs.mkdirSync(destParent, { recursive: true });
+		fs.cpSync(skill.dir, dest, { recursive: true });
+		return dest;
+	}
+
+	/** Create a fresh report directory under `reports/<timestamp>/`. */
+	newReportDir(): string {
 		this.ensureLayout();
 		const reportsDir = path.join(this.root, "reports");
 		const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..*$/, "").replace("T", "-");
 		const dir = this.uniqueChildDir(reportsDir, stamp);
 		assertInside(reportsDir, dir);
 		fs.mkdirSync(dir, { recursive: true });
+		return dir;
+	}
+
+	/** Write an audit record under `reports/<timestamp>/REPORT.md`. Returns its directory. */
+	writeReport(content: string): string {
+		const dir = this.newReportDir();
 		fs.writeFileSync(path.join(dir, "REPORT.md"), content);
 		return dir;
 	}

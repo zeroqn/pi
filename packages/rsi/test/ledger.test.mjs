@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { ensureLedger, ensureSkillEntry, ledgerLockPath, ledgerPath, readLedger, recordUsage, setLastPassAt, setSkillState, takeStatusSnapshot, withLedgerLock, writeLedger } from "../ledger.ts";
+import { ensureLedger, ensureSkillEntry, ledgerLockPath, ledgerPath, readLedger, recordUsage, setLastCurateAt, setLastPassAt, setSkillState, takeStatusSnapshot, withLedgerLock, writeLedger } from "../ledger.ts";
 
 function tempRoot(t) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "rsi-ledger-"));
@@ -152,4 +152,12 @@ test("setSkillState flips the lifecycle state", async (t) => {
 	const root = tempRoot(t);
 	await setSkillState(root, "retired", "archived");
 	assert.equal(readLedger(root).ledger.skills.retired.state, "archived");
+});
+
+test("setLastCurateAt advances and clears the curation clock", async (t) => {
+	const root = tempRoot(t);
+	await setLastCurateAt(root, "2026-09-14T12:00:00.000Z");
+	assert.equal(readLedger(root).ledger.last_curate_at, "2026-09-14T12:00:00.000Z");
+	await setLastCurateAt(root, null);
+	assert.equal(readLedger(root).ledger.last_curate_at, undefined);
 });

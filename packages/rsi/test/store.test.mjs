@@ -315,3 +315,43 @@ test("writeReport writes an audit record under reports", (t) => {
 	assert.equal(isInside(path.join(store.root, "reports"), dir), true);
 	assert.equal(fs.readFileSync(path.join(dir, "REPORT.md"), "utf8"), "# report\n");
 });
+
+test("patch and archive refuse a pinned skill", (t) => {
+	const store = tempStore(t);
+	store.create({ ...basic("pinned-skill"), metadata: { pinned: true } });
+	assert.equal(store.findByName("pinned-skill").pinned, true);
+
+	assert.equal(store.patch("pinned-skill", { body: "## How\n\nnew\n" }).ok, false);
+	assert.equal(store.archive("pinned-skill").ok, false);
+	assert.equal(store.findByName("pinned-skill").pinned, true);
+});
+
+test("snapshot copies a skill's directory for an exact revert", (t) => {
+	const store = tempStore(t);
+	store.create({ ...basic("snap-me"), files: [{ path: "references/a.md", content: "a" }] });
+
+	const snapshots = path.join(store.root, "reports", "20260914-000000", "snapshots");
+	const dir = store.snapshot("snap-me", snapshots);
+	assert.equal(dir, path.join(snapshots, "snap-me"));
+	assert.equal(fs.existsSync(path.join(dir, "SKILL.md")), true);
+	assert.equal(fs.existsSync(path.join(dir, "references", "a.md")), true);
+	assert.equal(store.snapshot("missing", snapshots), undefined);
+});
+
+test("humanTierNames exposes the reserved names for a pass to avoid", (t) => {
+	const store = tempStore(t, { reservedNames: ["tdd", "code-review"] });
+	assert.deepEqual(store.humanTierNames().sort(), ["code-review", "tdd"]);
+});
+
+test("planPatch resolves the merged content without writing", (t) => {
+	const store = tempStore(t);
+	store.create({ ...basic("planned-skill"), files: [{ path: "references/a.md", content: "a" }] });
+
+	const plan = store.planPatch("planned-skill", { body: "## How\n\nmerged\n" });
+	assert.equal(plan.ok, true);
+	assert.equal(plan.input.description, "planned-skill description");
+	assert.deepEqual(plan.input.files, [{ path: "references/a.md", content: "a" }]);
+	assert.equal(store.findByName("planned-skill").scope, "general");
+	assert.match(fs.readFileSync(store.findByName("planned-skill").filePath, "utf8"), /Do planned-skill/, "nothing was written");
+	assert.match(store.planPatch("missing", {}).reason, /no learned skill/);
+});

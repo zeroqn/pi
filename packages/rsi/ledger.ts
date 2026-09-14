@@ -49,6 +49,8 @@ export interface Ledger {
 	skills: Record<string, LedgerEntry>;
 	last_status_at?: string;
 	last_status?: StatusCounts;
+	/** Last consolidation pass, for the curator's own cadence. */
+	last_curate_at?: string;
 }
 
 export interface ReadLedgerResult {
@@ -100,6 +102,7 @@ export function readLedger(root: string): ReadLedgerResult {
 		};
 		if (typeof parsed.last_status_at === "string") ledger.last_status_at = parsed.last_status_at;
 		if (isStatusCounts(parsed.last_status)) ledger.last_status = parsed.last_status;
+		if (typeof parsed.last_curate_at === "string") ledger.last_curate_at = parsed.last_curate_at;
 		return { ledger };
 	} catch (error) {
 		return {
@@ -223,6 +226,18 @@ export async function setSkillState(root: string, name: string, state: "active" 
 export interface StatusSnapshot {
 	previous?: StatusCounts;
 	lastStatusAt?: string;
+}
+
+/** Advance the curator's cadence clock, or roll it back after a pass that did nothing. */
+export async function setLastCurateAt(root: string, at: string | null): Promise<boolean> {
+	const written = await withLedgerLock(root, () => {
+		const { ledger } = readLedger(root);
+		if (at === null) delete ledger.last_curate_at;
+		else ledger.last_curate_at = at;
+		writeLedger(root, ledger);
+		return true;
+	});
+	return written ?? false;
 }
 
 /**

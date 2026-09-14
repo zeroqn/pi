@@ -1,27 +1,33 @@
 /**
- * The learn trigger: a quiet-period timer plus the admission chain.
+ * The learn trigger: a quiet-period timer plus the admission chain, and the
+ * curator's own cadence on the same timer.
  *
  * `agent_settled` starts or resets the timer; `agent_start`/`turn_start` cancel
  * it; `session_shutdown` cancels it and never learns (it also fires on `/new`,
  * `/resume` and `/fork`, while the user is mid-flow). When the timer fires the
- * chain is: query-only suppression, the model-free pre-scan, the single-flight
- * `.lock`, then the minimum interval — and the interval is checked inside the
- * lock, because the lock is the slot. A pass that errored without doing any
- * work rolls `last_pass_at` back so the next settle can retry.
+ * learner chain is: query-only suppression, the model-free pre-scan, the
+ * single-flight `.lock`, then the minimum interval — and the interval is checked
+ * inside the lock, because the lock is the slot. A pass that errored without
+ * doing any work rolls `last_pass_at` back so the next settle can retry.
+ *
+ * Curation shares the lock and the suppression but has its own cadence check
+ * (`curationDue`): it is interval-or-size gated, so it runs rarely.
  *
  * `/rsi learn` bypasses the pre-scan and the interval but still respects the
- * lock and query-only suppression.
+ * lock and query-only suppression; `/rsi curate` forces the curator.
  *
  * Everything time-related goes through an injectable {@link Clock}, so the whole
- * chain is testable with a fake clock and a fake pass.
+ * chain is testable with a fake clock and fake passes.
  */
 
 import type { RsiConfig } from "./config.ts";
-import { readLedger, setLastPassAt } from "./ledger.ts";
+import { readLedger, setLastCurateAt, setLastPassAt } from "./ledger.ts";
 import { claimPassLock } from "./pass-lock.ts";
 import { scanMessages, type ScanMessage } from "./prescan.ts";
 
-export type PassReason = "settled" | "learn";
+/** What a learner pass was triggered by. */
+export type LearnerReason = "settled" | "learn";
+export type PassReason = LearnerReason | "curate";
 
 export interface PassOutcome {
 	ok: boolean;
@@ -67,8 +73,12 @@ export interface PassSchedulerOptions {
 	getActiveTools: () => string[];
 	/** The current session's messages, reduced for the pre-scan. */
 	getScanMessages: () => ScanMessage[];
-	/** The pass itself. Phase 3 supplies a stub; phase 4 supplies the fork. */
-	runPass: (reason: PassReason) => Promise<PassOutcome>;
+	/** The learner pass. */
+	runPass: (reason: LearnerReason) => Promise<PassOutcome>;
+	/** The curator pass; absent disables curation entirely. */
+	curate?: () => Promise<PassOutcome>;
+	/** The curator's interval-or-size check. */
+	curationDue?: () => boolean;
 	clock?: Clock;
 	/** Why an attempt was declined; for tests and diagnostics, not the user. */
 	onSkip?: (reason: string) => void;
@@ -92,7 +102,7 @@ export class PassScheduler {
 		const quietMs = this.options.config.quietMinutes * 60_000;
 		this.timer = this.clock.setTimeout(() => {
 			this.timer = undefined;
-			void this.attempt("settled");
+			void this.onQuiet();
 		}, quietMs);
 	}
 
@@ -111,9 +121,19 @@ export class PassScheduler {
 		return this.attempt("learn");
 	}
 
+	/** `/rsi curate`: force curation, bypassing its cadence. */
+	async curateNow(): Promise<AttemptResult> {
+		return this.attempt("curate");
+	}
 	/** True while a quiet timer is armed; for tests. */
 	get pending(): boolean {
 		return this.timer !== undefined;
+	}
+
+	private async onQuiet(): Promise<void> {
+		await this.attempt("settled");
+		const due = this.options.curate !== undefined && (this.options.curationDue?.() ?? true);
+		if (due) await this.attempt("curate");
 	}
 
 	private cancel(): void {
@@ -139,7 +159,9 @@ export class PassScheduler {
 			return this.skip("query-only session");
 		}
 
-		if (reason === "settled" && !scanMessages(this.options.getScanMessages()).learnable) {
+		if (reason === "curate") {
+			if (!this.options.curate) return this.skip("no curator configured");
+		} else if (reason === "settled" && !scanMessages(this.options.getScanMessages()).learnable) {
 			return this.skip("no learnable signal"); // silent, and no tokens spent
 		}
 
@@ -147,28 +169,46 @@ export class PassScheduler {
 		if (!lock) return this.skip("a pass is already running");
 
 		try {
-			const previous = readLedger(root).ledger.last_pass_at ?? null;
-			if (reason === "settled" && !intervalElapsed(previous, config.minIntervalMinutes * 60_000, this.clock.now())) {
-				return this.skip("within the minimum interval");
-			}
-
-			await setLastPassAt(root, new Date(this.clock.now()).toISOString());
-
-			let outcome: PassOutcome;
-			try {
-				outcome = await this.options.runPass(reason);
-			} catch (error) {
-				outcome = { ok: false, toolActions: 0 };
-				this.options.notify?.(`rsi: pass failed (${error instanceof Error ? error.message : String(error)})`, "error");
-			}
-
-			if (!outcome.ok && outcome.toolActions === 0) {
-				await setLastPassAt(root, previous);
-			}
-			return { ran: true, outcome };
+			if (reason === "curate") return await this.runCurate();
+			return await this.runLearner(reason);
 		} finally {
 			lock.release();
 		}
+	}
+
+	private async runLearner(reason: LearnerReason): Promise<AttemptResult> {
+		const { config, root } = this.options;
+		const previous = readLedger(root).ledger.last_pass_at ?? null;
+		if (reason === "settled" && !intervalElapsed(previous, config.minIntervalMinutes * 60_000, this.clock.now())) {
+			return this.skip("within the minimum interval");
+		}
+
+		await setLastPassAt(root, this.stamp());
+		const outcome = await this.outcome(() => this.options.runPass(reason));
+		if (!outcome.ok && outcome.toolActions === 0) await setLastPassAt(root, previous);
+		return { ran: true, outcome };
+	}
+
+	private async runCurate(): Promise<AttemptResult> {
+		const { root } = this.options;
+		const previous = readLedger(root).ledger.last_curate_at ?? null;
+		await setLastCurateAt(root, this.stamp());
+		const outcome = await this.outcome(() => this.options.curate?.() ?? Promise.resolve({ ok: true, toolActions: 0 }));
+		if (!outcome.ok && outcome.toolActions === 0) await setLastCurateAt(root, previous);
+		return { ran: true, outcome };
+	}
+
+	private async outcome(run: () => Promise<PassOutcome>): Promise<PassOutcome> {
+		try {
+			return await run();
+		} catch (error) {
+			this.options.notify?.(`rsi: pass failed (${error instanceof Error ? error.message : String(error)})`, "error");
+			return { ok: false, toolActions: 0 };
+		}
+	}
+
+	private stamp(): string {
+		return new Date(this.clock.now()).toISOString();
 	}
 
 	private skip(reason: string): AttemptResult {

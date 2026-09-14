@@ -20,16 +20,17 @@ import * as path from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { buildSessionContext, convertToLlm, getAgentDir, parseSkillBlock, serializeConversation } from "@earendil-works/pi-coding-agent";
 import { loadConfig } from "./config.ts";
+import { buildCandidates, buildCurationReport, buildCuratorPrompt, isCurationDue, retirementCandidates } from "./curation.ts";
 import { buildDigest } from "./digest.ts";
 import { runLearningFork, type ForkSession } from "./fork.ts";
 import { discoverSkillNames } from "./frontmatter.ts";
-import { readLedger, recordUsage, takeStatusSnapshot } from "./ledger.ts";
+import { readLedger, recordUsage, setSkillState, takeStatusSnapshot } from "./ledger.ts";
 import { buildReport, emptyTally, formatPassNotification, tallyChanged } from "./pass.ts";
 import { projectKeyFor } from "./project-key.ts";
 import { toScanMessages } from "./prescan.ts";
 import { buildReviewPrompt } from "./prompt.ts";
-import type { PassOutcome } from "./scheduler.ts";
-import { PassScheduler, type PassReason } from "./scheduler.ts";
+import type { LearnerReason, PassOutcome } from "./scheduler.ts";
+import { PassScheduler } from "./scheduler.ts";
 import type { SkillActionDeps } from "./skill-actions.ts";
 import { SkillStore, type Scope } from "./store.ts";
 import { bashReadCandidates, formatStatus, scopeKey, summarizeStatus, UsageTracker } from "./telemetry.ts";
@@ -63,6 +64,14 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		runPass: async (reason) => {
 			if (!currentCtx) return { ok: false, toolActions: 0 };
 			return executePass(reason, currentCtx);
+		},
+		curationDue: () => {
+			const { ledger } = readLedger(store.root);
+			return isCurationDue({ lastCurateAt: ledger.last_curate_at, activeCount: store.listSkills().length, config, now: Date.now() }).due;
+		},
+		curate: async () => {
+			if (!currentCtx) return { ok: false, toolActions: 0 };
+			return executeCuration(currentCtx);
 		},
 	});
 
@@ -183,7 +192,12 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 				if (!result.ran) ctx.ui.notify(`rsi: learn skipped (${result.skipped})`, "info");
 				return;
 			}
-			ctx.ui.notify(`rsi: unknown subcommand "${subcommand}"; phases 1–4 implement /rsi status and /rsi learn`, "warning");
+			if (subcommand === "curate") {
+				const result = await scheduler.curateNow();
+				if (!result.ran) ctx.ui.notify(`rsi: curate skipped (${result.skipped})`, "info");
+				return;
+			}
+			ctx.ui.notify(`rsi: unknown subcommand "${subcommand}"; phases 1–5 implement /rsi status, /rsi learn and /rsi curate`, "warning");
 		},
 	});
 
@@ -209,7 +223,7 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 
 	// -- the pass (spec §4.2–§4.4) ---------------------------------------------
 
-	async function executePass(reason: PassReason, ctx: ExtensionContext): Promise<PassOutcome> {
+	async function executePass(reason: LearnerReason, ctx: ExtensionContext): Promise<PassOutcome> {
 		const entries = ctx.sessionManager.getEntries();
 
 		let transcript: string;
@@ -283,6 +297,116 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 
 		return { ok: outcome.ok, toolActions: outcome.toolActions };
 	}
+
+	// -- the curator (spec §4.6) ------------------------------------------------
+
+	async function executeCuration(ctx: ExtensionContext): Promise<PassOutcome> {
+		const startLedger = readLedger(store.root).ledger;
+		const now = Date.now();
+		const candidates = buildCandidates(store, startLedger, now);
+		const beforeCount = candidates.length;
+		const due = isCurationDue({ lastCurateAt: startLedger.last_curate_at, activeCount: beforeCount, config, now });
+
+		const tally = emptyTally();
+		const retired: string[] = [];
+		let toolActions = 0;
+
+		// Retirement is deterministic, and runs before the model looks at anything.
+		for (const candidate of retirementCandidates(candidates, { disuseWeeks: config.disuseWeeks })) {
+			if (store.archive(candidate.name).ok) {
+				await setSkillState(store.root, candidate.name, "archived");
+				retired.push(candidate.name);
+				tally.archived++;
+				toolActions++;
+			}
+		}
+
+		const reportDir = store.newReportDir();
+		const mode = config.observeOnly ? "observe" : "write";
+		let modelLabel: string | undefined;
+		let error: string | undefined;
+
+		const remaining = buildCandidates(store, readLedger(store.root).ledger, Date.now());
+		if (remaining.length >= 2) {
+			const deps: SkillActionDeps = {
+				store,
+				root: store.root,
+				scope: scopeFor(ctx.cwd),
+				mode,
+				softAttempts: new Map<string, number>(),
+				onAction: (action, _name, held) => {
+					if (held) tally.proposed++;
+					else if (action === "create") tally.created++;
+					else if (action === "patch") tally.patched++;
+					else if (action === "archive") tally.archived++;
+				},
+				onHardHit: (hits) => {
+					tally.hardHits.push(...hits);
+				},
+				// A merge rewrites a skill in place; snapshot it first so it reverts exactly.
+				snapshot: (name) => {
+					store.snapshot(name, path.join(reportDir, "snapshots"));
+				},
+				now: () => new Date(),
+			};
+
+			const outcome = await runLearningFork({
+				cwd: ctx.cwd,
+				agentDir,
+				config,
+				deps,
+				prompt: buildCuratorPrompt({ candidates: remaining, humanTier: store.humanTierNames(), mode }),
+				fallbackModel: ctx.model,
+				onSession: (session) => {
+					activeFork = session;
+				},
+			});
+			activeFork = undefined;
+			modelLabel = outcome.modelLabel;
+			error = outcome.error;
+			toolActions += outcome.toolActions;
+		}
+
+		tally.error = error;
+		const afterCount = store.listSkills().length;
+		try {
+			fs.writeFileSync(
+				path.join(reportDir, "REPORT.md"),
+				buildCurationReport({
+					at: new Date().toISOString(),
+					mode,
+					model: modelLabel,
+					dueReason: due.reason,
+					beforeCount,
+					afterCount,
+					retired,
+					created: tally.created,
+					proposed: tally.proposed,
+					patched: tally.patched,
+					archived: tally.archived,
+					hardHits: tally.hardHits.length,
+					error,
+					snapshotDir: tally.patched > 0 ? path.join(reportDir, "snapshots") : undefined,
+				}),
+			);
+		} catch {
+			// The report is best effort; curation never fails over its audit record.
+		}
+
+		const notification = formatPassNotification(tally);
+		if (notification) {
+			ctx.ui.notify(`${notification.line} (${path.relative(store.root, reportDir)})`, notification.type);
+		} else if (error) {
+			ctx.ui.notify(`rsi: curation failed (${error})`, "error");
+		}
+
+		return { ok: error === undefined, toolActions };
+	}
+}
+
+function scopeFor(cwd: string): Scope {
+	const key = projectKeyFor(cwd);
+	return key ? { project: key } : "general";
 }
 
 function absoluteAgainst(target: string, cwd: string): string {

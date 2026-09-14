@@ -17,6 +17,7 @@
 		"index.ts",
 		"config.ts",
 		"content-scan.ts",
+		"curation.ts",
 		"digest.ts",
 		"fork.ts",
 		"frontmatter.ts",

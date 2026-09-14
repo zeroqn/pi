@@ -188,6 +188,34 @@ test("patch updates a skill and archive retires it", async (t) => {
 	assert.deepEqual(actions.map((a) => a.action), ["patch", "archive"]);
 });
 
+test("observe mode holds patches and archives as proposals instead of applying them", async (t) => {
+	const store = tempStore(t);
+	const { deps } = makeDeps(store, { mode: "observe" });
+	store.create({ name: "observe-lifecycle", description: "First.", scope: "general", body: "## How\n\nold\n" });
+
+	const patched = await runSkillAction({ action: "patch", name: "observe-lifecycle", body: "## How\n\nnew\n" }, deps);
+	assert.equal(patched.isError, undefined);
+	assert.match(fs.readFileSync(store.findByName("observe-lifecycle").filePath, "utf8"), /old/, "the live skill is untouched");
+	const patchRecord = JSON.parse(fs.readFileSync(path.join(store.root, "proposals", "observe-lifecycle", "proposal.json"), "utf8"));
+	assert.equal(patchRecord.kind, "patch");
+	assert.equal(patchRecord.name, "observe-lifecycle");
+
+	const archived = await runSkillAction({ action: "archive", name: "observe-lifecycle" }, deps);
+	assert.equal(archived.isError, undefined);
+	assert.ok(store.findByName("observe-lifecycle"), "nothing was moved");
+	assert.equal(fs.readdirSync(path.join(store.root, "proposals")).length, 2);
+});
+
+test("propose carries its kind and reason", async (t) => {
+	const store = tempStore(t);
+	const { deps } = makeDeps(store);
+	const result = await runSkillAction({ action: "propose", name: "promo", kind: "promotion", reason: "the same lesson in two scopes" }, deps);
+	assert.equal(result.isError, undefined);
+	const record = JSON.parse(fs.readFileSync(path.join(store.root, "proposals", "promo", "proposal.json"), "utf8"));
+	assert.equal(record.kind, "promotion");
+	assert.equal(record.reason, "the same lesson in two scopes");
+});
+
 test("an unknown action returns usage", async (t) => {
 	const store = tempStore(t);
 	const { deps } = makeDeps(store);

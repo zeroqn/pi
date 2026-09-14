@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { readLedger, setLastPassAt } from "../ledger.ts";
+import { readLedger, setLastCurateAt, setLastPassAt } from "../ledger.ts";
 import { passLockPath } from "../pass-lock.ts";
 import { intervalElapsed, isQueryOnly, PassScheduler } from "../scheduler.ts";
 
@@ -74,6 +74,8 @@ function makeScheduler(t, options = {}) {
 		getActiveTools: options.getActiveTools ?? (() => ["read", "write", "edit"]),
 		getScanMessages: options.getScanMessages ?? (() => [{ role: "user", text: "remember this" }]),
 		runPass,
+		curate: options.curate,
+		curationDue: options.curationDue,
 		clock,
 		onSkip: (reason) => skips.push(reason),
 		notify: options.notify,
@@ -234,4 +236,72 @@ test("learnNow bypasses the pre-scan and the interval but not the lock", async (
 	assert.deepEqual(result, { ran: true, outcome: { ok: true, toolActions: 1 } });
 	assert.deepEqual(calls, ["learn"]);
 	assert.equal(lastPassAt(root), new Date(clock.now()).toISOString());
+});
+
+// ---------------------------------------------------------------------------
+// Curation — its own cadence on the same lock, with its own clock.
+// ---------------------------------------------------------------------------
+
+test("curateNow respects the cadence and records last_curate_at", async (t) => {
+	const { root, scheduler } = makeScheduler(t, { curate: async () => ({ ok: true, toolActions: 1 }), curationDue: () => true });
+	assert.deepEqual(await scheduler.curateNow(), { ran: true, outcome: { ok: true, toolActions: 1 } });
+	assert.equal(readLedger(root).ledger.last_curate_at, new Date(EPOCH).toISOString());
+});
+
+test("curateNow forces curation past the cadence, but needs a curator", async (t) => {
+	const forced = makeScheduler(t, { curate: async () => ({ ok: true, toolActions: 1 }), curationDue: () => false });
+	assert.deepEqual(await forced.scheduler.curateNow(), { ran: true, outcome: { ok: true, toolActions: 1 } });
+
+	const none = makeScheduler(t);
+	assert.deepEqual(await none.scheduler.curateNow(), { ran: false, skipped: "no curator configured" });
+});
+
+test("the quiet timer does not curate when it is not due", async (t) => {
+	let curated = 0;
+	const { clock, scheduler } = makeScheduler(t, {
+		curate: async () => {
+			curated++;
+			return { ok: true, toolActions: 1 };
+		},
+		curationDue: () => false,
+	});
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	assert.equal(curated, 0);
+});
+
+test("a failed curation with no actions rolls the cadence clock back", async (t) => {
+	const { root, scheduler } = makeScheduler(t, {
+		curate: async () => {
+			throw new Error("boom");
+		},
+		curationDue: () => true,
+	});
+	await setLastCurateAt(root, "2026-01-01T00:00:00.000Z");
+	const result = await scheduler.curateNow();
+	assert.equal(result.outcome.ok, false);
+	assert.equal(readLedger(root).ledger.last_curate_at, "2026-01-01T00:00:00.000Z");
+});
+
+test("a query-only session suppresses curation too", async (t) => {
+	const { scheduler, skips } = makeScheduler(t, { curate: async () => ({ ok: true, toolActions: 1 }), curationDue: () => true, getActiveTools: () => ["read"] });
+	assert.deepEqual(await scheduler.curateNow(), { ran: false, skipped: "query-only session" });
+	assert.ok(skips.includes("query-only session"));
+});
+
+test("the quiet timer runs curation when it is due", async (t) => {
+	let curated = 0;
+	const { clock, scheduler } = makeScheduler(t, {
+		getScanMessages: () => [{ role: "user", text: "nothing learnable" }],
+		curate: async () => {
+			curated++;
+			return { ok: true, toolActions: 1 };
+		},
+		curationDue: () => true,
+	});
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	assert.equal(curated, 1);
 });

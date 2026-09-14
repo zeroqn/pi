@@ -15,6 +15,7 @@ import {
 	buildSkillFrontmatter,
 	validatePayloadPath,
 	type NewSkillInput,
+	type ProposalKind,
 	type Scope,
 	type SkillFile,
 	type SkillStore,
@@ -32,6 +33,8 @@ export interface SkillActionInput {
 	scope?: string;
 	files?: Array<{ path?: string; content?: string }>;
 	reason?: string;
+	/** For propose: skill | patch | archive | promotion. */
+	kind?: string;
 }
 
 export interface SkillActionDeps {
@@ -45,6 +48,8 @@ export interface SkillActionDeps {
 	onHardHit?: (hits: readonly ContentHit[]) => void;
 	/** Soft-hit retry counter, per skill name, for the length of a pass. */
 	softAttempts?: Map<string, number>;
+	/** Called before a patch so a merge can be reverted exactly. */
+	snapshot?: (name: string) => void;
 	now?: () => Date;
 }
 
@@ -100,8 +105,10 @@ async function createSkill(input: SkillActionInput, deps: SkillActionDeps, force
 	if (name.length === 0) return { text: "create requires a name", isError: true };
 	const description = typeof input.description === "string" ? input.description.trim() : "";
 	const body = typeof input.body === "string" ? input.body : "";
-	if (description.length === 0) return { text: "create requires a description", isError: true, name };
-	if (body.trim().length === 0) return { text: "create requires a body", isError: true, name };
+	if (forced === "create") {
+		if (description.length === 0) return { text: "create requires a description", isError: true, name };
+		if (body.trim().length === 0) return { text: "create requires a body", isError: true, name };
+	}
 
 	const files = normalizeFiles(input.files);
 	const outsideWhitelist = files.find((file) => validatePayloadPath(file.path) !== undefined);
@@ -125,7 +132,7 @@ async function createSkill(input: SkillActionInput, deps: SkillActionDeps, force
 		forced === "propose" || deps.mode === "observe" || outsideWhitelist !== undefined || files.some((file) => file.path.startsWith("scripts/"));
 
 	if (hold) {
-		const result = deps.store.propose(proposed, { reason, kind: "skill", mode: deps.mode, createdAt: deps.now?.().toISOString() });
+		const result = deps.store.propose(proposed, { reason, kind: proposalKind(input.kind), mode: deps.mode, createdAt: deps.now?.().toISOString() });
 		if (!result.ok) return { text: result.reason, isError: true, name };
 		deps.onAction?.(forced, name, true);
 		return { text: `held as a proposal for review (${reason}); nothing entered the live store.`, action: forced, name };
@@ -140,22 +147,30 @@ async function createSkill(input: SkillActionInput, deps: SkillActionDeps, force
 
 async function patchSkill(input: SkillActionInput, deps: SkillActionDeps): Promise<SkillActionResult> {
 	const name = typeof input.name === "string" ? input.name.trim() : "";
-	if (name.length === 0) return { text: "patch requires a name", isError: true };
-	const existing = deps.store.readSkillContent(name);
-	if (!existing) return { text: `no learned skill named "${name}"`, isError: true };
+	if (name.length === 0) return { text: "patch requires a name", isError: true, name };
 
-	const description = typeof input.description === "string" ? input.description : existing.skill.description;
-	const files = input.files ? normalizeFiles(input.files) : undefined;
-	const body = typeof input.body === "string" ? input.body : undefined;
+	const changes = {
+		description: typeof input.description === "string" ? input.description : undefined,
+		body: typeof input.body === "string" ? input.body : undefined,
+		files: input.files ? normalizeFiles(input.files) : undefined,
+	};
+	const planned = deps.store.planPatch(name, changes);
+	if (!planned.ok) return { text: planned.reason, isError: true, name };
 
-	const scanFiles = [
-		{ path: "SKILL.md", content: body !== undefined ? composeDocument(name, description, body, existing.skill.scope, files ?? []) : existing.content },
-		...(files ?? []),
-	];
-	const gate = scanFiles.length > 0 ? scanAndGate(scanFiles, name, deps) : undefined;
+	const content = planned.input;
+	const document = composeDocument(content.name, content.description, content.body, content.scope, content.files ?? []);
+	const gate = scanAndGate([{ path: "SKILL.md", content: document }, ...(content.files ?? [])], name, deps);
 	if (gate) return { ...gate, name };
 
-	const result = deps.store.patch(name, { description: input.description, body, files });
+	if (deps.mode === "observe") {
+		const result = deps.store.propose(content, { kind: "patch", reason: "observe-only mode", mode: deps.mode, createdAt: deps.now?.().toISOString() });
+		if (!result.ok) return { text: result.reason, isError: true, name };
+		deps.onAction?.("patch", name, true);
+		return { text: `proposed a patch for "${name}" for review; the live skill is unchanged.`, action: "patch", name };
+	}
+
+	deps.snapshot?.(name);
+	const result = deps.store.patch(name, changes);
 	if (!result.ok) return { text: result.reason, isError: true, name };
 	deps.onAction?.("patch", name, false);
 	return { text: `patched "${name}".`, action: "patch", name };
@@ -164,6 +179,14 @@ async function patchSkill(input: SkillActionInput, deps: SkillActionDeps): Promi
 async function archiveSkill(input: SkillActionInput, deps: SkillActionDeps): Promise<SkillActionResult> {
 	const name = typeof input.name === "string" ? input.name.trim() : "";
 	if (name.length === 0) return { text: "archive requires a name", isError: true };
+
+	if (deps.mode === "observe") {
+		const result = deps.store.propose({ name }, { kind: "archive", reason: "observe-only mode", mode: deps.mode, createdAt: deps.now?.().toISOString() });
+		if (!result.ok) return { text: result.reason, isError: true, name };
+		deps.onAction?.("archive", name, true);
+		return { text: `proposed archiving "${name}" for review; nothing was moved.`, action: "archive", name };
+	}
+
 	const result = deps.store.archive(name);
 	if (!result.ok) return { text: result.reason, isError: true, name };
 	await setSkillState(deps.root, name, "archived");
@@ -220,4 +243,8 @@ function scopeOf(value: string | undefined, fallback: Scope): Scope {
 	if (value === "general") return "general";
 	if (typeof value === "string" && value.trim().length > 0) return { project: value.trim() };
 	return fallback;
+}
+
+function proposalKind(value: string | undefined): ProposalKind | undefined {
+	return value === "skill" || value === "patch" || value === "archive" || value === "promotion" ? value : undefined;
 }
