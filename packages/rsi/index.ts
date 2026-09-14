@@ -5,9 +5,8 @@
  * over time, in an agent-owned store surfaced to pi only by this extension's
  * `resources_discover` handler. Phase 1 built the store, config and surfacing;
  * phase 2 telemetry; phase 3 the trigger, gate and pass lock; phase 4 the pass
- * itself: a deterministic digest plus the rendered transcript, handed to an
- * in-process fork whose only tool is the store API, in observe-only mode by
- * default.
+ * itself; phase 5 the curator; phase 6 the operator surface: `/rsi review`,
+ * pin/unpin, archive/restore/discard, promote, observe/write and off/on.
  *
  * Spec: `~/.pi/.scratch/rsi/spec.md` (§3 flow, §4.2 evidence, §4.3 the pass,
  * §4.4 content standard, §4.5 invariants). The store and `skill-actions.ts`
@@ -19,7 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { buildSessionContext, convertToLlm, getAgentDir, parseSkillBlock, serializeConversation } from "@earendil-works/pi-coding-agent";
-import { loadConfig } from "./config.ts";
+import { loadConfig, saveConfig } from "./config.ts";
 import { buildCandidates, buildCurationReport, buildCuratorPrompt, isCurationDue, retirementCandidates } from "./curation.ts";
 import { buildDigest } from "./digest.ts";
 import { runLearningFork, type ForkSession } from "./fork.ts";
@@ -31,6 +30,7 @@ import { toScanMessages } from "./prescan.ts";
 import { buildReviewPrompt } from "./prompt.ts";
 import type { LearnerReason, PassOutcome } from "./scheduler.ts";
 import { PassScheduler } from "./scheduler.ts";
+import { applyProposal, discardProposal, formatProposal } from "./review.ts";
 import type { SkillActionDeps } from "./skill-actions.ts";
 import { SkillStore, type Scope } from "./store.ts";
 import { bashReadCandidates, formatStatus, scopeKey, summarizeStatus, UsageTracker } from "./telemetry.ts";
@@ -179,25 +179,60 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	// -- operator surface (status and learn until phase 6) ---------------------
 
 	pi.registerCommand("rsi", {
-		description: "RSI: learned-skill status",
+		description: "RSI: learned-skill status and control",
 		handler: async (args, ctx) => {
-			const subcommand = args.trim();
-			if (subcommand.length === 0 || subcommand === "status") {
-				await showStatus(ctx);
-				return;
+			const tokens = args.trim().split(/\s+/).filter(Boolean);
+			const subcommand = tokens[0] ?? "status";
+			const rest = tokens.slice(1);
+
+			switch (subcommand) {
+				case "status":
+					await showStatus(ctx);
+					return;
+				case "learn": {
+					const result = await scheduler.learnNow();
+					// A ran pass reports its own outcome; only a skip needs saying here.
+					if (!result.ran) ctx.ui.notify(`rsi: learn skipped (${result.skipped})`, "info");
+					return;
+				}
+				case "curate": {
+					const result = await scheduler.curateNow();
+					if (!result.ran) ctx.ui.notify(`rsi: curate skipped (${result.skipped})`, "info");
+					return;
+				}
+				case "review":
+					await runReview(ctx);
+					return;
+				case "pin":
+					await setPinned(rest[0], true, ctx);
+					return;
+				case "unpin":
+					await setPinned(rest[0], false, ctx);
+					return;
+				case "archive":
+				case "discard":
+					await archiveSkill(rest[0], ctx);
+					return;
+				case "restore":
+					await restoreSkill(rest[0], ctx);
+					return;
+				case "promote":
+					await promoteSkill(rest[0], rest[1], ctx);
+					return;
+				case "off":
+				case "on":
+					await setEnabled(subcommand === "on", rest.includes("--project"), ctx);
+					return;
+				case "observe":
+				case "write":
+					await setObserveOnly(subcommand === "observe", ctx);
+					return;
+				default:
+					ctx.ui.notify(
+						`rsi: unknown subcommand "${subcommand}". Try: status, learn, curate, review, pin/unpin <name>, archive/discard <name>, restore <name>, promote <name> [--general|--human], observe|write, off|on [--project]`,
+						"warning",
+					);
 			}
-			if (subcommand === "learn") {
-				const result = await scheduler.learnNow();
-				// A ran pass reports its own outcome; only a skip needs saying here.
-				if (!result.ran) ctx.ui.notify(`rsi: learn skipped (${result.skipped})`, "info");
-				return;
-			}
-			if (subcommand === "curate") {
-				const result = await scheduler.curateNow();
-				if (!result.ran) ctx.ui.notify(`rsi: curate skipped (${result.skipped})`, "info");
-				return;
-			}
-			ctx.ui.notify(`rsi: unknown subcommand "${subcommand}"; phases 1–5 implement /rsi status, /rsi learn and /rsi curate`, "warning");
 		},
 	});
 
@@ -219,6 +254,142 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 			}),
 			"info",
 		);
+	}
+
+	// -- operator actions (spec §4.8) ------------------------------------------
+
+	function persistConfig(patch: Record<string, unknown>, ctx: ExtensionCommandContext): boolean {
+		const result = saveConfig({ agentDir }, patch);
+		if (!result.ok) {
+			ctx.ui.notify(result.warning ?? "rsi: could not write the config", "error");
+			return false;
+		}
+		return true;
+	}
+
+	async function runReview(ctx: ExtensionCommandContext): Promise<void> {
+		const pending = store.listProposals();
+		if (pending.length === 0) {
+			ctx.ui.notify("rsi: no pending proposals", "info");
+			return;
+		}
+		if (!ctx.hasUI) {
+			ctx.ui.notify(`rsi: ${pending.length} pending proposal(s): ${pending.map((p) => `[${p.record.kind}] ${p.record.name}`).join(", ")}`, "info");
+			return;
+		}
+
+		const labels = pending.map((p) => `[${p.record.kind}] ${p.record.name}${p.record.scope ? ` (${p.record.scope})` : ""}`);
+		const choice = await ctx.ui.select(`rsi: ${pending.length} pending proposal(s)`, labels);
+		if (!choice) return;
+		const selected = pending[labels.indexOf(choice)];
+
+		if (await ctx.ui.confirm(`Apply "${selected.record.name}"?`, formatProposal(selected))) {
+			const result = await applyProposal(store, selected);
+			ctx.ui.notify(`rsi: ${result.message}`, result.ok ? "info" : "warning");
+			if (result.ok) await ctx.reload();
+			return;
+		}
+
+		if (await ctx.ui.confirm(`Discard "${selected.record.name}"?`, "The proposal is removed; the library is untouched.")) {
+			discardProposal(store, selected);
+			ctx.ui.notify("rsi: proposal discarded", "info");
+		}
+	}
+
+	async function setPinned(name: string | undefined, pinned: boolean, ctx: ExtensionCommandContext): Promise<void> {
+		if (!name) {
+			ctx.ui.notify(`rsi: ${pinned ? "pin" : "unpin"} requires a skill name`, "warning");
+			return;
+		}
+		const result = store.setPinned(name, pinned);
+		if (!result.ok) {
+			ctx.ui.notify(`rsi: ${result.reason}`, "warning");
+			return;
+		}
+		ctx.ui.notify(`rsi: ${pinned ? "pinned" : "unpinned"} ${name}`, "info");
+	}
+
+	async function archiveSkill(name: string | undefined, ctx: ExtensionCommandContext): Promise<void> {
+		if (!name) {
+			ctx.ui.notify("rsi: archive requires a skill name", "warning");
+			return;
+		}
+		const result = store.archive(name);
+		if (!result.ok) {
+			ctx.ui.notify(`rsi: ${result.reason}`, "warning");
+			return;
+		}
+		await setSkillState(store.root, name, "archived");
+		ctx.ui.notify(`rsi: archived ${name} (restorable with /rsi restore ${name})`, "info");
+		await ctx.reload();
+	}
+
+	async function restoreSkill(name: string | undefined, ctx: ExtensionCommandContext): Promise<void> {
+		if (!name) {
+			ctx.ui.notify("rsi: restore requires a skill name", "warning");
+			return;
+		}
+		const result = store.restore(name);
+		if (!result.ok) {
+			ctx.ui.notify(`rsi: ${result.reason}`, "warning");
+			return;
+		}
+		await setSkillState(store.root, name, "active");
+		ctx.ui.notify(`rsi: restored ${name}`, "info");
+		await ctx.reload();
+	}
+
+	async function promoteSkill(name: string | undefined, flag: string | undefined, ctx: ExtensionCommandContext): Promise<void> {
+		if (!name) {
+			ctx.ui.notify("rsi: promote requires a skill name and --general or --human", "warning");
+			return;
+		}
+
+		if (flag === "--human") {
+			const exported = store.exportToHuman(name, path.join(agentDir, "skills"));
+			if (!exported.ok) {
+				ctx.ui.notify(`rsi: ${exported.reason}`, "warning");
+				return;
+			}
+			// Move, not copy: the learned original is archived so it cannot be curated again.
+			if (store.archive(name).ok) await setSkillState(store.root, name, "archived");
+			ctx.ui.notify(`rsi: promoted ${name} to the human tier`, "info");
+			await ctx.reload();
+			return;
+		}
+
+		const result = store.moveToScope(name, "general");
+		if (!result.ok) {
+			ctx.ui.notify(`rsi: ${result.reason}`, "warning");
+			return;
+		}
+		ctx.ui.notify(`rsi: promoted ${name} to general`, "info");
+		await ctx.reload();
+	}
+
+	async function setEnabled(enabled: boolean, project: boolean, ctx: ExtensionCommandContext): Promise<void> {
+		if (project) {
+			const key = projectKeyFor(ctx.cwd);
+			if (!key) {
+				ctx.ui.notify("rsi: the working directory is not in a git repo, so there is no project key", "warning");
+				return;
+			}
+			const next = enabled ? config.disabledProjects.filter((k) => k !== key) : [...new Set([...config.disabledProjects, key])];
+			config.disabledProjects = next;
+			if (!persistConfig({ disabledProjects: next }, ctx)) return;
+			ctx.ui.notify(`rsi: learning ${enabled ? "enabled" : "disabled"} for ${key}`, "info");
+		} else {
+			config.enabled = enabled;
+			if (!persistConfig({ enabled }, ctx)) return;
+			ctx.ui.notify(`rsi: ${enabled ? "enabled" : "disabled"}`, "info");
+		}
+		await ctx.reload();
+	}
+
+	async function setObserveOnly(observe: boolean, ctx: ExtensionCommandContext): Promise<void> {
+		config.observeOnly = observe;
+		if (!persistConfig({ observeOnly: observe }, ctx)) return;
+		ctx.ui.notify(`rsi: ${observe ? "observe-only" : "write"} mode`, "info");
 	}
 
 	// -- the pass (spec §4.2–§4.4) ---------------------------------------------

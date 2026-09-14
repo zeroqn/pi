@@ -355,3 +355,95 @@ test("planPatch resolves the merged content without writing", (t) => {
 	assert.match(fs.readFileSync(store.findByName("planned-skill").filePath, "utf8"), /Do planned-skill/, "nothing was written");
 	assert.match(store.planPatch("missing", {}).reason, /no learned skill/);
 });
+
+test("setPinned rewrites frontmatter, the durable source", (t) => {
+	const store = tempStore(t);
+	store.create(basic("pin-me"));
+	assert.equal(store.findByName("pin-me").pinned, false);
+
+	assert.equal(store.setPinned("pin-me", true).ok, true);
+	assert.equal(store.findByName("pin-me").pinned, true);
+	assert.equal(store.setPinned("pin-me", false).ok, true);
+	assert.equal(store.findByName("pin-me").pinned, false);
+	assert.equal(store.setPinned("missing", true).ok, false);
+});
+
+test("moveToScope promotes a project skill to general, frontmatter included", (t) => {
+	const store = tempStore(t);
+	store.create(basic("promote-me", { project: "github.com/acme/app" }));
+
+	const result = store.moveToScope("promote-me", "general");
+	assert.equal(result.ok, true);
+	assert.equal(result.skill.scope, "general");
+	assert.equal(result.skill.dir.startsWith(store.generalDir()), true);
+	assert.equal(result.skill.metadata.scope, "general");
+	assert.equal(store.findByName("promote-me").scope, "general");
+});
+
+test("archive then restore round-trips a skill to its original scope", (t) => {
+	const store = tempStore(t);
+	store.create(basic("round-trip", { project: "github.com/acme/app" }));
+
+	assert.equal(store.archive("round-trip").ok, true);
+	const archived = store.listArchived();
+	assert.deepEqual(archived.map((skill) => skill.name), ["round-trip"]);
+	assert.deepEqual(archived[0].scope, { project: "github.com/acme/app" });
+	assert.equal(store.findByName("round-trip"), undefined);
+
+	const restored = store.restore("round-trip");
+	assert.equal(restored.ok, true);
+	assert.equal(store.findByName("round-trip").scope.project, "github.com/acme/app");
+	assert.deepEqual(store.listArchived(), []);
+
+	assert.equal(store.restore("round-trip").ok, false, "nothing left to restore");
+});
+
+test("restore refuses when a live skill already holds the name", (t) => {
+	const store = tempStore(t);
+	store.create(basic("dupe"));
+	store.archive("dupe");
+	store.create(basic("dupe"));
+	assert.equal(store.restore("dupe").ok, false);
+});
+
+test("patch backups live in a hidden backups dir, not among retired skills", (t) => {
+	const store = tempStore(t);
+	store.create(basic("backed-up"));
+	store.patch("backed-up", { body: "## How\n\nnew\n" });
+	assert.deepEqual(fs.readdirSync(store.archiveRoot), [".backups"]);
+	assert.deepEqual(store.listArchived(), [], "a patch backup is not a retired skill");
+});
+
+test("listProposals reads content and operation proposals, and removeProposal discards", (t) => {
+	const store = tempStore(t);
+	store.propose({ name: "content-proposal", description: "D.", body: "## How\n\nx\n", scope: "general", files: [{ path: "references/a.md", content: "a" }] }, { kind: "skill", reason: "observe-only mode" });
+	store.propose({ name: "archive-proposal" }, { kind: "archive", reason: "observe-only mode" });
+
+	const pending = store.listProposals();
+	assert.deepEqual(pending.map((p) => p.record.name), ["archive-proposal", "content-proposal"]);
+	const content = pending.find((p) => p.record.name === "content-proposal");
+	assert.equal(content.input.description, "D.");
+	assert.equal(content.input.body, "## How\n\nx");
+	assert.deepEqual(content.input.files, [{ path: "references/a.md", content: "a" }]);
+	const operation = pending.find((p) => p.record.name === "archive-proposal");
+	assert.equal(operation.input, undefined);
+
+	store.removeProposal(content.dir);
+	assert.deepEqual(store.listProposals().map((p) => p.record.name), ["archive-proposal"]);
+});
+
+test("exportToHuman strips the learned metadata and refuses a collision", (t) => {
+	const store = tempStore(t);
+	store.create({ ...basic("to-human"), metadata: { pinned: true } });
+	const humanDir = fs.mkdtempSync(path.join(os.tmpdir(), "rsi-human-"));
+	t.after(() => fs.rmSync(humanDir, { recursive: true, force: true }));
+
+	const result = store.exportToHuman("to-human", humanDir);
+	assert.equal(result.ok, true);
+	const copy = fs.readFileSync(path.join(result.dir, "SKILL.md"), "utf8");
+	assert.doesNotMatch(copy, /metadata:/);
+	assert.match(copy, /description: "to-human description"/);
+	assert.equal(store.findByName("to-human") !== undefined, true, "the learned copy remains for the caller to archive");
+
+	assert.equal(store.exportToHuman("to-human", humanDir).ok, false, "the human tier now owns the name");
+});

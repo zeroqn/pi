@@ -122,6 +122,33 @@ type NumberConfigKey =
 	| "maxActiveSkills";
 type StringConfigKey = "reviewModel" | "curatorModel" | "thinking";
 
+/**
+ * Merge a patch into the config file and write it back atomically. Comments and
+ * formatting are not preserved: the file is rewritten as plain JSON, which the
+ * JSONC reader and every other pi config reader accept.
+ */
+export function saveConfig(options: { agentDir: string; file?: string }, patch: Record<string, unknown>): { ok: boolean; warning?: string } {
+	const file = options.file ?? configPathFor(options.agentDir);
+
+	let current: Record<string, unknown> = {};
+	try {
+		const parsed = JSON.parse(stripJsonc(fs.readFileSync(file, "utf8")));
+		if (isPlainObject(parsed)) current = parsed;
+	} catch {
+		// Missing or malformed config is replaced rather than propagated.
+	}
+
+	try {
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		const temp = `${file}.${process.pid}.tmp`;
+		fs.writeFileSync(temp, `${JSON.stringify({ ...current, ...patch }, null, 2)}\n`);
+		fs.renameSync(temp, file);
+	} catch (error) {
+		return { ok: false, warning: `rsi: could not write ${file} (${error instanceof Error ? error.message : String(error)})` };
+	}
+	return { ok: true };
+}
+
 function readBoolean(source: Record<string, unknown>, key: BooleanConfigKey, config: RsiConfig, warnings: string[]): void {
 	if (!(key in source)) return;
 	const value = source[key];

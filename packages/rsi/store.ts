@@ -88,6 +88,23 @@ export interface ProposalInput {
 	files?: SkillFile[];
 }
 
+/** The `proposal.json` a pending proposal is read back from. */
+export interface ProposalRecord {
+	kind: string;
+	name: string;
+	scope?: string;
+	reason?: string;
+	mode?: string;
+	created_at?: string;
+}
+
+export interface PendingProposal {
+	dir: string;
+	record: ProposalRecord;
+	/** Present when the proposal carries skill content to apply. */
+	input?: NewSkillInput;
+}
+
 export interface SkillContent {
 	skill: LearnedSkill;
 	/** The raw SKILL.md text. */
@@ -434,9 +451,9 @@ export class SkillStore {
 			return { ok: false, reason: `staging write failed: ${error instanceof Error ? error.message : String(error)}` };
 		}
 
-		const backup = this.uniqueChildDir(this.archiveRoot, name);
+		const backup = this.uniqueChildDir(path.join(this.archiveRoot, ".backups"), name);
 		try {
-			fs.mkdirSync(this.archiveRoot, { recursive: true });
+			fs.mkdirSync(path.join(this.archiveRoot, ".backups"), { recursive: true });
 			fs.renameSync(existing.dir, backup);
 			fs.renameSync(stagingDir, existing.dir);
 		} catch (error) {
@@ -498,6 +515,181 @@ export class SkillStore {
 		const dir = this.newReportDir();
 		fs.writeFileSync(path.join(dir, "REPORT.md"), content);
 		return dir;
+	}
+
+	// -- operator surface (spec §4.8) -----------------------------------------
+
+	proposalsDir(): string {
+		return path.join(this.root, "proposals");
+	}
+
+	/** Every pending proposal, read back from its proposal.json. */
+	listProposals(): PendingProposal[] {
+		let entries: fs.Dirent[];
+		try {
+			entries = fs.readdirSync(this.proposalsDir(), { withFileTypes: true });
+		} catch {
+			return [];
+		}
+		const pending: PendingProposal[] = [];
+		for (const entry of entries) {
+			if (!entry.isDirectory()) continue;
+			const proposal = this.readProposal(path.join(this.proposalsDir(), entry.name));
+			if (proposal) pending.push(proposal);
+		}
+		return pending.sort((a, b) => a.record.name.localeCompare(b.record.name));
+	}
+
+	readProposal(dir: string): PendingProposal | undefined {
+		assertInside(this.proposalsDir(), dir);
+		let record: Record<string, unknown>;
+		try {
+			record = JSON.parse(fs.readFileSync(path.join(dir, "proposal.json"), "utf8"));
+		} catch {
+			return undefined;
+		}
+		if (!isPlainObject(record) || typeof record.name !== "string") return undefined;
+
+		const skillDir = path.join(dir, "skill");
+		let input: NewSkillInput | undefined;
+		if (fs.existsSync(path.join(skillDir, SKILL_FILE_NAME))) {
+			const { frontmatter, body } = parseFrontmatter(fs.readFileSync(path.join(skillDir, SKILL_FILE_NAME), "utf8"));
+			input = {
+				name: record.name,
+				description: typeof frontmatter.description === "string" ? frontmatter.description : "",
+				body,
+				scope: parseScope(record.scope),
+				files: this.readPayloadFiles(skillDir),
+			};
+		}
+
+		return {
+			dir,
+			record: {
+				kind: typeof record.kind === "string" ? record.kind : "skill",
+				name: record.name,
+				scope: typeof record.scope === "string" ? record.scope : undefined,
+				reason: typeof record.reason === "string" ? record.reason : undefined,
+				mode: typeof record.mode === "string" ? record.mode : undefined,
+				created_at: typeof record.created_at === "string" ? record.created_at : undefined,
+			},
+			input,
+		};
+	}
+
+	/** Remove a pending proposal. Proposals are decisions, not library content. */
+	removeProposal(dir: string): void {
+		if (!isInside(this.proposalsDir(), dir)) return;
+		this.removeQuietly(dir);
+	}
+
+	/** Retired skills, read from the direct children of `.archive/`. */
+	listArchived(): LearnedSkill[] {
+		let entries: fs.Dirent[];
+		try {
+			entries = fs.readdirSync(this.archiveRoot, { withFileTypes: true });
+		} catch {
+			return [];
+		}
+		const archived: LearnedSkill[] = [];
+		for (const entry of entries) {
+			// `.backups` (patch snapshots) is hidden and never a retired skill.
+			if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+			const dir = path.join(this.archiveRoot, entry.name);
+			if (!fs.existsSync(path.join(dir, SKILL_FILE_NAME))) continue;
+			const skill = this.readSkill(dir, this.scopeFromFrontmatter(dir));
+			if (skill) archived.push(skill);
+		}
+		return archived.sort((a, b) => a.name.localeCompare(b.name));
+	}
+
+	/** Bring an archived skill back to the scope its frontmatter names. */
+	restore(name: string): ArchiveResult {
+		const archived = this.listArchived().find((skill) => skill.name === name);
+		if (!archived) return { ok: false, reason: `no archived skill named "${name}"` };
+
+		let dest: string;
+		try {
+			dest = path.join(this.scopeDir(archived.scope), name);
+		} catch (error) {
+			return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+		}
+		assertInside(this.root, dest);
+		if (fs.existsSync(dest)) return { ok: false, reason: `a skill named "${name}" is already live` };
+
+		try {
+			fs.mkdirSync(path.dirname(dest), { recursive: true });
+			fs.renameSync(archived.dir, dest);
+		} catch (error) {
+			return { ok: false, reason: `restore failed: ${error instanceof Error ? error.message : String(error)}` };
+		}
+		return { ok: true, dir: dest };
+	}
+
+	/** Move a learned skill to another scope, updating its frontmatter mirror. */
+	moveToScope(name: string, scope: Scope): PublishResult {
+		const skill = this.findByName(name);
+		if (!skill) return { ok: false, reason: `no learned skill named "${name}"` };
+
+		let dest: string;
+		try {
+			dest = path.join(this.scopeDir(scope), name);
+		} catch (error) {
+			return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+		}
+		assertInside(this.root, dest);
+		if (dest === skill.dir) return { ok: true, skill };
+		if (fs.existsSync(dest)) return { ok: false, reason: `a skill named "${name}" already exists in that scope` };
+
+		try {
+			fs.mkdirSync(path.dirname(dest), { recursive: true });
+			fs.renameSync(skill.dir, dest);
+		} catch (error) {
+			return { ok: false, reason: `promotion failed: ${error instanceof Error ? error.message : String(error)}` };
+		}
+
+		const moved = this.readSkill(dest, scope);
+		if (!moved) return { ok: false, reason: "moved skill could not be read back" };
+		this.rewriteFrontmatter(moved, { scope: scope === "general" ? "general" : scope.project });
+		const updated = this.readSkill(dest, scope);
+		return updated ? { ok: true, skill: updated } : { ok: false, reason: "moved skill could not be read back" };
+	}
+
+	/** Pin or unpin a skill by rewriting its frontmatter, the durable source. */
+	setPinned(name: string, pinned: boolean): { ok: true } | { ok: false; reason: string } {
+		const skill = this.findByName(name);
+		if (!skill) return { ok: false, reason: `no learned skill named "${name}"` };
+		try {
+			this.rewriteFrontmatter(skill, { pinned });
+		} catch (error) {
+			return { ok: false, reason: `pin failed: ${error instanceof Error ? error.message : String(error)}` };
+		}
+		return { ok: true };
+	}
+
+	/**
+	 * One-way tier promotion: copy a skill into the human tier with the learned
+	 * metadata stripped. The learned copy is left for the caller to archive.
+	 */
+	exportToHuman(name: string, humanSkillsDir: string): { ok: true; dir: string } | { ok: false; reason: string } {
+		const skill = this.findByName(name);
+		if (!skill) return { ok: false, reason: `no learned skill named "${name}"` };
+		const dest = path.join(humanSkillsDir, name);
+		if (this.reservedNames.has(name) || fs.existsSync(dest)) {
+			return { ok: false, reason: `the human tier already has a skill named "${name}"` };
+		}
+
+		try {
+			fs.mkdirSync(humanSkillsDir, { recursive: true });
+			fs.cpSync(skill.dir, dest, { recursive: true });
+			const file = path.join(dest, SKILL_FILE_NAME);
+			const { frontmatter, body } = parseFrontmatter(fs.readFileSync(file, "utf8"));
+			fs.writeFileSync(file, serializeFrontmatter({ name, description: frontmatter.description }, body));
+		} catch (error) {
+			this.removeQuietly(dest);
+			return { ok: false, reason: `promotion to the human tier failed: ${error instanceof Error ? error.message : String(error)}` };
+		}
+		return { ok: true, dir: dest };
 	}
 
 	// -- internals ------------------------------------------------------------
@@ -579,6 +771,27 @@ export class SkillStore {
 			metadata,
 			pinned: metadata.pinned === true,
 		};
+	}
+
+	/** Rewrite a skill's frontmatter in place, atomically, keeping the body. */
+	private rewriteFrontmatter(skill: LearnedSkill, patch: Record<string, unknown>): void {
+		const { frontmatter, body } = parseFrontmatter(fs.readFileSync(skill.filePath, "utf8"));
+		const metadata = { ...(isPlainObject(frontmatter.metadata) ? frontmatter.metadata : {}), ...patch };
+		const temp = `${skill.filePath}.${process.pid}.tmp`;
+		fs.writeFileSync(temp, serializeFrontmatter({ ...frontmatter, metadata }, body));
+		fs.renameSync(temp, skill.filePath);
+	}
+
+	/** The scope an archived skill's frontmatter names; defaults to general. */
+	private scopeFromFrontmatter(dir: string): Scope {
+		try {
+			const { frontmatter } = parseFrontmatter(fs.readFileSync(path.join(dir, SKILL_FILE_NAME), "utf8"));
+			const scope = isPlainObject(frontmatter.metadata) ? frontmatter.metadata.scope : undefined;
+			if (typeof scope === "string" && scope !== "general") return { project: scope };
+		} catch {
+			// Fall through to general.
+		}
+		return "general";
 	}
 
 	private writeSkillFiles(dir: string, frontmatter: Record<string, unknown>, body: string, files: readonly SkillFile[] | undefined): void {
@@ -671,6 +884,12 @@ export function validatePayloadPath(relative: string): string | undefined {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Parse a proposal's recorded scope back into a {@link Scope}. */
+function parseScope(value: unknown): Scope {
+	if (typeof value === "string" && value !== "general") return { project: value };
+	return "general";
 }
 
 /**

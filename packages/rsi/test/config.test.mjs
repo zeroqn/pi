@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { configPathFor, defaultStorePath, loadConfig } from "../config.ts";
+import { configPathFor, defaultStorePath, loadConfig, saveConfig } from "../config.ts";
 
 function tempAgent() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "rsi-cfg-"));
@@ -138,4 +138,43 @@ test("an explicit config file overrides the agent-dir location", (t) => {
 
 	const { config } = loadConfig({ agentDir, file });
 	assert.equal(config.quietMinutes, 1);
+});
+
+// ---------------------------------------------------------------------------
+// saveConfig — the operator toggles (/rsi off, observe, off --project) write
+// config back, so this must merge rather than clobber, and never throw.
+// ---------------------------------------------------------------------------
+
+test("saveConfig merges into an existing config, preserving other keys", (t) => {
+	const agentDir = tempAgent();
+	t.after(() => fs.rmSync(agentDir, { recursive: true, force: true }));
+
+	fs.mkdirSync(path.dirname(configPathFor(agentDir)), { recursive: true });
+	fs.writeFileSync(configPathFor(agentDir), '{\n  // keep me\n  "quietMinutes": 9,\n}');
+
+	assert.equal(saveConfig({ agentDir }, { observeOnly: false }).ok, true);
+	const { config, warnings } = loadConfig({ agentDir });
+	assert.deepEqual(warnings, []);
+	assert.equal(config.quietMinutes, 9, "the existing key survives");
+	assert.equal(config.observeOnly, false);
+});
+
+test("saveConfig creates the file and replaces a malformed one", (t) => {
+	const agentDir = tempAgent();
+	t.after(() => fs.rmSync(agentDir, { recursive: true, force: true }));
+
+	assert.equal(saveConfig({ agentDir }, { enabled: false }).ok, true);
+	assert.equal(loadConfig({ agentDir }).config.enabled, false);
+
+	fs.writeFileSync(configPathFor(agentDir), "{ not json");
+	assert.equal(saveConfig({ agentDir }, { enabled: true }).ok, true);
+	assert.equal(loadConfig({ agentDir }).config.enabled, true);
+});
+
+test("saveConfig round-trips a disabledProjects list", (t) => {
+	const agentDir = tempAgent();
+	t.after(() => fs.rmSync(agentDir, { recursive: true, force: true }));
+
+	assert.equal(saveConfig({ agentDir }, { disabledProjects: ["github.com/acme/app"] }).ok, true);
+	assert.deepEqual(loadConfig({ agentDir }).config.disabledProjects, ["github.com/acme/app"]);
 });

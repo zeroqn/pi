@@ -28,6 +28,7 @@
 		"prescan.ts",
 		"project-key.ts",
 		"prompt.ts",
+		"review.ts",
 		"scheduler.ts",
 		"skill-actions.ts",
 		"store.ts",
