@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"allowImportingTsExtensions": true,
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"noEmit": true,
+		"skipLibCheck": true,
+		"target": "ES2022",
+		"baseUrl": ".",
+		"paths": {
+			"@earendil-works/pi-coding-agent": [
+				"/nix/store/cyb9iy8dmwdz0z42wm771cpv7r6kr6d5-pi-coding-agent-0.85.1/lib/pi-coding-agent/index.d.ts"
+			]
+		}
+	},
+	"include": ["index.ts"]
+}
