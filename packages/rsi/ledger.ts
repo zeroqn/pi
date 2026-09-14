@@ -195,6 +195,20 @@ export interface StatusSnapshot {
 }
 
 /**
+ * Advance the interval clock at the start of a pass, or roll it back when a
+ * pass errored without doing any work so the next settle can retry.
+ */
+export async function setLastPassAt(root: string, at: string | null): Promise<boolean> {
+	const written = await withLedgerLock(root, () => {
+		const { ledger } = readLedger(root);
+		ledger.last_pass_at = at;
+		writeLedger(root, ledger);
+		return true;
+	});
+	return written ?? false;
+}
+
+/**
  * Store the counters just shown and return the previous look, so `/rsi status`
  * can open with a delta. Returns `undefined` when the lock was not available.
  */

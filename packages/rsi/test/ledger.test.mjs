@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { ensureLedger, ledgerLockPath, ledgerPath, readLedger, recordUsage, takeStatusSnapshot, withLedgerLock, writeLedger } from "../ledger.ts";
+import { ensureLedger, ledgerLockPath, ledgerPath, readLedger, recordUsage, setLastPassAt, takeStatusSnapshot, withLedgerLock, writeLedger } from "../ledger.ts";
 
 function tempRoot(t) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "rsi-ledger-"));
@@ -124,4 +124,13 @@ test("takeStatusSnapshot stores the look and returns the previous one", async (t
 	const { ledger } = readLedger(root);
 	assert.deepEqual(ledger.last_status, { skills: 3, uses: 9, neverUsed: 1 });
 	assert.equal(ledger.last_status_at, "2026-09-02T00:00:00.000Z");
+});
+
+test("setLastPassAt advances and restores the interval clock", async (t) => {
+	const root = tempRoot(t);
+	assert.equal(await setLastPassAt(root, "2026-09-14T12:00:00.000Z"), true);
+	assert.equal(readLedger(root).ledger.last_pass_at, "2026-09-14T12:00:00.000Z");
+
+	assert.equal(await setLastPassAt(root, null), true);
+	assert.equal(readLedger(root).ledger.last_pass_at, null);
 });

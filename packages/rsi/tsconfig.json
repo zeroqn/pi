@@ -18,8 +18,11 @@
 		"config.ts",
 		"frontmatter.ts",
 		"ledger.ts",
+		"pass-lock.ts",
 		"paths.ts",
+		"prescan.ts",
 		"project-key.ts",
+		"scheduler.ts",
 		"store.ts",
 		"telemetry.ts"
 	]

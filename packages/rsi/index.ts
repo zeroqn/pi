@@ -15,12 +15,14 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getAgentDir, parseSkillBlock } from "@earendil-works/pi-coding-agent";
 import { loadConfig } from "./config.ts";
 import { discoverSkillNames } from "./frontmatter.ts";
 import { readLedger, recordUsage, takeStatusSnapshot } from "./ledger.ts";
 import { projectKeyFor } from "./project-key.ts";
+import { toScanMessages } from "./prescan.ts";
+import { PassScheduler } from "./scheduler.ts";
 import { SkillStore, type Scope } from "./store.ts";
 import { bashReadCandidates, formatStatus, summarizeStatus, UsageTracker } from "./telemetry.ts";
 
@@ -37,6 +39,20 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 
 	// Bash gives no cwd, so relative paths are resolved against the session's.
 	let currentCwd = process.cwd();
+	// The pass fires on a timer, outside any handler, so it needs a live ctx.
+	let currentCtx: ExtensionContext | undefined;
+
+	const scheduler = new PassScheduler({
+		root: store.root,
+		config,
+		getActiveTools: () => pi.getActiveTools(),
+		getScanMessages: () => (currentCtx ? toScanMessages(currentCtx.sessionManager.getEntries()) : []),
+		runPass: async (reason) => {
+			// Phase 4 replaces this with the in-process learner fork.
+			if (reason === "learn") currentCtx?.ui.notify("rsi: the learner lands in phase 4; the trigger chain ran", "info");
+			return { ok: true, toolActions: 0 };
+		},
+	});
 
 	pi.on("resources_discover", async (event) => {
 		currentCwd = event.cwd;
@@ -56,6 +72,7 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
+		currentCtx = ctx;
 		if (!config.enabled) return;
 		for (const warning of warnings) {
 			ctx.ui.notify(warning, "warning");
@@ -82,7 +99,24 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("turn_start", async () => {
+		scheduler.activity();
 		if (config.enabled) tracker.beginTurn();
+		return undefined;
+	});
+
+	pi.on("agent_start", async () => {
+		scheduler.activity();
+		return undefined;
+	});
+
+	pi.on("agent_settled", async (_event, ctx) => {
+		currentCtx = ctx;
+		scheduler.settled();
+		return undefined;
+	});
+
+	pi.on("session_shutdown", async () => {
+		scheduler.shutdown();
 		return undefined;
 	});
 
@@ -116,7 +150,16 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 				await showStatus(ctx);
 				return;
 			}
-			ctx.ui.notify(`rsi: unknown subcommand "${subcommand}"; phase 2 implements only /rsi status`, "warning");
+			if (subcommand === "learn") {
+				const result = await scheduler.learnNow();
+				if (!result.ran) {
+					ctx.ui.notify(`rsi: learn skipped (${result.skipped})`, "info");
+				} else {
+					ctx.ui.notify(result.outcome.ok ? "rsi: learn pass complete" : "rsi: learn pass failed", result.outcome.ok ? "info" : "warning");
+				}
+				return;
+			}
+			ctx.ui.notify(`rsi: unknown subcommand "${subcommand}"; phases 1–3 implement /rsi status and /rsi learn`, "warning");
 		},
 	});
 
