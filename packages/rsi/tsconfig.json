@@ -20,6 +20,7 @@
 		"ledger.ts",
 		"paths.ts",
 		"project-key.ts",
-		"store.ts"
+		"store.ts",
+		"telemetry.ts"
 	]
 }

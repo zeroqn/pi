@@ -6,15 +6,24 @@
  * frontmatter instead, so a missing or corrupt ledger is a less-informed view,
  * never a loss of the library.
  *
- * Phase 1 is a stub: read, write and create the file atomically. The
- * `.ledger.lock` mutation path and the telemetry counters arrive in phase 2.
+ * Every mutation takes `rsi/.ledger.lock` — deliberately not the pass `.lock`,
+ * so a minutes-long pass never blocks recording — and replaces the file via a
+ * temp sibling and an atomic rename. The lock is held for milliseconds.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 
 export const LEDGER_SCHEMA_VERSION = 1;
 export const LEDGER_FILE_NAME = "index.json";
+export const LEDGER_LOCK_FILE_NAME = ".ledger.lock";
+
+/** How long to wait for a contended ledger lock before dropping the mutation. */
+const LOCK_TIMEOUT_MS = 2_000;
+/** A lock file older than this is presumed abandoned and reclaimed. */
+const LOCK_STALE_MS = 10_000;
+const LOCK_RETRY_MS = 20;
 
 export interface LedgerEntry {
 	first_seen_at?: string;
@@ -27,15 +36,35 @@ export interface LedgerEntry {
 	scope?: string;
 }
 
+/** The counters `/rsi status` opens with, so it can show a since-last-look delta. */
+export interface StatusCounts {
+	skills: number;
+	uses: number;
+	neverUsed: number;
+}
+
 export interface Ledger {
 	schema_version: number;
 	last_pass_at: string | null;
 	skills: Record<string, LedgerEntry>;
+	last_status_at?: string;
+	last_status?: StatusCounts;
 }
 
 export interface ReadLedgerResult {
 	ledger: Ledger;
 	warning?: string;
+}
+
+export type UsageKind = "read" | "expansion";
+
+export interface UsageRecord {
+	skill: string;
+	/** `"general"` or a project key; a mirror of the authoritative frontmatter. */
+	scope: string;
+	kind: UsageKind;
+	/** Injectable clock for tests. */
+	at?: string;
 }
 
 export function emptyLedger(): Ledger {
@@ -44,6 +73,10 @@ export function emptyLedger(): Ledger {
 
 export function ledgerPath(root: string): string {
 	return path.join(root, LEDGER_FILE_NAME);
+}
+
+export function ledgerLockPath(root: string): string {
+	return path.join(root, LEDGER_LOCK_FILE_NAME);
 }
 
 /** Read the ledger; missing is empty and corrupt is empty-with-a-warning. */
@@ -60,14 +93,14 @@ export function readLedger(root: string): ReadLedgerResult {
 		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
 			throw new Error("expected a JSON object");
 		}
-		const skills = typeof parsed.skills === "object" && parsed.skills !== null && !Array.isArray(parsed.skills) ? parsed.skills : {};
-		return {
-			ledger: {
-				schema_version: typeof parsed.schema_version === "number" ? parsed.schema_version : LEDGER_SCHEMA_VERSION,
-				last_pass_at: typeof parsed.last_pass_at === "string" ? parsed.last_pass_at : null,
-				skills,
-			},
+		const ledger: Ledger = {
+			schema_version: typeof parsed.schema_version === "number" ? parsed.schema_version : LEDGER_SCHEMA_VERSION,
+			last_pass_at: typeof parsed.last_pass_at === "string" ? parsed.last_pass_at : null,
+			skills: isPlainObject(parsed.skills) ? (parsed.skills as Record<string, LedgerEntry>) : {},
 		};
+		if (typeof parsed.last_status_at === "string") ledger.last_status_at = parsed.last_status_at;
+		if (isStatusCounts(parsed.last_status)) ledger.last_status = parsed.last_status;
+		return { ledger };
 	} catch (error) {
 		return {
 			ledger: emptyLedger(),
@@ -90,4 +123,119 @@ export function ensureLedger(root: string): boolean {
 	if (fs.existsSync(ledgerPath(root))) return false;
 	writeLedger(root, emptyLedger());
 	return true;
+}
+
+/**
+ * Run `fn` with the ledger lock held. Exclusive-create is the lock; a stale
+ * file (older than {@link LOCK_STALE_MS}) is reclaimed. Returns `undefined`
+ * rather than throwing when the lock cannot be taken in time: losing one usage
+ * count is better than surfacing an error from a background observation.
+ */
+export async function withLedgerLock<T>(root: string, fn: () => T): Promise<T | undefined> {
+	fs.mkdirSync(root, { recursive: true });
+	const lockPath = ledgerLockPath(root);
+	const deadline = Date.now() + LOCK_TIMEOUT_MS;
+	let attempt = 0;
+
+	for (;;) {
+		if (attempt > 0 && Date.now() >= deadline) return undefined;
+		attempt++;
+
+		let fd: number | undefined;
+		try {
+			fd = fs.openSync(lockPath, "wx");
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+		}
+		if (fd !== undefined) {
+			try {
+				fs.writeSync(fd, `${process.pid} ${Date.now()}\n`);
+				return fn();
+			} finally {
+				fs.closeSync(fd);
+				removeQuietly(lockPath);
+			}
+		}
+
+		const stale = isStaleLock(lockPath);
+		if (stale === true) {
+			removeQuietly(lockPath);
+			continue;
+		}
+		if (stale === undefined) continue; // the lock vanished; retry at once
+		await sleep(LOCK_RETRY_MS);
+	}
+}
+
+/**
+ * Record one usage observation. A read moves both counters; a `/skill:name`
+ * expansion moves only `use_count`. Every use resets the disuse clock.
+ */
+export async function recordUsage(root: string, usage: UsageRecord): Promise<boolean> {
+	const written = await withLedgerLock(root, () => {
+		const { ledger } = readLedger(root);
+		const at = usage.at ?? new Date().toISOString();
+		const entry = ledger.skills[usage.skill] ?? {};
+		entry.first_seen_at ??= at;
+		entry.last_used_at = at;
+		entry.use_count = (entry.use_count ?? 0) + 1;
+		if (usage.kind === "read") entry.read_count = (entry.read_count ?? 0) + 1;
+		entry.scope = usage.scope;
+		entry.state ??= "active";
+		ledger.skills[usage.skill] = entry;
+		writeLedger(root, ledger);
+		return true;
+	});
+	return written ?? false;
+}
+
+export interface StatusSnapshot {
+	previous?: StatusCounts;
+	lastStatusAt?: string;
+}
+
+/**
+ * Store the counters just shown and return the previous look, so `/rsi status`
+ * can open with a delta. Returns `undefined` when the lock was not available.
+ */
+export async function takeStatusSnapshot(root: string, current: StatusCounts, at?: string): Promise<StatusSnapshot | undefined> {
+	return withLedgerLock(root, () => {
+		const { ledger } = readLedger(root);
+		const previous = ledger.last_status;
+		const lastStatusAt = ledger.last_status_at;
+		ledger.last_status = current;
+		ledger.last_status_at = at ?? new Date().toISOString();
+		writeLedger(root, ledger);
+		return { previous, lastStatusAt };
+	});
+}
+
+function isStaleLock(lockPath: string): boolean | undefined {
+	try {
+		return Date.now() - fs.statSync(lockPath).mtimeMs > LOCK_STALE_MS;
+	} catch {
+		// The lock disappeared between the failed create and the stat.
+		return undefined;
+	}
+}
+
+function removeQuietly(target: string): void {
+	try {
+		fs.unlinkSync(target);
+	} catch {
+		// Already gone, or not ours to remove.
+	}
+}
+
+function isStatusCounts(value: unknown): value is StatusCounts {
+	return (
+		isPlainObject(value) &&
+		typeof value.skills === "number" &&
+		typeof value.uses === "number" &&
+		typeof value.neverUsed === "number"
+	);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
