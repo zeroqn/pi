@@ -46,7 +46,7 @@ export interface ChildKernelContext {
 	/** Sends a message to the session that spawned this kernel. */
 	onMessage: (text: string) => void;
 	/** Spawns a grandchild through the same manager, one level deeper. */
-	spawn: (request: Omit<SpawnRequest, "depth" | "ownerDispatch" | "spawnCell">) => Promise<ChildHandle>;
+	spawn: (request: Omit<SpawnRequest, "depth" | "ownerDispatch">) => Promise<ChildHandle>;
 	/** The registry lives in the root, so a child reads it through the manager. */
 	poll: (selector: string) => ChildHandle;
 	list: () => ChildHandle[];
@@ -367,7 +367,10 @@ export function createChildManager(deps: ChildManagerDeps) {
 				spawn({
 					...inner,
 					depth: request.depth + 1,
-					spawnCell: "",
+					// Provenance at depth >= 2: the spawning cell belongs to the child, so it
+					// travels with the request instead of being dropped (a gap v2's depth-2 run
+					// found: the entry recorded no spawn cell for grandchildren).
+					spawnCell: inner.spawnCell ?? "",
 					// Provenance matters: a grandchild must record *its* parent, or Magic
 					// Context cannot bind it (ticket 16).
 					parentSessionFile: inner.parentSessionFile,
@@ -393,8 +396,12 @@ export function createChildManager(deps: ChildManagerDeps) {
 				`You are "${request.name}", a delegated child session (depth ${request.depth}). Work the task and answer it.`,
 				// v2 ticket 05: RLM owns the kernel and delegation sentence, and it is
 				// deliberately parent-only — a child is told where its results go, not that it
-				// may one day have children of its own.
-				"You have a persistent Python kernel. You may delegate with rlm.spawn(name=..., prompt=...); results arrive as messages, never as the call's return value.",
+				// may one day have children of its own. At the cap it is told the opposite,
+				// because rlm.spawn would be refused (a mismatch v2's depth-2 run surfaced:
+				// the sentence promised something the cap forbids).
+				request.depth < deps.maxDepth
+					? "You have a persistent Python kernel. You may delegate with rlm.spawn(name=..., prompt=...); results arrive as messages, never as the call's return value."
+					: "You have a persistent Python kernel. You are at the delegation limit, so rlm.spawn will be refused — answer the task yourself.",
 				"Use agent_message.send(text) to send anything your parent needs before you finish.",
 			],
 		});

@@ -665,7 +665,12 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 			};
 			if (childContext) {
 				// The child's own session file is *its* child's parent — provenance, not the root's.
-				return childContext.spawn({ ...inner, parentSessionFile: sessionCtx?.sessionManager?.getSessionFile?.() });
+				return childContext.spawn({
+					...inner,
+					parentSessionFile: sessionCtx?.sessionManager?.getSessionFile?.(),
+					// Provenance at depth >= 2: the cell spawning the grandchild is this kernel's.
+					spawnCell: currentCell,
+				});
 			}
 			return manager!.spawn({
 				...inner,
