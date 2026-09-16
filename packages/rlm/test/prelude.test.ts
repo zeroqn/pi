@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,12 +36,28 @@ function findBinding(startDir: string): string | null {
 }
 
 /** The worker is a host prerequisite, so its absence is a skip rather than a failure. */
-const montyReady = (() => {
+function resolveWorker(): string | null {
+	const fromEnv = process.env.MONTY_BIN;
+	if (fromEnv) return existsSync(fromEnv) ? fromEnv : null;
 	const binding = findBinding(HERE);
-	if (!binding) return false;
-	const worker = process.env.MONTY_BIN;
-	return worker ? existsSync(worker) : true;
-})();
+	if (!binding) return null;
+	const bundled = join(dirname(binding), "monty");
+	return existsSync(bundled) ? bundled : null;
+}
+
+/**
+ * A present worker is not necessarily a runnable one. On this Nix host the bundled
+ * binary exists but its PT_INTERP (/lib64/ld-linux-x86-64.so.2) does not, and monty
+ * surfaces that as a spawn ENOENT against a file that is plainly there. Probe it, so
+ * the real-kernel tests skip with a reason instead of failing misleadingly.
+ */
+const workerPath = resolveWorker();
+const montyReady =
+	workerPath !== null &&
+	spawnSync(workerPath, ["--version"], { timeout: 5_000 }).status === 0;
+if (!montyReady) {
+	console.warn("skipping the real-kernel tests: no runnable monty worker — set MONTY_BIN (see README.md)");
+}
 
 describe("the prelude source", () => {
 	it("quotes the workspace and scratch paths rather than interpolating them raw", () => {
