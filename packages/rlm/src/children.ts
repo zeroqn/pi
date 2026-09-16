@@ -312,6 +312,31 @@ function usageOfRecord(record: ChildRecord): ChildHandle["usage"] | undefined {
 	return { input_tokens: totals.input, output_tokens: totals.output, total_tokens: totals.total };
 }
 
+/**
+ * The child's system prompt (v2 ticket 05).
+ *
+ * RLM owns the kernel and delegation sentence and states it **parent-only**: a child is
+ * told where its results go, not that it may one day have children of its own. At the cap
+ * it is told the opposite, because `rlm.spawn` would be refused.
+ *
+ * `RLM_CHILD_PROMPT=none` drops the added sentences and leaves the pre-v2 prompt. That is
+ * a **diagnostic, not a feature**: v2's criterion for this contract is an A/B — the same
+ * task with and without the added prompt must produce the same artefact — and a
+ * comparison needs a control that differs in exactly that one way.
+ */
+export function childPromptFor(request: { name: string; depth: number }, maxDepth: number): string[] {
+	const identity = `You are "${request.name}", a delegated child session (depth ${request.depth}). Work the task and answer it.`;
+	const reporting = "Use agent_message.send(text) to send anything your parent needs before you finish.";
+	if (process.env.RLM_CHILD_PROMPT === "none") return [identity, reporting];
+	return [
+		identity,
+		request.depth < maxDepth
+			? "You have a persistent Python kernel. You may delegate with rlm.spawn(name=..., prompt=...); results arrive as messages, never as the call's return value."
+			: "You have a persistent Python kernel. You are at the delegation limit, so rlm.spawn will be refused — answer the task yourself.",
+		reporting,
+	];
+}
+
 export function createChildManager(deps: ChildManagerDeps) {
 	const records = new Map<string, ChildRecord>();
 	let counter = 0;
@@ -392,18 +417,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 			noPromptTemplates: true,
 			noThemes: true,
 			extensionFactories: [deps.kernelFactoryFor(context), ...(deps.childFactories?.(request) ?? [])],
-			appendSystemPrompt: [
-				`You are "${request.name}", a delegated child session (depth ${request.depth}). Work the task and answer it.`,
-				// v2 ticket 05: RLM owns the kernel and delegation sentence, and it is
-				// deliberately parent-only — a child is told where its results go, not that it
-				// may one day have children of its own. At the cap it is told the opposite,
-				// because rlm.spawn would be refused (a mismatch v2's depth-2 run surfaced:
-				// the sentence promised something the cap forbids).
-				request.depth < deps.maxDepth
-					? "You have a persistent Python kernel. You may delegate with rlm.spawn(name=..., prompt=...); results arrive as messages, never as the call's return value."
-					: "You have a persistent Python kernel. You are at the delegation limit, so rlm.spawn will be refused — answer the task yourself.",
-				"Use agent_message.send(text) to send anything your parent needs before you finish.",
-			],
+			appendSystemPrompt: childPromptFor(request, deps.maxDepth),
 		});
 		await loader.reload();
 

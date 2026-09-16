@@ -70,9 +70,11 @@ pi -ne -e /workspace/pi/extensions/rlm/src/index.ts -nbt -na \
 
 `-ne` keeps other extensions out, `-nbt` disables built-in tools while keeping extension tools, `-na` ignores project-local config.
 
-Environment overrides: `RLM_FD` (find backend), `RLM_ZG` (grep backend), `RLM_SHELL`.
+Environment overrides: `RLM_FD` (find backend), `RLM_ZG` (grep backend), `RLM_SHELL`, and `RLM_CHILD_PROMPT=none`.
 
 **`MONTY_BIN` is only needed on a host without `/lib64/ld-linux-x86-64.so.2`** — NixOS, musl. The flake's `.#monty-bin` is the published worker patched for Nix; do **not** use `.#monty`, which is the local checkout at protocol 3 and cannot talk to the published client. On ordinary glibc, macOS and Windows, nothing is needed. See the install story in `.scratch/rlm-extension/spike/package/README.md`.
+
+**`RLM_CHILD_PROMPT=none` is a diagnostic, not a feature.** It drops the child's kernel and delegation sentences and leaves the pre-v2 prompt, because v2's acceptance criterion for that contract is an A/B — the same task run twice, with and without the added prompt, must produce the same artefact. Running it is how that criterion was closed (`.scratch/rlm-v2/v2-acceptance.md`, check 6); leaving it unset is the normal case.
 
 ## Install as a pi package
 
