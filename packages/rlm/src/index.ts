@@ -30,11 +30,11 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from "node:os";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createChildManager, findModels, modelRuntime } from "./children";
+import { createChildManager, findModels, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
 import type { ChildKernelContext, ChildHandle, Notice } from "./children";
 import { createBackgroundManager } from "./background";
 import type { BgHandleInfo } from "./background";
-import { magicContextChildShim, magicContextStatus } from "./magic-context";
+import { bindToParentInstance, magicContextChildShim, magicContextStatus } from "./magic-context";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FD = process.env.RLM_FD ?? "/nix/store/5j3vslc4gccb95xnzr1mxhgwrc0wfgad-fd-10.4.2/bin/fd";
@@ -373,12 +373,16 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	let previousSessionFile: string | undefined;
 	let sessionCtx: any = null;
 	let currentCell = "";
+	// v2 ticket 10: this session's own depth, resolved from its artifacts rather than
+	// from what it was told, so a resumed child still knows how deep it is.
+	let ownDepth = childContext ? childContext.depth : 0;
 	const notices: Notice[] = [];
 	let parentBusy = false;
 	const manager = childContext
 		? null
 		: createChildManager({
 				cwd: () => root || process.cwd(),
+				ownSessionFile: () => sessionCtx?.sessionManager?.getSessionFile?.(),
 				kernelFactoryFor: (child) => (childPi: any) => createKernel(childPi, child),
 				childFactories: (request) => [magicContextChildShim(request.parentSessionFile)],
 				runtime: () => modelRuntime(),
@@ -673,7 +677,10 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		};
 		return {
 			async rlm_spawn(...args: unknown[]) {
-				return spawnHandle(1, args);
+				// The depth is absolute: a session that is itself a child spawns one level
+				// deeper than its own durable depth, which is what enforces the cap with no
+				// root present (v2 ticket 10).
+				return spawnHandle(ownDepth + 1, args);
 			},
 			async rlm_poll(...args: unknown[]) {
 				const { selector } = bind(args, ["selector"]);
@@ -695,6 +702,10 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 				const text = query ? str(query) : undefined;
 				const count = num(limit, 20);
 				return childContext ? childContext.findModels(text, count) : findModels(await modelRuntime(), text, count);
+			},
+			/** v2 ticket 07: what this session's descendants have cost so far. */
+			async rlm_tree_cost() {
+				return { total_tokens: manager ? manager.treeCost() : 0, own_depth: ownDepth };
 			},
 			async agent_message_send(...args: unknown[]) {
 				const { text, receiver_role } = bind(args, ["text", "receiver_role"]);
@@ -746,6 +757,25 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		startReason = event?.reason ?? "startup";
 		previousSessionFile = event?.previousSessionFile;
 		sessionCtx = ctx;
+		// v2 ticket 10: this session's own depth comes from its own artifacts — the
+		// `rlm-child` entry, or the parentSession chain — so a child resumed without its
+		// spawner still knows how deep it is and how much spawning authority it has.
+		// Ticket 09: a session that is itself a child is re-served by its parent's Magic
+		// Context instance, which is what makes the contract survive a resume.
+		const resolvedDepth = resolveOwnDepth({
+			sessionManager: ctx?.sessionManager,
+			sessionFile: ctx?.sessionManager?.getSessionFile?.(),
+			maxDepth: MAX_DEPTH,
+		});
+		ownDepth = childContext ? childContext.depth : resolvedDepth.depth;
+		if (!childContext && resolvedDepth.depth > 0) {
+			const provenance = readChildProvenance(ctx?.sessionManager);
+			bindToParentInstance({
+				childSessionFile: ctx?.sessionManager?.getSessionFile?.(),
+				parentSessionFile: provenance?.parentSessionFile,
+				cwd: ctx?.cwd,
+			});
+		}
 		pi.setActiveTools(["python"]);
 		const problems = await preflight();
 		// Background handles are restored read-only: nothing is ever re-executed.
@@ -863,7 +893,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 			"In python, use read_text, write_text, edit_text and walk for file work; they are plain Python and need no await.",
 			'In python there are no third-party imports and no generators, inheritance or decorators. When you need real CPython or a library, use await bash("python3 ...").',
 			"In python, bulk file reads are faster through await bash(...) than through the kernel's own open(): each file operation is a separate host call. Use Python loops for logic over files, not for reading many of them.",
-			"Use await rlm.spawn(name=..., prompt=...) for work worth doing in parallel or in a cleaner context, then end the turn: the child's answer arrives as a message, and rlm.poll(id) reads its status.",
+			"Use await rlm.spawn(name=..., prompt=...) for work worth doing in parallel or in a cleaner context, then end the turn: the child's answer arrives as a message, and rlm.poll(id) reads its status. rlm.list() shows the children and their tokens; rlm.tree_cost() totals what the whole tree has spent.",
 		],
 		parameters: {
 			type: "object",

@@ -103,6 +103,9 @@ class _Rlm:
     def send(self, selector, text):
         return rlm_send(selector, text)
 
+    def tree_cost(self):
+        return rlm_tree_cost()
+
 rlm = _Rlm()
 
 class _AgentMessage:
