@@ -859,6 +859,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		promptGuidelines: [
 			"Use python for work that is stateful, multi-step or data-shaped — parsing, transforming, searching, summarising — instead of chaining many small tool calls.",
 			"In python, every host call is awaited: await bash(...), await find(...), await grep(...), await read_image(...), await rlm.spawn(...), await agent_message.send(...). A host call without await returns an unfinished object, not a result.",
+			"In python, a host call's result exists only in Python until you print or return it — `await bash(...)` on its own puts nothing in your context. Print the value you mean to read, or it is invisible to you even though the call succeeded.",
 			"In python, use read_text, write_text, edit_text and walk for file work; they are plain Python and need no await.",
 			'In python there are no third-party imports and no generators, inheritance or decorators. When you need real CPython or a library, use await bash("python3 ...").',
 			"In python, bulk file reads are faster through await bash(...) than through the kernel's own open(): each file operation is a separate host call. Use Python loops for logic over files, not for reading many of them.",
