@@ -28,7 +28,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, extname, join } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createChildManager, findModels, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
 import type { ChildKernelContext, ChildHandle, Notice } from "./children";
@@ -357,6 +357,17 @@ export default function (pi: any) {
 }
 
 /**
+ * The session file as an absolute host path. pi hands it over exactly as it was
+ * configured, so `--session-dir sessions` yields `sessions/<id>.jsonl` — relative, and
+ * monty refuses a relative *virtual* path, which killed the kernel before the first cell
+ * (ticket 12). Every derived path (scratch, journal, dump) is built from this one.
+ */
+export function sessionFilePath(ctx: any): string | undefined {
+	const file: string | undefined = ctx?.sessionManager?.getSessionFile?.();
+	return file ? resolve(file) : undefined;
+}
+
+/**
  * The kernel, for a root session (`childContext === null`) or for a child created
  * by `rlm.spawn`. A child gets the same tool surface but **no ambient extensions**
  * (ticket 07), and its delegation calls route through the spawner that made it.
@@ -427,7 +438,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	 * deleted during the session: journal replay re-reads it (ticket 14).
 	 */
 	function scratchDirFor(ctx: any): string {
-		const sessionFile: string | undefined = ctx?.sessionManager?.getSessionFile?.();
+		const sessionFile = sessionFilePath(ctx);
 		return sessionFile ? `${sessionFile}.scratch` : join(tmpdir(), `rlm-scratch-${process.pid}`);
 	}
 
@@ -442,7 +453,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		mount = new monty.MountDir({ hostPath: cwd, virtualPath: cwd, mode: "read-write" });
 		scratchMount = new monty.MountDir({ hostPath: scratch, virtualPath: scratch, mode: "read-write" });
 		root = cwd;
-		const sessionFile: string | undefined = ctx?.sessionManager?.getSessionFile?.();
+		const sessionFile = sessionFilePath(ctx);
 		journalPath = sessionFile ? `${sessionFile}.rlm-journal.jsonl` : "";
 		dumpPath = sessionFile ? `${sessionFile}.rlm-dump.bin` : "";
 		currentProgress = undefined;
@@ -520,8 +531,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	 * feed and read-after-write across cells has to survive.
 	 */
 	async function restoreFromJournal(ctx: any, cwd: string) {
-		const sourceFile: string | undefined =
-			startReason === "fork" && previousSessionFile ? previousSessionFile : ctx?.sessionManager?.getSessionFile?.();
+		const sourceFile = startReason === "fork" && previousSessionFile ? previousSessionFile : sessionFilePath(ctx);
 		if (!sourceFile) return;
 		const records = readJournal(`${sourceFile}.rlm-journal.jsonl`);
 		if (records.length === 0) return;
@@ -788,7 +798,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 
 	pi.on("session_start", async (event: any, ctx: any) => {
 		startReason = event?.reason ?? "startup";
-		previousSessionFile = event?.previousSessionFile;
+		previousSessionFile = event?.previousSessionFile ? resolve(event.previousSessionFile) : undefined;
 		sessionCtx = ctx;
 		// v2 ticket 10: this session's own depth comes from its own artifacts — the
 		// `rlm-child` entry, or the parentSession chain — so a child resumed without its
