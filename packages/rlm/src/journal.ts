@@ -52,11 +52,17 @@ export function restoredLine(report: RestoreReport): string {
 export function recordingHost(host: HostFns, record: (name: string, args: unknown[], result: unknown) => void): HostFns {
 	const wrapped: HostFns = {};
 	for (const [name, fn] of Object.entries(host)) {
-		wrapped[name] = async (...args: unknown[]) => {
+		const wrapper = async (...args: unknown[]) => {
 			const result = await fn(...args);
 			record(name, args, result);
 			return result;
 		};
+		// monty identifies a host function by its JS `.name` once the sandbox has read it as a
+		// value (ticket 02): an anonymous wrapper binds as the literal '<anonymous>' and every
+		// later call through the binding fails with NameError. The sandbox name is the key, so
+		// give the wrapper that name (function `.name` is configurable).
+		Object.defineProperty(wrapper, "name", { value: name });
+		wrapped[name] = wrapper;
 	}
 	return wrapped;
 }
@@ -72,14 +78,19 @@ export function replayHost(calls: HostCallRecord[]): {
 } {
 	let cursor = 0;
 	const host: HostFns = {};
-	for (const name of ["bash", "find", "grep", "read_image"]) {
-		host[name] = async () => {
+	// Serve every name the journal actually recorded (bash_host, bg_list, rlm_spawn, ...), not
+	// a hardcoded guess. Each wrapper is named to match its key so that a value read in a
+	// replayable cell (h = find) binds under the same name the journal can answer.
+	for (const name of new Set(calls.map((call) => call.name))) {
+		const replay = async () => {
 			const record = calls[cursor];
 			if (!record) throw new Error(`journal replay diverged: ${name}() with no recorded call left`);
 			if (record.name !== name) throw new Error(`journal replay diverged: expected ${record.name}(), got ${name}()`);
 			cursor += 1;
 			return record.result;
 		};
+		Object.defineProperty(replay, "name", { value: name });
+		host[name] = replay;
 	}
 	return { host, consumed: () => cursor };
 }

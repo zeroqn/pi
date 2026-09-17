@@ -114,8 +114,56 @@ describe("replay is reconstruction, not re-execution", () => {
 	});
 
 	it("stops loudly when the journal and the code disagree", async () => {
-		const replay = replayHost([{ name: "grep", args: [], result: {} }]);
-		await expect(replay.host.bash!()).rejects.toThrow(/diverged: expected grep\(\), got bash\(\)/);
-		await expect(replayHost([]).host.bash!()).rejects.toThrow(/no recorded call left/);
+		// Both names are present in the journal, so both are served; what diverges is the
+		// sequence (the code called bash_host where the journal recorded grep).
+		const replay = replayHost([
+			{ name: "grep", args: [], result: {} },
+			{ name: "bash_host", args: [], result: {} },
+		]);
+		await expect(replay.host.bash_host!()).rejects.toThrow(/diverged: expected grep\(\), got bash_host\(\)/);
+		// A recorded name whose calls are already spent must stop rather than re-run.
+		const spent = replayHost([{ name: "bash_host", args: [], result: { exit_code: 0 } }]);
+		expect(await spent.host.bash_host!()).toEqual({ exit_code: 0 });
+		await expect(spent.host.bash_host!()).rejects.toThrow(/no recorded call left/);
+	});
+});
+
+describe("host wrappers are named for the sandbox key they serve (ticket 01)", () => {
+	it("names every recordingHost wrapper after its key, so a value read stays callable", async () => {
+		const recorded: HostCallRecord[] = [];
+		const recording = recordingHost(
+			{
+				bash_host: async () => "out",
+				find: async () => ["a"],
+				rlm_spawn: async () => ({ child_id: "c1" }),
+			},
+			(name, args, result) => recorded.push({ name, args, result }),
+		);
+		// The empty name is what monty turned into '<anonymous>' after a value read (ticket 02).
+		expect(recording.bash_host!.name).toBe("bash_host");
+		expect(recording.find!.name).toBe("find");
+		expect(recording.rlm_spawn!.name).toBe("rlm_spawn");
+		// Recording still journals the lookup key exactly as before.
+		await recording.bash_host!();
+		expect(recorded).toEqual([{ name: "bash_host", args: [], result: "out" }]);
+	});
+
+	it("serves every name the journal recorded, named to match its key, with no divergence", async () => {
+		const calls: HostCallRecord[] = [
+			{ name: "bash_host", args: ["echo hi"], result: "out" },
+			{ name: "rlm_spawn", args: ["do a thing"], result: { child_id: "c1" } },
+			{ name: "bg_list", args: [], result: [] },
+		];
+		const replay = replayHost(calls);
+		// bash_host is the live key (ticket 02); rlm_spawn/bg_list are delegation/background.
+		expect(Object.keys(replay.host).sort()).toEqual(["bash_host", "bg_list", "rlm_spawn"]);
+		expect(replay.host.bash_host!.name).toBe("bash_host");
+		expect(replay.host.rlm_spawn!.name).toBe("rlm_spawn");
+		expect(replay.host.bg_list!.name).toBe("bg_list");
+		// Replay the exact sequence the journaling run produced: no throw, all served.
+		expect(await replay.host.bash_host!()).toBe("out");
+		expect(await replay.host.rlm_spawn!()).toEqual({ child_id: "c1" });
+		expect(await replay.host.bg_list!()).toEqual([]);
+		expect(replay.consumed()).toBe(3);
 	});
 });

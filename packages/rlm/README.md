@@ -33,14 +33,14 @@ Deliberately not yet implemented, in planned order:
 ```bash
 cd /workspace/pi/extensions/rlm
 export MONTY_BIN=$(nix build --no-link --print-out-paths /workspace/pi/monty#monty-bin)/bin/monty
-bun test        # 25 tests, 0 fail
+bun test        # 41 tests, 0 fail
 ```
 
 The monty-backed tests skip themselves when no worker is available, so the suite is runnable anywhere; set `MONTY_BIN` on a host whose glibc is not at `/lib64`.
 
 | Suite | Covers |
 | --- | --- |
-| `test/journal.test.ts` | the journal file (round-trip, torn lines, absent file), the restore report's three honest shapes, and that replay serves recorded results without calling through |
+| `test/journal.test.ts` | the journal file (round-trip, torn lines, absent file), the restore report's three honest shapes, that replay serves recorded results without calling through, and that host wrappers are named for the key they serve so `bash_host`/`rlm_*`/`bg_*` replay and value reads stay callable (ticket 01) |
 | `test/background.test.ts` | real processes: status transitions, exit codes, kill, timeout reason, the cap, the log file, read-only restore, and shutdown |
 | `test/prelude.test.ts` | the prelude's promised names, then its **semantics in a real kernel**: `ROOT`/`SCRATCH`, the sync file helpers, `bash` returning a plain result versus a `BgHandle`, and the delegation calls routing to the host |
 | `test/render.test.ts` | `# => value` rendering, including the `Map` case below |
@@ -96,7 +96,7 @@ Expected: `ROOT` is the working directory, `SCRATCH` is `<sessionFile>.scratch`,
 
 ### Verify durability (ticket 04)
 
-Run 1 defines state and performs a shell side effect; run 2 resumes the same session and reads the state back:
+Run 1 defines state and performs a shell side effect; run 2 resumes the same session and reads the state back. A clean turn also writes a dump, so the dump is deleted before run 2 to force the **journal replay** path: a dump restore is a different path and does not exercise `replayHost`.
 
 ```bash
 cd /workspace/pi
@@ -105,18 +105,25 @@ D=/tmp/rlm-journal-test
 rm -rf $D && mkdir -p $D/sessions
 
 pi -ne -e /workspace/pi/extensions/rlm/src/index.ts -nbt -na --session-dir $D/sessions -p \
-  "Use the python tool once, ONE cell: x = 41; await bash('printf side-effect\\n >> $D/side-effect.txt'); print('defined')"
+  "Use the python tool once, ONE cell: x = 41; await bash('echo hit >> $D/side-effect.txt'); print('defined')"
 
 SF=$(ls $D/sessions/*.jsonl | head -1)
+rm -f "$SF.rlm-dump.bin" "$SF.rlm-dump.bin.json"
+
 pi -ne -e /workspace/pi/extensions/rlm/src/index.ts -nbt -na --session-dir $D/sessions --session "$SF" -p \
   "Use the python tool once, ONE cell: print('restored x+1 =', x + 1)"
 
 wc -l < $D/side-effect.txt   # must still be 1: bash was served from the journal
+
+# The rebuild must be the COMPLETE one. A partial replay prints
+# "kernel partially rebuilt: stopped in cell N: NameError ..." and leaves the
+# namespace short. Counting marker lines alone cannot tell the two apart, which is
+# how the bash_host regression shipped. Inspect run 2's tool result in the session:
+grep -c 'kernel rebuilt from journal: replayed [0-9]* cells and [0-9]* host calls' "$SF"  # must print 1
+grep -c 'kernel partially rebuilt' "$SF" || true                                          # must print 0
 ```
 
-The second run's tool result must begin with `# kernel rebuilt from journal: replayed N cells and M host calls`, print `restored x+1 = 42`, and the side-effect file must still hold **one** line — replay reconstructs and does not re-execute.
-
-After a clean turn the same session also writes a dump, so a later resume reports `# kernel restored from a dump taken at cell N` instead. Both are correct; the dump is simply faster.
+Expected: run 2's tool result begins with `# kernel rebuilt from journal: replayed N cells and M host calls` (`N >= 1`, `M >= 1`), the assistant prints `restored x+1 = 42`, the side-effect file holds **one** line (replay reconstructs and does not re-execute), and the two `grep -c` lines report `1` and `0`. A partial rebuild fails one of them, so it cannot pass by accident.
 
 ### Verify delegation, background handles and images
 
