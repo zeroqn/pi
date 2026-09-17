@@ -30,7 +30,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from "node:os";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createChildManager, findModels, forkSourceFile, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
+import { createChildManager, findModels, headerParentSession, journalSourceOf, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
 import type { ChildKernelContext, ChildHandle, Notice } from "./children";
 import { createBackgroundManager } from "./background";
 import type { BgHandleInfo } from "./background";
@@ -99,7 +99,7 @@ let montyModule: typeof MontyModule | null = null;
 // Type-only, so it is erased: ANY static value import of the monty package loads
 // the napi addon before `loadMonty` can point the loader at the binding.
 import type * as MontyModule from "@pydantic/monty/node";
-import { appendJournal, readJournal, recordingHost, replayHost, restoredLine } from "./journal";
+import { appendJournal, readJournal, readJournals, recordingHost, replayHost, restoredLine } from "./journal";
 import type { CellRecord, HostCallRecord, HostFns, RestoreReport } from "./journal";
 import { prelude } from "./prelude";
 import { renderValue } from "./render";
@@ -397,6 +397,8 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	// copies the history into a new session and starts it as `"startup"` with no
 	// `previousSessionFile` (ticket 13), so the header is the only signal that survives.
 	let parentSessionFile: string | undefined;
+	/** Set when a restore stopped early, so the state is never dumped as if complete. */
+	let kernelIncomplete = false;
 	let sessionCtx: any = null;
 	let currentCell = "";
 	// v2 ticket 10: this session's own depth, resolved from its artifacts rather than
@@ -446,6 +448,26 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		return sessionFile ? `${sessionFile}.scratch` : join(tmpdir(), `rlm-scratch-${process.pid}`);
 	}
 
+	/**
+	 * Which journals this kernel replays, and the fork it is seeded from when it is one
+	 * (ticket 13/14; the rule and its reasons live in `journalSourceOf`).
+	 */
+	function journalSource(ctx: any): { records: CellRecord[]; seedFrom?: string } {
+		const ownFile = sessionFilePath(ctx);
+		const ownRecords = ownFile ? readJournal(`${ownFile}.rlm-journal.jsonl`) : [];
+		const source = journalSourceOf({
+			ownSessionFile: ownFile,
+			ownFirstIndex: ownRecords[0]?.index,
+			startReason,
+			previousSessionFile,
+			parentSessionFile,
+			// A resumed child is a child even though no `childContext` is in play.
+			isChild: childContext !== null || readChildProvenance(ctx?.sessionManager) !== null,
+		});
+		if (!source) return { records: [] };
+		return { records: readJournals(source.files), seedFrom: source.seedFrom };
+	}
+
 	async function startKernel(ctx: any) {
 		const monty = await loadMonty();
 		const cwd: string = ctx?.cwd ?? process.cwd();
@@ -479,7 +501,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		}
 		// The dump fast path must come first: `loadSession` refuses a session that has
 		// already been fed, and a matching dump already contains the prelude's state.
-		if (await restoreFromDump()) return;
+		if (await restoreFromDump(ctx)) return;
 		await session.feedRun(prelude(cwd, scratch), { mount: [mount, scratchMount] });
 		await restoreFromJournal(ctx, cwd);
 	}
@@ -490,11 +512,14 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	 * fallback rather than an error. A dump that matches but still fails to load is a
 	 * bug, so it is recorded.
 	 */
-	async function restoreFromDump(): Promise<boolean> {
-		const records = readJournal(journalPath);
+	async function restoreFromDump(ctx: any): Promise<boolean> {
+		const { records } = journalSource(ctx);
 		if (records.length === 0 || !existsSync(dumpPath)) return false;
 		try {
 			const meta = JSON.parse(readFileSync(`${dumpPath}.json`, "utf8")) as { client?: string; cells?: number };
+			// `cells` is what the kernel held when the dump was written, so a dump from a
+			// partially rebuilt kernel (or from before a fork's fragment existed) is stale
+			// here and replay is the honest path.
 			if (meta.client !== clientVersion() || meta.cells !== records.length) return false;
 			await session?.loadSession(readFileSync(dumpPath));
 			journal = records.slice();
@@ -517,6 +542,10 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 
 	/** Written at `agent_end` and shutdown: per cell would serialise a trivial namespace. */
 	async function dumpKernel(): Promise<void> {
+		// A kernel rebuilt only in part must not be frozen into a dump: the next resume would
+		// accept it as complete (the cell count matches) and the missing cells would be gone
+		// for good. Replay stays the path until the session is rebuilt in full.
+		if (kernelIncomplete) return;
 		if (!session || !dumpPath || journal.length === 0) return;
 		try {
 			const bytes = await session.dump();
@@ -535,17 +564,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	 * feed and read-after-write across cells has to survive.
 	 */
 	async function restoreFromJournal(ctx: any, cwd: string) {
-		// The journal to replay, and — when this session is a fork — the scratch to copy
-		// with it (ticket 13; the rule and its reasons live in `forkSourceFile`).
-		const forkedFrom = forkSourceFile({
-			startReason,
-			previousSessionFile,
-			parentSessionFile,
-			isChild: childContext !== null,
-		});
-		const sourceFile = forkedFrom ?? sessionFilePath(ctx);
-		if (!sourceFile) return;
-		const records = readJournal(`${sourceFile}.rlm-journal.jsonl`);
+		const { records, seedFrom } = journalSource(ctx);
 		if (records.length === 0) return;
 		const monty = await loadMonty();
 
@@ -553,8 +572,10 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		// produced only replays against real on-disk scratch, and replay stops at the
 		// first failure, so an empty fork scratch would cost the whole namespace.
 		let scratchNote: string | undefined;
-		if (forkedFrom) {
-			const sourceScratch = `${forkedFrom}.scratch`;
+		if (seedFrom) {
+			// Seeding is one-shot: only a fork with no journal of its own needs the copy, and
+			// only then is the source's scratch the one its cells were written against.
+			const sourceScratch = `${seedFrom}.scratch`;
 			if (existsSync(sourceScratch)) {
 				try {
 					cpSync(sourceScratch, scratch, { recursive: true });
@@ -595,6 +616,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 			}
 		}
 		journal = records.slice();
+		kernelIncomplete = Boolean(failure);
 		restored = {
 			cells: records.length,
 			hostCalls: consumed,

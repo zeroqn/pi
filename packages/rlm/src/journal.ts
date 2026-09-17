@@ -39,6 +39,27 @@ export function readJournal(path: string): CellRecord[] {
 	return records;
 }
 
+/**
+ * The cells to replay, from one or more **session files**, in order.
+ *
+ * One session is the ordinary case. Two happen when a fork's own journal is a *fragment*:
+ * a fork's cells are indexed against the history it inherited, so a fork that has run one
+ * cell holds a single record at index 2 — replaying that alone would lose everything it
+ * inherited (ticket 13). The parent's prefix (every record below the fragment's first
+ * index) is replayed first, then the fragment.
+ */
+export function readJournals(sessionFiles: string[]): CellRecord[] {
+	const lists = sessionFiles.map((file) => readJournal(`${file}.rlm-journal.jsonl`));
+	const records: CellRecord[] = [];
+	for (let index = 0; index < lists.length; index += 1) {
+		const limit = lists[index + 1]?.[0]?.index ?? Number.POSITIVE_INFINITY;
+		for (const record of lists[index] ?? []) {
+			if (record.index < limit) records.push(record);
+		}
+	}
+	return records;
+}
+
 /** What the model is told after a restore. Silence is the failure mode here. */
 export function restoredLine(report: RestoreReport): string {
 	if (report.partial) {

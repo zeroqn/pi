@@ -204,6 +204,39 @@ export function forkSourceFile(input: {
 }
 
 /**
+ * Where a kernel's journal — and, for a fork, the scratch that goes with it — comes from.
+ *
+ * A session's **own** journal is its own history, so it always wins when it exists: a fork
+ * replays the source's only to seed itself once, and after its first cell it has its own.
+ * A **child** is never seeded from its parent — its scratch is deliberately its own
+ * (ticket 03), and a child's header names its parent just as a fork's does, so provenance
+ * (the `rlm-child` entry, or being an in-process child) decides rather than the header.
+ */
+export function journalSourceOf(input: {
+	ownSessionFile?: string;
+	/** The first index the session's own journal holds, when it has one. */
+	ownFirstIndex?: number;
+	startReason: string;
+	previousSessionFile?: string;
+	parentSessionFile?: string;
+	isChild: boolean;
+}): { files: string[]; seedFrom?: string } | undefined {
+	const own = input.ownSessionFile;
+	if (own && input.ownFirstIndex !== undefined) {
+		// Its own journal wins — but a fork's is a fragment indexed against the history it
+		// inherited, so the parent's prefix is replayed underneath it (ticket 13).
+		if (input.ownFirstIndex > 0 && input.parentSessionFile && !input.isChild) {
+			return { files: [input.parentSessionFile, own] };
+		}
+		return { files: [own] };
+	}
+	if (input.isChild) return own ? { files: [own] } : undefined;
+	const source = forkSourceFile(input);
+	if (source) return { files: [source], seedFrom: source };
+	return own ? { files: [own] } : undefined;
+}
+
+/**
  * The fallback (v2 ticket 10): depth is the length of the `parentSession` chain in
  * session headers. Returns null when a chain exists but cannot be walked, which the
  * caller must read as *unknowable* rather than as zero.
