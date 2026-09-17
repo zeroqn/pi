@@ -979,8 +979,10 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 					value = await session?.feedRun(params.code, {
 						mount: [mount, scratchMount],
 						printCallback: streams,
-						externalLookup: recordingHost(makeHost(root, attachments, progress, { ...hostExtensions(), ...webFns }, background), (name, args, result) => {
-							cellCalls.push({ name, args, result });
+						externalLookup: recordingHost(makeHost(root, attachments, progress, { ...hostExtensions(), ...webFns }, background), (name, args, result, error) => {
+							// A call that raised is journaled too, so the cell that caught it replays
+							// (ticket 11) instead of stopping the rebuild.
+							cellCalls.push(error ? { name, args, error } : { name, args, result });
 						}),
 						os: (name: string) => {
 							if (/getenv|environ/i.test(name)) {

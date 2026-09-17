@@ -7,7 +7,9 @@
  */
 import { appendFileSync, readFileSync } from "node:fs";
 
-export type HostCallRecord = { name: string; args: unknown[]; result: unknown };
+/** A host call whose failure is replayed as the same Python exception (ticket 11). */
+export type HostCallError = { name: string; message: string };
+export type HostCallRecord = { name: string; args: unknown[]; result?: unknown; error?: HostCallError };
 export type CellRecord = { index: number; code: string; hostCalls: HostCallRecord[]; durationMs: number; at: string };
 export type HostFns = Record<string, (...args: unknown[]) => Promise<unknown>>;
 export type RestoreReport = { cells: number; hostCalls: number; partial: boolean; note?: string };
@@ -49,13 +51,32 @@ export function restoredLine(report: RestoreReport): string {
 	return `# kernel rebuilt from journal: replayed ${report.cells} cells and ${report.hostCalls} host calls; values derived from file reads reflect the filesystem as of now.`;
 }
 
-export function recordingHost(host: HostFns, record: (name: string, args: unknown[], result: unknown) => void): HostFns {
+/** The exception type name monty maps onto a Python exception, with its fallback. */
+export function hostCallError(error: unknown): HostCallError {
+	if (error instanceof Error) return { name: error.name || "Error", message: error.message };
+	// monty only maps a JS error by `.name` (dist/session.js), and a thrown non-error has
+	// none, so RuntimeError is what the sandbox saw; record that rather than the value.
+	return { name: "RuntimeError", message: String(error) };
+}
+
+export function recordingHost(
+	host: HostFns,
+	record: (name: string, args: unknown[], result: unknown, error?: HostCallError) => void,
+): HostFns {
 	const wrapped: HostFns = {};
 	for (const [name, fn] of Object.entries(host)) {
 		const wrapper = async (...args: unknown[]) => {
-			const result = await fn(...args);
-			record(name, args, result);
-			return result;
+			// A call that throws is recorded too, and still rethrown: replay re-runs the cell,
+			// so a missing record would leave the replay host one call ahead of the code and
+			// stop the rebuild (ticket 11).
+			try {
+				const result = await fn(...args);
+				record(name, args, result);
+				return result;
+			} catch (error) {
+				record(name, args, undefined, hostCallError(error));
+				throw error;
+			}
 		};
 		// monty identifies a host function by its JS `.name` once the sandbox has read it as a
 		// value (ticket 02): an anonymous wrapper binds as the literal '<anonymous>' and every
@@ -87,6 +108,12 @@ export function replayHost(calls: HostCallRecord[]): {
 			if (!record) throw new Error(`journal replay diverged: ${name}() with no recorded call left`);
 			if (record.name !== name) throw new Error(`journal replay diverged: expected ${record.name}(), got ${name}()`);
 			cursor += 1;
+			if (record.error) {
+				// Throw the recorded type, so the cell's own try/except behaves as it did live.
+				const error = new Error(record.error.message);
+				error.name = record.error.name;
+				throw error;
+			}
 			return record.result;
 		};
 		Object.defineProperty(replay, "name", { value: name });

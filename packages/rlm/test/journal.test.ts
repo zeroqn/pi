@@ -167,3 +167,57 @@ describe("host wrappers are named for the sandbox key they serve (ticket 01)", (
 		expect(replay.consumed()).toBe(3);
 	});
 });
+
+describe("a host call that raises is journaled and replayed (ticket 11)", () => {
+	it("records the failure instead of dropping it", async () => {
+		const recorded: HostCallRecord[] = [];
+		const host = recordingHost(
+			{
+				web_search: async () => ({ provider: "duckduckgo" }),
+				fetch_content: async (url: string) => {
+					const error = new Error(`Blocked internal address for 127.0.0.1: 127.0.0.1`);
+					error.name = "ValueError";
+					throw error;
+				},
+			},
+			(name, args, result, error) => recorded.push(error ? { name, args, error } : { name, args, result }),
+		);
+		expect(await host.web_search!("q")).toEqual({ provider: "duckduckgo" });
+		await expect(host.fetch_content!("http://127.0.0.1/")).rejects.toThrow(/Blocked internal address/);
+		expect(recorded).toEqual([
+			{ name: "web_search", args: ["q"], result: { provider: "duckduckgo" } },
+			{ name: "fetch_content", args: ["http://127.0.0.1/"], error: { name: "ValueError", message: "Blocked internal address for 127.0.0.1: 127.0.0.1" } },
+		]);
+	});
+
+	it("replays success / failure / success, reproducing the failure as the same type", async () => {
+		const calls: HostCallRecord[] = [
+			{ name: "fetch_content", args: ["https://example.com/"], result: { chars: 12 } },
+			{ name: "fetch_content", args: ["http://127.0.0.1/"], error: { name: "ValueError", message: "Blocked internal address for 127.0.0.1: 127.0.0.1" } },
+			{ name: "bash_host", args: ["echo hi"], result: { exit_code: 0 } },
+		];
+		const replay = replayHost(calls);
+		expect(await replay.host.fetch_content!("https://example.com/")).toEqual({ chars: 12 });
+		const caught = (await replay.host.fetch_content!("http://127.0.0.1/").catch((error: unknown) => error)) as Error;
+		expect(caught.name).toBe("ValueError");
+		expect(caught.message).toBe("Blocked internal address for 127.0.0.1: 127.0.0.1");
+		expect(await replay.host.bash_host!("echo hi")).toEqual({ exit_code: 0 });
+		expect(replay.consumed()).toBe(3);
+	});
+
+	it("survives the journal file round trip", () => {
+		const path = join(mkdtempSync(join(tmpdir(), "rlm-journal-errors-")), "journal.jsonl");
+		const record: CellRecord = {
+			index: 0,
+			code: "try: await fetch_content(...)\nexcept ValueError:\n    print(1)",
+			hostCalls: [
+				{ name: "web_search", args: ["q"], result: { provider: "anysearch" } },
+				{ name: "fetch_content", args: ["http://127.0.0.1/"], error: { name: "ValueError", message: "Blocked internal address" } },
+			],
+			durationMs: 3,
+			at: new Date().toISOString(),
+		};
+		appendJournal(path, record);
+		expect(readJournal(path)).toEqual([record]);
+	});
+});
