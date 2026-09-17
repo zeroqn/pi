@@ -30,7 +30,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from "node:os";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createChildManager, findModels, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
+import { createChildManager, findModels, forkSourceFile, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
 import type { ChildKernelContext, ChildHandle, Notice } from "./children";
 import { createBackgroundManager } from "./background";
 import type { BgHandleInfo } from "./background";
@@ -393,6 +393,10 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	let webNotified = false;
 	let currentProgress: ((text: string) => void) | undefined;
 	let previousSessionFile: string | undefined;
+	// A fork's source as *the fork's own session records it*. pi's CLI `--fork <path>`
+	// copies the history into a new session and starts it as `"startup"` with no
+	// `previousSessionFile` (ticket 13), so the header is the only signal that survives.
+	let parentSessionFile: string | undefined;
 	let sessionCtx: any = null;
 	let currentCell = "";
 	// v2 ticket 10: this session's own depth, resolved from its artifacts rather than
@@ -531,7 +535,15 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	 * feed and read-after-write across cells has to survive.
 	 */
 	async function restoreFromJournal(ctx: any, cwd: string) {
-		const sourceFile = startReason === "fork" && previousSessionFile ? previousSessionFile : sessionFilePath(ctx);
+		// The journal to replay, and — when this session is a fork — the scratch to copy
+		// with it (ticket 13; the rule and its reasons live in `forkSourceFile`).
+		const forkedFrom = forkSourceFile({
+			startReason,
+			previousSessionFile,
+			parentSessionFile,
+			isChild: childContext !== null,
+		});
+		const sourceFile = forkedFrom ?? sessionFilePath(ctx);
 		if (!sourceFile) return;
 		const records = readJournal(`${sourceFile}.rlm-journal.jsonl`);
 		if (records.length === 0) return;
@@ -541,8 +553,8 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		// produced only replays against real on-disk scratch, and replay stops at the
 		// first failure, so an empty fork scratch would cost the whole namespace.
 		let scratchNote: string | undefined;
-		if (startReason === "fork" && previousSessionFile) {
-			const sourceScratch = `${previousSessionFile}.scratch`;
+		if (forkedFrom) {
+			const sourceScratch = `${forkedFrom}.scratch`;
 			if (existsSync(sourceScratch)) {
 				try {
 					cpSync(sourceScratch, scratch, { recursive: true });
@@ -799,6 +811,8 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	pi.on("session_start", async (event: any, ctx: any) => {
 		startReason = event?.reason ?? "startup";
 		previousSessionFile = event?.previousSessionFile ? resolve(event.previousSessionFile) : undefined;
+		// The header, not the event, is what a CLI `--fork <path>` leaves behind (ticket 13).
+		parentSessionFile = headerParentSession(ctx?.sessionManager);
 		sessionCtx = ctx;
 		// v2 ticket 10: this session's own depth comes from its own artifacts — the
 		// `rlm-child` entry, or the parentSession chain — so a child resumed without its

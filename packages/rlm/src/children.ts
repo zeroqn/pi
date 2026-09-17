@@ -15,7 +15,7 @@
  */
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 export type ChildStatus = "running" | "done" | "failed" | "stopped";
 
@@ -170,6 +170,37 @@ function readSessionHeader(file: string): { parentSession?: string } | null {
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * A session's recorded fork source: its own header's `parentSession`, resolved.
+ *
+ * The CLI's `--fork <path>` copies the history into a new session and starts it as
+ * `"startup"` with no `previousSessionFile` event field, so this header is the only
+ * signal that a fork happened at all (`SessionManager.forkFrom` writes it).
+ */
+export function headerParentSession(sessionManager: any): string | undefined {
+	const parent: string | undefined = sessionManager?.getHeader?.()?.parentSession;
+	return parent ? resolve(parent) : undefined;
+}
+
+/**
+ * The session a kernel should take its journal and scratch from, when this session is a
+ * fork — or `undefined` for a session that is not one (ticket 13).
+ *
+ * Two signals, because pi has two forks: `/fork` and `/clone` emit
+ * `session_start {reason: "fork", previousSessionFile}`, while `--fork <path>` records the
+ * source only in the header. A child's header names its parent too, but that is
+ * provenance rather than a fork, so a child is never handed the parent's scratch.
+ */
+export function forkSourceFile(input: {
+	startReason: string;
+	previousSessionFile?: string;
+	parentSessionFile?: string;
+	isChild: boolean;
+}): string | undefined {
+	if (input.startReason === "fork" && input.previousSessionFile) return input.previousSessionFile;
+	return input.isChild ? undefined : input.parentSessionFile;
 }
 
 /**
