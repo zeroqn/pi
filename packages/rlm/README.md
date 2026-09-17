@@ -106,6 +106,10 @@ export function createHost(ctx: {
   reason}` when broken, and nothing at all when unset — a normal state, not a fault.
 - **Replay needs no module.** A resumed kernel serves `web_search` from the journal like any other host call, so a replayed
   search never touches the network.
+- **Keyword arguments arrive as one trailing object.** monty passes a sandbox call's Python keywords to the host as a
+  single plain object appended to the positionals — `web_search("q", num_results=3)` reaches the module as
+  `("q", { num_results: 3 })`. rlm's own host functions unwrap this in `bind()` (`src/index.ts`); a hook module must do
+  the same for itself. Found by the first live integration run, not by the unit tests, which called the functions directly.
 
 ## Install as a pi package
 
