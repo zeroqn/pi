@@ -33,6 +33,8 @@ export interface ChildHandle {
 }
 
 export interface Notice {
+	/** Transcript label; the child channel is the default. */
+	customType?: string;
 	key: string;
 	content: string;
 	/** Consulted at dispatch time: a cell that read the handle cancels the notice. */

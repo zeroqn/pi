@@ -13,6 +13,7 @@ Implemented and verified (each with a run recorded in the sections below):
 - **`SCRATCH`**: a second read-write mount at `<sessionFile>.scratch`, mirrored at its real host path, created lazily, never deleted during the session (ticket 14).
 - **The Python prelude** with `ROOT`/`SCRATCH` and the file helpers (`read_text`, `write_text`, `edit_text`, `walk`, `read_json`, `write_json`, `exists`, `mkdirp`), all sync.
 - **Host functions**: `bash`, `find`, `grep`, `read_image` — async, all awaited.
+- **A web host-function hook** (map `.scratch/rlm-web/`, ticket 03): `RLM_WEB_MODULE` names a module that exports `createHost(ctx)`, and the functions it returns join the same host surface — journaled by the same machinery, named and replay-safe like every other host function. Unset is silent and normal; configured-and-broken is recorded, told to the human, and told to the model once — never a stub.
 - **The preflight** (tickets 13, 15): at `session_start`, verify the napi binding loads, `MONTY_BIN` exists, and the client/worker versions agree. Loud, once, creates no pool.
 - **Progress updates** for long host calls, so a slow cell is not opaque (ticket 10).
 - **Journal-and-replay durability** (ticket 04): successful cells are journaled to `<sessionFile>.rlm-journal.jsonl` (code plus every host-call result) with a metadata-only `rlm-cell` entry in the transcript; a resumed or forked session rebuilds the kernel by replaying them as **one composite feed over `overlay` mounts with host calls served from the journal** — so replay cannot write to the host and does not re-run shell commands. A fork also copies the source's scratch (ticket 14). The result reports itself honestly, and a partial replay says so rather than pretending.
@@ -70,11 +71,41 @@ pi -ne -e /workspace/pi/extensions/rlm/src/index.ts -nbt -na \
 
 `-ne` keeps other extensions out, `-nbt` disables built-in tools while keeping extension tools, `-na` ignores project-local config.
 
-Environment overrides: `RLM_FD` (find backend), `RLM_ZG` (grep backend), `RLM_SHELL`, and `RLM_CHILD_PROMPT=none`.
+Environment overrides: `RLM_FD` (find backend), `RLM_ZG` (grep backend), `RLM_SHELL`, and `RLM_CHILD_PROMPT=none`. `RLM_WEB_MODULE` is the web hook below.
 
 **`MONTY_BIN` is only needed on a host without `/lib64/ld-linux-x86-64.so.2`** — NixOS, musl. The flake's `.#monty-bin` is the published worker patched for Nix; do **not** use `.#monty`, which is the local checkout at protocol 3 and cannot talk to the published client. On ordinary glibc, macOS and Windows, nothing is needed. See the install story in `.scratch/rlm-extension/spike/package/README.md`.
 
 **`RLM_CHILD_PROMPT=none` is a diagnostic, not a feature.** It drops the child's kernel and delegation sentences and leaves the pre-v2 prompt, because v2's acceptance criterion for that contract is an A/B — the same task run twice, with and without the added prompt, must produce the same artefact. Running it is how that criterion was closed (`.scratch/rlm-v2/v2-acceptance.md`, check 6); leaving it unset is the normal case.
+
+## Web host functions (`RLM_WEB_MODULE`)
+
+The kernel's host surface is closed by design: `bash`, `find`, `grep`, `read_image`, background handles and delegation. A
+module named by `RLM_WEB_MODULE` adds to it without rlm knowing what the functions do:
+
+```bash
+export RLM_WEB_MODULE=/workspace/pi/extensions/pi-web-code/host.ts
+```
+
+```ts
+// host.ts — the module's whole contract
+export function createHost(ctx: {
+  cwd: string;
+  sessionFile?: string;
+  progress?: (text: string) => void;
+}): { web_search: unknown; fetch_content: unknown };
+```
+
+- **Exactly those two names.** A missing name, an extra name, or a non-function is a contract mismatch: *neither* name is
+  injected and the reason is recorded.
+- **The factory runs once per kernel** with that kernel's context, so a child's functions see the child's `cwd` and session
+  file. `progress` forwards to the current cell's progress channel (it is live, not a per-kernel constant).
+- **Two moments.** The module is imported at extension load, so the tool description only promises what exists, and the
+  factory is called at kernel start. Deferred or degraded, the description says nothing about the web: a name that exists
+  but cannot work is worse than a name that does not exist.
+- **Recorded as `rlm-web`**: `{module, status: "loaded", contract: [...]}` when configured, `{module, status: "error",
+  reason}` when broken, and nothing at all when unset — a normal state, not a fault.
+- **Replay needs no module.** A resumed kernel serves `web_search` from the journal like any other host call, so a replayed
+  search never touches the network.
 
 ## Install as a pi package
 

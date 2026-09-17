@@ -103,6 +103,7 @@ import { appendJournal, readJournal, recordingHost, replayHost, restoredLine } f
 import type { CellRecord, HostCallRecord, HostFns, RestoreReport } from "./journal";
 import { prelude } from "./prelude";
 import { renderValue } from "./render";
+import { instantiateWebHook, resolveWebHook, webDescriptionSuffix, webPromptGuidelines } from "./web-hook";
 
 /** The installed client's version, or null when it cannot be read. */
 function clientVersion(): string | null {
@@ -346,6 +347,11 @@ function makeHost(
 // Extension
 // ---------------------------------------------------------------------------
 
+// The web hook is resolved once, at load time, so the tool description can promise
+// exactly what exists (map ticket 03). Top-level await is accepted by pi's loader,
+// and the environment cannot change under a running session.
+const webHook = await resolveWebHook();
+
 export default function (pi: any) {
 	return createKernel(pi, null);
 }
@@ -370,6 +376,11 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	let journal: CellRecord[] = [];
 	let restored: RestoreReport | null = null;
 	let startReason = "startup";
+	// Web host functions (ticket 03). The factory is called once per kernel with this
+	// kernel's context, so a child's fetches spill into the child's own scratch.
+	let webFns: HostFns = {};
+	let webNotified = false;
+	let currentProgress: ((text: string) => void) | undefined;
 	let previousSessionFile: string | undefined;
 	let sessionCtx: any = null;
 	let currentCell = "";
@@ -434,6 +445,23 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		const sessionFile: string | undefined = ctx?.sessionManager?.getSessionFile?.();
 		journalPath = sessionFile ? `${sessionFile}.rlm-journal.jsonl` : "";
 		dumpPath = sessionFile ? `${sessionFile}.rlm-dump.bin` : "";
+		currentProgress = undefined;
+		const web = instantiateWebHook(webHook, { cwd, sessionFile, progress: (text) => currentProgress?.(text) });
+		webFns = web.status === "injected" ? (web.fns as HostFns) : {};
+		if (web.status === "error") {
+			// A plan error is already recorded at session_start; only a factory failure is news here.
+			if (webHook.status === "loaded") {
+				try {
+					pi.appendEntry("rlm-web", { module: webHook.module, status: "error", reason: web.reason });
+				} catch {
+					/* a record must never fail a kernel */
+				}
+			}
+			if (!webNotified) {
+				webNotified = true;
+				dispatchNotice({ key: "web", customType: "rlm-web", content: `web host functions unavailable: ${web.reason}` });
+			}
+		}
 		// The dump fast path must come first: `loadSession` refuses a session that has
 		// already been fed, and a matching dump already contains the prelude's state.
 		if (await restoreFromDump()) return;
@@ -641,7 +669,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 			}
 			try {
 				pi.sendMessage(
-					{ customType: "rlm-child", content: notice.content, display: true },
+					{ customType: notice.customType ?? "rlm-child", content: notice.content, display: true },
 					{ deliverAs: "steer", triggerTurn: true },
 				);
 				trace("flush-sent", { key: notice.key });
@@ -816,6 +844,31 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 				/* diagnostics must never fail a session */
 			}
 		}
+		// Web hook bookkeeping (ticket 03): unset is silent and normal; configured is
+		// recorded always; broken is recorded, told to the human, and told to the model once.
+		if (webHook.status === "loaded") {
+			try {
+				// The names are the contract, not a fact about this module: what it actually
+				// returns is validated per kernel and recorded there if it deviates.
+				pi.appendEntry("rlm-web", { module: webHook.module, status: "loaded", contract: ["web_search", "fetch_content"] });
+			} catch {
+				/* see above */
+			}
+		} else if (webHook.status === "error") {
+			try {
+				pi.appendEntry("rlm-web", { module: webHook.module, status: "error", reason: webHook.reason });
+			} catch {
+				/* see above */
+			}
+			try {
+				ctx.ui?.notify?.(`web host functions unavailable: ${webHook.reason}`, "error");
+			} catch {
+				/* no UI in this mode */
+			}
+			// Deliberately no message to the model here: at session_start pi refuses a steer
+			// send ("Agent is already processing") and the run dies. The kernel-start path
+			// tells the model instead, where steering is legal.
+		}
 		if (problems.length === 0) return;
 		try {
 			ctx.ui?.setStatus?.("rlm", "kernel unavailable");
@@ -889,7 +942,8 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 			"child session and returns a handle immediately: it never returns the answer, which arrives later as a message. await bash(...) " +
 			"blocks until the command finishes; pass background=True to get a handle instead — h.poll(), h.output(), h.kill(), and await " +
 			"bg_list() — and end the turn, because you are notified when it finishes. Output is " +
-			"truncated to 2000 lines or 50KB, whichever comes first; when that happens the full output is written to a file and its path is reported.",
+			"truncated to 2000 lines or 50KB, whichever comes first; when that happens the full output is written to a file and its path is reported." +
+			webDescriptionSuffix(webHook),
 		promptSnippet: "Run Python in a persistent kernel with host-bridged shell, search, image reads and delegation",
 		promptGuidelines: [
 			"Use python for work that is stateful, multi-step or data-shaped — parsing, transforming, searching, summarising — instead of chaining many small tool calls.",
@@ -899,6 +953,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 			'In python there are no third-party imports and no generators, inheritance or decorators. When you need real CPython or a library, use await bash("python3 ...").',
 			"In python, bulk file reads are faster through await bash(...) than through the kernel's own open(): each file operation is a separate host call. Use Python loops for logic over files, not for reading many of them.",
 			"Use await rlm.spawn(name=..., prompt=...) for work worth doing in parallel or in a cleaner context, then end the turn: the child's answer arrives as a message, and rlm.poll(id) reads its status. rlm.list() shows the children and their tokens; rlm.tree_cost() totals what the whole tree has spent.",
+			...webPromptGuidelines(webHook),
 		],
 		parameters: {
 			type: "object",
@@ -913,6 +968,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 				const monty = await loadMonty();
 				const streams = new monty.CollectStreams();
 				const progress = (text: string) => onUpdate?.({ content: [{ type: "text", text }] });
+				currentProgress = progress;
 				const cellCalls: HostCallRecord[] = [];
 				currentCell = String(params.code).split("\n")[0]?.slice(0, 100) ?? "";
 				sessionCtx = ctx;
@@ -923,7 +979,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 					value = await session?.feedRun(params.code, {
 						mount: [mount, scratchMount],
 						printCallback: streams,
-						externalLookup: recordingHost(makeHost(root, attachments, progress, hostExtensions(), background), (name, args, result) => {
+						externalLookup: recordingHost(makeHost(root, attachments, progress, { ...hostExtensions(), ...webFns }, background), (name, args, result) => {
 							cellCalls.push({ name, args, result });
 						}),
 						os: (name: string) => {
