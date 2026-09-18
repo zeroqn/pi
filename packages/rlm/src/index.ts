@@ -36,6 +36,7 @@ import { createBackgroundManager } from "./background";
 import type { BgHandleInfo } from "./background";
 import { bindToParentInstance, magicContextChildShim, magicContextStatus } from "./magic-context";
 import { findRsiSeam, reportCapability, reportHostCall, reportUsage, rsiChildFactory, rsiStatus, seamSkill, seamSkills } from "./rsi-seam";
+import { beforeAgentStartResult } from "./skills-block";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FD = process.env.RLM_FD ?? "/nix/store/5j3vslc4gccb95xnzr1mxhgwrc0wfgad-fd-10.4.2/bin/fd";
@@ -875,6 +876,22 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		);
 		return next;
 	}
+
+	/**
+	 * The code-mode skills block (ticket 16). pi renders no skills for a session whose active
+	 * tools are `["python"]`, so RLM appends the block itself: the human tier from the event
+	 * plus the learned store from the seam. In any other session this returns `undefined` and
+	 * pi's prompt is untouched.
+	 */
+	pi.on("before_agent_start", async (event: any) => {
+		try {
+			return beforeAgentStartResult(event, seamCaller());
+		} catch {
+			// A prompt we cannot build must never take a turn down; the session simply runs
+			// without the block, exactly as it did before this existed.
+			return undefined;
+		}
+	});
 
 	pi.on("session_start", async (event: any, ctx: any) => {
 		startReason = event?.reason ?? "startup";
