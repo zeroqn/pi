@@ -21,7 +21,7 @@
  */
 
 import type { RsiConfig } from "./config.ts";
-import { readLedger, setLastCurateAt, setLastPassAt } from "./ledger.ts";
+import { readLedger, sessionPassAt, setLastCurateAt, setLastPassAt, setSessionPassAt } from "./ledger.ts";
 import { claimPassLock } from "./pass-lock.ts";
 import { scanMessages, type KernelSignal, type ScanMessage } from "./prescan.ts";
 
@@ -78,8 +78,13 @@ export function suppressedAsQueryOnly(input: {
 	return isQueryOnly(input.activeTools);
 }
 
-/** True when `minIntervalMs` has passed since the last recorded pass. */
+/**
+ * True when `minIntervalMs` has passed since the last recorded pass. A missing, unparseable or
+ * non-finite interval means **no constraint** — an absent knob must never wedge every pass shut,
+ * which a NaN comparison would do silently.
+ */
 export function intervalElapsed(lastPassAt: string | null | undefined, minIntervalMs: number, nowMs: number): boolean {
+	if (!Number.isFinite(minIntervalMs)) return true;
 	if (!lastPassAt) return true;
 	const parsed = Date.parse(lastPassAt);
 	if (Number.isNaN(parsed)) return true;
@@ -96,8 +101,18 @@ export interface PassSchedulerOptions {
 	 * published nothing (RSI x RLM ticket 03). Consulted before the tool-name heuristic.
 	 */
 	publishedCanWrite?: () => boolean | undefined;
+	/**
+	 * What this session published about its own write capability, or `undefined` when it
+	 * published nothing (RSI x RLM ticket 03). Consulted before the tool-name heuristic.
+	 */
+	publishedCanWrite?: () => boolean | undefined;
 	/** The current session's messages, reduced for the pre-scan. */
 	getScanMessages: () => ScanMessage[];
+	/**
+	 * Kernel-side evidence for a code-mode session, or `undefined` for a session with no
+	 * kernel (RSI x RLM ticket 04). Absent means the pre-scan behaves exactly as before.
+	 */
+	getKernelSignal?: () => KernelSignal | undefined;
 	/**
 	 * Kernel-side evidence for a code-mode session, or `undefined` for a session with no
 	 * kernel (RSI x RLM ticket 04). Absent means the pre-scan behaves exactly as before.
@@ -109,6 +124,22 @@ export interface PassSchedulerOptions {
 	curate?: () => Promise<PassOutcome>;
 	/** The curator's interval-or-size check. */
 	curationDue?: () => boolean;
+	/**
+	 * This session's identity for the per-session interval (RSI x RLM ticket 12). Absent means
+	 * the interval cannot be attributed to a session, and the tree-wide floor alone applies.
+	 */
+	getSessionFile?: () => string | undefined;
+	/**
+	 * Called when a pass was skipped because another pass held the lock. A session that has
+	 * already produced its final answer may never settle again — a child that has answered is
+	 * the case that matters — so a lost race must not mean that session never learns.
+	 */
+	onLockContention?: () => void;
+	/**
+	 * How long a quiet period is for this session. Defaults to `quietMinutes`; a child passes
+	 * its shorter `childQuietMinutes`, because a child lives for one delegated task (ticket 13).
+	 */
+	quietMinutes?: () => number;
 	clock?: Clock;
 	/** Why an attempt was declined; for tests and diagnostics, not the user. */
 	onSkip?: (reason: string) => void;
@@ -119,6 +150,13 @@ export class PassScheduler {
 	private readonly options: PassSchedulerOptions;
 	private readonly clock: Clock;
 	private timer: unknown;
+	/**
+	 * How many times this session has re-armed after losing the pass lock, and the bound on it
+	 * (ticket 12). A permanently contended store must degrade to the old skip behaviour rather
+	 * than retry forever; a session that has genuinely finished retries only a few times.
+	 */
+	private lockRetries = 0;
+	private static readonly MAX_LOCK_RETRIES = 3;
 
 	constructor(options: PassSchedulerOptions) {
 		this.options = options;
@@ -128,16 +166,20 @@ export class PassScheduler {
 	/** The session went quiet: (re)arm the quiet timer. */
 	settled(): void {
 		if (!this.options.config.enabled) return;
+		// Deliberately does *not* reset the retry budget: the re-arm path calls `settled()`
+		// again, so resetting here would let a contended store loop forever. A real turn
+		// (`activity`) or a pass that actually runs is what earns a fresh budget.
 		this.cancel();
-		const quietMs = this.options.config.quietMinutes * 60_000;
+		const quietMs = (this.options.quietMinutes?.() ?? this.options.config.quietMinutes) * 60_000;
 		this.timer = this.clock.setTimeout(() => {
 			this.timer = undefined;
 			void this.onQuiet();
 		}, quietMs);
 	}
 
-	/** A run started or a turn began: the session is no longer quiet. */
+	/** A run started or a turn began: the session is no longer quiet, and this is a fresh chance. */
 	activity(): void {
+		this.lockRetries = 0;
 		this.cancel();
 	}
 
@@ -196,7 +238,17 @@ export class PassScheduler {
 		}
 
 		const lock = claimPassLock(root, config.stageCeilingMinutes * 60_000);
-		if (!lock) return this.skip("a pass is already running");
+		if (!lock) {
+			// Someone else holds the slot. Re-arm so this session gets another chance — an
+			// answered child may never settle again — but only a bounded number of times, so a
+			// permanently contended store degrades to the old skip rather than a retry loop.
+			if (this.lockRetries < PassScheduler.MAX_LOCK_RETRIES) {
+				this.lockRetries++;
+				this.options.onLockContention?.();
+			}
+			return this.skip("a pass is already running");
+		}
+		this.lockRetries = 0;
 
 		try {
 			if (reason === "curate") return await this.runCurate();
@@ -208,14 +260,41 @@ export class PassScheduler {
 
 	private async runLearner(reason: LearnerReason): Promise<AttemptResult> {
 		const { config, root } = this.options;
-		const previous = readLedger(root).ledger.last_pass_at ?? null;
-		if (reason === "settled" && !intervalElapsed(previous, config.minIntervalMinutes * 60_000, this.clock.now())) {
-			return this.skip("within the minimum interval");
+		const sessionFile = this.options.getSessionFile?.();
+		const { ledger } = readLedger(root);
+
+		// Two clocks, doing two jobs (ticket 12):
+		//   - this session's own interval, so a child's pass does not consume the root's;
+		//   - the tree-wide floor, so a tree of N learners cannot spend N forks at once.
+		//
+		// With no session identity there is no per-session clock to apply, so the global stamp
+		// *is* the interval — exactly the single-learner behaviour this replaces.
+		const previousFloor = ledger.last_pass_at ?? null;
+		const previousSession = sessionFile ? sessionPassAt(ledger, sessionFile) : previousFloor;
+		if (reason === "settled") {
+			if (!intervalElapsed(previousSession, config.minIntervalMinutes * 60_000, this.clock.now())) {
+				return this.skip("within the minimum interval");
+			}
+			// The floor only adds a constraint when it is a *different* clock from the above.
+			if (sessionFile && !intervalElapsed(previousFloor, config.treeFloorMinutes * 60_000, this.clock.now())) {
+				return this.skip("within the tree-wide floor");
+			}
 		}
 
-		await setLastPassAt(root, this.stamp());
+		const stamp = this.stamp();
+		await setLastPassAt(root, stamp);
+		if (sessionFile) await setSessionPassAt(root, sessionFile, stamp);
+
 		const outcome = await this.outcome(() => this.options.runPass(reason));
-		if (!outcome.ok && outcome.toolActions === 0) await setLastPassAt(root, previous);
+
+		// Rollback follows the *session's* stamp: one session's transient failure must not
+		// license every other learner in the tree to retry at once. The floor stays advanced,
+		// because a pass did run — unless there is no session stamp, in which case the floor is
+		// the only clock there is.
+		if (!outcome.ok && outcome.toolActions === 0) {
+			if (sessionFile) await setSessionPassAt(root, sessionFile, previousSession);
+			else await setLastPassAt(root, previousFloor);
+		}
 		return { ran: true, outcome };
 	}
 

@@ -16,7 +16,14 @@ export interface RsiConfig {
 	enabled: boolean;
 	observeOnly: boolean;
 	quietMinutes: number;
+	/** How often **this session** may run a learner pass (RSI x RLM ticket 12). */
 	minIntervalMinutes: number;
+	/**
+	 * How often **any** session may run a learner pass — the tree-wide floor. Bounds how fast a
+	 * tree of independent learners can fork reviewers; set below `minIntervalMinutes` because it
+	 * is a rate limit rather than a per-session interval.
+	 */
+	treeFloorMinutes: number;
 	stageCeilingMinutes: number;
 	disuseWeeks: number;
 	consolidateEveryWeeks: number;
@@ -54,6 +61,7 @@ export function loadConfig(options: { agentDir: string; file?: string }): Loaded
 		observeOnly: true,
 		quietMinutes: 5,
 		minIntervalMinutes: 15,
+		treeFloorMinutes: 2,
 		stageCeilingMinutes: 10,
 		disuseWeeks: 6,
 		consolidateEveryWeeks: 4,
@@ -116,6 +124,7 @@ type BooleanConfigKey = "enabled" | "observeOnly";
 type NumberConfigKey =
 	| "quietMinutes"
 	| "minIntervalMinutes"
+	| "treeFloorMinutes"
 	| "stageCeilingMinutes"
 	| "disuseWeeks"
 	| "consolidateEveryWeeks"

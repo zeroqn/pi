@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { readLedger, setLastCurateAt, setLastPassAt } from "../ledger.ts";
+import { readLedger, sessionPassAt, setLastCurateAt, setLastPassAt, setSessionPassAt } from "../ledger.ts";
 import { passLockPath } from "../pass-lock.ts";
 import { intervalElapsed, isQueryOnly, PassScheduler, suppressedAsQueryOnly } from "../scheduler.ts";
 
@@ -48,6 +48,7 @@ function makeConfig(overrides = {}) {
 		observeOnly: true,
 		quietMinutes: 5,
 		minIntervalMinutes: 15,
+		treeFloorMinutes: 2,
 		stageCeilingMinutes: 10,
 		disuseWeeks: 6,
 		consolidateEveryWeeks: 4,
@@ -74,6 +75,10 @@ function makeScheduler(t, options = {}) {
 		getActiveTools: options.getActiveTools ?? (() => ["read", "write", "edit"]),
 		publishedCanWrite: options.publishedCanWrite,
 		getScanMessages: options.getScanMessages ?? (() => [{ role: "user", text: "remember this" }]),
+		getKernelSignal: options.getKernelSignal,
+		getSessionFile: options.getSessionFile,
+		onLockContention: options.onLockContention,
+		quietMinutes: options.quietMinutes,
 		runPass,
 		curate: options.curate,
 		curationDue: options.curationDue,
@@ -85,6 +90,34 @@ function makeScheduler(t, options = {}) {
 }
 
 const lastPassAt = (root) => readLedger(root).ledger.last_pass_at;
+
+/** A scheduler bound to an existing store root and clock, for cross-session cases. */
+function makeSchedulerAt(t, root, clock, options = {}) {
+	const skips = [];
+	const calls = [];
+	const scheduler = new PassScheduler({
+		root,
+		config: makeConfig(options.config),
+		getActiveTools: options.getActiveTools ?? (() => ["read", "write", "edit"]),
+		publishedCanWrite: options.publishedCanWrite,
+		getScanMessages: options.getScanMessages ?? (() => [{ role: "user", text: "remember this" }]),
+		getKernelSignal: options.getKernelSignal,
+		getSessionFile: options.getSessionFile,
+		onLockContention: options.onLockContention,
+		quietMinutes: options.quietMinutes,
+		runPass: options.runPass ?? (async (reason) => {
+			calls.push(reason);
+			return { ok: true, toolActions: 1 };
+		}),
+		curate: options.curate,
+		curationDue: options.curationDue,
+		clock,
+		onSkip: (reason) => skips.push(reason),
+		notify: options.notify,
+	});
+	return { root, clock, scheduler, skips, calls };
+}
+const sessionAt = (root, file) => sessionPassAt(readLedger(root).ledger, file);
 
 // ---------------------------------------------------------------------------
 // Pure predicates.
@@ -347,4 +380,176 @@ test("the quiet timer runs curation when it is due", async (t) => {
 	clock.advance(5 * 60_000);
 	await flush();
 	assert.equal(curated, 1);
+});
+
+// ---------------------------------------------------------------------------
+// Per-session interval and the tree-wide floor (RSI x RLM ticket 12).
+//
+// As shipped, one global stamp meant a tree of N learners got one pass per interval in
+// total — a child's pass consumed the root's. These pin the two-clock behaviour.
+// ---------------------------------------------------------------------------
+
+test("a session's pass does not consume another session's interval", async (t) => {
+	const a = "/sessions/a.jsonl";
+	const b = "/sessions/b.jsonl";
+	const { root, clock, scheduler, calls } = makeScheduler(t, { getSessionFile: () => a });
+
+	// Session A runs a pass and stamps only itself.
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	assert.deepEqual(calls, ["settled"]);
+	assert.equal(sessionAt(root, a), new Date(EPOCH + 5 * 60_000).toISOString());
+	assert.equal(sessionAt(root, b), null, "B was never stamped");
+
+	// A second scheduler standing in for session B is due immediately: its own clock is unset,
+	// and the floor is short enough to have elapsed.
+	const second = makeScheduler(t, { getSessionFile: () => b });
+	await setLastPassAt(second.root, new Date(EPOCH).toISOString());
+	const { scheduler: bScheduler, calls: bCalls } = makeScheduler(t, { getSessionFile: () => b });
+	await setSessionPassAt(root, b, null);
+	assert.equal(sessionAt(root, b), null);
+	// The same session, however, is still inside its own interval.
+	const { scheduler: sameAgain, calls: sameCalls } = makeScheduler(t, { getSessionFile: () => a });
+	await setLastPassAt(root, new Date(EPOCH + 5 * 60_000).toISOString());
+	sameAgain.settled();
+	clock.advance(60_000);
+	await flush();
+	assert.deepEqual(sameCalls, [], "A is inside its own interval");
+});
+
+test("the tree-wide floor caps how often any session may pass", async (t) => {
+	// A different session, with its own interval long elapsed, is still held back by the floor.
+	// The floor only bites when it is *longer* than the wait, which is exactly when a tree of
+	// learners would otherwise fire together.
+	const { root, clock, scheduler, skips, calls } = makeScheduler(t, {
+		config: { treeFloorMinutes: 60 },
+		getSessionFile: () => "/sessions/b.jsonl",
+	});
+	await setLastPassAt(root, new Date(EPOCH - 60_000).toISOString()); // 1 minute ago, well inside a 60-minute floor
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	assert.deepEqual(calls, []);
+	assert.ok(skips.includes("within the tree-wide floor"));
+});
+
+test("the floor does not constrain a session once it has elapsed", async (t) => {
+	const { root, clock, scheduler, calls } = makeScheduler(t, { getSessionFile: () => "/sessions/b.jsonl" });
+	await setLastPassAt(root, new Date(EPOCH - 10 * 60_000).toISOString());
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	// The pass ran, so both clocks advanced: this session's own, and the floor.
+	assert.deepEqual(calls, ["settled"]);
+	assert.equal(sessionAt(root, "/sessions/b.jsonl"), new Date(EPOCH + 5 * 60_000).toISOString());
+	assert.equal(lastPassAt(root), new Date(EPOCH + 5 * 60_000).toISOString());
+});
+
+test("a failed pass rolls back its own session's stamp, not the floor", async (t) => {
+	const file = "/sessions/a.jsonl";
+	const previous = new Date(EPOCH - 60 * 60_000).toISOString();
+	const { root, scheduler } = makeScheduler(t, {
+		getSessionFile: () => file,
+		runPass: async () => {
+			throw new Error("provider unavailable");
+		},
+	});
+	await setSessionPassAt(root, file, previous);
+	const result = await scheduler.learnNow();
+	assert.equal(result.outcome.ok, false);
+	assert.equal(sessionAt(root, file), previous, "this session may retry");
+	assert.notEqual(lastPassAt(root), previous, "the floor records that a pass ran");
+});
+
+test("a failed pass in one session does not license another to retry", async (t) => {
+	const file = "/sessions/a.jsonl";
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "rsi-sched-"));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	const clock = new FakeClock();
+
+	// A's pass fails with no work: A's own stamp rolls back, but the floor stays advanced.
+	const a = makeSchedulerAt(t, root, clock, {
+		getSessionFile: () => file,
+		runPass: async () => {
+			throw new Error("boom");
+		},
+	});
+	await setSessionPassAt(root, file, new Date(EPOCH - 60 * 60_000).toISOString());
+	await a.scheduler.learnNow();
+	assert.equal(sessionAt(root, file), new Date(EPOCH - 60 * 60_000).toISOString(), "A may retry");
+	assert.equal(lastPassAt(root), new Date(EPOCH).toISOString(), "the floor records that a pass ran");
+
+	// B is a different session with its own interval long elapsed, but the floor holds it back.
+	const b = makeSchedulerAt(t, root, clock, {
+		config: { treeFloorMinutes: 60 },
+		getSessionFile: () => "/sessions/b.jsonl",
+	});
+	b.scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	assert.deepEqual(b.calls, [], "B was not licensed by A's failure");
+});
+
+test("with no session file, the global stamp is the interval — the single-learner behaviour", async (t) => {
+	const { root, clock, scheduler, calls, skips } = makeScheduler(t);
+	await setLastPassAt(root, new Date(EPOCH - 60_000).toISOString());
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	assert.deepEqual(calls, []);
+	assert.ok(skips.includes("within the minimum interval"));
+});
+
+// ---------------------------------------------------------------------------
+// Losing the lock (ticket 12): an answered child may never settle again, so a lost
+// race must re-arm rather than silently ending that session's chance to learn.
+// ---------------------------------------------------------------------------
+
+test("losing the lock asks the caller to re-arm", async (t) => {
+	let rearmed = 0;
+	const { root, clock, scheduler, skips, calls } = makeScheduler(t, { onLockContention: () => { rearmed++; } });
+	fs.writeFileSync(passLockPath(root), `1 ${Date.now()} held\n`);
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	assert.equal(rearmed, 1);
+	assert.ok(skips.includes("a pass is already running"));
+	assert.deepEqual(calls, []);
+});
+
+test("the re-arm is bounded, so a contended store does not retry forever", async (t) => {
+	let rearmed = 0;
+	const { root, clock, scheduler } = makeScheduler(t, { onLockContention: () => { rearmed++; } });
+	fs.writeFileSync(passLockPath(root), `1 ${Date.now()} held\n`);
+	// Every attempt finds the lock held, so without a bound this would re-arm indefinitely.
+	for (let attempt = 0; attempt < 10; attempt++) {
+		scheduler.settled();
+		clock.advance(5 * 60_000);
+		await flush();
+	}
+	assert.equal(rearmed, 3, "bounded to MAX_LOCK_RETRIES consecutive re-arms");
+});
+
+test("winning the lock resets the retry budget", async (t) => {
+	let rearmed = 0;
+	const { root, clock, scheduler } = makeScheduler(t, { onLockContention: () => { rearmed++; } });
+	fs.writeFileSync(passLockPath(root), `1 ${Date.now()} held\n`);
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	assert.equal(rearmed, 1);
+
+	// The holder releases; the next attempt runs and clears the budget.
+	fs.rmSync(passLockPath(root));
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+
+	// Now it may be re-armed again from a fresh budget.
+	fs.writeFileSync(passLockPath(root), `1 ${Date.now()} held\n`);
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	assert.equal(rearmed, 2);
 });

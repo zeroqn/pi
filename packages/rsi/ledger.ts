@@ -45,7 +45,19 @@ export interface StatusCounts {
 
 export interface Ledger {
 	schema_version: number;
+	/**
+	 * The **tree-wide floor**: the last time *any* pass ran, whatever session ran it. Kept from
+	 * the single-learner design and now doing a different job — it caps how often a whole tree of
+	 * sessions can fork reviewers, so ten children finishing together cannot spend ten forks in a
+	 * minute (RSI x RLM ticket 12).
+	 */
 	last_pass_at: string | null;
+	/**
+	 * Each session's own interval stamp, keyed by session file. A session's pass no longer
+	 * consumes another session's interval — which as shipped it did, throttling a tree of N
+	 * learners to one pass per interval in total.
+	 */
+	sessions?: Record<string, { last_pass_at?: string }>;
 	skills: Record<string, LedgerEntry>;
 	last_status_at?: string;
 	last_status?: StatusCounts;
@@ -103,6 +115,7 @@ export function readLedger(root: string): ReadLedgerResult {
 		if (typeof parsed.last_status_at === "string") ledger.last_status_at = parsed.last_status_at;
 		if (isStatusCounts(parsed.last_status)) ledger.last_status = parsed.last_status;
 		if (typeof parsed.last_curate_at === "string") ledger.last_curate_at = parsed.last_curate_at;
+		if (isPlainObject(parsed.sessions)) ledger.sessions = parsed.sessions as Ledger["sessions"];
 		return { ledger };
 	} catch (error) {
 		return {
@@ -248,6 +261,31 @@ export async function setLastPassAt(root: string, at: string | null): Promise<bo
 	const written = await withLedgerLock(root, () => {
 		const { ledger } = readLedger(root);
 		ledger.last_pass_at = at;
+		writeLedger(root, ledger);
+		return true;
+	});
+	return written ?? false;
+}
+
+/** This session's own interval stamp, or `null` when it has never run a pass. */
+export function sessionPassAt(ledger: Ledger, sessionFile: string | undefined): string | null {
+	if (!sessionFile) return null;
+	return ledger.sessions?.[sessionFile]?.last_pass_at ?? null;
+}
+
+/**
+ * Advance this session's interval stamp, or roll it back after a pass that errored without
+ * doing any work so the session can retry (RSI x RLM ticket 12). The tree-wide floor is
+ * deliberately **not** rolled back: a pass did run, and the floor records that fact.
+ */
+export async function setSessionPassAt(root: string, sessionFile: string | undefined, at: string | null): Promise<boolean> {
+	if (!sessionFile) return false;
+	const written = await withLedgerLock(root, () => {
+		const { ledger } = readLedger(root);
+		const sessions = ledger.sessions ?? (ledger.sessions = {});
+		const entry = sessions[sessionFile] ?? (sessions[sessionFile] = {});
+		if (at === null) delete entry.last_pass_at;
+		else entry.last_pass_at = at;
 		writeLedger(root, ledger);
 		return true;
 	});

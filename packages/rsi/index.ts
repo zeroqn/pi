@@ -67,6 +67,12 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		// the gate consults it first; with RLM absent the fact is absent and the heuristic
 		// decides, exactly as before.
 		publishedCanWrite: () => publishedCapability(sessionFileOf(currentCtx)),
+		// The per-session interval is keyed by session file (ticket 12), so a child's pass does
+		// not consume the root's.
+		getSessionFile: () => sessionFileOf(currentCtx),
+		// A lost lock race must not mean this session never learns: an answered child may never
+		// settle again, so re-arm its quiet timer and let it try again (ticket 12).
+		onLockContention: () => scheduler.settled(),
 		getScanMessages: () => (currentCtx ? toScanMessages(currentCtx.sessionManager.getEntries()) : []),
 		// The code-mode half of the pre-scan (ticket 04): `["python"]` alone never reaches the
 		// pi-tool size threshold, so the kernel journal supplies the equivalent evidence.
