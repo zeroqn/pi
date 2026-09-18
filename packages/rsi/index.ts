@@ -34,7 +34,7 @@ import { PassScheduler } from "./scheduler.ts";
 import { applyProposal, discardProposal, formatProposal } from "./review.ts";
 import type { SkillActionDeps } from "./skill-actions.ts";
 import { publishedCapability, registerRsiSeam, type RsiSeamWork, type SeamHostCall, type SeamSkill, type SeamSkillContent, type SeamUsage } from "./seam.ts";
-import { SkillStore, type Scope } from "./store.ts";
+import { SkillStore, treeWrittenSkills, type Scope, type SkillProvenance } from "./store.ts";
 import { bashReadCandidates, formatStatus, scopeKey, summarizeStatus, UsageTracker } from "./telemetry.ts";
 
 /** Bound on the rendered transcript, so one huge session cannot blow the fork's budget. */
@@ -522,6 +522,7 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 			root: store.root,
 			scope,
 			mode,
+			provenance,
 			softAttempts,
 			onAction: (action, _name, held) => {
 				if (held) tally.proposed++;
@@ -535,7 +536,23 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 			now: () => new Date(),
 		};
 
-		const prompt = buildReviewPrompt({ scope: scopeKey(scope), mode, digest, transcript });
+		// Provenance (ticket 14): the session this pass is learning from, and its parent when it
+		// is itself a child. Recorded durably so a later pass can tell what its tree wrote.
+		const sessionFile = sessionFileOf(ctx);
+		const provenance: SkillProvenance = {
+			session: sessionFile,
+			parentSession: headerParentSession(ctx?.sessionManager),
+		};
+		const prompt = buildReviewPrompt({
+			scope: scopeKey(scope),
+			mode,
+			digest,
+			transcript,
+			treeWrote: treeWrittenSkills(store, sessionFile).map((skill) => ({
+				name: skill.name,
+				description: skill.description,
+			})),
+		});
 		const outcome = await runLearningFork({
 			cwd: ctx.cwd,
 			agentDir,
@@ -683,6 +700,23 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 function scopeFor(cwd: string): Scope {
 	const key = projectKeyFor(cwd);
 	return key ? { project: key } : "general";
+}
+
+/**
+ * The session this one was spawned from, from pi's own session header.
+ *
+ * A child session records its parent here, so this is provenance rather than a binding: a
+ * `/fork` also writes it, and for "which tree wrote this skill" that is the right answer
+ * either way (RSI x RLM ticket 14).
+ */
+function headerParentSession(sessionManager: unknown): string | undefined {
+	try {
+		const parent = (sessionManager as { getHeader?: () => { parentSession?: unknown } } | undefined)?.getHeader?.()
+			?.parentSession;
+		return typeof parent === "string" && parent.length > 0 ? path.resolve(parent) : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 /** The session file pi recorded, or `undefined` for an in-memory session. */

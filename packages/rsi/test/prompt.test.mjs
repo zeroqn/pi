@@ -30,3 +30,42 @@ test("the prompt carries the refusal licence and the authoring standards", () =>
 	assert.match(prompt, /grounded/i);
 	assert.match(prompt, /skill_store/);
 });
+
+// ---------------------------------------------------------------------------
+// The tree hint (RSI x RLM ticket 14): a pass is shown what its own tree wrote, so a
+// root does not create a sibling of the lesson its child just learned from the detail.
+// ---------------------------------------------------------------------------
+
+test("no tree hint section when nothing in the tree has written anything", () => {
+	const prompt = buildReviewPrompt({ scope: "general", mode: "write", digest: "d", transcript: "t" });
+	assert.equal(prompt.includes("Already written by this session"), false);
+	assert.equal(buildReviewPrompt({ scope: "general", mode: "write", digest: "d", transcript: "t", treeWrote: [] }).includes("Already written by this session"), false);
+});
+
+test("the tree hint names the skills and says not to duplicate them", () => {
+	const prompt = buildReviewPrompt({
+		scope: "general",
+		mode: "write",
+		digest: "d",
+		transcript: "t",
+		treeWrote: [{ name: "flaky-test-retry", description: "retry a flaky test" }],
+	});
+	assert.match(prompt, /Already written by this session's tree/);
+	assert.match(prompt, /- `flaky-test-retry`: retry a flaky test/);
+	assert.match(prompt, /do \*\*not\*\* create a second skill/);
+	// It must leave room for a genuinely different framing.
+	assert.match(prompt, /only when the lesson is genuinely distinct/);
+});
+
+test("the tree hint is evidence, not an instruction to emit nothing", () => {
+	// Emitting nothing is already correct when appropriate; the hint must not read as a blanket
+	// stop, or a session with a real new lesson would learn nothing.
+	const prompt = buildReviewPrompt({
+		scope: "general",
+		mode: "write",
+		digest: "d",
+		transcript: "t",
+		treeWrote: [{ name: "one", description: "d" }],
+	});
+	assert.match(prompt, /improve it in place/);
+});

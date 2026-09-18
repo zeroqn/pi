@@ -50,6 +50,8 @@ export interface NewSkillInput {
 	body: string;
 	metadata?: Record<string, unknown>;
 	files?: SkillFile[];
+	/** The session that produced it, recorded durably (ticket 14). */
+	provenance?: SkillProvenance;
 }
 
 export interface StagedSkill {
@@ -123,6 +125,19 @@ export function isValidSkillName(name: string): boolean {
 	return name.length >= 1 && name.length <= MAX_SKILL_NAME_LENGTH && SKILL_NAME.test(name);
 }
 
+/**
+ * Where a skill came from (RSI x RLM ticket 14). Durable, because it lives in the skill
+ * itself rather than the ledger, so it survives archiving and restore. The point is
+ * double-learning: a child's finding reaches its own pass *and* the root's, and the root's
+ * reviewer needs to know that its tree already wrote the lesson.
+ */
+export interface SkillProvenance {
+	/** The session file that produced the skill. */
+	session?: string;
+	/** That session's parent, so a pass can find what its own tree wrote. */
+	parentSession?: string;
+}
+
 /** The frontmatter a learned skill ships with; shared by every write path. */
 export function buildSkillFrontmatter(input: {
 	name: string;
@@ -132,6 +147,8 @@ export function buildSkillFrontmatter(input: {
 	createdAt?: string;
 	/** Payload paths the skill ships, declared in frontmatter so a reader sees them. */
 	files?: readonly string[];
+	/** The session that produced it, recorded durably (ticket 14). */
+	provenance?: SkillProvenance;
 }): Record<string, unknown> {
 	const metadata: Record<string, unknown> = { ...(input.metadata ?? {}) };
 	metadata.origin = "learned";
@@ -140,7 +157,34 @@ export function buildSkillFrontmatter(input: {
 	}
 	metadata.scope = input.scope === "general" ? "general" : input.scope.project;
 	if (input.files && input.files.length > 0) metadata.files = [...input.files];
+	if (input.provenance?.session) metadata.session = input.provenance.session;
+	if (input.provenance?.parentSession) metadata.parent_session = input.provenance.parentSession;
 	return { name: input.name, description: input.description, metadata };
+}
+
+/** A skill's recorded provenance, or `undefined` when it has none (a pre-provenance skill). */
+export function provenanceOf(skill: LearnedSkill): SkillProvenance | undefined {
+	const session = skill.metadata.session;
+	const parentSession = skill.metadata.parent_session;
+	if (typeof session !== "string" && typeof parentSession !== "string") return undefined;
+	return {
+		session: typeof session === "string" ? session : undefined,
+		parentSession: typeof parentSession === "string" ? parentSession : undefined,
+	};
+}
+
+/**
+ * The skills written **by this session's tree**, which is what a pass is shown so it does not
+ * create a sibling of its own child's work (ticket 14). "Tree" means: written by this session,
+ * or by a session whose parent is this session. Resolved from the durable provenance above,
+ * so it needs nothing from the seam.
+ */
+export function treeWrittenSkills(store: SkillStore, sessionFile: string | undefined): LearnedSkill[] {
+	if (!sessionFile) return [];
+	return store.listSkills().filter((skill) => {
+		const provenance = provenanceOf(skill);
+		return provenance?.session === sessionFile || provenance?.parentSession === sessionFile;
+	});
 }
 
 export class SkillStore {
@@ -264,7 +308,7 @@ export class SkillStore {
 
 		try {
 			fs.mkdirSync(stagingDir, { recursive: true });
-			this.writeSkillFiles(stagingDir, buildSkillFrontmatter({ name: input.name, description: input.description, scope: input.scope, metadata: input.metadata, files: (input.files ?? []).map((file) => file.path) }), input.body, input.files);
+			this.writeSkillFiles(stagingDir, buildSkillFrontmatter({ name: input.name, description: input.description, scope: input.scope, metadata: input.metadata, files: (input.files ?? []).map((file) => file.path), provenance: input.provenance }), input.body, input.files);
 		} catch (error) {
 			this.removeQuietly(path.join(this.stagingRoot, token));
 			return { ok: false, reason: `staging write failed: ${error instanceof Error ? error.message : String(error)}` };
@@ -447,7 +491,7 @@ export class SkillStore {
 		try {
 			this.writeSkillFiles(
 				stagingDir,
-				buildSkillFrontmatter({ name: input.name, description: input.description, scope: input.scope, metadata: input.metadata, files: (input.files ?? []).map((file) => file.path) }),
+				buildSkillFrontmatter({ name: input.name, description: input.description, scope: input.scope, metadata: input.metadata, files: (input.files ?? []).map((file) => file.path), provenance: input.provenance }),
 				input.body,
 				input.files,
 			);

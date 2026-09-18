@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { isValidSkillName, SkillStore, validatePayloadPath } from "../store.ts";
+import { isValidSkillName, provenanceOf, SkillStore, treeWrittenSkills, validatePayloadPath } from "../store.ts";
 import { isInside } from "../paths.ts";
 
 function tempStore(t, options = {}) {
@@ -484,4 +484,72 @@ test("what listSkills resolves for a scope is what skillPaths surfaces", (t) => 
 			`${dir} is listed but not surfaced to pi`,
 		);
 	}
+});
+
+// ---------------------------------------------------------------------------
+// Provenance and the tree hint (RSI x RLM ticket 14). A child's finding reaches its
+// own pass and the root's, so the root must be able to tell what its tree already
+// wrote — resolved from durable frontmatter, needing nothing from the seam.
+// ---------------------------------------------------------------------------
+
+test("a created skill records its session and parent in frontmatter", (t) => {
+	const store = tempStore(t);
+	const result = store.create({
+		...basic("with-provenance"),
+		provenance: { session: "/sessions/child.jsonl", parentSession: "/sessions/root.jsonl" },
+	});
+	assert.equal(result.ok, true);
+	const skill = store.findByName("with-provenance");
+	assert.equal(skill.metadata.session, "/sessions/child.jsonl");
+	assert.equal(skill.metadata.parent_session, "/sessions/root.jsonl");
+});
+
+test("a skill with no provenance records none, rather than empty keys", (t) => {
+	const store = tempStore(t);
+	store.create(basic("no-provenance"));
+	const skill = store.findByName("no-provenance");
+	assert.equal("session" in skill.metadata, false);
+	assert.equal("parent_session" in skill.metadata, false);
+	assert.equal(provenanceOf(skill), undefined);
+});
+
+test("provenance survives the file, not just the in-memory object", (t) => {
+	const store = tempStore(t);
+	store.create({ ...basic("durable"), provenance: { session: "/sessions/a.jsonl" } });
+	const file = path.join(store.root, "skills", "general", "durable", "SKILL.md");
+	assert.match(fs.readFileSync(file, "utf8"), /session: "\/sessions\/a\.jsonl"/);
+	// A fresh store reads it back from disk.
+	const reopened = new SkillStore({ root: store.root });
+	assert.equal(provenanceOf(reopened.findByName("durable")).session, "/sessions/a.jsonl");
+});
+
+test("the tree hint finds this session's own writes and its children's", (t) => {
+	const store = tempStore(t);
+	const root = "/sessions/root.jsonl";
+	const child = "/sessions/child.jsonl";
+	store.create({ ...basic("written-here"), provenance: { session: root } });
+	store.create({ ...basic("written-by-child"), provenance: { session: child, parentSession: root } });
+	store.create({ ...basic("someone-elses"), provenance: { session: "/sessions/other.jsonl" } });
+	store.create(basic("no-provenance-at-all"));
+
+	const tree = treeWrittenSkills(store, root).map((skill) => skill.name);
+	assert.deepEqual(tree, ["written-by-child", "written-here"]);
+});
+
+test("a child's tree hint is only its own work, never the root's", (t) => {
+	// A child learns from its own task; it must not be told the root's lessons are its own.
+	const store = tempStore(t);
+	const root = "/sessions/root.jsonl";
+	const child = "/sessions/child.jsonl";
+	store.create({ ...basic("written-here"), provenance: { session: child } });
+	store.create({ ...basic("written-by-root"), provenance: { session: root, parentSession: "/sessions/grandparent.jsonl" } });
+
+	assert.deepEqual(treeWrittenSkills(store, child).map((skill) => skill.name), ["written-here"]);
+});
+
+test("an unknown or absent session sees no tree hint at all", (t) => {
+	const store = tempStore(t);
+	store.create({ ...basic("anything"), provenance: { session: "/sessions/a.jsonl" } });
+	assert.deepEqual(treeWrittenSkills(store, undefined), []);
+	assert.deepEqual(treeWrittenSkills(store, "/sessions/never-seen.jsonl"), []);
 });

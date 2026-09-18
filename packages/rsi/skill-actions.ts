@@ -18,6 +18,7 @@ import {
 	type ProposalKind,
 	type Scope,
 	type SkillFile,
+	type SkillProvenance,
 	type SkillStore,
 } from "./store.ts";
 import { scopeKey } from "./telemetry.ts";
@@ -50,6 +51,11 @@ export interface SkillActionDeps {
 	softAttempts?: Map<string, number>;
 	/** Called before a patch so a merge can be reverted exactly. */
 	snapshot?: (name: string) => void;
+	/**
+	 * Where this pass's writes came from (RSI x RLM ticket 14), recorded durably in the
+	 * skill's frontmatter so a later pass can tell what its own tree already wrote.
+	 */
+	provenance?: SkillProvenance;
 	now?: () => Date;
 }
 
@@ -117,7 +123,7 @@ async function createSkill(input: SkillActionInput, deps: SkillActionDeps, force
 	const gate = gateContent({ name, description, body, scope, files, deps });
 	if (gate) return { ...gate, name };
 
-	const proposed = { name, description, body, scope, files } satisfies NewSkillInput;
+	const proposed = { name, description, body, scope, files, provenance: deps.provenance } satisfies NewSkillInput;
 	const reason =
 		forced === "propose"
 			? typeof input.reason === "string" && input.reason.trim().length > 0
