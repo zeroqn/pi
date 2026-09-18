@@ -32,6 +32,7 @@ import type { LearnerReason, PassOutcome } from "./scheduler.ts";
 import { PassScheduler } from "./scheduler.ts";
 import { applyProposal, discardProposal, formatProposal } from "./review.ts";
 import type { SkillActionDeps } from "./skill-actions.ts";
+import { registerRsiSeam, type RsiSeamWork, type SeamHostCall, type SeamSkill, type SeamSkillContent, type SeamUsage } from "./seam.ts";
 import { SkillStore, type Scope } from "./store.ts";
 import { bashReadCandidates, formatStatus, scopeKey, summarizeStatus, UsageTracker } from "./telemetry.ts";
 
@@ -75,6 +76,81 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		},
 	});
 
+	// -- the seam (RSI x RLM, tickets 07, 15) -----------------------------------
+
+	/**
+	 * RSI's half of the seam. The store is global and every instance serves the same one,
+	 * so reads answer process-wide; only session-scoped facts (a capability, a usage
+	 * report) resolve to a particular instance. Each session publishes its own - the
+	 * root's and a child's are separate instances, and a child's fact is never inherited.
+	 *
+	 * Nothing here runs unless another extension calls in: with RLM absent the facade is
+	 * published and never used.
+	 */
+	const seamWork: RsiSeamWork = {
+		skills: (scope) => listForSeam(scope),
+		skill: (name, scope) => contentForSeam(name, scope),
+		noteUsage: (usage, scope) => {
+			void recordSeamUsage(usage);
+		},
+		noteHostCall: (call, scope) => {
+			void recordSeamHostCall(call);
+		},
+	};
+
+	/**
+	 * The instance registers at `session_start`, when pi has told us the session file the
+	 * facade serves by. Registering at load time would key it on nothing.
+	 */
+	let withdrawSeam: (() => void) | undefined;
+
+	/** The learned skills a scope resolves to, in pi's own skill shape. */
+	function listForSeam(scope: Scope): SeamSkill[] {
+		const shape = (skill: { name: string; description: string; filePath: string; scope: Scope }): SeamSkill => ({
+			name: skill.name,
+			description: skill.description,
+			location: skill.filePath,
+			scope: scopeKey(skill.scope),
+		});
+		try {
+			return store.listSkills(scope).map(shape);
+		} catch {
+			// An unencodable project key must not take the caller down; general alone.
+			return store.listSkills("general").map(shape);
+		}
+	}
+
+	/** One skill's content, resolved in the caller's scope union - never another project's. */
+	function contentForSeam(name: string, scope: Scope): SeamSkillContent | undefined {
+		try {
+			if (!listForSeam(scope).some((skill) => skill.name === name)) return undefined;
+			const found = store.readSkillContent(name);
+			return found ? { content: found.content, files: found.files } : undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
+	/**
+	 * One consultation, counted once. The tracker owns the per-turn dedupe and the
+	 * path-to-skill resolution, so a `skill()` call and a bash read of the same skill in
+	 * the same turn are one act, exactly as an expansion and a read already are.
+	 */
+	async function recordSeamUsage(usage: SeamUsage): Promise<void> {
+		if (!config.enabled) return;
+		const event = usage.kind === "skill" ? tracker.noteExpansion(usage.target) : tracker.noteRead(usage.target);
+		if (event) await recordUsage(store.root, event);
+	}
+
+	/** A bash host call's path-looking tokens, matched exactly as a `bash` tool call is. */
+	async function recordSeamHostCall(call: SeamHostCall): Promise<void> {
+		if (!config.enabled) return;
+		for (const candidate of bashReadCandidates(call.command)) {
+			const event = tracker.noteRead(absoluteAgainst(candidate, call.cwd ?? currentCwd));
+			if (event) await recordUsage(store.root, event);
+		}
+	}
+
 	pi.on("resources_discover", async (event) => {
 		currentCwd = event.cwd;
 		if (!config.enabled) return {};
@@ -94,6 +170,8 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (_event, ctx) => {
 		currentCtx = ctx;
+		withdrawSeam?.();
+		withdrawSeam = registerRsiSeam({ work: seamWork, sessionFile: sessionFileOf(ctx) });
 		if (!config.enabled) return;
 		for (const warning of warnings) {
 			ctx.ui.notify(warning, "warning");
@@ -137,6 +215,11 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_shutdown", async () => {
+		// Withdraw before anything else: a withdrawn instance must not serve a session
+		// that is going away. A child never reaches this handler (ticket 09), which is
+		// why the registration is also pruned by session-file mtime.
+		withdrawSeam?.();
+		withdrawSeam = undefined;
 		scheduler.shutdown();
 		const fork = activeFork;
 		activeFork = undefined;
@@ -578,6 +661,16 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 function scopeFor(cwd: string): Scope {
 	const key = projectKeyFor(cwd);
 	return key ? { project: key } : "general";
+}
+
+/** The session file pi recorded, or `undefined` for an in-memory session. */
+function sessionFileOf(ctx: ExtensionContext | undefined): string | undefined {
+	try {
+		const file = ctx?.sessionManager?.getSessionFile?.();
+		return typeof file === "string" && file.length > 0 ? file : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function absoluteAgainst(target: string, cwd: string): string {

@@ -447,3 +447,41 @@ test("exportToHuman strips the learned metadata and refuses a collision", (t) =>
 
 	assert.equal(store.exportToHuman("to-human", humanDir).ok, false, "the human tier now owns the name");
 });
+
+// ---------------------------------------------------------------------------
+// Scope resolution — listSkills and skillPaths must agree, because pi loads what
+// skillPaths returns and the seam serves what listSkills finds. They disagreed:
+// listSkills(project) scanned only the project directory, so a project-scoped
+// session was told about fewer skills than pi had actually loaded.
+// ---------------------------------------------------------------------------
+
+test("listSkills(project) is the union of general and that project", (t) => {
+	const store = tempStore(t);
+	assert.equal(store.create(basic("general-skill")).ok, true);
+	assert.equal(store.create(basic("app-skill", { project: "github.com/acme/app" })).ok, true);
+	assert.equal(store.create(basic("other-skill", { project: "github.com/acme/other" })).ok, true);
+
+	const app = store.listSkills({ project: "github.com/acme/app" }).map((skill) => skill.name);
+	assert.deepEqual(app, ["app-skill", "general-skill"]);
+	assert.equal(store.findByName("general-skill", { project: "github.com/acme/app" })?.name, "general-skill");
+
+	// general alone sees only general, and every scope sees everything.
+	assert.deepEqual(store.listSkills("general").map((skill) => skill.name), ["general-skill"]);
+	assert.deepEqual(store.listSkills().map((skill) => skill.name), ["app-skill", "general-skill", "other-skill"]);
+});
+
+test("what listSkills resolves for a scope is what skillPaths surfaces", (t) => {
+	const store = tempStore(t);
+	store.create(basic("general-skill"));
+	store.create(basic("app-skill", { project: "github.com/acme/app" }));
+	const scope = { project: "github.com/acme/app" };
+
+	const listed = store.listSkills(scope).map((skill) => path.dirname(skill.dir));
+	for (const dir of listed) {
+		assert.equal(
+			store.skillPaths(scope).some((surfaced) => dir === surfaced || dir.startsWith(`${surfaced}${path.sep}`)),
+			true,
+			`${dir} is listed but not surfaced to pi`,
+		);
+	}
+});

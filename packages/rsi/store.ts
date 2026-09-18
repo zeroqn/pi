@@ -203,6 +203,11 @@ export class SkillStore {
 
 	// -- reads ----------------------------------------------------------------
 
+	/**
+	 * Skills for a scope. `general` always, plus the project scope when there is one -
+	 * the same union {@link skillPaths} surfaces to pi, so the two never disagree about
+	 * what a session can see. Called with no argument, every scope.
+	 */
 	listSkills(scope?: Scope): LearnedSkill[] {
 		const skills: LearnedSkill[] = [];
 		for (const entry of this.scanSkillDirs(scope)) {
@@ -718,8 +723,13 @@ export class SkillStore {
 					// A directory whose name is not a scope key is not ours.
 				}
 			}
+		} else if (scope === "general") {
+			scopes.push("general");
 		} else {
-			scopes.push(scope);
+			// A project scope is the union of general and that project, matching
+			// `skillPaths` and therefore what pi actually loads. Scanning only the
+			// project directory under-reported whenever a session was project-scoped.
+			scopes.push("general", scope);
 		}
 
 		for (const current of scopes) {
