@@ -174,6 +174,31 @@ test("a registration with no session file is never pruned, and still serves read
 	withdraw();
 });
 
+test("a registration published before its session starts still receives facts", (t) => {
+	t.after(() => __resetSeamForTests());
+	__resetSeamForTests();
+	// The load-order case: the facade is published at load time, before any `session_start`
+	// handler has run, so the session file is not known yet. A client that publishes its fact
+	// in its own `session_start` must still land on the right instance - otherwise the fact is
+	// dropped silently, which is the failure the acceptance check caught when RLM was loaded
+	// before RSI.
+	let file;
+	const { work } = fakeWork();
+	const withdraw = registerRsiSeam({ work, sessionFile: () => file });
+	const seam = findRsiSeam();
+
+	// No session file yet: the fact still registers, under the session-less key.
+	seam.capability({ canWrite: true, reason: "published before the session file existed" });
+	assert.equal(publishedCapability(undefined), true);
+
+	// And once the session file is known, a fact keyed by it resolves normally.
+	file = tempSessionFile(t, "late.jsonl");
+	seam.capability({ sessionFile: file, canWrite: false, reason: "read-only" });
+	assert.equal(publishedCapability(file), false);
+
+	withdraw();
+});
+
 test("a half-shaped slot is not mistaken for the seam", (t) => {
 	t.after(() => __resetSeamForTests());
 	__resetSeamForTests();

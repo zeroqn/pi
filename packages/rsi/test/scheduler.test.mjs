@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { readLedger, setLastCurateAt, setLastPassAt } from "../ledger.ts";
 import { passLockPath } from "../pass-lock.ts";
-import { intervalElapsed, isQueryOnly, PassScheduler } from "../scheduler.ts";
+import { intervalElapsed, isQueryOnly, PassScheduler, suppressedAsQueryOnly } from "../scheduler.ts";
 
 const EPOCH = Date.parse("2026-09-14T12:00:00.000Z");
 const flush = () => new Promise((resolve) => setTimeout(resolve, 20));
@@ -72,6 +72,7 @@ function makeScheduler(t, options = {}) {
 		root,
 		config: makeConfig(options.config),
 		getActiveTools: options.getActiveTools ?? (() => ["read", "write", "edit"]),
+		publishedCanWrite: options.publishedCanWrite,
 		getScanMessages: options.getScanMessages ?? (() => [{ role: "user", text: "remember this" }]),
 		runPass,
 		curate: options.curate,
@@ -88,6 +89,19 @@ const lastPassAt = (root) => readLedger(root).ledger.last_pass_at;
 // ---------------------------------------------------------------------------
 // Pure predicates.
 // ---------------------------------------------------------------------------
+
+test("a published capability wins over the tool-name heuristic", () => {
+	// The code-mode case: the tool set looks query-only, but the session says it can write.
+	assert.equal(suppressedAsQueryOnly({ activeTools: ["python"], publishedCanWrite: true }), false);
+	// And the reverse: a session that reports it cannot write is suppressed even if a
+	// writer tool happens to be active.
+	assert.equal(suppressedAsQueryOnly({ activeTools: ["read", "write"], publishedCanWrite: false }), true);
+});
+
+test("with nothing published, the tool-name heuristic decides", () => {
+	assert.equal(suppressedAsQueryOnly({ activeTools: ["python"], publishedCanWrite: undefined }), true);
+	assert.equal(suppressedAsQueryOnly({ activeTools: ["read", "write"], publishedCanWrite: undefined }), false);
+});
 
 test("isQueryOnly is true when neither writer tool is active", () => {
 	assert.equal(isQueryOnly(["read", "bash", "ffgrep"]), true);
@@ -150,6 +164,35 @@ test("a query-only session is suppressed for both trigger kinds", async (t) => {
 	assert.deepEqual(direct, { ran: false, skipped: "query-only session" });
 	assert.deepEqual(calls, []);
 	assert.ok(skips.includes("query-only session"));
+});
+
+test("a code-mode session with a published capability is admitted", async (t) => {
+	// The whole point of ticket 03: `["python"]` reads as query-only, so without the fact
+	// this session would be skipped and RLM sessions would never be learned from.
+	const { scheduler, calls, skips } = makeScheduler(t, {
+		getActiveTools: () => ["python"],
+		publishedCanWrite: () => true,
+	});
+	const result = await scheduler.learnNow();
+	assert.equal(result.ran, true);
+	assert.deepEqual(calls, ["learn"]);
+	assert.equal(skips.includes("query-only session"), false);
+});
+
+test("a session that publishes canWrite false stays suppressed", async (t) => {
+	const { scheduler, calls } = makeScheduler(t, {
+		getActiveTools: () => ["read", "write"],
+		publishedCanWrite: () => false,
+	});
+	assert.deepEqual(await scheduler.learnNow(), { ran: false, skipped: "query-only session" });
+	assert.deepEqual(calls, []);
+});
+
+test("a code-mode session with no published fact is still suppressed", async (t) => {
+	// RLM absent: nothing is published, and the heuristic must keep working as it did.
+	const { scheduler, calls } = makeScheduler(t, { getActiveTools: () => ["python"] });
+	assert.deepEqual(await scheduler.learnNow(), { ran: false, skipped: "query-only session" });
+	assert.deepEqual(calls, []);
 });
 
 test("settled without a learnable signal spends nothing", async (t) => {

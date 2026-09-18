@@ -111,8 +111,12 @@ export interface RsiSeam extends RsiSeamWork {
 
 interface Registration {
 	work: RsiSeamWork;
-	/** This instance's own session file; the key the facade serves by. */
-	sessionFile?: string;
+	/**
+	 * This instance's own session file; the key the facade serves by. A getter rather than a
+	 * value, because the facade is published at load time - before any `session_start`
+	 * handler of any extension has run - while the session file is only known later.
+	 */
+	sessionFile: () => string | undefined;
 	/** Per-session facts this instance published, keyed by session file. */
 	facts: Map<string, SeamCapability>;
 	registeredAt: number;
@@ -136,7 +140,7 @@ function resolve(caller: SeamCaller | undefined): Registration | undefined {
 	const file = caller?.sessionFile;
 	if (file && file.length > 0) {
 		for (const registration of registrations) {
-			if (registration.sessionFile === file) return registration;
+			if (registration.sessionFile() === file) return registration;
 		}
 	}
 	return registrations.size === 1 ? [...registrations][0] : undefined;
@@ -165,7 +169,7 @@ export function pruneRegistrations(maxAgeMs: number): number {
 	const now = Date.now();
 	let removed = 0;
 	for (const registration of [...registrations]) {
-		const file = registration.sessionFile;
+		const file = registration.sessionFile();
 		if (!file || file.length === 0) continue;
 		let mtime: number;
 		try {
@@ -188,10 +192,20 @@ export function pruneRegistrations(maxAgeMs: number): number {
  * Publish an instance and return the function that withdraws it. Idempotent, because
  * shutdown paths can run more than once.
  */
-export function registerRsiSeam(options: { work: RsiSeamWork; sessionFile?: string; maxAgeMs?: number }): () => void {
+export function registerRsiSeam(options: {
+	work: RsiSeamWork;
+	/**
+	 * This instance's session file, or a getter for it. A getter lets the facade be published
+	 * at load time - which is what makes the seam exist before any extension's `session_start`
+	 * handler runs, whatever order the extensions were loaded in - while the session file is
+	 * only known once the session starts.
+	 */
+	sessionFile?: string | (() => string | undefined);
+}): () => void {
+	const sessionFile = typeof options.sessionFile === "function" ? options.sessionFile : () => options.sessionFile as string | undefined;
 	const registration: Registration = {
 		work: options.work,
-		sessionFile: options.sessionFile,
+		sessionFile,
 		facts: new Map(),
 		registeredAt: Date.now(),
 	};
@@ -208,8 +222,9 @@ export function registerRsiSeam(options: { work: RsiSeamWork; sessionFile?: stri
 			resolve(call)?.work.noteHostCall(call, scopeFor(call));
 		},
 		capability: (fact) => {
-			// The fact belongs to the session that published it, on the instance that owns
-			// that session — a child's own instance, never its parent's.
+			// The fact belongs to the session that published it, on the instance that owns that
+			// session — a child's own instance, never its parent's. Falling back to this
+			// registration matters at load time, when no session file is known yet.
 			const owner = resolve({ sessionFile: fact.sessionFile }) ?? registration;
 			owner.facts.set(keyFor(fact.sessionFile), fact);
 		},

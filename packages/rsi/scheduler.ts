@@ -53,9 +53,29 @@ export const systemClock: Clock = {
 /**
  * A query-only session has neither writer tool, so there is nothing to learn
  * from and the learner suppresses itself. This also covers `readonly-mode`.
+ *
+ * This is the **fallback**: a session whose surface pi cannot describe with tool names -
+ * a code-mode session, whose only tool is `python` while its kernel can write - publishes
+ * a capability fact instead (RSI x RLM ticket 03), and {@link suppressedAsQueryOnly}
+ * consults that first. The heuristic stays for every session that publishes nothing, so
+ * nothing about RSI's existing behaviour changes when RLM is absent.
  */
 export function isQueryOnly(activeTools: readonly string[]): boolean {
 	return !activeTools.includes("write") && !activeTools.includes("edit");
+}
+
+/**
+ * Whether this session is suppressed as query-only. A published fact wins when there is
+ * one; otherwise the tool-name heuristic decides. `canWrite` is the session's own report
+ * about its surface, and only the session can know it.
+ */
+export function suppressedAsQueryOnly(input: {
+	activeTools: readonly string[];
+	/** The session's published fact, or `undefined` when it published none. */
+	publishedCanWrite: boolean | undefined;
+}): boolean {
+	if (input.publishedCanWrite !== undefined) return !input.publishedCanWrite;
+	return isQueryOnly(input.activeTools);
 }
 
 /** True when `minIntervalMs` has passed since the last recorded pass. */
@@ -71,6 +91,11 @@ export interface PassSchedulerOptions {
 	config: RsiConfig;
 	/** The live active-tool set, for query-only detection. */
 	getActiveTools: () => string[];
+	/**
+	 * What this session published about its own write capability, or `undefined` when it
+	 * published nothing (RSI x RLM ticket 03). Consulted before the tool-name heuristic.
+	 */
+	publishedCanWrite?: () => boolean | undefined;
 	/** The current session's messages, reduced for the pre-scan. */
 	getScanMessages: () => ScanMessage[];
 	/** The learner pass. */
@@ -155,7 +180,7 @@ export class PassScheduler {
 		const { config, root } = this.options;
 		if (!config.enabled) return this.skip("disabled");
 
-		if (isQueryOnly(this.options.getActiveTools())) {
+		if (suppressedAsQueryOnly({ activeTools: this.options.getActiveTools(), publishedCanWrite: this.options.publishedCanWrite?.() })) {
 			return this.skip("query-only session");
 		}
 

@@ -32,7 +32,7 @@ import type { LearnerReason, PassOutcome } from "./scheduler.ts";
 import { PassScheduler } from "./scheduler.ts";
 import { applyProposal, discardProposal, formatProposal } from "./review.ts";
 import type { SkillActionDeps } from "./skill-actions.ts";
-import { registerRsiSeam, type RsiSeamWork, type SeamHostCall, type SeamSkill, type SeamSkillContent, type SeamUsage } from "./seam.ts";
+import { publishedCapability, registerRsiSeam, type RsiSeamWork, type SeamHostCall, type SeamSkill, type SeamSkillContent, type SeamUsage } from "./seam.ts";
 import { SkillStore, type Scope } from "./store.ts";
 import { bashReadCandidates, formatStatus, scopeKey, summarizeStatus, UsageTracker } from "./telemetry.ts";
 
@@ -61,6 +61,11 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		root: store.root,
 		config,
 		getActiveTools: () => pi.getActiveTools(),
+		// A code-mode session's surface is `["python"]`, which the tool-name heuristic reads
+		// as query-only — but its kernel can write. RLM publishes that fact (ticket 03) and
+		// the gate consults it first; with RLM absent the fact is absent and the heuristic
+		// decides, exactly as before.
+		publishedCanWrite: () => publishedCapability(sessionFileOf(currentCtx)),
 		getScanMessages: () => (currentCtx ? toScanMessages(currentCtx.sessionManager.getEntries()) : []),
 		runPass: async (reason) => {
 			if (!currentCtx) return { ok: false, toolActions: 0 };
@@ -99,10 +104,13 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	};
 
 	/**
-	 * The instance registers at `session_start`, when pi has told us the session file the
-	 * facade serves by. Registering at load time would key it on nothing.
+	 * The instance registers at **load time**, not at `session_start`. Another extension's
+	 * `session_start` handler may run before ours - the load order decides - and RLM publishes
+	 * its capability there, so a facade that appeared later would miss it and the session would
+	 * silently never be learned from. The session file is passed as a getter instead, so the
+	 * registration is keyed correctly once the session actually starts.
 	 */
-	let withdrawSeam: (() => void) | undefined;
+	const withdrawSeam = registerRsiSeam({ work: seamWork, sessionFile: () => sessionFileOf(currentCtx) });
 
 	/** The learned skills a scope resolves to, in pi's own skill shape. */
 	function listForSeam(scope: Scope): SeamSkill[] {
@@ -170,8 +178,6 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (_event, ctx) => {
 		currentCtx = ctx;
-		withdrawSeam?.();
-		withdrawSeam = registerRsiSeam({ work: seamWork, sessionFile: sessionFileOf(ctx) });
 		if (!config.enabled) return;
 		for (const warning of warnings) {
 			ctx.ui.notify(warning, "warning");
@@ -215,11 +221,10 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_shutdown", async () => {
-		// Withdraw before anything else: a withdrawn instance must not serve a session
-		// that is going away. A child never reaches this handler (ticket 09), which is
-		// why the registration is also pruned by session-file mtime.
-		withdrawSeam?.();
-		withdrawSeam = undefined;
+		// Withdraw before anything else: a withdrawn instance must not serve a session that is
+		// going away. A child never reaches this handler (ticket 09), which is why the
+		// registration is also pruned by session-file mtime rather than only released here.
+		withdrawSeam();
 		scheduler.shutdown();
 		const fork = activeFork;
 		activeFork = undefined;
