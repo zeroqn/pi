@@ -749,10 +749,12 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	 */
 	function seamHostFns(): HostFns {
 		return {
-			async skills() {
+			// The prelude's `skills()`/`skill(name)` wrappers call these by name, so the
+			// suffix is part of the contract, not decoration.
+			async skills_host() {
 				return seamSkills(seamCaller());
 			},
-			async skill(...args: unknown[]) {
+			async skill_host(...args: unknown[]) {
 				const { name } = bind(args, ["name"]);
 				const wanted = str(name).trim();
 				if (!wanted) throw new Error("skill(name) requires a name");
