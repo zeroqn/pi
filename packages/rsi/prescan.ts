@@ -35,6 +35,23 @@ export interface ScanSignal {
 	reasons: string[];
 }
 
+/**
+ * Kernel-side evidence, for a session whose pi tool calls say nothing (RSI x RLM ticket 04).
+ *
+ * In code-mode the only pi tool is `python`, so "5+ tool calls" is unreachable however much
+ * work a session did. The kernel's own journal is the equivalent evidence: cells that ran and
+ * the host calls they made. Passed in rather than read here, so this stays a pure function.
+ */
+export interface KernelSignal {
+	cells: number;
+	hostCalls: number;
+	/** The journal's own error evidence: a host call that failed and a later one that did not. */
+	errorThenSuccess?: boolean;
+}
+
+/** The host-call count that counts as "size" in code-mode, matching the pi-tool threshold's intent. */
+const SIZE_HOST_CALLS = 5;
+
 /** Candidate signals, checked case-insensitively against user text. */
 const CORRECTION_MARKERS =
 	/\b(?:remember (?:this|that)|from now on|next time|don'?t do|do not do|stop doing|instead of|i said|not what i|that'?s wrong|still (?:not|broken|failing)|didn'?t work|does not work|doesn'?t work|you should have|why did you|i want you to|make sure|please don'?t)\b/i;
@@ -42,7 +59,7 @@ const CORRECTION_MARKERS =
 /** dirge's in-session complexity trigger. */
 const SIZE_TOOL_CALLS = 5;
 
-export function scanMessages(messages: readonly ScanMessage[]): ScanSignal {
+export function scanMessages(messages: readonly ScanMessage[], kernel?: KernelSignal): ScanSignal {
 	const reasons: string[] = [];
 
 	if (messages.some((message) => message.role === "user" && typeof message.text === "string" && CORRECTION_MARKERS.test(message.text))) {
@@ -53,6 +70,15 @@ export function scanMessages(messages: readonly ScanMessage[]): ScanSignal {
 
 	const calls = countToolCalls(messages);
 	if (calls >= SIZE_TOOL_CALLS) reasons.push(`${calls} tool calls`);
+
+	// Code-mode evidence. A child has no user turns at all, so the correction and repetition
+	// signals are structurally unavailable there (RSI x RLM ticket 13); these are what remain.
+	if (kernel) {
+		// Host calls are the evidence: a cell that made none did nothing observable, and a
+		// child with no host calls is admitted to nothing (ticket 13).
+		if (kernel.hostCalls >= SIZE_HOST_CALLS) reasons.push(`${kernel.hostCalls} kernel host calls`);
+		if (kernel.errorThenSuccess) reasons.push("a kernel error followed by a successful call");
+	}
 
 	return { learnable: reasons.length > 0, reasons };
 }

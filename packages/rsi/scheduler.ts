@@ -23,7 +23,7 @@
 import type { RsiConfig } from "./config.ts";
 import { readLedger, setLastCurateAt, setLastPassAt } from "./ledger.ts";
 import { claimPassLock } from "./pass-lock.ts";
-import { scanMessages, type ScanMessage } from "./prescan.ts";
+import { scanMessages, type KernelSignal, type ScanMessage } from "./prescan.ts";
 
 /** What a learner pass was triggered by. */
 export type LearnerReason = "settled" | "learn";
@@ -98,6 +98,11 @@ export interface PassSchedulerOptions {
 	publishedCanWrite?: () => boolean | undefined;
 	/** The current session's messages, reduced for the pre-scan. */
 	getScanMessages: () => ScanMessage[];
+	/**
+	 * Kernel-side evidence for a code-mode session, or `undefined` for a session with no
+	 * kernel (RSI x RLM ticket 04). Absent means the pre-scan behaves exactly as before.
+	 */
+	getKernelSignal?: () => KernelSignal | undefined;
 	/** The learner pass. */
 	runPass: (reason: LearnerReason) => Promise<PassOutcome>;
 	/** The curator pass; absent disables curation entirely. */
@@ -186,7 +191,7 @@ export class PassScheduler {
 
 		if (reason === "curate") {
 			if (!this.options.curate) return this.skip("no curator configured");
-		} else if (reason === "settled" && !scanMessages(this.options.getScanMessages()).learnable) {
+		} else if (reason === "settled" && !scanMessages(this.options.getScanMessages(), this.options.getKernelSignal?.()).learnable) {
 			return this.skip("no learnable signal"); // silent, and no tokens spent
 		}
 

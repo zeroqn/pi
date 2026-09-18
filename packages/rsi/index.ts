@@ -21,6 +21,7 @@ import { buildSessionContext, convertToLlm, getAgentDir, parseSkillBlock, serial
 import { loadConfig, saveConfig } from "./config.ts";
 import { buildCandidates, buildCurationReport, buildCuratorPrompt, isCurationDue, retirementCandidates } from "./curation.ts";
 import { buildDigest } from "./digest.ts";
+import { buildJournalDigest, journalPathFor, kernelActivity, readJournal } from "./journal.ts";
 import { runLearningFork, type ForkSession } from "./fork.ts";
 import { discoverSkillNames } from "./frontmatter.ts";
 import { readLedger, recordUsage, setSkillState, takeStatusSnapshot } from "./ledger.ts";
@@ -67,6 +68,9 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		// decides, exactly as before.
 		publishedCanWrite: () => publishedCapability(sessionFileOf(currentCtx)),
 		getScanMessages: () => (currentCtx ? toScanMessages(currentCtx.sessionManager.getEntries()) : []),
+		// The code-mode half of the pre-scan (ticket 04): `["python"]` alone never reaches the
+		// pi-tool size threshold, so the kernel journal supplies the equivalent evidence.
+		getKernelSignal: () => kernelActivity(readJournal(journalPathFor(sessionFileOf(currentCtx)))),
 		runPass: async (reason) => {
 			if (!currentCtx) return { ok: false, toolActions: 0 };
 			return executePass(reason, currentCtx);
@@ -493,7 +497,14 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 			transcript = `(transcript unavailable: ${message(error)})`;
 		}
 
-		const digest = buildDigest(toScanMessages(entries), { gitStat: gitDiffStat(ctx.cwd) });
+		// The code-mode half (ticket 04): a session whose only tool is `python` has an empty
+		// pi-tool digest, so the kernel journal is read by path and appended. Missing, torn or
+		// absent is simply no addition — the pi-tool digest stands as it did.
+		const cells = readJournal(journalPathFor(sessionFileOf(ctx)));
+		const journalDigest = buildJournalDigest(cells);
+		const digest = [buildDigest(toScanMessages(entries), { gitStat: gitDiffStat(ctx.cwd) }), journalDigest]
+			.filter((section): section is string => typeof section === "string" && section.length > 0)
+			.join("\n\n");
 		const projectKey = projectKeyFor(ctx.cwd);
 		const scope: Scope = projectKey ? { project: projectKey } : "general";
 		const mode = config.observeOnly ? "observe" : "write";

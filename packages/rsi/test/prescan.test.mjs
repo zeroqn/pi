@@ -96,3 +96,35 @@ test("toScanMessages reads user text, assistant tool calls and tool results", ()
 test("toScanMessages ignores malformed and empty entries", () => {
 	assert.deepEqual(toScanMessages([null, "x", { type: "message" }, { type: "message", message: { role: "assistant", content: [] } }]), []);
 });
+
+// ---------------------------------------------------------------------------
+// The code-mode signal (RSI x RLM ticket 04): `["python"]` alone never reaches the
+// pi-tool size threshold, so the kernel journal supplies equivalent evidence.
+// ---------------------------------------------------------------------------
+
+test("kernel host calls reach the size threshold where pi tool calls cannot", () => {
+	const messages = [{ role: "user", text: "do the thing" }];
+	assert.equal(scanMessages(messages).learnable, false, "no signal without a kernel");
+	assert.equal(scanMessages(messages, { cells: 1, hostCalls: 3, errorThenSuccess: false }).learnable, false, "three calls is under the bar");
+	const five = scanMessages(messages, { cells: 1, hostCalls: 5, errorThenSuccess: false });
+	assert.equal(five.learnable, true);
+	assert.deepEqual(five.reasons, ["5 kernel host calls"]);
+});
+
+test("a child with no host calls is admitted to nothing", () => {
+	// Ticket 13: a cell that made no host call did nothing observable, so it is not evidence.
+	const messages = [{ role: "user", text: "delegate something" }];
+	assert.equal(scanMessages(messages, { cells: 3, hostCalls: 0, errorThenSuccess: false }).learnable, false);
+});
+
+test("a kernel error followed by a success is a signal on its own", () => {
+	const signal = scanMessages([{ role: "user", text: "try it" }], { cells: 2, hostCalls: 2, errorThenSuccess: true });
+	assert.equal(signal.learnable, true);
+	assert.deepEqual(signal.reasons, ["a kernel error followed by a successful call"]);
+});
+
+test("the kernel signal adds to the pi-tool signals rather than replacing them", () => {
+	const signal = scanMessages([{ role: "user", text: "remember this" }], { cells: 1, hostCalls: 9, errorThenSuccess: false });
+	assert.equal(signal.learnable, true);
+	assert.deepEqual(signal.reasons, ["a user correction or preference", "9 kernel host calls"]);
+});
