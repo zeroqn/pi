@@ -40,7 +40,20 @@ import { bashReadCandidates, formatStatus, scopeKey, summarizeStatus, UsageTrack
 /** Bound on the rendered transcript, so one huge session cannot blow the fork's budget. */
 const MAX_TRANSCRIPT_CHARS = 120_000;
 
-export default function rsiExtension(pi: ExtensionAPI): void {
+/**
+ * What a child session's instance knows about itself (RSI x RLM ticket 11). RLM builds the
+ * factory per child at spawn time, so this is available before the child's session starts.
+ */
+export interface RsiChildDescriptor {
+	/** The child's name, as its spawner gave it. */
+	name?: string;
+	/** How deep it is: 1 for a direct child of the root. */
+	depth?: number;
+	/** The session file of the session that spawned it. */
+	parentSessionFile?: string;
+}
+
+export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescriptor): void {
 	const agentDir = getAgentDir();
 	const { config, warnings } = loadConfig({ agentDir });
 
@@ -82,6 +95,9 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 			return executePass(reason, currentCtx);
 		},
 		curationDue: () => {
+			// Curation is root-only (ticket 11): it rewrites and archives across the whole library,
+			// and every instance would see it as due at once. A child never curates.
+			if (child) return false;
 			const { ledger } = readLedger(store.root);
 			return isCurationDue({ lastCurateAt: ledger.last_curate_at, activeCount: store.listSkills().length, config, now: Date.now() }).due;
 		},
@@ -105,6 +121,15 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	const seamWork: RsiSeamWork = {
 		skills: (scope) => listForSeam(scope),
 		skill: (name, scope) => contentForSeam(name, scope),
+		/**
+		 * The factory RLM spreads into a child's loader (ticket 11). One implementation with a
+		 * descriptor, not a reduced child module: the store, config, gate and pass wiring are
+		 * exactly the parts that must not drift between root and child. The descriptor's only
+		 * effects are that a child does not curate, and that its provenance is its own.
+		 */
+		childFactory: (_childPi, request) => (childPi) => {
+			rsiExtension(childPi as ExtensionAPI, descriptorFrom(request));
+		},
 		noteUsage: (usage, scope) => {
 			void recordSeamUsage(usage);
 		},
@@ -717,6 +742,19 @@ function headerParentSession(sessionManager: unknown): string | undefined {
 	} catch {
 		return undefined;
 	}
+}
+
+/**
+ * Read a child descriptor out of RLM's spawn request. Only these three fields are taken, and
+ * anything else is ignored, so the request's shape can grow without this breaking.
+ */
+function descriptorFrom(request: unknown): RsiChildDescriptor {
+	const source = (request ?? {}) as Record<string, unknown>;
+	return {
+		name: typeof source.name === "string" ? source.name : undefined,
+		depth: typeof source.depth === "number" ? source.depth : undefined,
+		parentSessionFile: typeof source.parentSessionFile === "string" ? source.parentSessionFile : undefined,
+	};
 }
 
 /** The session file pi recorded, or `undefined` for an in-memory session. */

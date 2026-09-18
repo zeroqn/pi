@@ -87,6 +87,12 @@ export interface SeamHostCall {
 
 /** What an instance supplies. The facade adds the dispatch and the process-wide reads. */
 export interface RsiSeamWork {
+	/**
+	 * The factory a child session is given (ticket 11), built per child at spawn time so it can
+	 * carry the child's descriptor. Optional: a consumer that finds it missing runs children
+	 * without RSI, exactly as before.
+	 */
+	childFactory?: (pi: unknown, request: unknown) => (pi: unknown) => void;
 	/** The union for a scope: `general` always, plus the project scope when the cwd resolves to one. */
 	skills(scope: Scope): SeamSkill[];
 	skill(name: string, scope: Scope): SeamSkillContent | undefined;
@@ -107,6 +113,11 @@ export interface RsiSeam extends RsiSeamWork {
 	 * a client that finds it missing runs children without RSI, as today.
 	 */
 	childFactory?(pi: unknown, request: unknown): (pi: unknown) => void;
+}
+
+/** True when the facade can put RSI into a child session. */
+export function hasChildFactory(seam: RsiSeam | undefined): boolean {
+	return typeof seam?.childFactory === "function";
 }
 
 interface Registration {
@@ -221,6 +232,9 @@ export function registerRsiSeam(options: {
 		noteHostCall: (call) => {
 			resolve(call)?.work.noteHostCall(call, scopeFor(call));
 		},
+		// Process-wide, like the reads: any instance can hand out the child factory, because
+		// every instance would build the same one. A grandchild resolves the same facade.
+		childFactory: (childPi, request) => any()?.work.childFactory?.(childPi, request),
 		capability: (fact) => {
 			// The fact belongs to the session that published it, on the instance that owns that
 			// session — a child's own instance, never its parent's. Falling back to this

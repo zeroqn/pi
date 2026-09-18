@@ -206,3 +206,36 @@ test("a half-shaped slot is not mistaken for the seam", (t) => {
 	assert.equal(findRsiSeam(), undefined, "a facade without skill() is not ours");
 	__resetSeamForTests();
 });
+
+test("a child factory is offered through the facade, and a grandchild resolves the same one", (t) => {
+	t.after(() => __resetSeamForTests());
+	__resetSeamForTests();
+	const built = [];
+	const { work } = fakeWork();
+	work.childFactory = (_pi, request) => (childPi) => built.push({ request, childPi });
+
+	// Two instances, as a root and a child session would be: either can hand out the factory,
+	// because every instance would build the same one (ticket 11).
+	const withdrawA = registerRsiSeam({ work, sessionFile: tempSessionFile(t, "a.jsonl") });
+	const withdrawB = registerRsiSeam({ work: fakeWork().work, sessionFile: tempSessionFile(t, "b.jsonl") });
+
+	const seam = findRsiSeam();
+	assert.equal(typeof seam.childFactory, "function");
+	const factory = seam.childFactory(undefined, { name: "kid", depth: 1 });
+	assert.equal(typeof factory, "function");
+	factory({ marker: "childPi" });
+	assert.equal(built.length, 1);
+	assert.equal(built[0].request.name, "kid");
+	assert.deepEqual(built[0].childPi, { marker: "childPi" });
+
+	withdrawA();
+	withdrawB();
+});
+
+test("a facade whose work omits the child factory returns undefined rather than throwing", (t) => {
+	t.after(() => __resetSeamForTests());
+	__resetSeamForTests();
+	registerRsiSeam({ work: fakeWork().work, sessionFile: tempSessionFile(t) });
+	const factory = findRsiSeam().childFactory(undefined, {});
+	assert.equal(factory, undefined, "an older RSI runs children without itself");
+});
