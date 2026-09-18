@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { buildCandidates, buildCurationReport, buildCuratorPrompt, isCurationDue, retirementCandidates } from "../curation.ts";
 import { SkillStore } from "../store.ts";
+import { curationDueForSession } from "../curation.ts";
 
 const DAY = 86_400_000;
 const NOW = Date.parse("2026-09-14T12:00:00.000Z");
@@ -134,4 +135,31 @@ test("the curation report records the before/after delta and retirement", () => 
 	assert.match(report, /## Retired for disuse\n\n- stale-a\n- stale-b/);
 	assert.match(report, /Snapshots: \/store\/reports\/x\/snapshots/);
 	assert.match(report, /- patched: 2/);
+});
+
+// ---------------------------------------------------------------------------
+// Curation ownership (RSI x RLM ticket 11): it is a library-wide operation, so a child
+// never curates whatever the library looks like.
+// ---------------------------------------------------------------------------
+
+test("a child never curates, however overdue the library is", () => {
+	const input = {
+		lastCurateAt: null,
+		activeCount: 400,
+		config: { consolidateEveryWeeks: 4, maxActiveSkills: 25 },
+		now: Date.parse("2026-09-18T00:00:00.000Z"),
+	};
+	assert.equal(curationDueForSession({ ...input, isChild: false }), true, "the control: a root is due");
+	assert.equal(curationDueForSession({ ...input, isChild: true }), false, "a child is never due");
+});
+
+test("a root is not due on a small, recently curated library", () => {
+	const now = Date.parse("2026-09-18T00:00:00.000Z");
+	assert.equal(curationDueForSession({
+		isChild: false,
+		lastCurateAt: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
+		activeCount: 3,
+		config: { consolidateEveryWeeks: 4, maxActiveSkills: 25 },
+		now,
+	}), false);
 });

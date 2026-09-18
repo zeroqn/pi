@@ -70,6 +70,29 @@ export interface CurationDue {
 }
 
 /** Interval-or-size, gated on the library having anything in it at all. */
+/**
+ * Whether the curator is due **for this session**.
+ *
+ * Curation is root-only (RSI x RLM ticket 11): it rewrites and archives across the whole
+ * library, and with a tree of independent learners every instance would see it as due at once.
+ * A child therefore never curates, whatever the library looks like.
+ */
+export function curationDueForSession(input: {
+	isChild: boolean;
+	lastCurateAt: string | null | undefined;
+	activeCount: number;
+	config: { consolidateEveryWeeks: number; maxActiveSkills: number };
+	now: number;
+}): boolean {
+	if (input.isChild) return false;
+	return isCurationDue({
+		lastCurateAt: input.lastCurateAt,
+		activeCount: input.activeCount,
+		config: input.config,
+		now: input.now,
+	}).due;
+}
+
 export function isCurationDue(input: {
 	lastCurateAt: string | null | undefined;
 	activeCount: number;

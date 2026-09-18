@@ -19,7 +19,7 @@ import * as path from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { buildSessionContext, convertToLlm, getAgentDir, parseSkillBlock, serializeConversation } from "@earendil-works/pi-coding-agent";
 import { loadConfig, saveConfig } from "./config.ts";
-import { buildCandidates, buildCurationReport, buildCuratorPrompt, isCurationDue, retirementCandidates } from "./curation.ts";
+import { buildCandidates, buildCurationReport, buildCuratorPrompt, curationDueForSession, retirementCandidates } from "./curation.ts";
 import { buildDigest } from "./digest.ts";
 import { buildJournalDigest, journalPathFor, kernelActivity, readJournal } from "./journal.ts";
 import { runLearningFork, type ForkSession } from "./fork.ts";
@@ -115,13 +115,14 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 			if (!currentCtx) return { ok: false, toolActions: 0 };
 			return executePass(reason, currentCtx);
 		},
-		curationDue: () => {
-			// Curation is root-only (ticket 11): it rewrites and archives across the whole library,
-			// and every instance would see it as due at once. A child never curates.
-			if (child) return false;
-			const { ledger } = readLedger(store.root);
-			return isCurationDue({ lastCurateAt: ledger.last_curate_at, activeCount: store.listSkills().length, config, now: Date.now() }).due;
-		},
+		curationDue: () =>
+			curationDueForSession({
+				isChild: child !== undefined,
+				lastCurateAt: readLedger(store.root).ledger.last_curate_at,
+				activeCount: store.listSkills().length,
+				config,
+				now: Date.now(),
+			}),
 		curate: async () => {
 			if (!currentCtx) return { ok: false, toolActions: 0 };
 			return executeCuration(currentCtx);
