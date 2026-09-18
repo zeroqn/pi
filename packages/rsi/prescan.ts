@@ -83,6 +83,25 @@ export function scanMessages(messages: readonly ScanMessage[], kernel?: KernelSi
 	return { learnable: reasons.length > 0, reasons };
 }
 
+/**
+ * Whether the session's last completed turn was **aborted** (RSI x RLM ticket 13).
+ *
+ * A child killed mid-task still emits `agent_settled` — the aborted run's own `finally` does —
+ * so without this a pass would run over a deliberately truncated session. The signal is pi's
+ * own record: the last assistant message carries `stopReason: "aborted"`. Read from the
+ * entries rather than the seam, so it works for any session, child or not.
+ */
+export function lastTurnWasAborted(entries: readonly unknown[]): boolean {
+	for (let index = entries.length - 1; index >= 0; index--) {
+		const entry = entries[index];
+		if (!isRecord(entry) || entry.type !== "message") continue;
+		const message = entry.message;
+		if (!isRecord(message) || message.role !== "assistant") continue;
+		return message.stopReason === "aborted";
+	}
+	return false;
+}
+
 /** Reduce raw session entries into scan messages, ignoring non-message entries. */
 export function toScanMessages(entries: readonly unknown[]): ScanMessage[] {
 	const messages: ScanMessage[] = [];

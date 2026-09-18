@@ -16,6 +16,12 @@ export interface RsiConfig {
 	enabled: boolean;
 	observeOnly: boolean;
 	quietMinutes: number;
+	/**
+	 * How long a quiet period is for a **child** session, which lives for one delegated task
+	 * rather than an interactive session (RSI x RLM ticket 13). Shorter by default, because a
+	 * five-minute wait would usually outlive the child.
+	 */
+	childQuietMinutes: number;
 	/** How often **this session** may run a learner pass (RSI x RLM ticket 12). */
 	minIntervalMinutes: number;
 	/**
@@ -60,6 +66,7 @@ export function loadConfig(options: { agentDir: string; file?: string }): Loaded
 		enabled: true,
 		observeOnly: true,
 		quietMinutes: 5,
+		childQuietMinutes: 1,
 		minIntervalMinutes: 15,
 		treeFloorMinutes: 2,
 		stageCeilingMinutes: 10,
@@ -123,6 +130,7 @@ export function loadConfig(options: { agentDir: string; file?: string }): Loaded
 type BooleanConfigKey = "enabled" | "observeOnly";
 type NumberConfigKey =
 	| "quietMinutes"
+	| "childQuietMinutes"
 	| "minIntervalMinutes"
 	| "treeFloorMinutes"
 	| "stageCeilingMinutes"

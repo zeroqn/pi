@@ -79,6 +79,7 @@ function makeScheduler(t, options = {}) {
 		getSessionFile: options.getSessionFile,
 		onLockContention: options.onLockContention,
 		quietMinutes: options.quietMinutes,
+		lastTurnWasAborted: options.lastTurnWasAborted,
 		runPass,
 		curate: options.curate,
 		curationDue: options.curationDue,
@@ -105,6 +106,7 @@ function makeSchedulerAt(t, root, clock, options = {}) {
 		getSessionFile: options.getSessionFile,
 		onLockContention: options.onLockContention,
 		quietMinutes: options.quietMinutes,
+		lastTurnWasAborted: options.lastTurnWasAborted,
 		runPass: options.runPass ?? (async (reason) => {
 			calls.push(reason);
 			return { ok: true, toolActions: 1 };
@@ -552,4 +554,66 @@ test("winning the lock resets the retry budget", async (t) => {
 	clock.advance(5 * 60_000);
 	await flush();
 	assert.equal(rearmed, 2);
+});
+
+// ---------------------------------------------------------------------------
+// The child's pass (RSI x RLM ticket 13): a shorter quiet period, and a guard for a
+// session that was aborted — an aborted run still settles, which would otherwise run a
+// pass over a deliberately truncated session.
+// ---------------------------------------------------------------------------
+
+test("a session's own quiet period is used when one is supplied", async (t) => {
+	const { clock, scheduler, calls } = makeScheduler(t, { quietMinutes: () => 1 });
+	scheduler.settled();
+	clock.advance(60_000);
+	await flush();
+	assert.deepEqual(calls, ["settled"], "one minute is enough for this session");
+});
+
+test("without one, the config's quietMinutes applies", async (t) => {
+	const { clock, scheduler, calls } = makeScheduler(t);
+	scheduler.settled();
+	clock.advance(60_000);
+	await flush();
+	assert.deepEqual(calls, [], "still quiet: the config says five minutes");
+	clock.advance(4 * 60_000);
+	await flush();
+	assert.deepEqual(calls, ["settled"]);
+});
+
+test("a session whose last turn was aborted is skipped", async (t) => {
+	const { clock, scheduler, skips, calls } = makeScheduler(t, { lastTurnWasAborted: () => true });
+	scheduler.settled();
+	clock.advance(5 * 60_000);
+	await flush();
+	assert.deepEqual(calls, [], "no fork over a truncated session");
+	assert.ok(skips.includes("the last turn was aborted"));
+});
+
+test("an explicit learn still runs on an aborted session", async (t) => {
+	// The guard is an admission heuristic, not a prohibition: `/rsi learn` is the human saying
+	// "learn from this anyway".
+	const { scheduler, calls } = makeScheduler(t, { lastTurnWasAborted: () => true });
+	const result = await scheduler.learnNow();
+	assert.equal(result.ran, true);
+	assert.deepEqual(calls, ["learn"]);
+});
+
+test("a pass that throws reports through notify instead of failing silently", async (t) => {
+	// The gap that let a broken pass go unnoticed: the throw was contained (correctly), but
+	// nothing was wired to `notify`, so the tree-wide floor advanced and left no trace.
+	const notices = [];
+	const { scheduler } = makeScheduler(t, {
+		runPass: async () => {
+			throw new Error("Cannot access 'provenance' before initialization");
+		},
+		notify: (line, type) => notices.push({ line, type }),
+	});
+	const result = await scheduler.learnNow();
+	assert.equal(result.ran, true);
+	assert.equal(result.outcome.ok, false);
+	assert.equal(notices.length, 1);
+	assert.match(notices[0].line, /rsi: pass failed/);
+	assert.match(notices[0].line, /before initialization/);
+	assert.equal(notices[0].type, "error");
 });

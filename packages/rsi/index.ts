@@ -27,7 +27,7 @@ import { discoverSkillNames } from "./frontmatter.ts";
 import { readLedger, recordUsage, setSkillState, takeStatusSnapshot } from "./ledger.ts";
 import { buildReport, emptyTally, formatPassNotification, tallyChanged } from "./pass.ts";
 import { projectKeyFor } from "./project-key.ts";
-import { toScanMessages } from "./prescan.ts";
+import { lastTurnWasAborted, toScanMessages } from "./prescan.ts";
 import { buildReviewPrompt } from "./prompt.ts";
 import type { LearnerReason, PassOutcome } from "./scheduler.ts";
 import { PassScheduler } from "./scheduler.ts";
@@ -74,6 +74,21 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 	const scheduler = new PassScheduler({
 		root: store.root,
 		config,
+		/**
+		 * A pass that fails must say so. This was never wired, so a throwing pass advanced the
+		 * tree-wide floor and left no trace anywhere — the worst kind of silent absence.
+		 */
+		notify: (line, type) => {
+			if (child) {
+				try {
+					pi.appendEntry("rsi-pass", { line, level: type ?? "info", failed: true });
+				} catch {
+					/* the record is best effort */
+				}
+				return;
+			}
+			currentCtx?.ui?.notify?.(line, type);
+		},
 		getActiveTools: () => pi.getActiveTools(),
 		// A code-mode session's surface is `["python"]`, which the tool-name heuristic reads
 		// as query-only — but its kernel can write. RLM publishes that fact (ticket 03) and
@@ -86,6 +101,12 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 		// A lost lock race must not mean this session never learns: an answered child may never
 		// settle again, so re-arm its quiet timer and let it try again (ticket 12).
 		onLockContention: () => scheduler.settled(),
+		// A child lives for one delegated task, so its quiet period is shorter (ticket 13).
+		quietMinutes: () => (child ? config.childQuietMinutes : config.quietMinutes),
+		// A child killed mid-task still settles, which would otherwise run a pass over a
+		// deliberately truncated session (ticket 13).
+		lastTurnWasAborted: () =>
+			currentCtx ? lastTurnWasAborted(currentCtx.sessionManager.getEntries()) : false,
 		getScanMessages: () => (currentCtx ? toScanMessages(currentCtx.sessionManager.getEntries()) : []),
 		// The code-mode half of the pre-scan (ticket 04): `["python"]` alone never reaches the
 		// pi-tool size threshold, so the kernel journal supplies the equivalent evidence.
@@ -542,6 +563,13 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 
 		const tally = emptyTally();
 		const softAttempts = new Map<string, number>();
+		// Provenance (ticket 14): the session this pass is learning from, and its parent when it
+		// is itself a child. Recorded durably so a later pass can tell what its tree wrote.
+		const sessionFile = sessionFileOf(ctx);
+		const provenance: SkillProvenance = {
+			session: sessionFile,
+			parentSession: headerParentSession(ctx?.sessionManager),
+		};
 		const deps: SkillActionDeps = {
 			store,
 			root: store.root,
@@ -561,13 +589,6 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 			now: () => new Date(),
 		};
 
-		// Provenance (ticket 14): the session this pass is learning from, and its parent when it
-		// is itself a child. Recorded durably so a later pass can tell what its tree wrote.
-		const sessionFile = sessionFileOf(ctx);
-		const provenance: SkillProvenance = {
-			session: sessionFile,
-			parentSession: headerParentSession(ctx?.sessionManager),
-		};
 		const prompt = buildReviewPrompt({
 			scope: scopeKey(scope),
 			mode,
@@ -611,7 +632,21 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 		}
 
 		const notification = formatPassNotification(tally);
-		if (notification) ctx.ui.notify(`${notification.line}${reportNote}`, notification.type);
+		if (notification) {
+			const line = `${notification.line}${reportNote}`;
+			if (child) {
+				// A child's `ctx.ui` is a no-op in print mode, so the notify would vanish. Its
+				// transcript entry is durable and visible when the child's session is read, and
+				// the root still sees the skill through `/rsi status` (ticket 12).
+				try {
+					pi.appendEntry("rsi-pass", { line, reason, scope: scopeKey(scope), mode });
+				} catch {
+					// The transcript entry is bookkeeping; its absence must not fail a pass.
+				}
+			} else {
+				ctx.ui.notify(line, notification.type);
+			}
+		}
 
 		return { ok: outcome.ok, toolActions: outcome.toolActions };
 	}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { scanMessages, toScanMessages } from "../prescan.ts";
+import { lastTurnWasAborted, scanMessages, toScanMessages } from "../prescan.ts";
 
 const assistant = (toolCalls) => ({ role: "assistant", toolCalls });
 const result = (toolName, isError) => ({ role: "toolResult", toolResult: { toolName, isError } });
@@ -127,4 +127,29 @@ test("the kernel signal adds to the pi-tool signals rather than replacing them",
 	const signal = scanMessages([{ role: "user", text: "remember this" }], { cells: 1, hostCalls: 9, errorThenSuccess: false });
 	assert.equal(signal.learnable, true);
 	assert.deepEqual(signal.reasons, ["a user correction or preference", "9 kernel host calls"]);
+});
+
+// ---------------------------------------------------------------------------
+// The abort signal (RSI x RLM ticket 13): pi records `stopReason` on the assistant
+// message, and an aborted run still emits `agent_settled`.
+// ---------------------------------------------------------------------------
+
+const assistantEntry = (stopReason) => ({ type: "message", message: { role: "assistant", content: [], stopReason } });
+
+test("lastTurnWasAborted reads pi's own stopReason", () => {
+	assert.equal(lastTurnWasAborted([assistantEntry("stop")]), false);
+	assert.equal(lastTurnWasAborted([assistantEntry("aborted")]), true);
+	assert.equal(lastTurnWasAborted([assistantEntry("toolUse")]), false);
+});
+
+test("lastTurnWasAborted looks at the *last* assistant turn, not any of them", () => {
+	// A session that was aborted once and then continued is not a truncated session.
+	assert.equal(lastTurnWasAborted([assistantEntry("aborted"), assistantEntry("stop")]), false);
+	assert.equal(lastTurnWasAborted([assistantEntry("stop"), assistantEntry("aborted")]), true);
+});
+
+test("lastTurnWasAborted ignores non-message entries and an empty session", () => {
+	assert.equal(lastTurnWasAborted([]), false);
+	assert.equal(lastTurnWasAborted([{ type: "custom" }, null, "x"]), false);
+	assert.equal(lastTurnWasAborted([{ type: "message", message: { role: "user", content: [] } }]), false);
 });

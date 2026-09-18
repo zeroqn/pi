@@ -114,6 +114,12 @@ export interface PassSchedulerOptions {
 	 */
 	getKernelSignal?: () => KernelSignal | undefined;
 	/**
+	 * Whether the session's last turn was aborted (RSI x RLM ticket 13). A child killed mid-task
+	 * still settles, which would otherwise run a pass over a deliberately truncated session.
+	 * Absent means never aborted, which is every session that does not report otherwise.
+	 */
+	lastTurnWasAborted?: () => boolean;
+	/**
 	 * Kernel-side evidence for a code-mode session, or `undefined` for a session with no
 	 * kernel (RSI x RLM ticket 04). Absent means the pre-scan behaves exactly as before.
 	 */
@@ -233,8 +239,13 @@ export class PassScheduler {
 
 		if (reason === "curate") {
 			if (!this.options.curate) return this.skip("no curator configured");
-		} else if (reason === "settled" && !scanMessages(this.options.getScanMessages(), this.options.getKernelSignal?.()).learnable) {
-			return this.skip("no learnable signal"); // silent, and no tokens spent
+		} else if (reason === "settled") {
+			// A session whose last turn was aborted is a deliberately truncated one: the digest
+			// would be model-free truth about work that was cut off. Low value for a full fork.
+			if (this.options.lastTurnWasAborted?.() === true) return this.skip("the last turn was aborted");
+			if (!scanMessages(this.options.getScanMessages(), this.options.getKernelSignal?.()).learnable) {
+				return this.skip("no learnable signal"); // silent, and no tokens spent
+			}
 		}
 
 		const lock = claimPassLock(root, config.stageCeilingMinutes * 60_000);
