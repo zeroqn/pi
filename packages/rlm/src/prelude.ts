@@ -116,5 +116,13 @@ agent_message = _AgentMessage()
 
 def find_models(query=None, limit=20):
     return rlm_find_models(query, limit)
+
+async def skills():
+    """The learned skills this session can see: a list of {name, description, location, scope}."""
+    return await skills_host()
+
+async def skill(name):
+    """Load one learned skill's content. Raises when the name is not in skills()."""
+    return await skill_host(name)
 `;
 }

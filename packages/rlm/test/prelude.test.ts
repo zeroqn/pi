@@ -82,6 +82,8 @@ describe("the prelude source", () => {
 			"class _Rlm",
 			"class _AgentMessage",
 			"def find_models",
+			"async def skills",
+			"async def skill",
 			"rlm = _Rlm()",
 			"agent_message = _AgentMessage()",
 		]) {
@@ -169,6 +171,18 @@ describe.skipIf(!montyReady)("the prelude in a real kernel", () => {
 			expect(spawned).toBe("child-1");
 
 			const listed = await run("len(await rlm.list())", { rlm_list: async () => [{ child_id: "child-1" }] });
+
+		// The RSI seam's kernel surface (RSI x RLM tickets 02, 15): a read and a load, both
+		// host-bridged, with the load raising on an unknown name rather than returning junk.
+		const visible = await run('(await skills())[0]["name"]', {
+			skills_host: async () => [{ name: "seeded", description: "d", location: "/x/SKILL.md", scope: "general" }],
+		});
+		expect(visible).toBe("seeded");
+		const loaded = await run('(await skill("seeded"))["content"]', {
+			skills_host: async () => [{ name: "seeded", description: "d", location: "/x/SKILL.md", scope: "general" }],
+			skill_host: async (name: unknown) => ({ content: `body of ${name}`, files: [] }),
+		});
+		expect(loaded).toBe("body of seeded");
 			expect(listed).toBe(1);
 
 			const sent = await run('m = await agent_message.send("hello", receiver_role="parent")\nm["to"]', {

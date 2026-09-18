@@ -35,6 +35,7 @@ import type { ChildKernelContext, ChildHandle, Notice } from "./children";
 import { createBackgroundManager } from "./background";
 import type { BgHandleInfo } from "./background";
 import { bindToParentInstance, magicContextChildShim, magicContextStatus } from "./magic-context";
+import { findRsiSeam, reportCapability, reportHostCall, reportUsage, rsiChildFactory, rsiStatus, seamSkill, seamSkills } from "./rsi-seam";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FD = process.env.RLM_FD ?? "/nix/store/5j3vslc4gccb95xnzr1mxhgwrc0wfgad-fd-10.4.2/bin/fd";
@@ -252,6 +253,17 @@ function bind(args: unknown[], names: string[]): Record<string, unknown> {
 	return out;
 }
 
+/**
+ * The identity every seam report carries. `makeHost` is a module-level function and cannot
+ * see the kernel's closure, so the live session installs its caller here at `session_start`
+ * and clears it at shutdown. `undefined` means "no session yet", and every report is inert.
+ */
+let seamCallerRef: (() => { sessionFile?: string; cwd?: string }) | undefined;
+
+function seamCaller(): { sessionFile?: string; cwd?: string } {
+	return seamCallerRef?.() ?? {};
+}
+
 function makeHost(
 	root: string,
 	attachments: Attachment[],
@@ -262,6 +274,9 @@ function makeHost(
 	return {
 		async bash_host(...args: unknown[]) {
 			const { command, timeout, background } = bind(args, ["command", "timeout", "background"]);
+			// RSI's counted backstop (ticket 02): a bash command can always reach the store,
+			// so its path-looking tokens are offered to RSI, which owns the matching.
+			reportHostCall(str(command), seamCaller());
 			if (background === true) {
 				return backgroundManager.start(str(command), timeout === null ? null : num(timeout, 0) || null);
 			}
@@ -412,7 +427,9 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 				cwd: () => root || process.cwd(),
 				ownSessionFile: () => sessionCtx?.sessionManager?.getSessionFile?.(),
 				kernelFactoryFor: (child) => (childPi: any) => createKernel(childPi, child),
-				childFactories: (request) => [magicContextChildShim(request.parentSessionFile)],
+				// RSI offers its child factory through the seam (ticket 11); RLM never names
+				// RSI, and an RSI that is absent or too old contributes nothing.
+				childFactories: (request) => [magicContextChildShim(request.parentSessionFile), ...rsiChildFactory(request)],
 				runtime: () => modelRuntime(),
 				maxDepth: MAX_DEPTH,
 				maxLive: MAX_LIVE_CHILDREN,
@@ -724,6 +741,33 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	}
 
 	/** The delegation and background surface the kernel sees (tickets 06, 10). */
+	/**
+	 * The seam's kernel host functions (RSI x RLM tickets 02 and 15). `skills()` and
+	 * `skill(name)` are host functions rather than registered tools, because the kernel's
+	 * surface is this fixed set (ticket 08). Both report their own consultation, and RSI
+	 * does the matching and dedupe.
+	 */
+	function seamHostFns(): HostFns {
+		return {
+			async skills() {
+				return seamSkills(seamCaller());
+			},
+			async skill(...args: unknown[]) {
+				const { name } = bind(args, ["name"]);
+				const wanted = str(name).trim();
+				if (!wanted) throw new Error("skill(name) requires a name");
+				const found = seamSkill(wanted, seamCaller());
+				if (!found) {
+					throw new Error(
+						`no learned skill named "${wanted}" — call skills() for the ones this session can see`,
+					);
+				}
+				reportUsage({ kind: "skill", target: wanted, caller: seamCaller() });
+				return { content: found.content, files: found.files };
+			},
+		};
+	}
+
 	function hostExtensions(): HostFns {
 		const spawnHandle = async (depth: number, args: unknown[]): Promise<ChildHandle> => {
 			const { prompt, name, model, thinking } = bind(args, ["prompt", "name", "model", "thinking"]);
@@ -836,6 +880,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		// The header, not the event, is what a CLI `--fork <path>` leaves behind (ticket 13).
 		parentSessionFile = headerParentSession(ctx?.sessionManager);
 		sessionCtx = ctx;
+		seamCallerRef = () => ({ sessionFile: ctx?.sessionManager?.getSessionFile?.(), cwd: ctx?.cwd ?? root });
 		// v2 ticket 10: this session's own depth comes from its own artifacts — the
 		// `rlm-child` entry, or the parentSession chain — so a child resumed without its
 		// spawner still knows how deep it is and how much spawning authority it has.
@@ -856,6 +901,16 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 			});
 		}
 		pi.setActiveTools(["python"]);
+		// The capability fact (RSI x RLM ticket 03): RSI's gate suppresses a session whose
+		// active tools lack `write`/`edit`, which is every code-mode session — the kernel
+		// can write, but not through a pi tool. The surface is fixed by this point, so this
+		// is the right moment to publish it. A child publishes its own; the root's is never
+		// inherited, because the fact is keyed by session file.
+		reportCapability({
+			sessionFile: ctx?.sessionManager?.getSessionFile?.(),
+			canWrite: true,
+			reason: "code-mode kernel: write_text/edit_text/bash host functions exist",
+		});
 		const problems = await preflight();
 		// Background handles are restored read-only: nothing is ever re-executed.
 		try {
@@ -889,6 +944,13 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 			} catch {
 				/* diagnostics must never fail a session */
 			}
+		}
+		// The RSI seam's status, recorded for every session including a child, so a missing
+		// RSI is one visible line rather than a silently absent capability (ticket 15).
+		try {
+			pi.appendEntry("rlm-rsi", { status: rsiStatus(), startReason });
+		} catch {
+			/* diagnostics must never fail a session */
 		}
 		// Web hook bookkeeping (ticket 03): unset is silent and normal; configured is
 		// recorded always; broken is recorded, told to the human, and told to the model once.
@@ -946,6 +1008,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	});
 
 	pi.on("session_shutdown", async () => {
+		seamCallerRef = undefined;
 		await dumpKernel();
 		await manager?.shutdownAll();
 		await background.shutdownAll();
@@ -1025,7 +1088,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 					value = await session?.feedRun(params.code, {
 						mount: [mount, scratchMount],
 						printCallback: streams,
-						externalLookup: recordingHost(makeHost(root, attachments, progress, { ...hostExtensions(), ...webFns }, background), (name, args, result, error) => {
+						externalLookup: recordingHost(makeHost(root, attachments, progress, { ...hostExtensions(), ...seamHostFns(), ...webFns }, background), (name, args, result, error) => {
 							// A call that raised is journaled too, so the cell that caught it replays
 							// (ticket 11) instead of stopping the rebuild.
 							cellCalls.push(error ? { name, args, error } : { name, args, result });
