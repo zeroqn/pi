@@ -11,9 +11,8 @@ one is a fork.
 | [`zvec-grep`](packages/zvec-grep) | zvec-grep search and managed ripgrep as native pi tools. |
 | [`pi-web-guard`](packages/pi-web-guard) | Fences pi-web-access tool output as untrusted, plus a prompt rule. |
 | [`readonly-mode`](packages/readonly-mode) | Query-only mode: removes writer tools, gates bash, injects a prompt. |
-| [`magic-context-pi-native`](packages/magic-context-pi-native) | Keeps Magic Context's config in pi's own config tree. |
 | [`rpiv-advisor-pi-native`](packages/rpiv-advisor-pi-native) | Keeps rpiv-advisor's config in pi's own config tree. |
-| [`magic-context`](vendor/magic-context) | Forked. Cross-session memory and context management for pi. |
+| [`magic-context`](packages/magic-context) | Forked. Cross-session memory and context management for pi. **Prebuilt** — see below. |
 
 The first three compose into one code-mode runtime — rlm replaces the tool surface with a
 Python kernel, web-code adds host functions to it, and rsi is reachable from inside a cell
@@ -52,17 +51,20 @@ pi install .                   # or this repo's root, whose manifest declares al
 
 `vendor/magic-context` is a submodule of
 [zeroqn/magic-context](https://github.com/zeroqn/magic-context), branch `pi-agents` —
-[cortexkit/magic-context](https://github.com/cortexkit/magic-context) plus four commits that add
-the process-global registry rlm's child shim binds to. Rebase onto upstream with:
+[cortexkit/magic-context](https://github.com/cortexkit/magic-context) plus five commits. The
+important one publishes the process-global registry rlm's child shim binds to. Rebase onto
+upstream with:
 
 ```bash
 git -C vendor/magic-context fetch upstream master
 git -C vendor/magic-context rebase FETCH_HEAD
 ```
 
-It is not installable on its own: the fork ships source, not a build, so a git install would
-clone 115 MB of history and then have nothing to load. Use the submodule here, or the package
-built from it.
+**`packages/magic-context/` is generated from it.** A git install never initialises submodules, so
+the built plugin has to live somewhere git actually delivers — CI
+([`.github/workflows/magic-context.yml`](.github/workflows/magic-context.yml)) rebuilds it from the
+submodule and commits the result. Do not edit it by hand. It is not installable on its own: the fork
+ships source, not a build.
 
 ## Licence
 

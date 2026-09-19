@@ -1,0 +1,43 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Install
+        run: bun install
+
+      - name: Tests
+        run: bun run test
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Root pi manifest resolves
+        run: |
+          node -e '
+            const fs = require("node:fs"), path = require("node:path");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const entries = pkg.pi?.extensions ?? [];
+            if (!entries.length) throw new Error("no pi.extensions in the root manifest");
+            let missing = 0;
+            for (const e of entries) {
+              const ok = fs.existsSync(path.resolve(e));
+              console.log((ok ? "  ok   " : "  MISS ") + e);
+              if (!ok) missing++;
+            }
+            if (missing) throw new Error(missing + " manifest entries do not exist");
+            console.log(entries.length + " extensions resolvable");
+          '
