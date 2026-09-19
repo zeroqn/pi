@@ -9,6 +9,7 @@
 	],
 	"scripts": {
 		"test": "bun run --cwd packages/rlm test && bun run --cwd packages/web-code test && bun run --cwd packages/rsi test",
+		"check": "bun run test && bun run typecheck",
 		"typecheck": "bun run --cwd packages/rlm typecheck && bun run --cwd packages/web-code typecheck && bun run --cwd packages/rsi typecheck",
 		"submodule:init": "git submodule update --init --recursive"
 	},

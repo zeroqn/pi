@@ -101,11 +101,6 @@ export interface PassSchedulerOptions {
 	 * published nothing (RSI x RLM ticket 03). Consulted before the tool-name heuristic.
 	 */
 	publishedCanWrite?: () => boolean | undefined;
-	/**
-	 * What this session published about its own write capability, or `undefined` when it
-	 * published nothing (RSI x RLM ticket 03). Consulted before the tool-name heuristic.
-	 */
-	publishedCanWrite?: () => boolean | undefined;
 	/** The current session's messages, reduced for the pre-scan. */
 	getScanMessages: () => ScanMessage[];
 	/**
@@ -119,11 +114,6 @@ export interface PassSchedulerOptions {
 	 * Absent means never aborted, which is every session that does not report otherwise.
 	 */
 	lastTurnWasAborted?: () => boolean;
-	/**
-	 * Kernel-side evidence for a code-mode session, or `undefined` for a session with no
-	 * kernel (RSI x RLM ticket 04). Absent means the pre-scan behaves exactly as before.
-	 */
-	getKernelSignal?: () => KernelSignal | undefined;
 	/** The learner pass. */
 	runPass: (reason: LearnerReason) => Promise<PassOutcome>;
 	/** The curator pass; absent disables curation entirely. */

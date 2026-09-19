@@ -19,7 +19,7 @@ import * as path from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { buildSessionContext, convertToLlm, getAgentDir, parseSkillBlock, serializeConversation } from "@earendil-works/pi-coding-agent";
 import { loadConfig, saveConfig } from "./config.ts";
-import { buildCandidates, buildCurationReport, buildCuratorPrompt, curationDueForSession, retirementCandidates } from "./curation.ts";
+import { buildCandidates, buildCurationReport, buildCuratorPrompt, curationDueForSession, isCurationDue, retirementCandidates } from "./curation.ts";
 import { buildDigest } from "./digest.ts";
 import { buildJournalDigest, journalPathFor, kernelActivity, readJournal } from "./journal.ts";
 import { runLearningFork, type ForkSession } from "./fork.ts";

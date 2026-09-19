@@ -64,6 +64,13 @@ export function retirementCandidates(candidates: readonly Candidate[], options: 
 	return candidates.filter((candidate) => !candidate.pinned && candidate.idleDays >= window);
 }
 
+/**
+ * The config the due-check actually reads: the interval and the size ceiling, nothing else.
+ * Both entry points take this shape rather than the whole `RsiConfig`, so the session-aware
+ * wrapper can pass on the narrower config it is handed without claiming to know the rest.
+ */
+export type CurationConfig = Pick<RsiConfig, "consolidateEveryWeeks" | "maxActiveSkills">;
+
 export interface CurationDue {
 	due: boolean;
 	reason?: string;
@@ -81,7 +88,7 @@ export function curationDueForSession(input: {
 	isChild: boolean;
 	lastCurateAt: string | null | undefined;
 	activeCount: number;
-	config: { consolidateEveryWeeks: number; maxActiveSkills: number };
+	config: CurationConfig;
 	now: number;
 }): boolean {
 	if (input.isChild) return false;
@@ -96,7 +103,7 @@ export function curationDueForSession(input: {
 export function isCurationDue(input: {
 	lastCurateAt: string | null | undefined;
 	activeCount: number;
-	config: RsiConfig;
+	config: CurationConfig;
 	now: number;
 }): CurationDue {
 	if (input.activeCount === 0) return { due: false, reason: "nothing learned yet" };

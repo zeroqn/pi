@@ -102,17 +102,32 @@ export interface RsiSeamWork {
 	noteHostCall(call: SeamHostCall, scope: Scope): void;
 }
 
-export interface RsiSeam extends RsiSeamWork {
+/**
+ * The facade other extensions consume.
+ *
+ * Its shape is the **caller's**, not the work's: a consumer asks what *this* session can see,
+ * and the facade resolves that to a store scope with `scopeFor`. It therefore does not extend
+ * {@link RsiSeamWork}, whose methods already take the resolved `Scope`.
+ */
+export interface RsiSeam {
+	/** The union for the caller's scope: `general` always, plus the project scope when the caller's cwd resolves to one. */
+	skills(caller?: SeamCaller): SeamSkill[];
+	skill(name: string, caller?: SeamCaller): SeamSkillContent | undefined;
+	/** Record one consultation. Fire-and-forget: a lost count must never surface as an error. */
+	noteUsage(usage: SeamUsage): void;
+	/** Offer one bash command's path-looking tokens as candidate reads. */
+	noteHostCall(call: SeamHostCall): void;
 	/**
 	 * Register a session's facts. Published by the client at `session_start`, so a child's
 	 * fact is its own and the root's is never inherited.
 	 */
 	capability(fact: SeamCapability): void;
 	/**
-	 * The factory a child session is given, when RLM asks for one (ticket 11). Optional:
-	 * a client that finds it missing runs children without RSI, as today.
+	 * The factory a child session is given, when RLM asks for one (ticket 11). May return
+	 * `undefined`: the facade always exists, but an older instance has no factory to offer,
+	 * and the consumer runs the child without RSI rather than throwing.
 	 */
-	childFactory?(pi: unknown, request: unknown): (pi: unknown) => void;
+	childFactory?(pi: unknown, request: unknown): ((pi: unknown) => void) | undefined;
 }
 
 /** True when the facade can put RSI into a child session. */
