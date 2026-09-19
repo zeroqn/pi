@@ -40,6 +40,12 @@ jobs:
               process.exit(0);
             }
             if (!stamp) throw new Error("packages/magic-context/package.json has no builtFrom.commit");
+            const pluginPkg = "vendor/magic-context/packages/pi-plugin/package.json";
+            if (fs.existsSync(pluginPkg)) {
+              const want = JSON.parse(fs.readFileSync(pluginPkg, "utf8")).version;
+              const got = JSON.parse(fs.readFileSync("packages/magic-context/package.json", "utf8")).version;
+              if (want !== got) throw new Error("prebuilt package version " + got + " != plugin version " + want);
+            }
             if (stamp !== head) {
               throw new Error(
                 "packages/magic-context was built from " + stamp.slice(0, 8) +

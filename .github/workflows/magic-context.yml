@@ -74,19 +74,26 @@ jobs:
           fi
           echo "clean"
 
-      - name: Stamp the submodule commit
+      - name: Stamp the version and submodule commit
         run: |
           node -e '
             const fs = require("node:fs");
             const { execFileSync } = require("node:child_process");
+            const read = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
+            const plugin = read("vendor/magic-context/packages/pi-plugin/package.json");
             const p = "packages/magic-context/package.json";
-            const pkg = JSON.parse(fs.readFileSync(p, "utf8"));
+            const pkg = read(p);
+            // Track the plugin version so the prebuilt package states which
+            // upstream release it carries. Its own release cadence is the
+            // commit stamp, not a number we invent.
+            pkg.version = plugin.version;
             pkg.builtFrom = {
               submodule: "vendor/magic-context",
               commit: execFileSync("git", ["-C", "vendor/magic-context", "rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+              pluginVersion: plugin.version,
             };
             fs.writeFileSync(p, JSON.stringify(pkg, null, "\t") + "\n");
-            console.log("stamped " + pkg.builtFrom.commit.slice(0, 8));
+            console.log("stamped " + pkg.version + " @ " + pkg.builtFrom.commit.slice(0, 8));
           '
 
       - name: Refresh the lockfile
