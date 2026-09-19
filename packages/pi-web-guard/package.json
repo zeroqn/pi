@@ -1,0 +1,28 @@
+{
+	"name": "pi-web-guard",
+	"version": "0.1.0",
+	"description": "Prompt-injection guard for pi-web-access: fences web_search/fetch_content/get_search_content/source_check output as untrusted data and adds a matching system-prompt rule.",
+	"type": "module",
+	"scripts": {
+		"test": "node --test"
+	},
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"extension",
+		"security",
+		"prompt-injection"
+	],
+	"license": "MIT",
+	"peerDependencies": {
+		"@earendil-works/pi-ai": "*",
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*"
+	},
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	}
+}
