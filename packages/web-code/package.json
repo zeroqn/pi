@@ -1,0 +1,28 @@
+{
+  "name": "pi-web-code",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Web host functions (web_search, fetch_content) for the rlm Python kernel, over DuckDuckGo and AnySearch.",
+  "type": "module",
+  "keywords": ["pi-package", "pi", "rlm", "web-search"],
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "linkedom": "^0.18.13",
+    "turndown": "^7.2.4",
+    "unpdf": "^1.8.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "@types/node": "^22.20.3",
+    "@types/turndown": "^5.0.6",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "smoke": "bun scripts/live-smoke.ts"
+  },
+  "pi": {
+    "extensions": ["./host.ts"]
+  }
+}
