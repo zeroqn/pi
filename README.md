@@ -49,12 +49,15 @@ the others missing, which is why they can be installed in any combination.
 ## Quickstart
 
 ```bash
-git clone --recurse-submodules <this-repo> pi-extensions
-cd pi-extensions
+git clone --recurse-submodules https://github.com/zeroqn/pi.git
+cd pi
 bun install
 
-bun run test            # 372 tests across the three workspace packages
+bun run check           # 372 tests, then typecheck, across the three workspace packages
 ```
+
+`bun run test` runs the tests alone; `bun run check` adds the typechecks. Keep both green — the
+rsi typecheck is what catches a name used but never imported, which the tests do not.
 
 Then install the packages you want into pi:
 
