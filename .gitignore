@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# rlm session artifacts (journal, dump, background logs, scratch mount)
+*.rlm-journal.jsonl
+*.rlm-journal.jsonl.bg/
+*.rlm-dump.bin
+*.scratch/
+
+# editor / OS
+.idea/
+.vscode/
+*.swp

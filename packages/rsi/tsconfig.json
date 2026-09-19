@@ -6,32 +6,9 @@
 		"noEmit": true,
 		"skipLibCheck": true,
 		"strict": true,
-		"target": "ES2022",
-		"paths": {
-			"@earendil-works/pi-coding-agent": [
-				"/nix/store/cyb9iy8dmwdz0z42wm771cpv7r6kr6d5-pi-coding-agent-0.85.1/lib/pi-coding-agent/index.d.ts"
-			]
-		}
+		"target": "ES2022"
 	},
 	"include": [
-		"index.ts",
-		"config.ts",
-		"content-scan.ts",
-		"curation.ts",
-		"digest.ts",
-		"fork.ts",
-		"frontmatter.ts",
-		"ledger.ts",
-		"pass-lock.ts",
-		"pass.ts",
-		"paths.ts",
-		"prescan.ts",
-		"project-key.ts",
-		"prompt.ts",
-		"review.ts",
-		"scheduler.ts",
-		"skill-actions.ts",
-		"store.ts",
-		"telemetry.ts"
+		"**/*.ts"
 	]
 }

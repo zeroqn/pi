@@ -18,6 +18,10 @@
 	"peerDependencies": {
 		"@earendil-works/pi-coding-agent": "*"
 	},
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "^0.85.1",
+		"typescript": "^5.8.0"
+	},
 	"pi": {
 		"extensions": [
 			"./index.ts"

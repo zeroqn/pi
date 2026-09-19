@@ -1,0 +1,16 @@
+{
+	"name": "pi-extensions",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Four pi extensions that compose into a code-mode agent runtime: a Python kernel, a learned-skill store, web host functions, and child-session context management.",
+	"workspaces": [
+		"packages/*"
+	],
+	"scripts": {
+		"test": "bun run --cwd packages/rlm test && bun run --cwd packages/web-code test && bun run --cwd packages/rsi test",
+		"typecheck": "bun run --cwd packages/rlm typecheck && bun run --cwd packages/web-code typecheck && bun run --cwd packages/rsi typecheck",
+		"submodule:init": "git submodule update --init --recursive"
+	},
+	"license": "MIT"
+}
