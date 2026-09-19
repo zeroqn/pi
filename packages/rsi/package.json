@@ -1,0 +1,26 @@
+{
+	"name": "rsi",
+	"version": "0.1.0",
+	"description": "Recursive skill improvement for pi: an agent-owned learned-skill store surfaced by resources_discover, with scoped skills, name-uniqueness enforcement, and staged atomic writes.",
+	"type": "module",
+	"scripts": {
+		"test": "node --test",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"extension",
+		"skills"
+	],
+	"license": "MIT",
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*"
+	},
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	}
+}
