@@ -4,9 +4,10 @@ name: magic-context prebuilt
 # commits the result back to main. The submodule is the single source of truth;
 # this directory is generated.
 #
-# Requires a secret MC_BUILD_TOKEN: a PAT or GitHub App token with `contents:
-# write` on this repo. The default GITHUB_TOKEN cannot push to a branch that has
-# a ruleset protecting it, which main almost certainly does.
+# Pushes with GITHUB_TOKEN, so the repo's Settings -> Actions -> General ->
+# Workflow permissions must be "Read and write", and if a ruleset protects main
+# it must list the GitHub Actions app as a bypass actor - otherwise the push is
+# rejected even though the build succeeded.
 
 on:
   push:
@@ -21,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -30,7 +31,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          token: ${{ secrets.MC_BUILD_TOKEN }}
           fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
