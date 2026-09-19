@@ -1,0 +1,4 @@
+[submodule "vendor/magic-context"]
+	path = vendor/magic-context
+	url = https://github.com/zeroqn/magic-context
+	branch = pi-agents
