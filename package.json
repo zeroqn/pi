@@ -3,14 +3,14 @@
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
-	"description": "Four pi extensions that compose into a code-mode agent runtime: a Python kernel, a learned-skill store, web host functions, and child-session context management.",
+	"description": "Personal pi extensions: a code-mode Python kernel, a learned-skill store, web host functions, prompt-injection and read-only guards, and native-tool integrations.",
 	"workspaces": [
 		"packages/*"
 	],
 	"scripts": {
-		"test": "bun run --cwd packages/rlm test && bun run --cwd packages/web-code test && bun run --cwd packages/rsi test",
+		"test": "bun run --cwd packages/rlm test && bun run --cwd packages/web-code test && bun run --cwd packages/rsi test && bun run --cwd packages/pi-web-guard test && bun run --cwd packages/readonly-mode test",
+		"typecheck": "bun run --cwd packages/rlm typecheck && bun run --cwd packages/web-code typecheck && bun run --cwd packages/rsi typecheck && bun run --cwd packages/pi-web-guard typecheck && bun run --cwd packages/readonly-mode typecheck && bun run --cwd packages/zvec-grep typecheck && bun run --cwd packages/magic-context-pi-native typecheck && bun run --cwd packages/rpiv-advisor-pi-native typecheck",
 		"check": "bun run test && bun run typecheck",
-		"typecheck": "bun run --cwd packages/rlm typecheck && bun run --cwd packages/web-code typecheck && bun run --cwd packages/rsi typecheck",
 		"submodule:init": "git submodule update --init --recursive"
 	},
 	"license": "MIT",
@@ -18,7 +18,12 @@
 		"extensions": [
 			"packages/rlm/src/index.ts",
 			"packages/rsi/index.ts",
-			"packages/web-code/host.ts"
+			"packages/web-code/host.ts",
+			"packages/pi-web-guard/index.ts",
+			"packages/readonly-mode/index.ts",
+			"packages/zvec-grep/index.ts",
+			"packages/magic-context-pi-native/index.ts",
+			"packages/rpiv-advisor-pi-native/index.ts"
 		]
 	}
 }

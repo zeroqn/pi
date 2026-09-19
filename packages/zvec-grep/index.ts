@@ -692,6 +692,7 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 								: "Searching the indexed workspace…",
 					},
 				],
+				details: { roots },
 			});
 
 			const outcomes = await runAcrossRoots(pi, roots, args, signal, SEARCH_TIMEOUT_MS);

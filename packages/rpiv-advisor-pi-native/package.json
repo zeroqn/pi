@@ -1,0 +1,26 @@
+{
+	"name": "rpiv-advisor-pi-native",
+	"version": "0.1.0",
+	"description": "Point rpiv-advisor's XDG config path at pi's own config tree, so the pi-native file is the real storage.",
+	"type": "module",
+	"scripts": {
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"extension"
+	],
+	"license": "MIT",
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "^0.85.1",
+		"@types/node": "^22.20.0",
+		"typescript": "^5.8.0"
+	},
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	}
+}

@@ -4,7 +4,8 @@
 	"description": "Query-only mode for pi: a /readonly toggle that removes the writer tools, gates bash commands, and injects a read-only prompt.",
 	"type": "module",
 	"scripts": {
-		"test": "node --test"
+		"test": "node --test",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
 	},
 	"keywords": [
 		"pi-package",
@@ -21,5 +22,10 @@
 		"extensions": [
 			"./index.ts"
 		]
+	},
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "^0.85.1",
+		"@types/node": "^22.20.0",
+		"typescript": "^5.8.0"
 	}
 }
