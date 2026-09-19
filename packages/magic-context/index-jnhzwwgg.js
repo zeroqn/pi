@@ -40,7 +40,7 @@ var require_dist = __commonJS(function(exports, module) {
 
 // ../../node_modules/.bun/@jitl+quickjs-singlefile-cjs-release-asyncify@0.32.0/node_modules/@jitl/quickjs-singlefile-cjs-release-asyncify/dist/index.js
 var require_dist2 = __commonJS(function(exports, module) {
-  var __filename = "/workspace/pi/extensions/vendor/magic-context/node_modules/.bun/@jitl+quickjs-singlefile-cjs-release-asyncify@0.32.0/node_modules/@jitl/quickjs-singlefile-cjs-release-asyncify/dist/index.js";
+  var __filename = "/home/runner/work/pi/pi/vendor/magic-context/node_modules/.bun/@jitl+quickjs-singlefile-cjs-release-asyncify@0.32.0/node_modules/@jitl/quickjs-singlefile-cjs-release-asyncify/dist/index.js";
   var __create = Object.create;
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;

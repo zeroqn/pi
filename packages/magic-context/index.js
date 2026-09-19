@@ -476,7 +476,7 @@ import {
   registerTodoStateLifecycle,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-9b1pbs2b.js";
+} from "./index-bhmxdvtt.js";
 import {
   pushNotification2
 } from "./index-b3eqj1g6.js";
@@ -7655,7 +7655,7 @@ var asyncModuleLoaded = false;
 function getAsyncModule() {
   asyncModulePromise ??= (async () => {
     const [{ default: singlefileAsyncifyVariant }, { newQuickJSAsyncWASMModuleFromVariant }] = await Promise.all([
-      import("./index-fr3x6spx.js").then((m)=>__toESM(m.default,1)),
+      import("./index-jnhzwwgg.js").then((m)=>__toESM(m.default,1)),
       import("./index-v6t0tg85.js")
     ]);
     const module = await newQuickJSAsyncWASMModuleFromVariant(singlefileAsyncifyVariant);
