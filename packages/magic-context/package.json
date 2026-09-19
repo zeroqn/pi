@@ -33,5 +33,12 @@
 	"optionalDependencies": {
 		"onnxruntime-node": "1.24.3",
 		"sharp": "^0.35.0"
+	},
+	"builtFrom": {
+		"submodule": "vendor/magic-context",
+		"commit": "2c20fcb05ee5fcde440e00a19a183c535e57768d"
+	},
+	"scripts": {
+		"postinstall": "node -e \"process.exit(0)\""
 	}
 }

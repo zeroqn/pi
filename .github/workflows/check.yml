@@ -25,6 +25,32 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Prebuilt magic-context is current
+        run: |
+          node -e '
+            const { execFileSync } = require("node:child_process");
+            const fs = require("node:fs");
+            const stamp = JSON.parse(fs.readFileSync("packages/magic-context/package.json", "utf8"))
+              .builtFrom?.commit;
+            let head = "";
+            try {
+              head = execFileSync("git", ["-C", "vendor/magic-context", "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+            } catch {
+              console.log("submodule not checked out; skipping (clone with --recurse-submodules to check)");
+              process.exit(0);
+            }
+            if (!stamp) throw new Error("packages/magic-context/package.json has no builtFrom.commit");
+            if (stamp !== head) {
+              throw new Error(
+                "packages/magic-context was built from " + stamp.slice(0, 8) +
+                " but the submodule is at " + head.slice(0, 8) +
+                ". The magic-context workflow rebuilds it on push to main; " +
+                "run it via workflow_dispatch, or rebuild locally with: " +
+                "bun run --cwd vendor/magic-context/packages/pi-plugin build");
+            }
+            console.log("prebuilt package matches submodule " + head.slice(0, 8));
+          '
+
       - name: Root pi manifest resolves
         run: |
           node -e '
