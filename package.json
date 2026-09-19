@@ -13,5 +13,12 @@
 		"typecheck": "bun run --cwd packages/rlm typecheck && bun run --cwd packages/web-code typecheck && bun run --cwd packages/rsi typecheck",
 		"submodule:init": "git submodule update --init --recursive"
 	},
-	"license": "MIT"
+	"license": "MIT",
+	"pi": {
+		"extensions": [
+			"packages/rlm/src/index.ts",
+			"packages/rsi/index.ts",
+			"packages/web-code/host.ts"
+		]
+	}
 }
