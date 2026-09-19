@@ -60,8 +60,9 @@ git -C vendor/magic-context fetch upstream master
 git -C vendor/magic-context rebase FETCH_HEAD
 ```
 
-It is also installable on its own, without this monorepo:
-`pi install git:github.com/zeroqn/magic-context`.
+It is not installable on its own: the fork ships source, not a build, so a git install would
+clone 115 MB of history and then have nothing to load. Use the submodule here, or the package
+built from it.
 
 ## Licence
 
