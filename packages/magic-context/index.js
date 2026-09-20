@@ -477,7 +477,7 @@ import {
   registerTodoStateLifecycle,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-83fnrd49.js";
+} from "./index-8cq18xwv.js";
 import {
   pushNotification2
 } from "./index-b3eqj1g6.js";

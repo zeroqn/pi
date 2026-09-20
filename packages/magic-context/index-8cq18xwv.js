@@ -8878,7 +8878,7 @@ import { existsSync as existsSync4, readFileSync as readFileSync3, realpathSync 
 import { createRequire } from "node:module";
 import { homedir as homedir6 } from "node:os";
 import { dirname as dirname3, join as join3, resolve as resolve2 } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // ../plugin/src/shared/commit-detection.ts
 var HASH_HEX = "[0-9a-f]{7,12}";
@@ -9012,18 +9012,8 @@ var tokenizerLoadPromise;
 var tokenizerWarningSent = false;
 var tokenizerEncodingPath;
 var tokenizerSerializedTableBytes;
-function tokenizerPackageRoots() {
-  const cwd = process.cwd();
-  const openCodeCache = join3(process.env.XDG_CACHE_HOME ?? join3(homedir6(), ".cache"), "opencode");
-  const roots = [cwd, openCodeCache];
-  const candidates = [];
-  for (const root of roots) {
-    for (const packageDir of TOKENIZER_PACKAGE_DIRS) {
-      candidates.push(join3(root, "node_modules", ...packageDir, "node_modules", "ai-tokenizer"));
-    }
-    candidates.push(join3(root, "node_modules", "ai-tokenizer"));
-  }
-  let ancestor = process.argv[1] ? dirname3(resolve2(process.argv[1])) : cwd;
+function pushAncestorTokenizerPaths(startDir, candidates) {
+  let ancestor = startDir;
   while (true) {
     candidates.push(join3(ancestor, "node_modules", "ai-tokenizer"));
     const parent = dirname3(ancestor);
@@ -9031,6 +9021,29 @@ function tokenizerPackageRoots() {
       break;
     ancestor = parent;
   }
+}
+function tokenizerModuleDirectory() {
+  try {
+    return dirname3(fileURLToPath(import.meta.url));
+  } catch {
+    return;
+  }
+}
+function tokenizerPackageRoots() {
+  const cwd = process.cwd();
+  const openCodeCache = join3(process.env.XDG_CACHE_HOME ?? join3(homedir6(), ".cache"), "opencode");
+  const roots = [cwd, openCodeCache];
+  const candidates = [];
+  const moduleDir = tokenizerModuleDirectory();
+  if (moduleDir)
+    pushAncestorTokenizerPaths(moduleDir, candidates);
+  for (const root of roots) {
+    for (const packageDir of TOKENIZER_PACKAGE_DIRS) {
+      candidates.push(join3(root, "node_modules", ...packageDir, "node_modules", "ai-tokenizer"));
+    }
+    candidates.push(join3(root, "node_modules", "ai-tokenizer"));
+  }
+  pushAncestorTokenizerPaths(process.argv[1] ? dirname3(resolve2(process.argv[1])) : cwd, candidates);
   return [...new Set(candidates)];
 }
 function packageImportTarget(value) {
@@ -9078,7 +9091,7 @@ function loadTokenizer() {
 async function loadTokenizerFromInstalledPackage() {
   const installedPaths = findTokenizerImportPaths();
   if (!installedPaths) {
-    throw new Error("ai-tokenizer was not found under the project, runtime, or OpenCode cache node_modules roots");
+    throw new Error("ai-tokenizer was not found under the plugin, project, runtime, or OpenCode cache node_modules roots");
   }
   const [tokenizerModule, claudeEncoding] = await Promise.all([
     import(pathToFileURL(installedPaths.tokenizerPath).href),
