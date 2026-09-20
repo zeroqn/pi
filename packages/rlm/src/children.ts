@@ -72,6 +72,8 @@ interface ChildRecord extends ChildHandle {
 	session?: any;
 	noticeRead: boolean;
 	deleted: boolean;
+	/** Where this child's notices go — retained so a resumed turn can still notify. */
+	ownerDispatch: (notice: Notice) => void;
 	cost: CostTotals;
 	countedIds: Set<string>;
 }
@@ -367,7 +369,15 @@ export function forgetManagerViews(): void {
 }
 
 function handleOf(record: ChildRecord): ChildHandle {
-	const { session: _session, noticeRead: _noticeRead, deleted: _deleted, cost: _cost, countedIds: _countedIds, ...handle } = record;
+	const {
+		session: _session,
+		noticeRead: _noticeRead,
+		deleted: _deleted,
+		ownerDispatch: _ownerDispatch,
+		cost: _cost,
+		countedIds: _countedIds,
+		...handle
+	} = record;
 	return { ...handle };
 }
 
@@ -376,6 +386,42 @@ function usageOfRecord(record: ChildRecord): ChildHandle["usage"] | undefined {
 	const totals = foldSessionCost(record.session, record.cost, record.countedIds);
 	if (totals.entries === 0) return lastMessageUsage(record.session);
 	return { input_tokens: totals.input, output_tokens: totals.output, total_tokens: totals.total };
+}
+
+/**
+ * Run one turn of a child to completion, then dispatch its completion notice (ticket 06:
+ * completion always notifies with status only, and a child that fails silently is
+ * impossible).
+ *
+ * Module-level so `spawn` and `send` share exactly one ending. A resumed child used to
+ * reach a second `finally` that updated its status but dispatched nothing, so `send`ing a
+ * finished child and ending the turn left the parent waiting for a notice that never came.
+ */
+async function runChildTurn(record: ChildRecord, prompt: string): Promise<void> {
+	try {
+		await record.session?.prompt(prompt);
+		record.status = "done";
+	} catch (error) {
+		record.status = "failed";
+		record.reason = error instanceof Error ? error.message : String(error);
+	} finally {
+		record.ended_at = new Date().toISOString();
+		record.usage = usageOfRecord(record);
+		const spent = record.usage?.total_tokens ? ` ${record.usage.total_tokens} tokens` : "";
+		const detail = [
+			`[${record.child_id} "${record.name}"] finished: ${record.status}${spent}`,
+			record.reason ? `— ${record.reason}` : "",
+			record.session_file ? `\nsession: ${record.session_file}` : "",
+			`\nRead the result with await rlm.poll("${record.child_id}") or the stored transcript (the session file is outside the workspace mount, so read it through await bash("cat …")).`,
+		]
+			.filter(Boolean)
+			.join(" ");
+		record.ownerDispatch({
+			key: `done:${record.child_id}`,
+			content: detail,
+			cancelled: () => record.noticeRead,
+		});
+	}
 }
 
 /**
@@ -401,6 +447,19 @@ export function childPromptFor(request: { name: string; depth: number }, maxDept
 			: "You have a persistent Python kernel. You are at the delegation limit, so rlm.spawn will be refused — answer the task yourself.",
 		reporting,
 	];
+}
+
+/**
+ * The read rule (ticket 06, matching ticket 10's background handles): a poll or list
+ * withdraws a pending completion notice **only when there is a result to read**.
+ *
+ * Polling a child that is still running is a status check, not a read of its answer, so it
+ * must leave the notice that child's completion will dispatch intact. Withdrawing on every
+ * poll meant a parent that checked on a running child never heard it finish and had to be
+ * prompted by hand — the bug this function exists to prevent.
+ */
+export function markNoticeReadIfFinished(record: { status: ChildStatus; noticeRead: boolean }): void {
+	if (record.status !== "running") record.noticeRead = true;
 }
 
 export function createChildManager(deps: ChildManagerDeps) {
@@ -535,6 +594,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 			session,
 			noticeRead: false,
 			deleted: false,
+			ownerDispatch: request.ownerDispatch,
 			cost: { input: 0, output: 0, total: 0, entries: 0 },
 			countedIds: new Set<string>(),
 		};
@@ -545,40 +605,15 @@ export function createChildManager(deps: ChildManagerDeps) {
 		if (ownFile && !managerChildren.has(ownFile)) registerManagerView(ownFile, directChildren);
 
 		// Admission-only: the turn runs on its own, and completion is a notice.
-		void (async () => {
-			try {
-				await session.prompt(request.prompt);
-				record.status = "done";
-			} catch (error) {
-				record.status = "failed";
-				record.reason = error instanceof Error ? error.message : String(error);
-			} finally {
-				record.ended_at = new Date().toISOString();
-				record.usage = usageOfRecord(record);
-				const spent = record.usage?.total_tokens ? ` ${record.usage.total_tokens} tokens` : "";
-				const detail = [
-					`[${id} "${record.name}"] finished: ${record.status}${spent}`,
-					record.reason ? `— ${record.reason}` : "",
-					record.session_file ? `\nsession: ${record.session_file}` : "",
-					`\nRead the result with await rlm.poll("${id}") or the stored transcript (the session file is outside the workspace mount, so read it through await bash("cat …")).`,
-				]
-					.filter(Boolean)
-					.join(" ");
-				request.ownerDispatch({
-					key: `done:${id}`,
-					content: detail,
-					cancelled: () => record.noticeRead,
-				});
-			}
-		})();
+		void runChildTurn(record, request.prompt);
 
 		return handleOf(record);
 	}
 
-	/** A poll or list is a read: it cancels the pending completion notice. */
+	/** A poll or list is a read — but only a finished child's is a read of its answer. */
 	function poll(selector: string): ChildHandle {
 		const record = find(selector);
-		record.noticeRead = true;
+		markNoticeReadIfFinished(record);
 		record.usage = usageOfRecord(record) ?? record.usage;
 		return handleOf(record);
 	}
@@ -586,9 +621,9 @@ export function createChildManager(deps: ChildManagerDeps) {
 	function list(): ChildHandle[] {
 		const visible = [...records.values()].filter((record) => !record.deleted);
 		for (const record of visible) {
-			// A list is a read: refresh the rollup and cancel the pending notices.
+			// Refresh the rollup, and withdraw the pending notice of any child with a result.
 			record.usage = usageOfRecord(record) ?? record.usage;
-			if (record.status !== "running") record.noticeRead = true;
+			markNoticeReadIfFinished(record);
 		}
 		return visible.map(handleOf);
 	}
@@ -615,21 +650,14 @@ export function createChildManager(deps: ChildManagerDeps) {
 		if (record.status === "running") {
 			await record.session?.followUp(text);
 		} else {
+			// Resuming a finished child is a fresh turn: clear the previous ending (including
+			// its reason, so a failure cannot bleed into a later success) and run it through
+			// the same path a spawn takes, notice and all.
 			record.status = "running";
 			record.ended_at = null;
+			record.reason = undefined;
 			record.noticeRead = false;
-			void (async () => {
-				try {
-					await record.session?.prompt(text);
-					record.status = "done";
-				} catch (error) {
-					record.status = "failed";
-					record.reason = error instanceof Error ? error.message : String(error);
-				} finally {
-					record.ended_at = new Date().toISOString();
-					record.usage = usageOfRecord(record);
-				}
-			})();
+			void runChildTurn(record, text);
 		}
 		return handleOf(record);
 	}

@@ -7,16 +7,19 @@
  * would hand a child a root's spawning authority, and a cost that double-counts would
  * misreport what a tree spent.
  */
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	CHILD_ENTRY_TYPE,
 	type CostTotals,
+	type Notice,
+	createChildManager,
 	deriveDepth,
 	foldSessionCost,
 	forgetManagerViews,
+	markNoticeReadIfFinished,
 	readChildProvenance,
 	childPromptFor,
 	registerManagerView,
@@ -262,5 +265,165 @@ describe("the child prompt's shapes (v2 ticket 05)", () => {
 		} finally {
 			delete process.env.RLM_CHILD_PROMPT;
 		}
+	});
+});
+
+describe("the read rule (ticket 06)", () => {
+	it("withdraws a completion notice only once the child has a result to read", () => {
+		// A status check on a running child must not kill the notice its completion sends.
+		const running = { status: "running" as const, noticeRead: false };
+		markNoticeReadIfFinished(running);
+		expect(running.noticeRead).toBe(false);
+
+		// Reading a finished child is reading its result, so the notice is withdrawn.
+		for (const status of ["done", "failed", "stopped"] as const) {
+			const finished = { status, noticeRead: false };
+			markNoticeReadIfFinished(finished);
+			expect(finished.noticeRead).toBe(true);
+		}
+	});
+});
+
+/* ------------------------------------------------------------------ *
+ * The manager, driven end-to-end with pi mocked
+ * ------------------------------------------------------------------ */
+
+/**
+ * `spawn` reaches pi through a dynamic import, which is the only thing standing between
+ * these tests and a real child session. Mocking it lets the notice path be exercised for
+ * real — statuses, withdrawal, `send` — instead of only through the extracted pieces. The
+ * child's turn blocks until the test releases it, so "still running" is controllable.
+ */
+let releaseTurn: (() => void) | null = null;
+let turnBehavior: () => Promise<void> = () =>
+	new Promise<void>((resolve) => {
+		releaseTurn = resolve;
+	});
+
+mock.module("@earendil-works/pi-coding-agent", () => ({
+	SettingsManager: { create: () => ({}) },
+	DefaultResourceLoader: class {
+		async reload() {}
+	},
+	SessionManager: { create: () => ({ appendCustomEntry() {} }) },
+	createAgentSession: async () => ({
+		session: {
+			sessionFile: "/tmp/child.jsonl",
+			model: null,
+			bindExtensions: async () => {},
+			prompt: () => turnBehavior(),
+			followUp: async () => {},
+			abort: async () => {},
+			dispose: () => {},
+		},
+	}),
+}));
+
+function managerHarness() {
+	const notices: Notice[] = [];
+	const manager = createChildManager({
+		cwd: () => "/tmp/work",
+		ownSessionFile: () => "/tmp/parent.jsonl",
+		kernelFactoryFor: () => () => {},
+		runtime: async () => ({}),
+		maxDepth: 2,
+		maxLive: 8,
+	});
+	return {
+		manager,
+		notices,
+		spawn: (name = "probe") =>
+			manager.spawn({
+				prompt: "go",
+				name,
+				depth: 1,
+				spawnCell: "",
+				parentSessionFile: "/tmp/parent.jsonl",
+				ownerDispatch: (notice) => notices.push(notice),
+			}),
+		release: () => {
+			releaseTurn?.();
+			releaseTurn = null;
+		},
+	};
+}
+
+/** Let the child turn's fire-and-forget continuation run. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+describe("the manager's notices (ticket 06)", () => {
+	beforeEach(() => {
+		releaseTurn = null;
+		turnBehavior = () =>
+			new Promise<void>((resolve) => {
+				releaseTurn = resolve;
+			});
+	});
+
+	it("a status check on a running child leaves its completion notice standing", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+
+		// The original bug: polling a child that had not finished cancelled the notice it
+		// would send when it did, so the parent had to be prompted by hand to hear back.
+		h.manager.poll(handle.child_id);
+		expect(h.notices).toHaveLength(0);
+
+		h.release();
+		await settle();
+		expect(h.notices).toHaveLength(1);
+		expect(h.notices[0]!.cancelled?.()).toBe(false);
+		expect(h.manager.poll(handle.child_id).status).toBe("done");
+	});
+
+	it("reading a finished child withdraws its notice", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		h.release();
+		await settle();
+		expect(h.notices).toHaveLength(1);
+
+		h.manager.poll(handle.child_id);
+		expect(h.notices[0]!.cancelled?.()).toBe(true);
+	});
+
+	it("notifies again when a finished child is resumed with send", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		h.release();
+		await settle();
+		expect(h.notices).toHaveLength(1);
+		expect(h.notices[0]!.content).toContain("finished: done");
+
+		// `send` to a finished child was the silent path: it ran a fresh turn and dispatched
+		// nothing, so the parent waited for a completion message that never came.
+		await h.manager.send(handle.child_id, "again");
+		expect(h.manager.poll(handle.child_id).status).toBe("running");
+		h.release();
+		await settle();
+		expect(h.notices).toHaveLength(2);
+		expect(h.notices[1]!.content).toContain("finished: done");
+	});
+
+	it("carries a failure's reason, and a later success does not restate it", async () => {
+		const h = managerHarness();
+		turnBehavior = async () => {
+			throw new Error("boom");
+		};
+		const handle = await h.spawn();
+		await settle();
+		expect(h.notices[0]!.content).toContain("boom");
+
+		// Resuming clears the previous ending, so a success must not repeat the old failure.
+		turnBehavior = () =>
+			new Promise<void>((resolve) => {
+				releaseTurn = resolve;
+			});
+		await h.manager.send(handle.child_id, "again");
+		h.release();
+		await settle();
+		expect(h.notices).toHaveLength(2);
+		expect(h.notices[1]!.content).not.toContain("boom");
+		expect(h.notices[1]!.content).toContain("finished: done");
 	});
 });
