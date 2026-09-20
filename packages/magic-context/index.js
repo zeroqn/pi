@@ -107,6 +107,7 @@ import {
   getNullOwnerToolTag,
   adoptNullOwnerToolTag,
   resolveOpenCodeDbPath,
+  assertOpenCodeStoreGeneration,
   openCodeDbPathExists,
   recordOpenCodeDbReadFailure,
   clearOpenCodeDbReadFailure,
@@ -476,7 +477,7 @@ import {
   registerTodoStateLifecycle,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-bhmxdvtt.js";
+} from "./index-83fnrd49.js";
 import {
   pushNotification2
 } from "./index-b3eqj1g6.js";
@@ -1247,7 +1248,19 @@ async function runSessionProjectBackfill(db, source, options = {}) {
   let identityResolutionsSinceYield = 0;
   let afterSessionId = null;
   for (;; ) {
-    const sourcePage = await readPage(afterSessionId, SESSION_PAGE_SIZE);
+    let sourcePage;
+    try {
+      sourcePage = await readPage(afterSessionId, SESSION_PAGE_SIZE);
+    } catch (error) {
+      try {
+        if (!markBackfillRetryPending(db, harness, holderId, now())) {
+          log("[session-projects] backfill lease changed before failure cleanup");
+        }
+      } catch (releaseError) {
+        log(`[session-projects] failed to make backfill lease retryable after discovery failed: ${releaseError}`);
+      }
+      throw error;
+    }
     if (sourcePage.length === 0)
       break;
     afterSessionId = sourcePage.at(-1)?.sessionId ?? afterSessionId;
@@ -2844,6 +2857,12 @@ function openOpenCodeDb() {
   }
   try {
     const db = new Database(dbPath, { readonly: true });
+    try {
+      assertOpenCodeStoreGeneration(db, "v1", dbPath);
+    } catch (error) {
+      db.close();
+      throw error;
+    }
     db.exec("PRAGMA busy_timeout = 5000");
     clearOpenCodeDbReadFailure();
     return db;
@@ -12043,11 +12062,11 @@ function planDueTasks(db, projectIdentity, tasks, now) {
   }
   return due;
 }
-function advanceAfterRun(db, projectIdentity, due, finishedAt, status, error, schedulePatch) {
+function advanceAfterRun(db, projectIdentity, due, finishedAt, status, error, schedulePatch, startedAt) {
   writeTaskScheduleState(db, {
     projectPath: projectIdentity,
     task: due.config.task,
-    lastRunAt: status === "completed" ? finishedAt : readLastRunAt(db, projectIdentity, due.config.task),
+    lastRunAt: status === "completed" ? startedAt ?? finishedAt : readLastRunAt(db, projectIdentity, due.config.task),
     nextDueAt: nextDueAtMs(due.config.schedule, finishedAt, due.scheduledAt),
     schedule: due.config.schedule,
     lastStatus: status,
@@ -12132,6 +12151,7 @@ async function runDomainGroup(deps, group, cb) {
         }
       }
       let outcome;
+      const startedAt = Date.now();
       try {
         outcome = await executor(due.config, {
           db,
@@ -12145,7 +12165,7 @@ async function runDomainGroup(deps, group, cb) {
       }
       const finishedAt = Date.now();
       if (outcome.status === "completed") {
-        advanceAfterRun(db, projectIdentity, due, finishedAt, "completed", null, outcome.schedulePatch);
+        advanceAfterRun(db, projectIdentity, due, finishedAt, "completed", null, outcome.schedulePatch, startedAt);
         cb?.onRan?.(due.config.task, outcome.detail, outcome.backlog);
       } else if (outcome.transient) {
         recordTransientFailure(db, projectIdentity, due, finishedAt, outcome.error ?? null);
@@ -14012,6 +14032,16 @@ import {
 } from "node:path";
 import { pathToFileURL } from "node:url";
 var PI_CODING_AGENT_MODULE2 = "@earendil-works/pi-coding-agent";
+var OMP_CODING_AGENT_MODULE = "@oh-my-pi/pi-coding-agent";
+var CODING_AGENT_MODULES = [
+  PI_CODING_AGENT_MODULE2,
+  OMP_CODING_AGENT_MODULE
+];
+var CODING_AGENT_MODULE_LABEL = CODING_AGENT_MODULES.join(" or ");
+var CODING_AGENT_PACKAGE_NAMES = new Set(CODING_AGENT_MODULES);
+function isCodingAgentPackageName(name) {
+  return typeof name === "string" && CODING_AGENT_PACKAGE_NAMES.has(name);
+}
 var SCRIPT_ENTRY_PATTERN = /\.(mjs|cjs|mts|cts|js|ts|tsx|jsx)$/i;
 var TS_ENTRY_PATTERN = /\.(mts|cts|ts|tsx)$/i;
 function isScriptEntry(filePath) {
@@ -14046,11 +14076,11 @@ function findPackageRoot(startDir) {
   let dir = startDir;
   while (dir !== dirname2(dir)) {
     const pkg = readManifest(join5(dir, "package.json"));
-    if (pkg?.name === PI_CODING_AGENT_MODULE2) {
+    if (isCodingAgentPackageName(pkg?.name)) {
       if (basename2(dir) === "dist") {
         const parentDir = dirname2(dir);
         const parentPkg = readManifest(join5(parentDir, "package.json"));
-        if (parentPkg?.name === PI_CODING_AGENT_MODULE2) {
+        if (parentPkg?.name === pkg.name) {
           return { dir: parentDir, pkg: parentPkg };
         }
       }
@@ -14123,11 +14153,14 @@ var defaultLoaders = [
       }
       const found = findPackageRoot(dirname2(entry));
       if (!found) {
-        throw new Error(`Could not locate ${PI_CODING_AGENT_MODULE2} package.json from ${entry}`);
+        throw new Error(`Could not locate ${CODING_AGENT_MODULE_LABEL} package.json from ${entry}`);
       }
       const entryPath = resolveManifestEntry(found);
       if (TS_ENTRY_PATTERN.test(entry)) {
         const srcEntry = toSourceEntry(entryPath, found.dir);
+        if (!srcEntry && TS_ENTRY_PATTERN.test(entryPath) && existsSync7(entryPath)) {
+          return await import(pathToFileURL(entryPath).href);
+        }
         if (srcEntry && existsSync7(srcEntry)) {
           return await import(pathToFileURL(srcEntry).href);
         }
@@ -14139,6 +14172,10 @@ var defaultLoaders = [
   {
     name: "Bare import",
     load: async () => await import(PI_CODING_AGENT_MODULE2)
+  },
+  {
+    name: "Bare import (OMP)",
+    load: async () => await import(OMP_CODING_AGENT_MODULE)
   }
 ];
 var cachedModulePromise = null;
@@ -14156,7 +14193,7 @@ async function resolvePiCodingAgentModule(loaders) {
         errors.push(err);
       }
     }
-    throw new Error(`Failed to resolve ${PI_CODING_AGENT_MODULE2} via all strategies:
+    throw new Error(`Failed to resolve a Pi/OMP coding-agent module (${CODING_AGENT_MODULE_LABEL}) via all strategies:
 ` + errors.map((e, i) => `  - ${activeLoaders[i].name}: ${e.message || e}`).join(`
 `) + `
 Likely cause: symlinked or nonstandard install layout.`);
@@ -16227,7 +16264,7 @@ function applyFlushedStatuses(sessionId, db, targets, preloadedTags) {
 
 // ../plugin/src/hooks/magic-context/cache-busting-signals.ts
 function hasReclaimRide(signals) {
-  return signals.hardFold || signals.force || signals.explicitFlush || signals.publishedHistory || signals.agentDrop;
+  return signals.hardFold || signals.force || signals.explicitFlush || signals.publishedHistory;
 }
 
 // ../plugin/src/hooks/magic-context/caveman.ts
@@ -17623,6 +17660,73 @@ function checkCompartmentTrigger(db, sessionId, sessionMeta, usage, _previousPer
   };
 }
 
+// ../plugin/src/hooks/magic-context/dropped-token-estimate.ts
+var TAG_QUERY_CHUNK_SIZE = 900;
+var ESTIMATED_CHARACTERS_PER_TOKEN = 3.5;
+function estimateCharacters(characters) {
+  return Math.ceil(Math.max(0, characters) / ESTIMATED_CHARACTERS_PER_TOKEN);
+}
+function persistedCountOrByteEstimate(count, bytes) {
+  return typeof count === "number" && Number.isFinite(count) ? Math.max(0, count) : estimateCharacters(bytes);
+}
+function loadPersistedTagTokenCounts(db, sessionId, tagNumbers) {
+  const countsByTag = new Map;
+  for (let offset = 0;offset < tagNumbers.length; offset += TAG_QUERY_CHUNK_SIZE) {
+    const chunk = tagNumbers.slice(offset, offset + TAG_QUERY_CHUNK_SIZE);
+    const placeholders = chunk.map(() => "?").join(",");
+    const rows = db.prepare(`SELECT tag_number AS tagNumber,
+                        type,
+                        byte_size AS byteSize,
+                        input_byte_size AS inputByteSize,
+                        reasoning_byte_size AS reasoningByteSize,
+                        token_count AS tokenCount,
+                        input_token_count AS inputTokenCount,
+                        reasoning_token_count AS reasoningTokenCount
+                   FROM tags
+                  WHERE session_id = ? AND tag_number IN (${placeholders})`).all(sessionId, ...chunk);
+    for (const row of rows)
+      countsByTag.set(row.tagNumber, row);
+  }
+  return countsByTag;
+}
+function estimateDroppedTokensFromTagReductions(db, sessionId, reductions) {
+  if (reductions.length === 0)
+    return 0;
+  const structuralByTag = new Map;
+  const partialCharactersByTag = new Map;
+  for (const reduction of reductions) {
+    if (reduction.mode === "partial") {
+      partialCharactersByTag.set(reduction.tagNumber, (partialCharactersByTag.get(reduction.tagNumber) ?? 0) + Math.max(0, reduction.removedCharacters));
+      continue;
+    }
+    const prior = structuralByTag.get(reduction.tagNumber);
+    if (!prior || reduction.mode === "full") {
+      structuralByTag.set(reduction.tagNumber, reduction);
+    }
+  }
+  const tagNumbers = [...new Set([...structuralByTag.keys(), ...partialCharactersByTag.keys()])];
+  const countsByTag = loadPersistedTagTokenCounts(db, sessionId, tagNumbers);
+  let total = 0;
+  for (const [tagNumber, reduction] of structuralByTag) {
+    const row = countsByTag.get(tagNumber);
+    if (!row)
+      continue;
+    total += persistedCountOrByteEstimate(row.tokenCount, row.byteSize);
+    if (reduction.mode === "full") {
+      total += persistedCountOrByteEstimate(row.reasoningTokenCount, row.reasoningByteSize);
+      if (row.type === "tool") {
+        total += persistedCountOrByteEstimate(row.inputTokenCount, row.inputByteSize);
+      }
+    }
+  }
+  for (const [tagNumber, removedCharacters] of partialCharactersByTag) {
+    if (structuralByTag.has(tagNumber) || !countsByTag.has(tagNumber))
+      continue;
+    total += estimateCharacters(removedCharacters);
+  }
+  return Math.max(0, Math.round(total));
+}
+
 // ../plugin/src/hooks/magic-context/emergency-fail-closed.ts
 class EmergencyFailClosedError extends Error {
   code = "EMERGENCY_FAIL_CLOSED";
@@ -18969,17 +19073,65 @@ function persistFilteredNoise(db, sessionId, chunk, eligibleEnd) {
 }
 
 // ../plugin/src/hooks/magic-context/producer-window-guard.ts
-var PRODUCER_WINDOW_REFUSAL_MARGIN = 0.15;
+var PRODUCER_WINDOW_REFUSAL_MARGIN = 0.03;
+var HISTORIAN_TRUNCATION_MARKER = "[… tokens truncated by Magic Context to fit the historian window …]";
+function producerInputTokenLimit(contextLimitTokens, maxOutputTokens) {
+  if (typeof contextLimitTokens !== "number" || !Number.isFinite(contextLimitTokens) || contextLimitTokens <= 0 || !Number.isFinite(maxOutputTokens) || maxOutputTokens < 0) {
+    return;
+  }
+  const usableInputTokens = Math.max(0, Math.floor(contextLimitTokens - maxOutputTokens));
+  return Math.max(0, Math.floor(usableInputTokens * (1 - PRODUCER_WINDOW_REFUSAL_MARGIN)));
+}
 function producerWindowFailureReason(input) {
   const { producerSourceTokens, contextLimitTokens, maxOutputTokens } = input;
-  if (typeof contextLimitTokens !== "number" || !Number.isFinite(contextLimitTokens) || contextLimitTokens <= 0 || !Number.isFinite(producerSourceTokens) || producerSourceTokens <= 0 || !Number.isFinite(maxOutputTokens) || maxOutputTokens < 0) {
+  const producerInputLimitTokens = producerInputTokenLimit(contextLimitTokens, maxOutputTokens);
+  if (producerInputLimitTokens === undefined || typeof contextLimitTokens !== "number" || !Number.isFinite(producerSourceTokens) || producerSourceTokens <= 0) {
     return null;
   }
   const usableInputTokens = Math.max(0, Math.floor(contextLimitTokens - maxOutputTokens));
-  const refusalThreshold = usableInputTokens * (1 + PRODUCER_WINDOW_REFUSAL_MARGIN);
-  if (producerSourceTokens < refusalThreshold)
+  if (producerSourceTokens <= producerInputLimitTokens)
     return null;
-  return `producer_source_exceeds_window producer_source_tokens=${Math.round(producerSourceTokens)} usable_input_tokens=${usableInputTokens} context_limit_tokens=${Math.round(contextLimitTokens)} max_output_tokens=${Math.round(maxOutputTokens)} refusal_margin=${PRODUCER_WINDOW_REFUSAL_MARGIN}`;
+  return `producer_source_exceeds_window producer_source_tokens=${Math.round(producerSourceTokens)} usable_input_tokens=${usableInputTokens} producer_input_limit_tokens=${producerInputLimitTokens} context_limit_tokens=${Math.round(contextLimitTokens)} max_output_tokens=${Math.round(maxOutputTokens)} estimator_margin=${PRODUCER_WINDOW_REFUSAL_MARGIN}`;
+}
+function splitMarkerPair() {
+  return `
+${HISTORIAN_TRUNCATION_MARKER}
+${HISTORIAN_TRUNCATION_MARKER}
+`;
+}
+function fitAtomicHistorianSourceToProducerWindow(args) {
+  const producerInputLimitTokens = producerInputTokenLimit(args.contextLimitTokens, args.maxOutputTokens);
+  const originalTokens = estimateTokens(args.text);
+  if (producerInputLimitTokens === undefined || originalTokens < producerInputLimitTokens || producerInputLimitTokens <= 0) {
+    return { text: args.text, producerInputLimitTokens, removedTokens: 0 };
+  }
+  const boundary = [...args.resultBoundaries ?? []].filter((candidate) => Number.isFinite(candidate.sourceOffset) && candidate.sourceOffset > 0 && candidate.sourceOffset < args.text.length).sort((a, b) => b.bodyTokens - a.bodyTokens || a.ordinal - b.ordinal)[0];
+  const splitOffset = boundary?.sourceOffset ?? Math.floor(args.text.length / 2);
+  const left = args.text.slice(0, splitOffset);
+  const right = args.text.slice(splitOffset);
+  const markers = splitMarkerPair();
+  const target = producerInputLimitTokens;
+  let lo = 0;
+  let hi = 1;
+  let best = markers;
+  for (let iteration = 0;iteration < 48; iteration++) {
+    const scale = (lo + hi) / 2;
+    const leftLength = Math.floor(left.length * scale);
+    const rightLength = Math.floor(right.length * scale);
+    const candidate = left.slice(0, leftLength) + markers + right.slice(right.length - rightLength);
+    if (estimateTokens(candidate) <= target) {
+      best = candidate;
+      lo = scale;
+    } else {
+      hi = scale;
+    }
+  }
+  return {
+    text: best,
+    producerInputLimitTokens,
+    ...boundary ? { splitBoundaryOrdinal: boundary.ordinal } : {},
+    removedTokens: Math.max(0, originalTokens - estimateTokens(best))
+  };
 }
 
 // ../plugin/src/hooks/magic-context/reference-seeds.generated.ts
@@ -21124,10 +21276,19 @@ async function runPiHistorian(deps) {
         chunkStart: chunk.startIndex,
         sessionCompartments: priorCompartments
       });
-      const chunkText = chunk.oversizeAtomicUnit ? chunk.text : truncateHistorianInputIfNeeded(chunk.text, historianChunkTokens);
+      const fittedAtomicSource = chunk.oversizeAtomicUnit ? fitAtomicHistorianSourceToProducerWindow({
+        text: chunk.text,
+        resultBoundaries: chunk.toolResultBoundaries,
+        contextLimitTokens: historianContextLimit,
+        maxOutputTokens
+      }) : null;
+      const chunkText = chunk.oversizeAtomicUnit ? fittedAtomicSource?.text ?? chunk.text : truncateHistorianInputIfNeeded(chunk.text, historianChunkTokens);
       const producerSourceTokens = estimateTokens(chunkText);
       if (boundarySnapshot.oversizeAtomicUnit || chunk.oversizeAtomicUnit) {
         sessionLog(sessionId, `historian oversize admission: range=${chunk.startIndex}-${chunk.endIndex} rawComponentTokens=${boundarySnapshot.diagnostics?.head.completedFence.tokenMass ?? "unknown"} perRunCap=${perRunCap} producerSourceTokens=${producerSourceTokens} historianChunkTokens=${historianChunkTokens}; ${describeBoundaryDiagnostics(boundarySnapshot)}`);
+      }
+      if (fittedAtomicSource && fittedAtomicSource.removedTokens > 0) {
+        sessionLog(sessionId, `historian pathological component split: range=${chunk.startIndex}-${chunk.endIndex} resultBoundary=${fittedAtomicSource.splitBoundaryOrdinal ?? "midpoint"} removedTokens=${fittedAtomicSource.removedTokens} producerSourceTokens=${producerSourceTokens} producerInputLimitTokens=${fittedAtomicSource.producerInputLimitTokens ?? "unknown"}`);
       }
       const producerWindowFailure = producerWindowFailureReason({
         producerSourceTokens,
@@ -21862,6 +22023,7 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
   let deduplicatedTools = 0;
   let droppedInjections = 0;
   let droppedStaleReduceCalls = 0;
+  const droppedTokenReductions = [];
   if (config.emergency) {
     const emergency = config.emergency;
     const priorInputSample = getEmergencyInputSample(db, sessionId);
@@ -21898,6 +22060,10 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
             updateTagDropMode(db, sessionId, tag.tagNumber, skeleton ? "truncated" : "full");
             droppedTools++;
             emergencyDroppedTools++;
+            droppedTokenReductions.push({
+              tagNumber: tag.tagNumber,
+              mode: skeleton ? "truncated" : "full"
+            });
           }
         }
       }).immediate();
@@ -21957,12 +22123,22 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
             updateTagStatus(db, sessionId, tag.tagNumber, "dropped");
             if (dropResult === "removed" || didReplace) {
               droppedInjections++;
+              droppedTokenReductions.push({
+                tagNumber: tag.tagNumber,
+                mode: "full"
+              });
             }
           }
         } else {
           if (freezePiContentDecision(db, sessionId, "reminder-strip", tag.messageId)) {
-            if (target.setContent(stripped))
+            if (target.setContent(stripped)) {
               droppedInjections++;
+              droppedTokenReductions.push({
+                tagNumber: tag.tagNumber,
+                mode: "partial",
+                removedCharacters: Math.max(0, content.length - stripped.length)
+              });
+            }
           }
         }
       }
@@ -22001,6 +22177,10 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
           updateTagStatus(db, sessionId, tag.tagNumber, "dropped");
           if (result === "removed" || result === "truncated") {
             deduplicatedTools++;
+            droppedTokenReductions.push({
+              tagNumber: tag.tagNumber,
+              mode: "full"
+            });
           }
         }
       }
@@ -22019,6 +22199,15 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
     });
     compressedTextTags = cavemanResult.compressedToLite + cavemanResult.compressedToFull + cavemanResult.compressedToUltra;
     mutatedTextTags = cavemanResult.mutatedTextTags;
+    if (cavemanResult.textReductions) {
+      for (const r of cavemanResult.textReductions) {
+        droppedTokenReductions.push({
+          tagNumber: r.tagNumber,
+          mode: "partial",
+          removedCharacters: r.removedCharacters
+        });
+      }
+    }
   }
   return {
     droppedTools,
@@ -22027,7 +22216,8 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
     droppedStaleReduceCalls,
     emergencyDroppedTools,
     compressedTextTags,
-    mutatedTextTags
+    mutatedTextTags,
+    droppedTokenReductions
   };
 }
 function buildCtxReduceTagNumbers(tags) {
@@ -22593,7 +22783,7 @@ function refreshPiTailHygieneBaseline(input) {
   for (let index = input.previous.baselineParts.length;index < measured.parts.length; index += 1) {
     const part = measured.parts[index];
     turnDeltaT += part.tokens;
-    if (part.kind !== "toolOutput")
+    if (part.kind !== "toolOutput" || !part.protected)
       turnDeltaU += part.uTokens;
   }
   return {
@@ -26572,7 +26762,7 @@ function memoryGuidanceBlock(memoryEnabled) {
 ` : "";
 }
 var BASE_INTRO = (memoryEnabled) => `Messages and tool outputs are tagged with §N§ identifiers (e.g., §1§, §42§).
-Use \`ctx_reduce\` to mark spent tagged content as discardable and reclaim space. Marking is NOT an immediate delete — it queues the content, which stays fully visible until space is actually needed (as soon as the next turn if you're already under pressure, much later if not), so mark a tool output as soon as you're done with it rather than hoarding the call for the end of the turn. The newest token-mass window stays protected until displaced. Syntax: "3-5", "1,2,9", or "1-5,8,12-15".
+Use \`ctx_reduce\` to mark spent tagged content as discardable and reclaim space. Marking QUEUES content for release. It stays fully visible to you until it is actually released, which may be the next turn or many turns later. Mark a tool output as soon as you're done with it rather than hoarding the call for the end of the turn. The newest token-mass window stays protected until displaced. Syntax: "3-5", "1,2,9", or "1-5,8,12-15".
 Do not announce or narrate \`ctx_reduce\` drops — just call the tool silently. Saying "I'll drop these outputs" wastes tokens the user does not care about.
 ${CTX_NOTE_GUIDANCE}
 ${memoryGuidanceBlock(memoryEnabled)}Use \`ctx_search\` to search across project memories, indexed git commits, and this session's full conversation history (including compacted parts) from one query.
@@ -29706,7 +29896,8 @@ async function runPipeline(args) {
   let heuristicOrReasoningDidMutate = false;
   let didMutateFromFlushedStatuses = false;
   let droppedCount = 0;
-  const droppedTokens = 0;
+  let droppedTokens = 0;
+  const droppedTokenReductions = [];
   let emergency = false;
   let autoReclaimDidMutateThisPass = false;
   let suppressDeferredHistoryDrain = false;
@@ -29831,17 +30022,15 @@ async function runPipeline(args) {
     routinePressureAppliedBySession.set(args.sessionId, true);
   }
   const routinePressureAlreadyApplied = !args.sessionMeta.isSubagent && executePressureEligible && routinePressureAppliedBySession.get(args.sessionId) === true;
-  const historianRunning = inFlightHistorian.has(args.sessionId);
-  const publishedWorkDrainAllowed = args.schedulerDecision === "execute" || args.forceMaterialization === true || foldExecutedThisPass || firstRenderBust || hasPendingMaterialization(args.sessionId) || deferredMaterializeEligible;
   const hasPendingMaterializeSignal = hasPendingMaterialization(args.sessionId);
   const rideSignals = {
     hardFold: foldExecutedThisPass || firstRenderBust,
-    force: args.forceMaterialization === true || emergencyDropEligible,
-    explicitFlush: hasPendingMaterializeSignal || args.isCacheBusting,
-    publishedHistory: !prefixPreflightContended && (publishedM1RefreshedThisPass || canConsumeDeferredLate && deferredHistoryWasPendingAtPassStart),
-    agentDrop: false
+    force: (args.forceMaterialization === true || emergencyDropEligible) && (args.contextUsage.percentage >= 95 || getEmergencyInputSample(args.db, args.sessionId) === 0),
+    explicitFlush: hasPendingMaterializeSignal || deferredMaterializeEligible && !prefixPreflightContended,
+    publishedHistory: !prefixPreflightContended && (args.isCacheBusting || publishedM1RefreshedThisPass || canConsumeDeferredLate && deferredHistoryWasPendingAtPassStart)
   };
-  let isCacheBustingPass = hasReclaimRide(rideSignals);
+  const isCacheBustingPass = hasReclaimRide(rideSignals);
+  const publishedWorkDrainAllowed = isCacheBustingPass;
   const usesTokenProtection = args.protectedTokenTierOverrides !== undefined || args.protectedTokens !== undefined;
   const resolveProtectionFloor = () => resolveEpochFloorForPass(args.db, args.sessionId, {
     configuredOverride: args.protectedTokens,
@@ -29906,15 +30095,14 @@ async function runPipeline(args) {
   }
   const deferredMaterializationWasPending = deferredMaterializationSessions.has(args.sessionId);
   const deferredHistoryRefreshWasPending = deferredHistoryWasPendingAtPassStart;
-  const shouldReadPendingOps = !args.compactionOff && (args.schedulerDecision === "execute" || args.forceMaterialization || hasPendingMaterializeSignal || foldExecutedThisPass || firstRenderBust || historianRunning);
+  const shouldReadPendingOps = !args.compactionOff && (publishedWorkDrainAllowed || args.schedulerDecision === "execute" || args.forceMaterialization || hasPendingMaterializeSignal || foldExecutedThisPass || firstRenderBust);
   const pendingOps = shouldReadPendingOps ? getPendingOps(args.db, args.sessionId) : [];
   const protectionWindowForPass = getProtectionWindowForSession(args.db, args.sessionId, protectionFloorResolution.floor);
   const protectedTagNumbersForPass = usesTokenProtection ? protectionWindowForPass.protectedTagNumbers : newestActiveTagNumbersByCount(getActiveTagsBySession(args.db, args.sessionId), args.protectedTags);
   const pendingOperationTags = pendingOps.length > 0 ? getTagsForPendingOperations(args.db, args.sessionId, pendingOps.map((operation) => operation.tagId), usesTokenProtection ? 0 : args.protectedTags, RECENT_TOOL_SKELETON_WINDOW) : [];
-  const baseShouldApplyPendingOps = args.schedulerDecision === "execute" || args.forceMaterialization || hasPendingMaterializeSignal || foldExecutedThisPass || firstRenderBust;
   const deferredMaterialize = canConsumeDeferredLate && deferredMaterializationWasPending;
   const deferredHistoryRefresh = canConsumeDeferredLate && deferredHistoryRefreshWasPending;
-  const shouldApplyPendingOps = (baseShouldApplyPendingOps || deferredMaterialize) && publishedWorkDrainAllowed;
+  const shouldApplyPendingOps = publishedWorkDrainAllowed;
   mutationGateObserverForTests?.({
     foldDue: foldDueDecision.value,
     foldExecuted: foldExecutedThisPass,
@@ -29930,15 +30118,11 @@ async function runPipeline(args) {
     pendingDecisionLogObserverForTests?.(pendingDecisionLog);
     try {
       const tApplyPending = performance.now();
-      pendingOpsDidMutate = applyPendingOperations(args.sessionId, args.db, targets, args.contextUsage.percentage >= 95 ? newestCtxReduceTagNumbers(getTagsBySession(args.db, args.sessionId)) : protectedTagNumbersForPass, pendingOperationTags, pendingOps);
+      pendingOpsDidMutate = applyPendingOperations(args.sessionId, args.db, targets, args.contextUsage.percentage >= 95 ? newestCtxReduceTagNumbers(getTagsBySession(args.db, args.sessionId)) : protectedTagNumbersForPass, pendingOperationTags, pendingOps, [], new Set, (reduction) => droppedTokenReductions.push(reduction));
       if (pendingOpsDidMutate) {
         droppedCount += pendingOps.length;
       }
       logTransformTiming(args.sessionId, "applyPendingOperations", tApplyPending);
-      rideSignals.agentDrop = pendingOpsDidMutate;
-      isCacheBustingPass = hasReclaimRide(rideSignals);
-      if (pendingOpsDidMutate)
-        shouldRunHeuristics = args.heuristics !== undefined;
       executedWorkThisPass ||= isCacheBustingPass;
       materializationSatisfiedThisPass = true;
       pendingOpsAppliedThisPass = true;
@@ -29953,7 +30137,7 @@ async function runPipeline(args) {
     }
   } else {
     const pendingOpsDepth = getPendingOpsCount(args.db, args.sessionId);
-    const refusalReason = args.schedulerDeferReason ?? (historianRunning ? "historian_in_flight" : "scheduler_defer");
+    const refusalReason = args.schedulerDeferReason ?? "no_originating_cache_bust";
     const pendingDecisionLog = `pending ops WILL NOT APPLY — reason=${refusalReason} pendingOps=${pendingOpsDepth === null ? "not loaded (deferred pass)" : pendingOpsDepth} context=${args.contextUsage.percentage.toFixed(1)}%`;
     sessionLog(args.sessionId, pendingDecisionLog);
     pendingDecisionLogObserverForTests?.(pendingDecisionLog);
@@ -30019,7 +30203,7 @@ async function runPipeline(args) {
     sessionLog(args.sessionId, heuristicsDecisionLog);
     pendingDecisionLogObserverForTests?.(heuristicsDecisionLog);
   } else {
-    const reason = args.heuristics === undefined ? "disabled" : args.schedulerDeferReason ?? (historianRunning ? "historian_in_flight" : alreadyRanHeuristicsThisTurn ? "already_ran_this_turn" : "scheduler_defer");
+    const reason = args.heuristics === undefined ? "disabled" : args.schedulerDeferReason ?? (!isCacheBustingPass ? "no_originating_cache_bust" : alreadyRanHeuristicsThisTurn ? "already_ran_this_turn" : "scheduler_defer");
     const heuristicsDecisionLog = `heuristics WILL NOT RUN — reason=${reason}`;
     sessionLog(args.sessionId, heuristicsDecisionLog);
     pendingDecisionLogObserverForTests?.(heuristicsDecisionLog);
@@ -30059,7 +30243,11 @@ async function runPipeline(args) {
           droppedStaleReduceCalls: heuristicsResult.droppedStaleReduceCalls + ridingCleanup.droppedStaleReduceCalls,
           emergencyDroppedTools: heuristicsResult.emergencyDroppedTools,
           compressedTextTags: heuristicsResult.compressedTextTags + ridingCleanup.compressedTextTags,
-          mutatedTextTags: heuristicsResult.mutatedTextTags + ridingCleanup.mutatedTextTags
+          mutatedTextTags: heuristicsResult.mutatedTextTags + ridingCleanup.mutatedTextTags,
+          droppedTokenReductions: [
+            ...heuristicsResult.droppedTokenReductions,
+            ...ridingCleanup.droppedTokenReductions
+          ]
         };
         routineCleanupApplied = true;
       }
@@ -30069,6 +30257,9 @@ async function runPipeline(args) {
       const heuristicMutationCount = heuristicsResult.droppedTools + heuristicsResult.deduplicatedTools + heuristicsResult.droppedInjections + heuristicsResult.droppedStaleReduceCalls + heuristicsResult.mutatedTextTags;
       droppedCount += heuristicsResult.droppedTools + heuristicsResult.deduplicatedTools + heuristicsResult.droppedInjections + heuristicsResult.droppedStaleReduceCalls + heuristicsResult.mutatedTextTags;
       emergency ||= heuristicsResult.emergencyDroppedTools > 0;
+      if (heuristicsResult.droppedTokenReductions.length > 0) {
+        droppedTokenReductions.push(...heuristicsResult.droppedTokenReductions);
+      }
       if (heuristicMutationCount > 0)
         heuristicOrReasoningDidMutate = true;
       heuristicsExecuted = true;
@@ -30177,7 +30368,7 @@ async function runPipeline(args) {
     }
     autoReclaimTargetCount = syntheticPendingOps.length;
     if (syntheticPendingOps.length > 0) {
-      autoReclaimDidMutate = applyPendingOperations(args.sessionId, args.db, targets, protectedTagNumbersForPass, undefined, [], syntheticPendingOps, editMarkerTagIds);
+      autoReclaimDidMutate = applyPendingOperations(args.sessionId, args.db, targets, protectedTagNumbersForPass, undefined, [], syntheticPendingOps, editMarkerTagIds, (reduction) => droppedTokenReductions.push(reduction));
       if (autoReclaimDidMutate) {
         droppedCount += syntheticPendingOps.length;
         autoReclaimDidMutateThisPass = true;
@@ -30441,6 +30632,9 @@ async function runPipeline(args) {
     pendingDropTagNumbers: new Set(channelPendingOps.filter((operation) => operation.operation === "drop").map((operation) => operation.tagId))
   };
   const bustedThisPass = firstRenderBust || didMutateFromFlushedStatuses || pendingOpsDidMutate || heuristicOrReasoningDidMutate || autoReclaimDidMutateThisPass || materialized || historyWasConsumedThisPass;
+  if (bustedThisPass || isCacheBustingPass) {
+    droppedTokens = estimateDroppedTokensFromTagReductions(args.db, args.sessionId, droppedTokenReductions);
+  }
   return {
     messages: outputMessages,
     heuristicsExecuted,
@@ -32888,7 +33082,7 @@ function formatTailHygiene(status) {
 // package.json
 var package_default = {
   name: "@cortexkit/pi-magic-context",
-  version: "0.42.4",
+  version: "0.42.6",
   type: "module",
   description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
   main: "dist/index.js",

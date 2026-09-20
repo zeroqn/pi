@@ -6834,6 +6834,7 @@ var DEFAULT_EXECUTE_THRESHOLD_PERCENTAGE = 65;
 var EXECUTE_THRESHOLD_CAP_MESSAGE = "execute_threshold is capped at 90% for cache safety: output capacity is reserved from the usable context window, and the remaining 10% absorbs mid-turn growth before the absolute 95% emergency wall. Use a value between 20 and 90.";
 var DEFAULT_HISTORIAN_TIMEOUT_MS = 600000;
 var DEFAULT_HISTORY_BUDGET_PERCENTAGE = 0.15;
+var PROTECTED_TOKENS_MIN = 4000;
 var DEFAULT_LOCAL_EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
 var PiThinkingLevelSchema = _enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"]).optional();
 var OmpThinkingLevelSchema = _enum(["off", "minimal", "low", "medium", "high", "xhigh", "max", "inherit", "auto"]).optional();
@@ -7203,8 +7204,8 @@ var MagicContextConfigSchema = object({
   smart_notes: object({
     retina_handoff: boolean2().default(false).describe("When true, dreamer skips smart notes whose surface conditions compiled to retina provider configs at authoring time. Default false keeps both paths active until the retina consumer is deployed.")
   }).default({ retina_handoff: false }).describe("Smart-note ownership transition controls."),
-  cache_ttl: union([string2(), object({ default: string2() }).catchall(string2())]).default("5m").describe(`How long Magic Context assumes the provider's cached prefix stays valid. This is MC's own deferral gate — it does not change the provider's actual cache lifetime. String (e.g. "5m", "1h", "30s") or per-model object ({ default: "5m", "model-id": "10m" }). Set to "never" to mean MC never assumes expiry (for lanes kept warm externally by a cache-keep tool) — disables the idle-TTL heuristic so MC never initiates a rebuild based on elapsed time. Provider-side extended TTL is a separate request-level concern (cache_control: { ttl } in the request body).`),
-  prompt_surface: PromptSurfaceConfigSchema.default({ default: "full" }).describe("Prompt-surface presets: default is full; models use bare model IDs, provider/model, or provider/* routing keys. Guidance and tool-description overrides are user-level only. On OpenCode and Pi, per-model routing applies to the guidance block only: tool descriptions are registered once per process, so they follow the default preset (a v1 plugin-surface limitation; per-model tool descriptions are planned for the OpenCode v2 plugin API once the SDK stabilizes)."),
+  cache_ttl: union([string2(), object({ default: string2() }).catchall(string2())]).default("5m").describe(`How long Magic Context assumes the provider's cached prefix stays valid. This is MC's own deferral gate — it does not change the provider's actual cache lifetime. String (e.g. "5m", "1h", "30s") or per-model object ({ default: "5m", "provider/model": "1h", "provider/*": "never" }); keys resolve most-specific first (exact provider/model, bare model ID, shorter dash-prefixes, then the provider/* wildcard, then default). Set to "never" to mean MC never assumes expiry (for lanes kept warm externally by a cache-keep tool) — disables the idle-TTL heuristic so MC never initiates a rebuild based on elapsed time. Provider-side extended TTL is a separate request-level concern (cache_control: { ttl } in the request body).`),
+  prompt_surface: PromptSurfaceConfigSchema.default({ default: "full" }).describe("Prompt-surface presets: default is full; models use bare model IDs, provider/model, or provider/* routing keys. Guidance and tool-description overrides are user-level only. OpenCode 1.x, Pi, and OMP register tool descriptions once per process (they follow the default preset). OpenCode 2 rewrites the five ctx_* descriptions per request from the draft model."),
   output_reserve: union([
     number2().min(0),
     object({ default: number2().min(0) }).catchall(number2().min(0))
@@ -7220,7 +7221,7 @@ var MagicContextConfigSchema = object({
   execute_threshold_tokens: object({
     default: number2().min(5000).max(2000000).optional()
   }).catchall(number2().min(5000).max(2000000)).optional().describe("Absolute token thresholds per model. When matched, overrides execute_threshold_percentage for that model. Accepts `default` for all models or per-model keys. Values above 90% × context_limit are clamped with a warning log. Min 5_000, max 2_000_000."),
-  protected_tokens: number2().int().min(4000).max(1e6).optional().describe("Positive integer token floor to protect from automatic reclaim (min: 4_000, max: 1_000_000). When omitted, the derived default is clamp(round(0.05 × usableSoft), min(16_000, round(0.08 × usableSoft)), 64_000)."),
+  protected_tokens: number2().int().min(PROTECTED_TOKENS_MIN).max(1e6).optional().describe("Positive integer token floor to protect from automatic reclaim (min: 4_000, max: 1_000_000). When omitted, the derived default is clamp(round(0.05 × usableSoft), min(16_000, round(0.08 × usableSoft)), 64_000)."),
   protected_tags: unknown().optional().describe("Deprecated: number of recent tags to protect. Ignored for behaviour; use protected_tokens instead.").meta({ deprecated: true }),
   clear_reasoning_age: number2().min(10).default(50).describe("Clear reasoning/thinking blocks older than N tags (default: 50)"),
   history_budget_percentage: number2().min(0.05).max(0.5).default(DEFAULT_HISTORY_BUDGET_PERCENTAGE).describe("Fraction of usable context (context_limit × execute_threshold) reserved for the session history block (default: 0.15)"),
@@ -8933,6 +8934,25 @@ function extractTexts(parts) {
     }
   }
   return texts;
+}
+function extractToolResultBodyTokens(parts) {
+  let tokens = 0;
+  for (const part of parts) {
+    if (part === null || typeof part !== "object")
+      continue;
+    const p = part;
+    if (p.type !== "tool")
+      continue;
+    const state = p.state;
+    if (!state || typeof state !== "object")
+      continue;
+    const body = state.output ?? state.error;
+    if (body === undefined)
+      continue;
+    const text = typeof body === "string" ? body : JSON.stringify(body);
+    tokens += Math.ceil(text.length / 4);
+  }
+  return tokens;
 }
 function extractToolCallSummaries(parts) {
   const summaries = [];
@@ -10947,6 +10967,28 @@ async function pullAndApplyMirrorPageWithStatus(args) {
     limit
   });
   const nextCursor = applyMirrorPage({ db: args.db, page: response.page });
+  if (args.domain === "memories" && args.module.memoryIdentityAck) {
+    const rowsByProject = new Map;
+    for (const feed of response.page.rows) {
+      if (feed.domain !== "memories" || feed.op === "tombstone")
+        continue;
+      const project = rowString(feed.full_row_snapshot, "project_path");
+      if (!project)
+        continue;
+      const identity = mirrorIdentity(args.db, "memories", project, feed.module_row_id);
+      if (!identity)
+        continue;
+      const rows = rowsByProject.get(project) ?? [];
+      rows.push({
+        module_row_id: feed.module_row_id,
+        context_row_id: identity.context_row_id
+      });
+      rowsByProject.set(project, rows);
+    }
+    for (const [project, rows] of rowsByProject) {
+      await args.module.memoryIdentityAck({ project, rows });
+    }
+  }
   return {
     cursor: nextCursor,
     hasMore: response.page.has_more,
@@ -11716,6 +11758,114 @@ function isSqliteLockError(error) {
 }
 function tableExists2(db, name) {
   return Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(name));
+}
+function tableHasHarnessColumn(db, name) {
+  if (!tableExists2(db, name))
+    return false;
+  return db.prepare(`PRAGMA table_info(${name})`).all().some((column) => column.name === "harness");
+}
+var V85_OPENCODE2_RELABEL_TABLES = [
+  "tags",
+  "pending_ops",
+  "source_contents",
+  "compartments",
+  "compartment_chunk_embeddings",
+  "session_projects",
+  "compartment_events",
+  "compression_depth",
+  "session_facts",
+  "primer_candidates",
+  "notes",
+  "message_history_index",
+  "message_history_source",
+  "pending_session_cleanup",
+  "message_history_orphan_sweep",
+  "session_meta",
+  "subagent_invocations",
+  "historian_runs",
+  "transform_decisions",
+  "recomp_compartments",
+  "recomp_facts"
+];
+var V85_OPTIONAL_OPENCODE2_RELABEL_TABLES = ["session_project_backfill_state"];
+function deleteLosingOpenCode2Twin(db, table, joinColumns, newerPredicate) {
+  if (!tableHasHarnessColumn(db, table))
+    return;
+  const naturalJoin = joinColumns.map((column) => `oc.${column} = o2.${column}`).join(" AND ");
+  const o2On = naturalJoin ? `${naturalJoin} AND oc.harness = 'opencode'` : `oc.harness = 'opencode'`;
+  const ocOn = naturalJoin ? `${naturalJoin} AND o2.harness = 'opencode2'` : `o2.harness = 'opencode2'`;
+  db.exec(`
+        DELETE FROM ${table}
+        WHERE rowid IN (
+            SELECT o2.rowid
+            FROM ${table} AS o2
+            JOIN ${table} AS oc
+              ON ${o2On}
+            WHERE o2.harness = 'opencode2'
+              AND NOT (${newerPredicate})
+        );
+        DELETE FROM ${table}
+        WHERE rowid IN (
+            SELECT oc.rowid
+            FROM ${table} AS oc
+            JOIN ${table} AS o2
+              ON ${ocOn}
+            WHERE oc.harness = 'opencode'
+              AND (${newerPredicate})
+        );
+    `);
+}
+function relabelOpenCode2HarnessRows(db) {
+  deleteLosingOpenCode2Twin(db, "session_projects", ["session_id"], "o2.updated_at > oc.updated_at");
+  deleteLosingOpenCode2Twin(db, "primer_candidates", ["project_path", "session_id", "source_start_message_id", "source_end_message_id"], "o2.created_at > oc.created_at");
+  deleteLosingOpenCode2Twin(db, "transform_decisions", ["session_id", "message_id"], "o2.ts_ms > oc.ts_ms");
+  deleteLosingOpenCode2Twin(db, "message_history_orphan_sweep", [], "COALESCE(o2.last_swept_at, -1) > COALESCE(oc.last_swept_at, -1)");
+  if (tableHasHarnessColumn(db, "session_project_backfill_state")) {
+    db.exec(`
+            DELETE FROM session_project_backfill_state
+            WHERE harness = 'opencode2'
+              AND EXISTS (
+                  SELECT 1 FROM session_project_backfill_state WHERE harness = 'opencode'
+              )
+              AND NOT (
+                  (status = 'completed'
+                    AND (SELECT status FROM session_project_backfill_state WHERE harness = 'opencode')
+                        != 'completed')
+                  OR (
+                      status = (SELECT status FROM session_project_backfill_state WHERE harness = 'opencode')
+                      AND COALESCE(started_at, -1) > COALESCE(
+                          (SELECT started_at FROM session_project_backfill_state WHERE harness = 'opencode'),
+                          -1
+                      )
+                  )
+              );
+            DELETE FROM session_project_backfill_state
+            WHERE harness = 'opencode'
+              AND EXISTS (
+                  SELECT 1 FROM session_project_backfill_state WHERE harness = 'opencode2'
+              )
+              AND (
+                  ((SELECT status FROM session_project_backfill_state WHERE harness = 'opencode2') = 'completed'
+                    AND status != 'completed')
+                  OR (
+                      status = (SELECT status FROM session_project_backfill_state WHERE harness = 'opencode2')
+                      AND COALESCE(
+                          (SELECT started_at FROM session_project_backfill_state WHERE harness = 'opencode2'),
+                          -1
+                      ) > COALESCE(started_at, -1)
+                  )
+              );
+        `);
+  }
+  const tables = new Set([
+    ...V85_OPENCODE2_RELABEL_TABLES,
+    ...V85_OPTIONAL_OPENCODE2_RELABEL_TABLES
+  ]);
+  for (const table of tables) {
+    if (!tableHasHarnessColumn(db, table))
+      continue;
+    db.exec(`UPDATE ${table} SET harness = 'opencode' WHERE harness = 'opencode2'`);
+  }
 }
 function healMismatchedTierClose(db, table, hasLegacy) {
   if (!tableExists2(db, table))
@@ -13879,6 +14029,13 @@ var MIGRATIONS = [
       ensureColumn(db, "session_meta", "protected_tokens_effective", "INTEGER");
       ensureColumn(db, "session_meta", "protected_tokens_pre_snapshot", "TEXT");
     }
+  },
+  {
+    version: 85,
+    description: "relabel OpenCode 1.x mis-tagged opencode2 session rows",
+    up(db) {
+      relabelOpenCode2HarnessRows(db);
+    }
   }
 ];
 var LATEST_MIGRATION_VERSION = MIGRATIONS.reduce((max, m) => Math.max(max, m.version), 0);
@@ -14067,15 +14224,16 @@ import { isAbsolute as isAbsolute3, join as join4 } from "node:path";
 var cachedResolution = null;
 var lastReadFailure = null;
 var claimedDiagnostics = new Set;
-function openCodeDataDir() {
-  return join4(process.env.XDG_DATA_HOME ?? join4(homedir7(), ".local", "share"), "opencode");
+function openCodeDataDir(env = process.env, dataHome) {
+  return join4(dataHome ?? env.XDG_DATA_HOME ?? join4(homedir7(), ".local", "share"), "opencode");
 }
-function environmentKey(dataDir) {
+function environmentKey(dataDir, hostGeneration, channel, env) {
   return [
+    hostGeneration,
     dataDir,
-    process.env.OPENCODE_DB ?? "",
-    process.env.OPENCODE_DISABLE_CHANNEL_DB ?? "",
-    process.env.OPENCODE_CHANNEL ?? ""
+    env.OPENCODE_DB ?? "",
+    env.OPENCODE_DISABLE_CHANNEL_DB ?? "",
+    channel ?? env.OPENCODE_CHANNEL ?? ""
   ].join("\x00");
 }
 function channelPath(dataDir, channel) {
@@ -14107,8 +14265,8 @@ function discoverOpenCodeDb(dataDir) {
   const channel = name === "opencode.db" ? null : name.slice("opencode-".length, -".db".length) || null;
   return { path: existing.path, source: "discovered", channel };
 }
-function resolveFresh(dataDir) {
-  const explicit = process.env.OPENCODE_DB;
+function resolveV1Fresh(dataDir, env = process.env) {
+  const explicit = env.OPENCODE_DB;
   if (explicit !== undefined && explicit.length > 0) {
     if (explicit === ":memory:") {
       return { path: explicit, source: "OPENCODE_DB", channel: null };
@@ -14119,30 +14277,76 @@ function resolveFresh(dataDir) {
       channel: null
     };
   }
-  const disableChannelDb = process.env.OPENCODE_DISABLE_CHANNEL_DB;
+  const disableChannelDb = env.OPENCODE_DISABLE_CHANNEL_DB;
   if (disableChannelDb === "1" || disableChannelDb === "true") {
     return { path: join4(dataDir, "opencode.db"), source: "default", channel: null };
   }
-  const channel = process.env.OPENCODE_CHANNEL;
+  const channel = env.OPENCODE_CHANNEL;
   if (channel !== undefined && channel.length > 0) {
     return { path: channelPath(dataDir, channel), source: "channel", channel };
   }
   return discoverOpenCodeDb(dataDir);
 }
-function resolveOpenCodeDbPath() {
-  const dataDir = openCodeDataDir();
-  const key = environmentKey(dataDir);
+function sourceOpenCodeDatabaseFilename(hostGeneration, channel, env = process.env) {
+  if (hostGeneration === "v1") {
+    const explicit = env.OPENCODE_DB;
+    if (explicit !== undefined && explicit.length > 0)
+      return explicit;
+    if (env.OPENCODE_DISABLE_CHANNEL_DB === "1" || env.OPENCODE_DISABLE_CHANNEL_DB === "true") {
+      return "opencode.db";
+    }
+    return ["latest", "beta", "prod"].includes(channel) ? "opencode.db" : `opencode-${channel}.db`;
+  }
+  return env.OPENCODE_DB ?? (["latest", "dev", "beta", "next", "prod"].includes(channel) || env.OPENCODE_DISABLE_CHANNEL_DB === "1" || env.OPENCODE_DISABLE_CHANNEL_DB === "true" ? "opencode.db" : `opencode-${channel.replace(/[^a-zA-Z0-9._-]/g, "")}.db`);
+}
+function resolveV2Fresh(dataDir, channel, env) {
+  const filename = sourceOpenCodeDatabaseFilename("v2", channel, env);
+  const explicit = env.OPENCODE_DB !== undefined;
+  return {
+    path: filename === ":memory:" ? filename : join4(dataDir, filename),
+    source: explicit ? "OPENCODE_DB" : env.OPENCODE_CHANNEL ? "channel" : "default",
+    channel: explicit ? null : channel
+  };
+}
+function resolveOpenCodeDbPath(hostGeneration = "v1", options = {}) {
+  const env = options.env ?? process.env;
+  const dataDir = openCodeDataDir(env, options.dataHome);
+  const channel = options.channel ?? env.OPENCODE_CHANNEL;
+  const key = environmentKey(dataDir, hostGeneration, channel, env);
   if (cachedResolution?.key === key && (!cachedResolution.existed || existsSync5(cachedResolution.resolution.path))) {
     if (cachedResolution.existed)
       return cachedResolution.resolution;
   }
-  const resolution = resolveFresh(dataDir);
+  const resolution = hostGeneration === "v2" ? resolveV2Fresh(dataDir, channel ?? "latest", env) : resolveV1Fresh(dataDir, env);
   cachedResolution = {
     key,
     resolution,
     existed: resolution.path !== ":memory:" && existsSync5(resolution.path)
   };
   return resolution;
+}
+function schemaTableNames(db, schema = "main") {
+  const rows = db.prepare(`SELECT name FROM ${schema}.sqlite_master WHERE type = 'table' AND name IN ('message', 'part', 'session', 'project', 'session_message')`).all();
+  return new Set(rows.flatMap((row) => typeof row.name === "string" ? [row.name] : []));
+}
+function detectOpenCodeStoreGeneration(db, schema = "main") {
+  const tables = schemaTableNames(db, schema);
+  const hasV1Messages = tables.has("message") && tables.has("part");
+  if (hasV1Messages)
+    return "v1";
+  if (tables.has("session_message"))
+    return "v2";
+  if (tables.has("session") || tables.has("project"))
+    return "v1";
+  return "unknown";
+}
+function assertOpenCodeStoreGeneration(db, expected, path, schema = "main") {
+  const actual = detectOpenCodeStoreGeneration(db, schema);
+  if (actual === expected)
+    return;
+  if (actual === "unknown")
+    return;
+  throw new Error(`OpenCode store generation mismatch at ${path}: expected ${expected}, found ${actual}; refusing generation-specific database access`);
 }
 function openCodeDbPathExists(resolution = resolveOpenCodeDbPath()) {
   return resolution.path !== ":memory:" && existsSync5(resolution.path);
@@ -14213,6 +14417,7 @@ function runToolOwnerBackfill(db) {
   const escapedDbPath = opencodeDbPath.replaceAll("'", "''");
   db.exec(`ATTACH '${escapedDbPath}' AS oc_backfill`);
   try {
+    assertOpenCodeStoreGeneration(db, "v1", opencodeDbPath, "oc_backfill");
     backfillToolOwnersInChunks(db, result);
   } finally {
     try {
@@ -14431,7 +14636,7 @@ function getSchemaFenceRejection() {
 function getMigrationOnOpenRefusal() {
   return lastMigrationOnOpenRefusal;
 }
-var LATEST_SUPPORTED_VERSION = 84;
+var LATEST_SUPPORTED_VERSION = 85;
 var BOOT_SQLITE_BUSY_TIMEOUT_MS = 5000;
 var PERMISSIONS_ENFORCEABLE = process.platform !== "win32";
 var defaultStoragePermissionFs = { chmodSync: chmodSync2, mkdirSync: mkdirSync4 };
@@ -14897,7 +15102,7 @@ function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS) {
       tag_id INTEGER,
       session_id TEXT,
       content TEXT,
-      created_at INTEGER,
+      created_at INTEGER, -- epoch ms; Date.now() on source writes, preserved on session clones
       harness TEXT NOT NULL DEFAULT 'opencode',
       PRIMARY KEY(session_id, tag_id)
     );
@@ -14921,7 +15126,7 @@ function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS) {
       p1_embedding BLOB,
       p1_embedding_model_id TEXT,
       legacy INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL, -- epoch ms (Date.now())
       harness TEXT NOT NULL DEFAULT 'opencode',
       UNIQUE(session_id, sequence)
     );
@@ -14940,7 +15145,7 @@ function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS) {
       model_id TEXT NOT NULL,
       dims INTEGER NOT NULL,
       vector BLOB NOT NULL,
-      created_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL, -- epoch ms (Date.now())
       UNIQUE(compartment_id, model_id, window_index)
     );
     CREATE INDEX IF NOT EXISTS idx_cce_session ON compartment_chunk_embeddings(session_id);
@@ -14963,7 +15168,7 @@ function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS) {
       kind TEXT NOT NULL,
       at_compartment INTEGER,
       fields_json TEXT NOT NULL DEFAULT '{}',
-      created_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL, -- epoch ms (Date.now())
       harness TEXT NOT NULL DEFAULT 'opencode'
     );
     CREATE INDEX IF NOT EXISTS idx_compartment_events_session
@@ -14992,7 +15197,7 @@ function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS) {
       session_id TEXT NOT NULL,
       category TEXT NOT NULL,
       content TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL, -- epoch ms (Date.now())
       updated_at INTEGER NOT NULL,
       harness TEXT NOT NULL DEFAULT 'opencode'
     );
@@ -15011,7 +15216,7 @@ function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS) {
       source_message_time INTEGER NOT NULL,
       question_embedding BLOB,
       question_embedding_model_id TEXT,
-      created_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL, -- epoch ms (Date.now())
       UNIQUE(project_path, harness, session_id, source_start_message_id, source_end_message_id)
     );
     CREATE INDEX IF NOT EXISTS idx_primer_candidates_project_time
@@ -15034,7 +15239,7 @@ function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS) {
       answer_refreshed_at INTEGER,
       source_candidate_ids TEXT NOT NULL DEFAULT '[]',
       source_candidate_provenance TEXT,
-      created_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL, -- epoch ms (Date.now())
       updated_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_primers_project_status_observed
@@ -15147,7 +15352,7 @@ function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS) {
       job_id TEXT,
       cursor TEXT,
       status TEXT NOT NULL DEFAULT 'pending',
-      created_at INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT 0, -- epoch ms (Date.now())
       updated_at INTEGER NOT NULL DEFAULT 0,
       UNIQUE(session_id, request_key)
     );
@@ -15188,7 +15393,7 @@ function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS) {
       shadow_epoch INTEGER NOT NULL DEFAULT 0,
       corpus_hash TEXT NOT NULL DEFAULT '',
       coverage_json TEXT NOT NULL DEFAULT '{}',
-      created_at INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT 0, -- epoch ms (Date.now())
       UNIQUE(dedup_key, cohort_key)
     );
     CREATE INDEX IF NOT EXISTS idx_embedding_measurement_session
@@ -15611,7 +15816,7 @@ CREATE INDEX IF NOT EXISTS idx_dream_queue_pending ON dream_queue(started_at, en
       importance_avg REAL,
       discarded_last INTEGER NOT NULL DEFAULT 0,
       legacy INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL -- epoch ms (Date.now())
     );
     CREATE INDEX IF NOT EXISTS idx_historian_runs_session
       ON historian_runs(session_id, created_at DESC);
@@ -15664,7 +15869,7 @@ CREATE INDEX IF NOT EXISTS idx_dream_queue_pending ON dream_queue(started_at, en
       importance INTEGER NOT NULL DEFAULT 50,
       episode_type TEXT,
       pass_number INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL, -- epoch ms (Date.now())
       harness TEXT NOT NULL DEFAULT 'opencode',
       UNIQUE(session_id, sequence)
     );
@@ -15675,7 +15880,7 @@ CREATE INDEX IF NOT EXISTS idx_dream_queue_pending ON dream_queue(started_at, en
       category TEXT NOT NULL,
       content TEXT NOT NULL,
       pass_number INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL, -- epoch ms (Date.now())
       harness TEXT NOT NULL DEFAULT 'opencode'
     );
 
@@ -19655,6 +19860,12 @@ function getReadOnlySessionDb() {
   }
   closeCachedReadOnlyDb();
   const db = new Database(dbPath, { readonly: true });
+  try {
+    assertOpenCodeStoreGeneration(db, "v1", dbPath);
+  } catch (error) {
+    closeQuietly(db);
+    throw error;
+  }
   cachedReadOnlyDb = { path: dbPath, db };
   clearOpenCodeDbReadFailure();
   return db;
@@ -21273,6 +21484,14 @@ function readSessionChunk(sessionId, tokenBudget, offset = 1, eligibleEndOrdinal
   const totalMessageCount = getCachedAbsoluteMessageCount(sessionId) ?? messages.length;
   const startOrdinal = Math.max(1, offset);
   const completedToolArcs = buildToolArcs(messages).flatMap((arc) => arc.resOrdinal === null ? [] : [{ start: arc.invOrdinal, end: arc.resOrdinal }]);
+  const completedToolComponents = [];
+  for (const arc of completedToolArcs) {
+    const component = completedToolComponents[completedToolComponents.length - 1];
+    if (component && arc.start <= component.end)
+      component.end = Math.max(component.end, arc.end);
+    else
+      completedToolComponents.push({ ...arc });
+  }
   const lines = [];
   const lineMeta = [];
   const flushedToolOnlyBlocks = [];
@@ -21286,6 +21505,25 @@ function readSessionChunk(sessionId, tokenBudget, offset = 1, eligibleEndOrdinal
   let pendingNoiseMeta = [];
   let commitClusters = 0;
   let lastFlushedRole = "";
+  let admittedOversizeComponentEnd = null;
+  let currentBlockApproxTokens = 0;
+  let formattedBudgetCrossed = false;
+  let sourceCharacters = 0;
+  const toolResultBoundaries = [];
+  function pinComponentWhenFormattedBudgetCrosses(ordinal, appendedText) {
+    if (admittedOversizeComponentEnd !== null || formattedBudgetCrossed || !currentBlock)
+      return;
+    currentBlockApproxTokens += estimateTokens(appendedText) + (currentBlock.parts.length > 1 ? 1 : 0);
+    if (totalTokens + currentBlockApproxTokens + 64 <= tokenBudget)
+      return;
+    const previewTokens = totalTokens + estimateTokens(formatBlock(currentBlock));
+    if (previewTokens <= tokenBudget)
+      return;
+    formattedBudgetCrossed = true;
+    const component = completedToolComponents.find((candidate) => candidate.start <= ordinal && candidate.end >= ordinal);
+    if (component)
+      admittedOversizeComponentEnd = component.end;
+  }
   function recordFilteredNoise(meta) {
     pendingNoiseMeta.push(meta);
     if (!currentBlock) {
@@ -21312,7 +21550,23 @@ function readSessionChunk(sessionId, tokenBudget, offset = 1, eligibleEndOrdinal
     highestScannedOrdinal = Math.max(highestScannedOrdinal, lastOrdinal);
     lastMessageId = currentBlock.meta[currentBlock.meta.length - 1]?.messageId ?? "";
     messagesProcessed += currentBlock.meta.length;
+    const lineStart = sourceCharacters + (lines.length > 0 ? 1 : 0);
+    const renderedParts = currentBlock.parts.join(" / ");
+    let partOffset = lineStart + (blockText.length - renderedParts.length);
+    for (let index = 0;index < currentBlock.parts.length; index++) {
+      const part = currentBlock.parts[index] ?? "";
+      const partMeta = currentBlock.partMeta[index];
+      if (partMeta && partMeta.toolResultBodyTokens > 0) {
+        toolResultBoundaries.push({
+          ordinal: partMeta.ordinal,
+          sourceOffset: partOffset,
+          bodyTokens: partMeta.toolResultBodyTokens
+        });
+      }
+      partOffset += part.length + (index + 1 < currentBlock.parts.length ? 3 : 0);
+    }
     lines.push(blockText);
+    sourceCharacters = lineStart + blockText.length;
     lineMeta.push(...currentBlock.meta);
     totalTokens += blockTokens;
     if (currentBlock.isToolOnly) {
@@ -21322,11 +21576,15 @@ function readSessionChunk(sessionId, tokenBudget, offset = 1, eligibleEndOrdinal
       });
     }
     currentBlock = null;
+    currentBlockApproxTokens = 0;
     return true;
   }
   for (const msg of messages) {
     if (eligibleEndOrdinal !== undefined && msg.ordinal >= eligibleEndOrdinal)
       break;
+    if (admittedOversizeComponentEnd !== null && msg.ordinal > admittedOversizeComponentEnd) {
+      break;
+    }
     if (msg.ordinal < startOrdinal)
       continue;
     const meta = { ordinal: msg.ordinal, messageId: msg.id };
@@ -21340,6 +21598,10 @@ function readSessionChunk(sessionId, tokenBudget, offset = 1, eligibleEndOrdinal
       if (currentBlock && currentBlock.role === "A") {
         currentBlock.endOrdinal = msg.ordinal;
         currentBlock.parts.push(tcText);
+        currentBlock.partMeta.push({
+          ordinal: msg.ordinal,
+          toolResultBodyTokens: extractToolResultBodyTokens(msg.parts)
+        });
         currentBlock.meta.push(...pendingNoiseMeta, meta);
         pendingNoiseMeta = [];
       } else {
@@ -21350,12 +21612,19 @@ function readSessionChunk(sessionId, tokenBudget, offset = 1, eligibleEndOrdinal
           startOrdinal: pendingNoiseMeta[0]?.ordinal ?? msg.ordinal,
           endOrdinal: msg.ordinal,
           parts: [tcText],
+          partMeta: [
+            {
+              ordinal: msg.ordinal,
+              toolResultBodyTokens: extractToolResultBodyTokens(msg.parts)
+            }
+          ],
           meta: [...pendingNoiseMeta, meta],
           commitHashes: [],
           isToolOnly: true
         };
         pendingNoiseMeta = [];
       }
+      pinComponentWhenFormattedBudgetCrosses(msg.ordinal, tcText);
       continue;
     }
     const role = compactRole(msg.role);
@@ -21372,11 +21641,16 @@ function readSessionChunk(sessionId, tokenBudget, offset = 1, eligibleEndOrdinal
     if (currentBlock && currentBlock.role === role) {
       currentBlock.endOrdinal = msg.ordinal;
       currentBlock.parts.push(text);
+      currentBlock.partMeta.push({
+        ordinal: msg.ordinal,
+        toolResultBodyTokens: extractToolResultBodyTokens(msg.parts)
+      });
       currentBlock.meta.push(...pendingNoiseMeta, meta);
       currentBlock.commitHashes = mergeCommitHashes(currentBlock.commitHashes, compacted.commitHashes);
       if (msgHasNarrative)
         currentBlock.isToolOnly = false;
       pendingNoiseMeta = [];
+      pinComponentWhenFormattedBudgetCrosses(msg.ordinal, text);
       continue;
     }
     if (!flushCurrentBlock())
@@ -21386,11 +21660,18 @@ function readSessionChunk(sessionId, tokenBudget, offset = 1, eligibleEndOrdinal
       startOrdinal: pendingNoiseMeta[0]?.ordinal ?? msg.ordinal,
       endOrdinal: msg.ordinal,
       parts: [text],
+      partMeta: [
+        {
+          ordinal: msg.ordinal,
+          toolResultBodyTokens: extractToolResultBodyTokens(msg.parts)
+        }
+      ],
       meta: [...pendingNoiseMeta, meta],
       commitHashes: [...compacted.commitHashes],
       isToolOnly: !msgHasNarrative
     };
     pendingNoiseMeta = [];
+    pinComponentWhenFormattedBudgetCrosses(msg.ordinal, text);
   }
   if (flushCurrentBlock() && pendingNoiseMeta.length > 0) {
     highestScannedOrdinal = Math.max(highestScannedOrdinal, pendingNoiseMeta[pendingNoiseMeta.length - 1]?.ordinal ?? highestScannedOrdinal);
@@ -21421,7 +21702,8 @@ function readSessionChunk(sessionId, tokenBudget, offset = 1, eligibleEndOrdinal
     ...messagesProcessed === 0 && text.length === 0 ? { filteredNoiseLines: pendingNoiseMeta } : {},
     commitClusterCount: commitClusters,
     toolOnlyRanges,
-    completedToolArcs
+    completedToolArcs,
+    toolResultBoundaries
   };
 }
 
@@ -21771,19 +22053,25 @@ function indexMessagesAfterOrdinal(db, sessionId, messages, _lastIndexedOrdinal,
   }
   return inserted;
 }
-function getMessageHistoryOrphanSweepState(db) {
-  return db.prepare("SELECT cursor_session_id, last_swept_at FROM message_history_orphan_sweep WHERE harness = 'opencode'").get() ?? {};
+function openCodeSweepHarness() {
+  const harness = getHarness();
+  if (harness === "opencode" || harness === "opencode2")
+    return harness;
+  throw new Error(`OpenCode orphan sweep cannot read a ${harness} host store`);
 }
-function persistMessageHistoryOrphanSweepState(db, cursor, lastSweptAt) {
+function getMessageHistoryOrphanSweepState(db, harness) {
+  return db.prepare("SELECT cursor_session_id, last_swept_at FROM message_history_orphan_sweep WHERE harness = ?").get(harness) ?? {};
+}
+function persistMessageHistoryOrphanSweepState(db, cursor, lastSweptAt, harness) {
   db.prepare(`INSERT INTO message_history_orphan_sweep (harness, cursor_session_id, last_swept_at)
-         VALUES ('opencode', ?, ?)
+          VALUES (?, ?, ?)
          ON CONFLICT(harness) DO UPDATE SET
              cursor_session_id = excluded.cursor_session_id,
-             last_swept_at = excluded.last_swept_at`).run(cursor, lastSweptAt);
+             last_swept_at = excluded.last_swept_at`).run(harness, cursor, lastSweptAt);
 }
-function getOpenCodeSessionScopedCandidateSourceSql() {
+function getOpenCodeSessionScopedCandidateSourceSql(harness) {
   return SESSION_SCOPED_TABLES.filter((definition) => definition.harnessScoped === true).map((definition) => {
-    const predicates = ["session_id IS NOT NULL", "harness = 'opencode'"];
+    const predicates = ["session_id IS NOT NULL", `harness = '${harness}'`];
     if (definition.extraPredicate)
       predicates.push(definition.extraPredicate);
     return `SELECT session_id FROM ${definition.table} WHERE ${predicates.join(" AND ")}`;
@@ -21797,7 +22085,8 @@ function sweepOrphanedOpenCodeMessageIndexes(db, openReadableOpenCodeDb, options
   const safetyAgeMs = Math.max(0, options.safetyAgeMs ?? MESSAGE_HISTORY_ORPHAN_SAFETY_AGE_MS);
   const cooldownMs = Math.max(0, options.cooldownMs ?? MESSAGE_HISTORY_ORPHAN_SWEEP_COOLDOWN_MS);
   const unavailableReprobeMs = Math.max(cooldownMs, options.unavailableReprobeMs ?? MESSAGE_HISTORY_ORPHAN_UNAVAILABLE_REPROBE_MS);
-  const state = getMessageHistoryOrphanSweepState(db);
+  const harness = openCodeSweepHarness();
+  const state = getMessageHistoryOrphanSweepState(db, harness);
   const cursor = typeof state.cursor_session_id === "string" ? state.cursor_session_id : "";
   if (typeof state.last_swept_at === "number" && state.last_swept_at + cooldownMs > now) {
     return { status: "cooldown", scanned: 0, deleted: 0, cursor };
@@ -21809,12 +22098,12 @@ function sweepOrphanedOpenCodeMessageIndexes(db, openReadableOpenCodeDb, options
     openCodeDb = null;
   }
   if (!openCodeDb) {
-    persistMessageHistoryOrphanSweepState(db, cursor, now + unavailableReprobeMs - cooldownMs);
+    persistMessageHistoryOrphanSweepState(db, cursor, now + unavailableReprobeMs - cooldownMs, harness);
     return { status: "source_unavailable", scanned: 0, deleted: 0, cursor };
   }
   try {
     const cutoff = now - safetyAgeMs;
-    const candidateSourceSql = getOpenCodeSessionScopedCandidateSourceSql();
+    const candidateSourceSql = getOpenCodeSessionScopedCandidateSourceSql(harness);
     const candidates = db.prepare(`SELECT session_id
                  FROM (${candidateSourceSql}) AS session_candidates
                  WHERE session_id > ?
@@ -21822,7 +22111,7 @@ function sweepOrphanedOpenCodeMessageIndexes(db, openReadableOpenCodeDb, options
                        SELECT 1
                        FROM message_history_index
                        WHERE message_history_index.session_id = session_candidates.session_id
-                         AND message_history_index.harness = 'opencode'
+                          AND message_history_index.harness = '${harness}'
                          AND message_history_index.updated_at > ?
                    )
                  ORDER BY session_id ASC
@@ -21843,13 +22132,13 @@ function sweepOrphanedOpenCodeMessageIndexes(db, openReadableOpenCodeDb, options
                        SELECT 1
                        FROM message_history_index
                        WHERE message_history_index.session_id = session_candidates.session_id
-                         AND message_history_index.harness = 'opencode'
+                          AND message_history_index.harness = '${harness}'
                          AND message_history_index.updated_at > ?
                    )
                  LIMIT 1`);
       const eligibleSessionIds = missingSessionIds.filter((sessionId) => stillEligible.get(sessionId, cutoff));
-      deleted = deleteSessionScopedRows(db, eligibleSessionIds, "opencode");
-      persistMessageHistoryOrphanSweepState(db, nextCursor, completedAt);
+      deleted = deleteSessionScopedRows(db, eligibleSessionIds, harness);
+      persistMessageHistoryOrphanSweepState(db, nextCursor, completedAt, harness);
       db.exec("COMMIT");
       committed = true;
       logSlowWriteTransaction("message_index_orphan_sweep", transactionStartedAt);
@@ -23888,9 +24177,9 @@ import { existsSync as existsSync9, readFileSync as readFileSync9, statSync as s
 import { dirname as dirname5, isAbsolute as isAbsolute4, resolve as resolve4 } from "node:path";
 
 // ../plugin/src/tools/light-descriptions.ts
-var CTX_REDUCE_LIGHT_DESCRIPTION = `For ctx_reduce users, mark spent §N§ outputs discardable; release is QUEUED, not immediate, so content stays visible until space is needed. Newest tags stay protected until they age out. Released content becomes a placeholder; recover it only by rerunning the source or recovery tool, so mark only genuinely finished material. Mark analyzed, redundant, persisted, or merely confirmatory outputs; keep user messages, unresolved errors, unextracted evidence, and exact wording. NEVER blanket-mark a large range: review every tag first.`;
+var CTX_REDUCE_LIGHT_DESCRIPTION = `Marking QUEUES content for release. It stays fully visible to you until it is actually released, which may be the next turn or many turns later. Newest tags stay protected until they age out. Release leaves a placeholder; recover only by rerunning the source or recovery tool. Mark only finished material. Mark analyzed, redundant, saved, or confirmatory outputs; keep user messages, unresolved errors, unextracted evidence, and exact wording. NEVER blanket-mark a large range: review every tag first.`;
 var CTX_EXPAND_LIGHT_DESCRIPTION = `For ctx_expand users, recover compacted conversation by passing a session-history heading's inclusive start/end ordinals. Results are raw [N] U:/A: transcript capped near 15K tokens; oversized ranges return the head and a continuation. Use verbose=true to list each message ordinal, part previews, and tool-output sizes; use message=N for one complete stored message and its tool exchanges. NEVER expand ranges after the last compartment because that live tail is already visible.`;
-var CTX_NOTE_LIGHT_DESCRIPTION = `For ctx_note: write saves, read lists, update changes, dismiss retires one note_id or 1–50 note_ids (choose one); surface_condition makes a smart note. Smart-note conditions must be externally verifiable via GitHub, disk, git, or web—not this conversation or future actions.`;
+var CTX_NOTE_LIGHT_DESCRIPTION = `For ctx_note: write saves, read lists, update changes one note (note_ids=[N]), dismiss retires 1–50 (note_ids); surface_condition makes a smart note. Smart-note conditions must be externally verifiable via GitHub, disk, git, or web—not this conversation or future actions.`;
 var CTX_MEMORY_LIGHT_DESCRIPTION = `For ctx_memory users, write one standalone durable fact with category and content; update one ID, archive one or more IDs, merge two or more IDs, or get one to twenty numeric IDs. get reads memories in every status; list remains dreamer-only, so primary agents must NEVER assume bulk-list access.`;
 var CTX_SEARCH_LIGHT_DESCRIPTION = `For ctx_search users, retrieve only hidden recall: memories not in <project-memory>, compacted messages outside the live tail, commits, and notes; phrase query as a question carrying exact terms. Omit sources for broad search; select memory, message, git_commit, or note, or pass memory IDs directly. Hits expand through ctx_expand.`;
 
@@ -24157,8 +24446,8 @@ function createPromptSurfaceRuntime(options) {
     return content;
   };
   return {
-    resolveRegistration(config) {
-      const { preset } = resolvePromptSurface(config, undefined);
+    resolveRegistration(config, modelKey) {
+      const { preset } = resolvePromptSurface(config, modelKey);
       const overrides = config?.tool_descriptions ?? {};
       for (const [toolId, description] of Object.entries(overrides)) {
         if (!PROMPT_SURFACE_TOOL_ID_SET.has(toolId)) {
@@ -25762,6 +26051,11 @@ function parsePiConfig(rawConfig, recoveredTopLevelKeys = []) {
     }
     delete patched[key];
     const defaultValue = defaults[key];
+    const invalidRawValue = rawConfig[key];
+    if (key === "protected_tokens" && typeof invalidRawValue === "number" && invalidRawValue < PROTECTED_TOKENS_MIN) {
+      warnings.push(`protected_tokens is a token floor (minimum ${PROTECTED_TOKENS_MIN}, default derived from the context window); ${invalidRawValue} looks like the old protected_tags count. Remove the key to use the default, or set a token count such as 16000.`);
+      continue;
+    }
     warnings.push(`"${key}": invalid value (${redactConfigValue(rawConfig[key])}), using default ${JSON.stringify(defaultValue)}.`);
   }
   const retryParsed = MagicContextConfigSchema.safeParse(patched);
@@ -27558,6 +27852,27 @@ var embeddingRowMetadata = new WeakMap;
 function isSynapseEmbeddingTruncated(vector) {
   return embeddingRowMetadata.get(vector)?.truncated === true;
 }
+function toSynapseLaneDescriptor(metadata) {
+  const tokenBudget = metadata.recommended_token_budget;
+  return {
+    lane: metadata.model,
+    ...metadata.device_class ? { device_class: metadata.device_class } : {},
+    max_tokens: metadata.max_tokens,
+    max_tokens_source: metadata.max_tokens_source,
+    ...metadata.bucket_ladder ? { bucket_ladder: [...metadata.bucket_ladder] } : {},
+    ...metadata.dims ? { dims: metadata.dims } : {},
+    ...metadata.dtype ? { dtype: metadata.dtype } : {},
+    ...typeof metadata.certified === "boolean" ? { certified: metadata.certified } : {},
+    ...metadata.warm_load_cost_hint_ms !== undefined ? { warm_load_cost_hint_ms: metadata.warm_load_cost_hint_ms } : {},
+    ...metadata.recommended_batch ? {
+      recommended_batch: {
+        rows: metadata.recommended_batch,
+        ...tokenBudget !== undefined ? { token_budget: tokenBudget } : {}
+      }
+    } : {},
+    warm: metadata.max_tokens_source === "runtime_bucket" || metadata.max_tokens_source === "worker_bucket"
+  };
+}
 function formatSynapseLaneDescriptor(descriptor) {
   const certified = descriptor.certified === undefined ? "unknown" : String(descriptor.certified);
   return `lane=${descriptor.lane}; device_class=${descriptor.device_class ?? "unknown"}; ` + `max_tokens=${descriptor.max_tokens} (${descriptor.max_tokens_source}); ` + `certified=${certified}; warm=${descriptor.warm ? "yes" : "no"}; ` + `warm_load_cost_hint_ms=${descriptor.warm_load_cost_hint_ms ?? "unknown"}`;
@@ -29308,16 +29623,27 @@ function startLockHeartbeat(lockPath) {
   timer.unref?.();
   return () => clearInterval(timer);
 }
+var ONNX_RUNTIME_WEB_SPECIFIER = "onnxruntime-web";
 var localEmbeddingRuntimeMode = "native";
 var localEmbeddingProcessFailure = null;
 var wasmRuntimeInjected = false;
 var localEmbeddingHostForRuntime = currentLocalEmbeddingHost;
+var resolveWasmOrtForRuntime = () => {
+  try {
+    return typeof import.meta.resolve === "function" ? import.meta.resolve(ONNX_RUNTIME_WEB_SPECIFIER) : undefined;
+  } catch {
+    return;
+  }
+};
+var importWasmOrtModule = async (specifier) => await import(specifier);
+var importWasmOrtModuleForRuntime = importWasmOrtModule;
 var importWasmOrtForRuntime = async () => {
   const { createRequire: createRequireFn } = await import("node:module");
   const requireFn = createRequireFn(import.meta.url);
-  const ortEntry = requireFn.resolve("onnxruntime-web");
+  const ortEntry = requireFn.resolve(ONNX_RUNTIME_WEB_SPECIFIER);
+  const ortSpecifier = resolveWasmOrtForRuntime() ?? ONNX_RUNTIME_WEB_SPECIFIER;
   return {
-    module: await import("onnxruntime-web"),
+    module: await importWasmOrtModuleForRuntime(ortSpecifier),
     entryPath: ortEntry
   };
 };
@@ -29351,6 +29677,7 @@ async function injectWasmOrt() {
   try {
     const { module: ortWeb, entryPath } = await importWasmOrtForRuntime();
     if (ortWeb.env?.wasm) {
+      ortWeb.env.wasm.numThreads = 1;
       ortWeb.env.wasm.wasmPaths = `${pathToFileURL2(dirname8(entryPath)).href}/`;
     }
     globalThis[Symbol.for("onnxruntime")] = ortWeb;
@@ -30862,6 +31189,13 @@ function updatePersistedShadowBackfillState(db, projectIdentity, scope, modelId,
          SET provenance_json = ?
          WHERE project_path = ? AND scope = ? AND model_id = ?`).run(JSON.stringify(provenance), projectIdentity, scope, modelId);
 }
+function shadowDescriptorProvenanceJson(db, projectIdentity, scope, modelId, synapseProvenance) {
+  const provenance = typeof synapseProvenance === "object" && synapseProvenance !== null && !Array.isArray(synapseProvenance) ? { ...synapseProvenance } : synapseProvenance === undefined ? {} : { synapse_provenance: synapseProvenance };
+  const existing = getPersistedShadowBackfillState(db, projectIdentity, scope, modelId);
+  if (existing)
+    provenance[SHADOW_BACKFILL_PROVENANCE_KEY2] = existing;
+  return JSON.stringify(provenance);
+}
 function persistPrimaryDescriptor(db, registration) {
   const descriptorTable = db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'embedding_registrations'").get();
   if (!descriptorTable)
@@ -30880,6 +31214,43 @@ function persistPrimaryDescriptor(db, registration) {
             provenance_json = excluded.provenance_json,
             generation = excluded.generation,
             updated_at = excluded.updated_at`).run(registration.projectIdentity, registration.providerIdentity, registration.modelId, registration.chunkModelId, fields.fingerprint ?? "", fields.tableEpoch ?? 0, fields.dims ?? 0, JSON.stringify(fields.provenance ?? {}), registration.generation, Date.now());
+}
+function persistShadowDescriptor(db, registration) {
+  const descriptorTable = db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'shadow_embedding_registrations'").get();
+  if (!descriptorTable)
+    return;
+  const fields = synapseConfigFields(registration.config);
+  const now = Date.now();
+  db.prepare(`INSERT INTO shadow_embedding_registrations
+            (project_path, scope, model_id, generation, fingerprint, table_epoch, dims, provenance_json, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(project_path, scope, model_id) DO UPDATE SET
+            generation = excluded.generation,
+            fingerprint = excluded.fingerprint,
+            table_epoch = excluded.table_epoch,
+            dims = excluded.dims,
+            provenance_json = excluded.provenance_json,
+            updated_at = excluded.updated_at`).run(registration.projectIdentity, "memory", registration.modelId, registration.generation, fields.fingerprint ?? "", fields.tableEpoch ?? 0, fields.dims ?? 0, shadowDescriptorProvenanceJson(db, registration.projectIdentity, "memory", registration.modelId, fields.provenance), now);
+  db.prepare(`INSERT INTO shadow_embedding_registrations
+            (project_path, scope, model_id, generation, fingerprint, table_epoch, dims, provenance_json, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(project_path, scope, model_id) DO UPDATE SET
+            generation = excluded.generation,
+            fingerprint = excluded.fingerprint,
+            table_epoch = excluded.table_epoch,
+            dims = excluded.dims,
+            provenance_json = excluded.provenance_json,
+            updated_at = excluded.updated_at`).run(registration.projectIdentity, "commit", registration.modelId, registration.generation, fields.fingerprint ?? "", fields.tableEpoch ?? 0, fields.dims ?? 0, shadowDescriptorProvenanceJson(db, registration.projectIdentity, "commit", registration.modelId, fields.provenance), now);
+  db.prepare(`INSERT INTO shadow_embedding_registrations
+            (project_path, scope, model_id, generation, fingerprint, table_epoch, dims, provenance_json, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(project_path, scope, model_id) DO UPDATE SET
+            generation = excluded.generation,
+            fingerprint = excluded.fingerprint,
+            table_epoch = excluded.table_epoch,
+            dims = excluded.dims,
+            provenance_json = excluded.provenance_json,
+            updated_at = excluded.updated_at`).run(registration.projectIdentity, "chunk", registration.chunkModelId, registration.generation, fields.fingerprint ?? "", fields.tableEpoch ?? 0, fields.dims ?? 0, shadowDescriptorProvenanceJson(db, registration.projectIdentity, "chunk", registration.chunkModelId, fields.provenance), now);
 }
 function resolveEmbeddingConfig(config) {
   if (!config || config.provider === "local") {
@@ -31304,6 +31675,91 @@ function registerProjectEmbedding(db, projectIdentity, config, features, sourceD
   }
   return snapshotFor(registration);
 }
+function registerProjectShadowEmbedding(db, projectIdentity, config, sourceDirectory, options = {}) {
+  const resolvedConfig = resolveEmbeddingConfig(config);
+  if (resolvedConfig.provider !== "synapse") {
+    throw new Error("Shadow embedding registration requires the synapse provider");
+  }
+  const providerIdentity = getEmbeddingProviderIdentity(resolvedConfig);
+  const chunkModelId = getChunkEmbeddingModelId(resolvedConfig, providerIdentity);
+  const provider = createProvider(resolvedConfig, {
+    projectRoot: sourceDirectory,
+    session: `shadow:${projectIdentity}`
+  });
+  if (!provider)
+    return null;
+  const prior = shadowRegistrations.get(projectIdentity);
+  if (prior && prior.providerIdentity === providerIdentity) {
+    provider.dispose();
+    dbForShadowQueue.set(projectIdentity, db);
+    persistShadowDescriptor(db, prior);
+    const backfillAlreadyArmed = hasPendingShadowBackfill(projectIdentity) || shadowQueue.some((item) => item.projectIdentity === projectIdentity);
+    if (!backfillAlreadyArmed || options.manualBackfill === true) {
+      maybeArmShadowBackfill(db, projectIdentity, prior, options.manualBackfill === true);
+    }
+    return {
+      ...snapshotFor({
+        projectIdentity,
+        sourceDirectory,
+        config: prior.config,
+        providerIdentity: prior.providerIdentity,
+        runtimeFingerprint: `shadow:${prior.providerIdentity}`,
+        provider: prior.provider,
+        generation: prior.generation,
+        features: { memoryEnabled: true, gitCommitEnabled: true },
+        modelId: prior.modelId,
+        chunkModelId: prior.chunkModelId,
+        observationMode: false
+      }),
+      provider: "synapse"
+    };
+  }
+  const generation = ++globalRegistrationGeneration;
+  const registration = {
+    projectIdentity,
+    sourceDirectory,
+    config: resolvedConfig,
+    provider,
+    providerIdentity,
+    modelId: providerIdentity,
+    chunkModelId,
+    generation
+  };
+  shadowRegistrations.set(projectIdentity, registration);
+  dbForShadowQueue.set(projectIdentity, db);
+  if (prior) {
+    disposeProvider(prior.provider);
+    for (const scope of ["memory", "commit", "chunk"]) {
+      const scopeKey = `${projectIdentity}:${scope}`;
+      shadowBackfillLastIds.delete(scopeKey);
+      shadowBackfillStopReasons.delete(scopeKey);
+      shadowBackfillLastWriteOutcomes.delete(scopeKey);
+    }
+  }
+  db.transaction(() => {
+    const now = Date.now();
+    recordScopeActiveIdentity(db, projectIdentity, "memory", registration.modelId, now);
+    recordScopeActiveIdentity(db, projectIdentity, "commit", registration.modelId, now);
+    recordScopeActiveIdentity(db, projectIdentity, "chunk", registration.chunkModelId, now);
+    persistShadowDescriptor(db, registration);
+  })();
+  maybeArmShadowBackfill(db, projectIdentity, registration, options.manualBackfill === true);
+  return {
+    projectIdentity,
+    sourceDirectory,
+    providerIdentity,
+    runtimeFingerprint: `shadow:${providerIdentity}`,
+    generation,
+    features: { memoryEnabled: true, gitCommitEnabled: true },
+    enabled: true,
+    gitCommitEnabled: true,
+    modelId: registration.modelId,
+    chunkModelId: registration.chunkModelId,
+    model: "model" in resolvedConfig && typeof resolvedConfig.model === "string" ? resolvedConfig.model : registration.modelId,
+    provider: "synapse",
+    ...synapseDescriptorFromConfig(resolvedConfig) ? { synapseDescriptor: synapseDescriptorFromConfig(resolvedConfig) } : {}
+  };
+}
 function startShadowWorker() {
   if (shadowWorker)
     return;
@@ -31490,6 +31946,56 @@ function pumpShadowBackfill() {
     if (scopes.size === 0)
       pendingShadowBackfills.delete(projectIdentity);
   }
+}
+function maybeArmShadowBackfill(db, projectIdentity, shadow, manualBackfill = false) {
+  if (untrustedLoadProjects.has(projectIdentity))
+    return;
+  const primary = projectRegistrations.get(projectIdentity);
+  if (!primary)
+    return;
+  const pending = new Set;
+  for (const scope of ["memory", "commit", "chunk"]) {
+    const primaryModelId = shadowModelIdForScope(primary, scope);
+    const shadowModelId = shadowModelIdForScope(shadow, scope);
+    const stallKey = `${projectIdentity}:${scope}`;
+    if (primaryModelId === "off" || shadowModelId === "off")
+      continue;
+    const batch = shadowBackfillCandidateBatch(db, projectIdentity, scope, primaryModelId, shadow, SHADOW_MAX_ITEMS_PER_TICK);
+    const persisted = getPersistedShadowBackfillState(db, projectIdentity, scope, shadowModelId);
+    if (batch.ids.length === 0) {
+      if (persisted?.stopReason === "stalled_no_progress") {
+        shadowBackfillStopReasons.set(stallKey, "drained");
+        updatePersistedShadowBackfillState(db, projectIdentity, scope, shadowModelId, (state) => ({
+          ...state,
+          stopReason: "drained",
+          candidateSignature: undefined,
+          writeRefusalReason: undefined,
+          stoppedAt: shadowBackfillNow()
+        }));
+      }
+      continue;
+    }
+    if (!manualBackfill && persisted?.stopReason === "stalled_no_progress" && persisted.candidateSignature === batch.signature) {
+      shadowBackfillStopReasons.set(stallKey, "stalled_no_progress");
+      continue;
+    }
+    shadowBackfillStopReasons.delete(stallKey);
+    shadowBackfillLastIds.delete(stallKey);
+    shadowBackfillLastWriteOutcomes.delete(stallKey);
+    updatePersistedShadowBackfillState(db, projectIdentity, scope, shadowModelId, (state) => ({
+      ...state,
+      stopReason: undefined,
+      candidateSignature: undefined,
+      writeRefusalReason: undefined,
+      stoppedAt: undefined
+    }));
+    pending.add(scope);
+  }
+  if (pending.size === 0)
+    return;
+  pendingShadowBackfills.set(projectIdentity, pending);
+  pumpShadowBackfill();
+  startShadowWorker();
 }
 async function embedShadowItems(registration, items, db, scope) {
   const raw = registration.config;
@@ -31747,6 +32253,26 @@ function registerProjectInObservationMode(db, projectIdentity, sourceDirectory, 
   projectRegistrations.set(projectIdentity, registration);
   disposeProvider(prior?.provider ?? null);
   return snapshotFor(registration);
+}
+function unregisterProjectShadowEmbedding(projectIdentity) {
+  const shadow = shadowRegistrations.get(projectIdentity);
+  shadowRegistrations.delete(projectIdentity);
+  dbForShadowQueue.delete(projectIdentity);
+  pendingShadowBackfills.delete(projectIdentity);
+  for (let index = shadowQueue.length - 1;index >= 0; index -= 1) {
+    if (shadowQueue[index].projectIdentity === projectIdentity)
+      shadowQueue.splice(index, 1);
+  }
+  for (const scope of ["memory", "commit", "chunk"]) {
+    const key = `${projectIdentity}:${scope}`;
+    shadowBackfillLastIds.delete(key);
+    shadowBackfillStopReasons.delete(key);
+    shadowBackfillLastWriteOutcomes.delete(key);
+  }
+  const primaryProvider = projectRegistrations.get(projectIdentity)?.provider ?? null;
+  if (shadow?.provider && shadow.provider !== primaryProvider) {
+    disposeProvider(shadow.provider);
+  }
 }
 function getProjectEmbeddingSnapshot(projectIdentity) {
   const registration = projectRegistrations.get(projectIdentity);
@@ -32435,6 +32961,133 @@ function handleUntrustedLoad(db, projectIdentity, directory, detailed) {
   return true;
 }
 
+// ../plugin/src/plugin/embedding-routing.ts
+var SYNAPSE_PROBE_TTL_MS = 60000;
+var synapseProbeCache = new Map;
+function fallbackConfig(config, provider) {
+  const raw = config;
+  const model = typeof raw.model === "string" ? raw.model.trim() : "";
+  const endpoint = typeof raw.endpoint === "string" ? raw.endpoint.trim() : "";
+  const apiKey = typeof raw.api_key === "string" ? raw.api_key.trim() : "";
+  const inputType = typeof raw.input_type === "string" ? raw.input_type.trim() : "";
+  const queryInputType = typeof raw.query_input_type === "string" ? raw.query_input_type.trim() : "";
+  const queryInstruction = typeof raw.query_instruction === "string" || raw.query_instruction === false ? raw.query_instruction : undefined;
+  const documentPrefix = typeof raw.document_prefix === "string" ? raw.document_prefix : undefined;
+  const truncate = typeof raw.truncate === "string" ? raw.truncate.trim() : "";
+  const maxInputTokens = typeof raw.max_input_tokens === "number" ? raw.max_input_tokens : undefined;
+  if (provider === "off")
+    return { provider: "off" };
+  if (provider === "openai-compatible") {
+    return {
+      provider: "openai-compatible",
+      model,
+      endpoint,
+      ...apiKey ? { api_key: apiKey } : {},
+      ...inputType ? { input_type: inputType } : {},
+      ...queryInputType ? { query_input_type: queryInputType } : {},
+      ...queryInstruction !== undefined ? { query_instruction: queryInstruction } : {},
+      ...documentPrefix !== undefined ? { document_prefix: documentPrefix } : {},
+      ...truncate ? { truncate } : {},
+      ...maxInputTokens !== undefined ? { max_input_tokens: maxInputTokens } : {}
+    };
+  }
+  return {
+    provider: "local",
+    model: model || DEFAULT_LOCAL_EMBEDDING_MODEL,
+    local_runtime: raw.local_runtime === "native" || raw.local_runtime === "wasm" ? raw.local_runtime : "auto",
+    ...maxInputTokens !== undefined ? { max_input_tokens: maxInputTokens } : {}
+  };
+}
+function synapseOptions(config, subc, projectRoot, session, metadata) {
+  return {
+    connectionFile: subc.connection_file,
+    projectRoot,
+    session,
+    model: metadata?.model ?? (config.provider === "synapse" && "model" in config ? config.model : undefined) ?? SYNAPSE_DEFAULT_MODEL,
+    ...metadata ? {
+      metadata
+    } : {}
+  };
+}
+function probeKey(subc, config) {
+  const model = config.provider === "synapse" && "model" in config ? config.model : SYNAPSE_DEFAULT_MODEL;
+  return `${subc.connection_file}\x00${model ?? SYNAPSE_DEFAULT_MODEL}`;
+}
+function discoverSynapseLane(config, subc, projectRoot, session) {
+  const key = probeKey(subc, config);
+  const cached = synapseProbeCache.get(key);
+  if (cached && cached.expiresAt > Date.now())
+    return cached.promise;
+  const promise = SynapseEmbeddingProvider.discover(synapseOptions(config, subc, projectRoot, session));
+  synapseProbeCache.set(key, { expiresAt: Date.now() + SYNAPSE_PROBE_TTL_MS, promise });
+  promise.catch(() => {
+    return;
+  });
+  return promise;
+}
+function resolvedSynapseConfig(subc, metadata, projectRoot, session) {
+  return {
+    provider: "synapse",
+    model: metadata.model,
+    max_input_tokens: metadata.max_tokens,
+    synapse_connection_file: subc.connection_file,
+    synapse_fingerprint: metadata.fingerprint,
+    synapse_table_epoch: metadata.table_epoch,
+    ...typeof metadata.dims === "number" ? { synapse_dims: metadata.dims } : {},
+    ...metadata.recommended_batch ? { synapse_recommended_batch: metadata.recommended_batch } : {},
+    ...metadata.recommended_token_budget ? { synapse_recommended_token_budget: metadata.recommended_token_budget } : {},
+    synapse_descriptor: toSynapseLaneDescriptor(metadata),
+    ...metadata.provenance !== undefined ? { synapse_provenance: metadata.provenance } : {}
+  };
+}
+async function resolveEmbeddingRouting(args) {
+  const config = args.config.embedding;
+  const subc = args.config.subc;
+  const shadowEnabled = args.config.shadow_embedding?.enabled === true;
+  const warnings = [];
+  if (config.provider !== "synapse") {
+    let shadow = null;
+    if (shadowEnabled && config.provider === "off") {
+      warnings.push("shadow_embedding is ignored when embedding.provider is off");
+    } else if (shadowEnabled && !subc) {
+      warnings.push("shadow_embedding requires a subc block; shadow lane is disabled");
+    } else if (shadowEnabled && subc) {
+      try {
+        const metadata = await discoverSynapseLane(config, subc, args.projectRoot, args.session ?? "routing");
+        shadow = resolvedSynapseConfig(subc, metadata, args.projectRoot, args.session ?? "routing");
+      } catch (error) {
+        warnings.push(`shadow_embedding is unavailable; using the primary ${config.provider} lane: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return { primary: config, shadow, warnings };
+  }
+  if (shadowEnabled) {
+    warnings.push("shadow_embedding is ignored when the primary provider is synapse");
+  }
+  const fallbackProvider = config.fallback_provider;
+  const fallback = fallbackConfig(config, fallbackProvider);
+  if (!subc) {
+    warnings.push("embedding.provider synapse requires a subc block; using fallback provider");
+    return { primary: fallback, shadow: null, warnings };
+  }
+  if (!fallbackProvider) {
+    warnings.push("embedding.provider synapse requires embedding.fallback_provider; using local fallback");
+    return { primary: fallbackConfig(config, "local"), shadow: null, warnings };
+  }
+  try {
+    const metadata = await discoverSynapseLane(config, subc, args.projectRoot, args.session ?? "routing");
+    return {
+      primary: resolvedSynapseConfig(subc, metadata, args.projectRoot, args.session ?? "routing"),
+      shadow: null,
+      warnings
+    };
+  } catch (error) {
+    warnings.push(`Synapse is not ready; using embedding.fallback_provider=${fallbackProvider}: ${error instanceof Error ? error.message : String(error)}`);
+    log(`[magic-context] Synapse routing fell back: ${warnings.at(-1)}`);
+    return { primary: fallback, shadow: null, warnings };
+  }
+}
+
 // src/embedding-bootstrap.ts
 var registrationFingerprintsByDatabase = new WeakMap;
 function configCandidatePaths(directory, loadedPaths) {
@@ -32475,16 +33128,36 @@ async function ensureProjectRegisteredFromPiDirectory(directory, db) {
     handleUntrustedLoad(db, projectIdentity, directory, detailed);
     return;
   }
+  const routing = await resolveEmbeddingRouting({
+    config: detailed.config,
+    projectRoot: directory,
+    session: `bootstrap:${projectIdentity}`
+  });
+  for (const warning of routing.warnings) {
+    log(`[magic-context] ${warning}`);
+  }
   const features = {
     memoryEnabled: detailed.config.memory.enabled,
     gitCommitEnabled: detailed.config.memory.git_commit_indexing.enabled
   };
-  registerProjectEmbedding(db, projectIdentity, detailed.config.embedding, features, directory);
-  const fingerprintPaths = configCandidatePaths(directory, detailed.loadedFromPaths);
-  registrationFingerprints.set(projectIdentity, {
-    paths: fingerprintPaths,
-    fingerprint: configFingerprint(fingerprintPaths)
-  });
+  registerProjectEmbedding(db, projectIdentity, routing.primary, features, directory);
+  if (routing.shadow) {
+    registerProjectShadowEmbedding(db, projectIdentity, routing.shadow, directory);
+  } else {
+    unregisterProjectShadowEmbedding(projectIdentity);
+  }
+  const configuredProvider = detailed.config.embedding.provider;
+  const canDiscover = Boolean(detailed.config.subc) && (configuredProvider === "synapse" ? Boolean(detailed.config.embedding.fallback_provider) : configuredProvider !== "off" && detailed.config.shadow_embedding?.enabled === true);
+  const discoveryFailed = canDiscover && (configuredProvider === "synapse" ? routing.primary.provider !== "synapse" : routing.shadow === null);
+  if (!discoveryFailed) {
+    const fingerprintPaths = configCandidatePaths(directory, detailed.loadedFromPaths);
+    registrationFingerprints.set(projectIdentity, {
+      paths: fingerprintPaths,
+      fingerprint: configFingerprint(fingerprintPaths)
+    });
+  } else {
+    registrationFingerprints.delete(projectIdentity);
+  }
 }
 
 // src/pi-harness-kind.ts
@@ -33113,6 +33786,46 @@ Two recovery modes for finer detail:
 - ctx_expand(message=138) — returns the FULL untruncated content of the message at that ordinal: every text part, and every tool call's complete input + output, read from stored history. This is the cheap way to get back a tool output you dropped with ctx_reduce — the original is still in storage even though the wire shows [dropped §N§]. If the message was deleted from history (session prune/revert), it says so.`;
 var CTX_EXPAND_TOKEN_BUDGET = 15000;
 
+// ../plugin/src/tools/ctx-expand/mode.ts
+function isInt(value) {
+  return typeof value === "number" && Number.isInteger(value);
+}
+function minOrdinal(domain) {
+  return domain === "non-negative" ? 0 : 1;
+}
+function messageError(domain) {
+  return domain === "non-negative" ? "Error: message must be a non-negative integer." : "Error: message must be a positive integer.";
+}
+function rangeError(domain) {
+  return domain === "non-negative" ? "Error: provide either message=<ordinal>, or start and end (non-negative integers, start <= end)." : "Error: provide either message=<ordinal>, or start and end (positive integers, start <= end).";
+}
+function resolveCtxExpandMode(args, domain) {
+  const min = minOrdinal(domain);
+  const messagePresent = args.message !== undefined && args.message !== null;
+  const message = isInt(args.message) ? args.message : undefined;
+  const start = isInt(args.start) ? args.start : undefined;
+  const end = isInt(args.end) ? args.end : undefined;
+  const messageValid = message !== undefined && message >= min;
+  const rangeValid = start !== undefined && end !== undefined && start >= min && end >= start;
+  const fillerPair = start === 0 && end === 0;
+  const rangeNamed = rangeValid && !fillerPair;
+  if (messageValid && !rangeNamed) {
+    return { kind: "message", message };
+  }
+  if (messagePresent && !messageValid && !rangeNamed) {
+    return { kind: "error", message: messageError(domain) };
+  }
+  if (rangeValid) {
+    return {
+      kind: "range",
+      start,
+      end,
+      verbose: args.verbose === true
+    };
+  }
+  return { kind: "error", message: rangeError(domain) };
+}
+
 // ../plugin/src/tools/ctx-expand/render.ts
 function isRecord4(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -33709,27 +34422,26 @@ function createCtxExpandTool(deps) {
         readMessages: () => readPiSessionMessages(ctx)
       });
       try {
-        if (params.message !== undefined) {
-          if (typeof params.message !== "number" || !Number.isInteger(params.message) || params.message < 1) {
-            return err("Error: message must be a positive integer.");
-          }
-          return ok(renderMessageByOrdinal(sessionId, params.message));
+        const mode = resolveCtxExpandMode(params, "positive");
+        if (mode.kind === "error") {
+          return err(mode.message);
         }
-        if (typeof params.start !== "number" || typeof params.end !== "number" || !Number.isInteger(params.start) || !Number.isInteger(params.end) || params.start < 1 || params.end < params.start) {
-          return err("Error: provide either message=<ordinal>, or start and end (positive integers, start <= end).");
+        if (mode.kind === "message") {
+          return ok(renderMessageByOrdinal(sessionId, mode.message));
         }
+        const { start, end, verbose } = mode;
         const lastCompartmentEnd = getLastCompartmentEndMessage(deps.db, sessionId);
-        if (lastCompartmentEnd >= 0 && params.start > lastCompartmentEnd) {
-          return ok(`Range ${params.start}-${params.end} is entirely within the live tail (after the last compacted message ${lastCompartmentEnd}); those messages are already visible in context.`);
+        if (lastCompartmentEnd >= 0 && start > lastCompartmentEnd) {
+          return ok(`Range ${start}-${end} is entirely within the live tail (after the last compacted message ${lastCompartmentEnd}); those messages are already visible in context.`);
         }
-        const effectiveEnd = lastCompartmentEnd >= 0 ? Math.min(params.end, lastCompartmentEnd) : params.end;
-        if (params.verbose === true) {
-          const v = renderVerboseRange(sessionId, params.start, effectiveEnd, CTX_EXPAND_TOKEN_BUDGET);
+        const effectiveEnd = lastCompartmentEnd >= 0 ? Math.min(end, lastCompartmentEnd) : end;
+        if (verbose) {
+          const v = renderVerboseRange(sessionId, start, effectiveEnd, CTX_EXPAND_TOKEN_BUDGET);
           if (!v.text) {
-            return ok(`No messages found in range ${params.start}-${effectiveEnd}. The range may be outside this session's history.`);
+            return ok(`No messages found in range ${start}-${effectiveEnd}. The range may be outside this session's history.`);
           }
           const out = [
-            `Messages ${params.start}-${v.lastOrdinal} (verbose). Recover any one in full with ctx_expand(message=<ordinal>):`,
+            `Messages ${start}-${v.lastOrdinal} (verbose). Recover any one in full with ctx_expand(message=<ordinal>):`,
             "",
             v.text
           ];
@@ -33739,9 +34451,9 @@ function createCtxExpandTool(deps) {
           return ok(out.join(`
 `));
         }
-        const chunk = readSessionChunk(sessionId, CTX_EXPAND_TOKEN_BUDGET, params.start, effectiveEnd + 1);
+        const chunk = readSessionChunk(sessionId, CTX_EXPAND_TOKEN_BUDGET, start, effectiveEnd + 1);
         if (!chunk.text || chunk.messageCount === 0) {
-          return ok(`No messages found in range ${params.start}-${params.end}. The range may be outside this session's history.`);
+          return ok(`No messages found in range ${start}-${end}. The range may be outside this session's history.`);
         }
         const lines = [];
         lines.push(`Messages ${chunk.startIndex}-${chunk.endIndex} (${chunk.messageCount} messages, ~${chunk.tokenEstimate} tokens):`);
@@ -35365,7 +36077,7 @@ function err2(text) {
   };
 }
 function normalizeLimit(limit) {
-  if (typeof limit !== "number" || !Number.isFinite(limit))
+  if (typeof limit !== "number" || !Number.isFinite(limit) || limit === 0)
     return DEFAULT_LIST_LIMIT;
   return Math.max(1, Math.floor(limit));
 }
@@ -35440,8 +36152,8 @@ function formatGetOutput(args) {
 
 `);
 }
-function updateMemoryContentInCurrentTransaction(db, memory, content, normalizedHash) {
-  db.prepare("UPDATE memories SET content = ?, normalized_hash = ?, updated_at = ? WHERE id = ?").run(content, normalizedHash, Date.now(), memory.id);
+function updateMemoryContentInCurrentTransaction(db, memory, content, normalizedHash, category) {
+  db.prepare("UPDATE memories SET content = ?, normalized_hash = ?, category = ?, updated_at = ? WHERE id = ?").run(content, normalizedHash, category, Date.now(), memory.id);
   if (hasMemoryShareableColumn(db)) {
     db.prepare("UPDATE memories SET shareable = 0 WHERE id = ?").run(memory.id);
   }
@@ -35502,14 +36214,17 @@ function createCtxMemoryTool(deps) {
       await deps.ensureProjectRegistered?.(ctx.cwd, deps.db);
       const activeCurateCategory = dreamerAllowed ? getActiveCurateCategory(deps.db, projectIdentity) : null;
       if (activeCurateCategory) {
+        const usesCategory = ["write", "update", "merge", "list"].includes(params.action);
+        const usesIds = ["update", "archive", "merge", "get"].includes(params.action);
+        const usesSuccessor = params.action === "update" || params.action === "archive";
         const scopeRefusal = getCurateCategoryScopeRefusal({
           scope: activeCurateCategory,
           action: params.action,
-          requestedCategory: params.category,
-          ids: [
+          requestedCategory: usesCategory ? params.category : undefined,
+          ids: usesIds ? [
             ...params.ids ?? [],
-            ...Number.isInteger(params.superseded_by) ? [params.superseded_by] : []
-          ],
+            ...usesSuccessor && Number.isInteger(params.superseded_by) ? [params.superseded_by] : []
+          ] : [],
           categoryForId: (id) => {
             const category = getMemoryById(deps.db, id)?.category;
             return category ? curateCategoryForMemoryCategory(category) : null;
@@ -35644,18 +36359,19 @@ function createCtxMemoryTool(deps) {
           return err2(inactiveMemoryError(updateId, "updating"));
         }
         const normalizedHash = computeNormalizedHash(content);
+        const targetCategory = params.category ?? memory.category;
         const targetIdentity = targetIdentityForStoredPath(memory.projectPath);
-        const duplicate = getMemoryByHash(deps.db, targetIdentity, memory.category, normalizedHash);
+        const duplicate = getMemoryByHash(deps.db, targetIdentity, targetCategory, normalizedHash);
         if (duplicate && duplicate.id !== memory.id) {
           return err2(`Error: Memory content already exists as ID ${duplicate.id}; merge or archive duplicates instead.`);
         }
         runImmediateTransaction(deps.db, () => {
-          updateMemoryContentInCurrentTransaction(deps.db, memory, content, normalizedHash);
+          updateMemoryContentInCurrentTransaction(deps.db, memory, content, normalizedHash, targetCategory);
           queueMemoryMutation(deps.db, {
             projectPath: targetIdentity,
             mutationType: "update",
             targetMemoryId: memory.id,
-            category: memory.category,
+            category: targetCategory,
             newContent: content
           });
         });
@@ -35665,7 +36381,7 @@ function createCtxMemoryTool(deps) {
           memoryId: memory.id,
           content
         });
-        return ok2(`Updated memory [ID: ${memory.id}] in ${memory.category}.`);
+        return ok2(`Updated memory [ID: ${memory.id}] in ${targetCategory}.`);
       }
       if (params.action === "merge") {
         const ids = params.ids;
@@ -36387,7 +37103,7 @@ Use a note when something matters LATER but not in the next few steps: "revisit 
 Actions:
 - write: save a note (content). Add surface_condition to make it a smart note (below).
 - read: list notes, newest first. Default: latest active session notes + ready smart notes; page older ones with limit/offset, or inspect other states with filter.
-- update: change a note by note_id. dismiss: retire one by note_id or 1–50 by note_ids; provide exactly one.
+- update: change one note (note_ids=[N]). dismiss: retire 1–50 notes (note_ids=[...]).
 
 Smart notes: pass surface_condition and the note stays hidden until a background checker confirms the condition — using ONLY externally verifiable signals (GitHub state via gh, files on disk, git history, web pages). It cannot see this conversation, so the condition must be checkable from outside:
 ✓ "When PR #42 in cortexkit/magic-context is merged"
@@ -36420,13 +37136,10 @@ var ParamsSchema2 = _Object_({
   surface_condition: Optional(String2({
     description: "Externally verifiable condition for smart notes. A background checker verifies it using ONLY outside signals (GitHub state via gh, files on disk, git history, web) — it cannot see this conversation. Use for PR/issue state, release tags, file contents, workflow runs. NOT for 'when the user mentions X' / 'when we revisit Y' — write a regular note instead."
   })),
-  note_id: Optional(Number2({
-    description: "Note ID (required for 'dismiss' and 'update' actions)."
-  })),
   note_ids: Optional(_Array_(Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }), {
     minItems: 1,
     maxItems: 50,
-    description: "One to fifty note ids for 'dismiss' only; do not combine with note_id."
+    description: "Note ids: exactly one for 'update', one to fifty for 'dismiss'. Ignored by 'write' and 'read'."
   })),
   filter: Optional(Union(FILTER_VALUES.map((value) => Literal(value)), {
     description: "Optional read filter. Defaults to active session notes + ready smart notes. Use 'all' to inspect every status or 'pending' to inspect unsurfaced smart notes."
@@ -36471,16 +37184,17 @@ function formatNoteLine(note) {
 }
 var DISMISS_FOOTER = `
 
-To dismiss a stale note: ctx_note(action="dismiss", note_id=N) or note_ids=[N,...]`;
+To dismiss a stale note: ctx_note(action="dismiss", note_ids=[N])`;
 function formatDismissResults(results) {
   const dismissedCount = results.filter((result) => result.outcome === "dismissed").length;
   return `Dismissed ${dismissedCount} of ${results.length} notes.
 ${results.map((result) => `- Note #${result.noteId}: ${result.outcome}`).join(`
 `)}`;
 }
-function parseDismissNoteIds(value) {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 50 || value.some((id) => typeof id !== "number" || !Number.isInteger(id) || id <= 0)) {
-    return "Error: 'note_ids' must contain 1 to 50 positive integer ids when action is 'dismiss'.";
+function parseNoteIds(action, value) {
+  const max = action === "update" ? 1 : 50;
+  if (!Array.isArray(value) || value.length < 1 || value.length > max || value.some((id) => typeof id !== "number" || !Number.isInteger(id) || id <= 0)) {
+    return action === "update" ? "Error: 'note_ids' must contain exactly one positive integer id when action is 'update'." : "Error: 'note_ids' must contain 1 to 50 positive integer ids when action is 'dismiss'.";
   }
   return value;
 }
@@ -36508,7 +37222,6 @@ function createCtxNoteTool(deps) {
         },
         content: "string",
         surface_condition: "string",
-        note_id: "number",
         note_ids: { type: "array", items: "number", maxItems: 50 },
         filter: { type: "enum", values: FILTER_VALUES },
         limit: "number",
@@ -36517,17 +37230,9 @@ function createCtxNoteTool(deps) {
       const sessionId = ctx.sessionManager.getSessionId();
       const dreamerEnabled = deps.resolveDreamerEnabled?.(ctx) ?? deps.dreamerEnabled;
       const action = params.action ?? (params.content?.trim() ? "write" : "read");
-      const hasNoteId = params.note_id !== undefined;
-      const hasNoteIds = params.note_ids !== undefined;
-      if (hasNoteId && hasNoteIds) {
-        return err3("Error: 'note_id' and 'note_ids' cannot be used together; provide one or the other.");
-      }
-      if (hasNoteIds && action !== "dismiss") {
-        return err3("Error: 'note_ids' is only valid when action is 'dismiss'.");
-      }
-      const dismissNoteIds = action === "dismiss" && hasNoteIds ? parseDismissNoteIds(params.note_ids) : undefined;
-      if (typeof dismissNoteIds === "string")
-        return err3(dismissNoteIds);
+      const noteIds = action === "dismiss" || action === "update" ? parseNoteIds(action, params.note_ids) : undefined;
+      if (typeof noteIds === "string")
+        return err3(noteIds);
       if (action === "write") {
         const content = params.content?.trim();
         if (!content)
@@ -36578,25 +37283,21 @@ wake plane active — create a scheduled wake instead; stored as a plain note.`)
         if (!projectIdentity) {
           return err3("Error: Could not resolve project identity for note dismiss.");
         }
-        if (dismissNoteIds) {
-          return ok3(formatDismissResults(dismissNotes(deps.db, dismissNoteIds, {
+        const ids = noteIds;
+        if (ids.length > 1) {
+          return ok3(formatDismissResults(dismissNotes(deps.db, ids, {
             projectPath: projectIdentity,
             sessionId
           })));
         }
-        if (typeof params.note_id !== "number") {
-          return err3("Error: 'note_id' is required when action is 'dismiss'.");
-        }
-        const dismissed = dismissNote(deps.db, params.note_id, {
+        const dismissed = dismissNote(deps.db, ids[0], {
           projectPath: projectIdentity,
           sessionId
         });
-        return dismissed ? ok3(`Note #${params.note_id} dismissed.`) : err3(`Error: Note #${params.note_id} not found in your session/project or already dismissed.`);
+        return dismissed ? ok3(`Note #${ids[0]} dismissed.`) : err3(`Error: Note #${ids[0]} not found in your session/project or already dismissed.`);
       }
       if (action === "update") {
-        if (typeof params.note_id !== "number") {
-          return err3("Error: 'note_id' is required when action is 'update'.");
-        }
+        const noteId = noteIds[0];
         const updates = {};
         if (params.content?.trim())
           updates.content = params.content.trim();
@@ -36616,19 +37317,19 @@ wake plane active — create a scheduled wake instead; stored as a plain note.`)
         if (!projectIdentity) {
           return err3("Error: Could not resolve project identity for note update.");
         }
-        const updated = updateNote(deps.db, params.note_id, updates, {
+        const updated = updateNote(deps.db, noteId, updates, {
           projectPath: projectIdentity,
           sessionId
         });
         if (!updated) {
-          return err3(`Error: Note #${params.note_id} not found in your session/project.`);
+          return err3(`Error: Note #${noteId} not found in your session/project.`);
         }
         const parts = [];
         if (updates.content)
           parts.push(`content: ${updates.content}`);
         if (updates.surfaceCondition)
           parts.push(`condition: ${updates.surfaceCondition}`);
-        return ok3(`Updated note #${params.note_id}
+        return ok3(`Updated note #${noteId}
 - ${parts.join(`
 - `)}${compilation ? conditionCompileReplySuffix(compilation) : ""}`);
       }
@@ -36788,7 +37489,7 @@ function parseInteger(str) {
 var CTX_REDUCE_DESCRIPTION = `Mark spent tagged content as discardable to reclaim context space. This is NOT an immediate delete. Use §N§ identifiers visible in the conversation. The \`drop\` param accepts ranges: "3-5", "1,2,9", "1-5,8".
 
 How it works:
-- Marking QUEUES content for release. It stays fully visible to you until context space is actually needed — which may be as soon as the next turn if you are already under pressure, or many turns later if not. So mark spent outputs as soon as you finish with them; don't hoard the call for the end of the turn.
+- Marking QUEUES content for release. It stays fully visible to you until it is actually released, which may be the next turn or many turns later. Mark spent outputs as soon as you finish with them; don't hoard the call for the end of the turn.
 - The newest tags are protected: marking one just queues it until it ages out of the recent window, so marking recent output is harmless.
 - When content is finally released it becomes a short placeholder, and re-running the tool is the only way to get it back. So mark only what you are genuinely DONE with — the test is "have I extracted what I need from this?", not "is it safe / do I have time before it drops?".
 
@@ -39577,6 +40278,12 @@ function getWritableOpenCodeDb() {
     throw new Error(`OpenCode database not found at ${dbPath} (source=${resolution.source}; is OpenCode installed?)`);
   }
   const db = new Database(dbPath);
+  try {
+    assertOpenCodeStoreGeneration(db, "v1", dbPath);
+  } catch (error) {
+    closeQuietly(db);
+    throw error;
+  }
   db.exec("PRAGMA busy_timeout=5000");
   db.exec("PRAGMA journal_mode=WAL");
   cachedWriteDb = { path: dbPath, db };
@@ -40429,9 +41136,14 @@ var ParamsSchema4 = _Object_({
   }))
 }, { additionalProperties: true });
 function normalizeLimit3(limit) {
-  if (typeof limit !== "number" || !Number.isFinite(limit))
+  if (typeof limit !== "number" || !Number.isFinite(limit) || limit === 0)
     return DEFAULT_LIMIT;
   return Math.max(1, Math.floor(limit));
+}
+function normalizeSources(sources) {
+  if (sources === undefined || sources.length === 0)
+    return;
+  return sources;
 }
 function createCtxSearchTool(deps) {
   const resolveProject = deps.resolveProjectIdentity ?? resolveProjectIdentityForSession;
@@ -40515,7 +41227,7 @@ function createCtxSearchTool(deps) {
         isEmbeddingRuntimeEnabled: () => embeddingEnabled === true,
         maxMessageOrdinal: messageOrdinalCutoff,
         gitCommitsEnabled,
-        sources: params.sources,
+        sources: normalizeSources(params.sources),
         visibleMemoryIds,
         diagnostics,
         gitRepositoryAvailable: directoryHasGitMetadata(ctx.cwd),
@@ -40661,4 +41373,4 @@ function registerMagicContextTools(pi, opts) {
   ]);
 }
 
-export { COMPACTION_ENABLED_PATH, isDreamerRunnable, isCompactionEnabled, migrateMagicContextConfigLocations, withContentLanguageDirective, withMigrationLanguageDirective, buildPrimaryLanguageDirective, parseCron, nextOccurrence, nextDueAtMs, canonicalModelIdentity, piModelRefToCanonical, resolveModelRefForPi, modelRefLookupOrder, ompModelRefToCanonical, resolveModelRefForOmp, resolveModelConfigValue, resolveModelConfigOrDefault, DEFAULT_HISTORIAN_TIMEOUT_MS, getProtectedTokensTierOverrides, sanitizeDiagnosticText, hasShareabilitySensitiveText, FAIL_CLOSED_DOCTOR_COMMAND, formatFailClosedBlockingMessage, createFailClosedBlockingError, isFailClosedBlockingError, shouldBypassFailClosedBlock, createFailClosedController, setHarness, getHarness, ensureCortexKitArtifactGitignore, getProjectMagicContextHistorianDir, getMagicContextStorageResolution, getMagicContextStorageDir, log, sessionLog, flushLogger, ProjectIdentityError, resolveProjectIdentityStrict, resolveProjectIdentity, resolveProjectIdentityForSession, beginBootQuietPeriod, scheduleAfterBootQuiet, CTX_REDUCE_KEEP, newestCtxReduceTagNumbers, textMentionsRecentCommit, hasMeaningfulUserText, extractTexts, extractToolCallSummaries, preloadTokenizer, estimateTokens, normalizeText, stripWellFormedLeadingTagPrefix, stripPersistedAssistantText, byteSize, stripTagPrefix, peelLeadingMcTagNotation, prependTag, isRecord, estimateImageTokensFromDataUrl, normalizeTodoStateJson, buildSyntheticTodoPart, stripChannel1ReminderSpans, effectiveTailHygiene, CHANNEL1_SENTINEL, CHANNEL1_FLOOR_TOKENS, decideChannel1, evaluateChannel2, reclaimableToolOutputCount, buildChannel2Reminder, buildChannel1Reminder, planEmergencyDrop, updateTagByteSize, getRecentTagOwnerMessageIds, AGE_RECLAIM_MIN_TOKENS, getOldestActiveUnprotectedToolTags, getActiveToolTagsForAgeReclaim, getTriggerTagTokenUpperBound, updateTagInputByteSize, updateTagTokenCount, getPersistedToolTagAccounting, getAllStatusTagTokenTotalsFlat, updateTagInputTokenCount, tagTokenCountIsNull, backfillTagTokenCounts, insertTag, updateTagStatus, updateTagDropMode, updateCavemanDepth, hasPiFallbackMessageTags, findAdoptableFallbackTags, hasPiFallbackToolOwnerTags, findPiFallbackToolOwnerTags, adoptPiFallbackToolOwnerTag, adoptPiFallbackMessageTag, getMaxTagNumberBySession, getAssignableTagNumberByMessageId, deriveTagLoadFloor, getTagsBySession, getActiveTagsBySession, getTagsForPendingOperations, getTagsByNumbers, getDroppedTagsByNumbers, getMaxDroppedTagNumber, getToolTagNumberByOwner, getNullOwnerToolTag, adoptNullOwnerToolTag, resolveOpenCodeDbPath, openCodeDbPathExists, recordOpenCodeDbReadFailure, clearOpenCodeDbReadFailure, claimOpenCodeDbDiagnosticOnce, Database, closeQuietly, completedToolArcCrossesBoundary, estimateTrueRawMessageTokens, buildToolArcs, fenceBoundaryForCompletedToolArcs, fenceBoundaryForToolArcs, buildTrueRawTokenIndex, computeRawRangeFingerprint, invalidateTrueRawTokenCache, DROPPED_INPUT_MESSAGE, droppedInputMarker, containsDroppedInputPlaceholder, isEditTool, applyEditMarkerToInput, setRawMessageProvider, withRawMessageProvider, cleanUserText, withRawSessionMessageCache, readRawSessionMessages, primeTailRawMessageCache, getCachedAbsoluteMessageCount, primeInMemoryTailRawMessageCache, getRawSessionMessageCount, getRawSessionTagKeysThrough, getLegacyProtectedTailStartOrdinal, readSessionChunk, logSlowWriteTransaction, clearCompressionDepth, clearCompressionDepthRange, getMessageIndexSourceIdentity, isMessageIndexSourceCurrent, getLastIndexedOrdinal, getMessageIndexReconciliationStartOrdinal, isMessageIndexReconciledThrough, indexSingleMessage, indexMessagesAfterOrdinal, sweepOrphanedOpenCodeMessageIndexes, recordSessionProjectIdentity, COMPARTMENT_LEASE_RENEWAL_MS, acquireCompartmentLease, renewCompartmentLease, releaseCompartmentLease, releaseCompartmentLeaseBestEffort, isCompartmentLeaseHeld, isNoContentCompartment, HAS_COMPARTMENT_CONTENT_SQL, persistCachedM0, clearCachedM0M1, getCompartments, getLastCompartmentEndMessage, getLastCompartmentEndMessageId, getCompartmentsByEndMessageId, appendCompartments, saveRecompStagingPass, getRecompStaging, clearRecompStaging, getRecompPartialRange, setRecompPartialRange, escapeXmlAttr, escapeXmlContent, getModuleNoteEvaluationBridge, getContextStoreUuid, drainMirrorPages, parseCompartmentOutput, resolveWorkspaceShareCategories, resolveWorkspaceIdentitySet, expandWorkspaceIdentitySetWithAliases, sourceNameForMemory, computeWorkspaceEpochFingerprint, bumpEpochsForWorkspaceMembers, readProjectDocsCanonical, encodePiContentDecision, getPiContentDecisions, freezePiContentDecision, getNativeReplayState, saveNativeToolInputs, addNativeReasoningIds, copySessionStateForClone, getErrorMessage, describeError, piHarnessKindFromExecutable, setStoragePrivatePermissionEnforcement, getSchemaFenceRejection, getMigrationOnOpenRefusal, LATEST_SUPPORTED_VERSION, getDatabasePath, getPersistedSchemaVersion, setSqlitePragmaConfig, applySqliteTuningPragmas, runSqliteOptimize, openDatabase, openDatabaseAsync, queueM0Mutation, getMaxM0MutationId, queueMemoryMutation, getMemoryMutationsForRender, getMemoryMutationsForRenderByProjects, getMaxMemoryMutationId, getMaxMemoryMutationIdForProjects, MAX_EXECUTE_THRESHOLD, escalationBands, computeProtectionWindow, readEpochFloorSnapshot, getProtectionWindowForSession, isProviderOverflowFailClosedProven, describeProtectedTailDrainBudgetSkip, loadProtectedTailMeta, markProtectedTailPolicyV3Seeded, recordProtectedTailPublicationFloor, recordProtectedTailNoEligibleHead, getWrapupInProgressState, isWrapupInProgress, acquireWrapupInProgress, updateWrapupInProgress, releaseWrapupInProgress, resolveCompactionModeRecord, getCompactionModeRecord, setCompactionModeRecord, reserveProtectedTailDrainTokens, clearEmergencyDrainLatch, recordHistorianDrainFailure, clearHistorianDrainFailure, rollbackProtectedTailDrainReservation, clearPersistedReasoningWatermark, getEmergencyInputSample, setEmergencyDropSample, clearEmergencyDropSample, getLastNudgeUndropped, setLastNudgeUndropped, getChannel1NudgeState, setChannel1NudgeState, markChannel1PostReduceGracePending, captureChannel1PostReduceGraceBaseline, getChannel2NudgeState, getChannel2NudgeClaim, setChannel2NudgeState, casChannel2NudgeState, claimChannel2NudgeState, casChannel2NudgeClaim, getPersistedNoteNudge, setPersistedNoteNudgeTrigger, setPersistedNoteNudgeTriggerMessageId, getNoteNudgeAnchors, getAutoSearchHintDecisions, deliverNoteNudgeAtomic, appendAutoSearchHintDecision, pruneNoteNudgeAnchors, pruneAutoSearchHintDecisions, getPersistedTodoSyntheticAnchor, setPersistedTodoSyntheticAnchor, clearPersistedTodoSyntheticAnchor, getNoteLastReadAt, incrementHistorianFailure, clearHistorianFailureState, getOverflowState, recordOverflowDetected, clearEmergencyRecovery, clearDetectedContextLimit, getStrippedPlaceholderIds, applyStrippedPlaceholderDelta, NEWEST_REASONING_BEARING_ASSISTANT, THINKING_BINDING_RECOVERY_FROZEN_PREFIX, thinkingBindingRecoveryFrozenId, getThinkingBindingRecoveryTarget, armThinkingBindingRecovery, clearThinkingBindingRecoveryIf, getMergedReasoningStrippedIds, addMergedReasoningStrippedIds, getProcessedImageStrippedIds, addProcessedImageStrippedIds, getPendingCompactionMarkerState, clearPendingCompactionMarkerStateIf, getPendingPiCompactionMarkerState, setPendingPiCompactionMarkerState, clearPendingPiCompactionMarkerStateIf, getSessionsWithPendingPiMarker, setSessionWorkMetrics, getSessionWorkMetrics, resolveEpochFloorForPass, getOrCreateSessionMeta, updateSessionMeta, advanceToolReclaimWatermark, retryPendingSessionCleanups, retryPendingRustSessionCleanupsForProject, getNotes, getSessionNotes, getPendingSmartNotes, getReadySmartNotes, markNoteReady, markNoteChecked, queuePendingOp, getPendingOps, getPendingOpsCount, clearPendingOps, removePendingOp, PRIMER_CANDIDATE_TTL_MS, PRIMER_CANDIDATE_MAX_AGE_MS, primerOccurrenceKey, primerOccurrenceUtcDay, insertPrimerCandidates, updatePrimerCandidateEmbedding, getPrimerCandidatesByIds, getPrimerCandidatesForPromotion, countPrimerCandidatesForProject, getActivePrimers, createPrimer, updatePrimerSupport, updatePrimerAnswer, GLOBAL_USER_PROFILE_PROJECT_PATH, getProjectState, bumpProjectUserProfileVersion, saveSourceContent, getSourceContents, recordSubagentInvocation, getLatestHistorianInvocationId, BoundedSessionMap, MIN_PLAUSIBLE_CONTEXT_LIMIT, reloadWindowOverlay, getWindowOverlay, resolveWindowOverlayFacts, deriveWindowGeometry, hasTrustedAbsoluteWall, applyProvenInputFloor, formatWindowDerivationLine, isSaneLimit, resolveOutputReserve, getSdkContextLimit, formatConfigParseStatusLine, formatConfigParseNotice, claimConfigParseFailuresOnce, promptSurfaceHashMaterial, createPromptSurfaceRuntime, createPromptSurfaceGuidanceEpochCache, SYNTH_USER_ID_PREFIX, resolvePiStableId, readPiSessionSnapshot, readPiSessionMessages, readPiSessionMessagePage, findLastModelKeyFromBranch, convertEntriesToRawMessages, convertEntriesToRawMessagePage, computeCueContentHash, hasMuralCueColumns, getMuralCueState, memoryNeedsCue, setMuralCue, recordMuralCueRejection, invalidateMemory, computeNormalizedHash, hasMemoryShareableColumn, hasMemoryClassifiedAtColumn, getUnclassifiedMemoryIds, insertMemory, getMemoryByHash, getMemoriesByProject, getMemoriesByProjects, getMaxMemoryIdForProjects, getAllActiveMemoriesForMigration, getMemoryById, setMemoryClassification, archiveMemory, deleteMemory, getMemoryCount, getMemoryCountsByStatus, USER_MEMORY_CANDIDATE_TTL_MS, insertUserMemoryCandidates, getUserMemoryCandidates, deleteUserMemoryCandidates, pruneExpiredUserMemoryCandidates, insertUserMemory, getActiveUserMemories, updateUserMemoryContent, dismissUserMemory, getTaskScheduleState, getMostRecentTaskRunAt, pruneNonCanonicalTaskRows, deleteTaskScheduleRowsForProject, seedTaskScheduleState, writeTaskScheduleState, isRetrospectiveWindowProcessed, recordRetrospectiveWindowProcessed, curateCategoryForMemoryCategory, peekCurateCategoryScope, beginCurateCategoryRun, curateTaskStateAfterSuccess, formatSynapseLaneDescriptor, buildCanonicalChunkTextFromFts, buildCompartmentSummaryFallbackText, canonicalizeInMemoryChunkTextForEmbedding, chunkCanonicalText, chunkEmbeddingWindowsAreCurrent, replaceCompartmentChunkEmbeddings, cosineSimilarity, GIT_SWEEP_LEASE_RENEWAL_MS, acquireGitSweepLease, renewGitSweepLease, markGitSweepSuccessAndRelease, parkGitSweepNonIndexable, releaseGitSweepLease, describeShadowBackfillWriteRefusal, contentSha256, sweepStaleEmbeddingIdentitiesForProject, enqueueShadowEmbeddingItems, getProjectEmbeddingSnapshot, getProjectChunkEmbeddingModelId, getProjectEmbeddingMaxInputTokens, embedTextForProject, embedBatchForProject, embedItemsForProject, embedUnembeddedMemoriesForProject, drainCommitBacklogForProject, embedSessionCompartmentChunks, getEmbeddingCoverageStatus, promoteSessionFactsDurable, embedPromotedFacts, recordMemoryMapping, recordMemoryVerifications, getUnmappedMemoryIds, clearMemoryVerifications, getMemoryVerifications, resolveGitTopLevel, readGitHead, readGitChangedFilesSince, readGitFileChangeTimesSince, verificationFileExists, normalizeVerificationFiles, isDirectiveShapedProjectRule, takeCurateSafetyRefusalCount, wakePlaneStatus, indexCommitsForProject, embedUnembeddedCommits, loadPiConfig, ensureProjectRegisteredFromPiDirectory, resolvePiHarnessDetection, resolvePiHarnessKind, resolveMuralWire, updateCompactionMarkerAfterPublication, COMPARTMENT_RENDER_EPOCH, encodeCachedM0UpgradeIdentity, decodeCachedM0UpgradeIdentity, DEFAULT_HISTORY_BUDGET_TOKENS, renderCompartmentAtTier, renderDecayedCompartments, extractM0Block, TEMPORAL_MARKER_PATTERN, temporalMarkerPrefix, clearInjectionCache, getVisibleMemoryIds, renderMemoryBlock, DEFAULT_MEMORY_BUDGET_TOKENS, DEFAULT_USER_PROFILE_BUDGET_TOKENS, trimMemoriesToBudgetV2, trimWorkspaceMemoriesToBudgetV2, trimUserMemoriesToBudget, renderMemoryBlockV2, stripMemoryMuralBlock, unifiedSearch, rememberTodowriteToolCallTodos, parseTodos, setTodoSnapshot, registerTodoOverlay, registerTodoStateLifecycle, syncCtxMemoryToolEnabled, registerMagicContextTools };
+export { COMPACTION_ENABLED_PATH, isDreamerRunnable, isCompactionEnabled, migrateMagicContextConfigLocations, withContentLanguageDirective, withMigrationLanguageDirective, buildPrimaryLanguageDirective, parseCron, nextOccurrence, nextDueAtMs, canonicalModelIdentity, piModelRefToCanonical, resolveModelRefForPi, modelRefLookupOrder, ompModelRefToCanonical, resolveModelRefForOmp, resolveModelConfigValue, resolveModelConfigOrDefault, DEFAULT_HISTORIAN_TIMEOUT_MS, getProtectedTokensTierOverrides, sanitizeDiagnosticText, hasShareabilitySensitiveText, FAIL_CLOSED_DOCTOR_COMMAND, formatFailClosedBlockingMessage, createFailClosedBlockingError, isFailClosedBlockingError, shouldBypassFailClosedBlock, createFailClosedController, setHarness, getHarness, ensureCortexKitArtifactGitignore, getProjectMagicContextHistorianDir, getMagicContextStorageResolution, getMagicContextStorageDir, log, sessionLog, flushLogger, ProjectIdentityError, resolveProjectIdentityStrict, resolveProjectIdentity, resolveProjectIdentityForSession, beginBootQuietPeriod, scheduleAfterBootQuiet, CTX_REDUCE_KEEP, newestCtxReduceTagNumbers, textMentionsRecentCommit, hasMeaningfulUserText, extractTexts, extractToolCallSummaries, preloadTokenizer, estimateTokens, normalizeText, stripWellFormedLeadingTagPrefix, stripPersistedAssistantText, byteSize, stripTagPrefix, peelLeadingMcTagNotation, prependTag, isRecord, estimateImageTokensFromDataUrl, normalizeTodoStateJson, buildSyntheticTodoPart, stripChannel1ReminderSpans, effectiveTailHygiene, CHANNEL1_SENTINEL, CHANNEL1_FLOOR_TOKENS, decideChannel1, evaluateChannel2, reclaimableToolOutputCount, buildChannel2Reminder, buildChannel1Reminder, planEmergencyDrop, updateTagByteSize, getRecentTagOwnerMessageIds, AGE_RECLAIM_MIN_TOKENS, getOldestActiveUnprotectedToolTags, getActiveToolTagsForAgeReclaim, getTriggerTagTokenUpperBound, updateTagInputByteSize, updateTagTokenCount, getPersistedToolTagAccounting, getAllStatusTagTokenTotalsFlat, updateTagInputTokenCount, tagTokenCountIsNull, backfillTagTokenCounts, insertTag, updateTagStatus, updateTagDropMode, updateCavemanDepth, hasPiFallbackMessageTags, findAdoptableFallbackTags, hasPiFallbackToolOwnerTags, findPiFallbackToolOwnerTags, adoptPiFallbackToolOwnerTag, adoptPiFallbackMessageTag, getMaxTagNumberBySession, getAssignableTagNumberByMessageId, deriveTagLoadFloor, getTagsBySession, getActiveTagsBySession, getTagsForPendingOperations, getTagsByNumbers, getDroppedTagsByNumbers, getMaxDroppedTagNumber, getToolTagNumberByOwner, getNullOwnerToolTag, adoptNullOwnerToolTag, resolveOpenCodeDbPath, assertOpenCodeStoreGeneration, openCodeDbPathExists, recordOpenCodeDbReadFailure, clearOpenCodeDbReadFailure, claimOpenCodeDbDiagnosticOnce, Database, closeQuietly, completedToolArcCrossesBoundary, estimateTrueRawMessageTokens, buildToolArcs, fenceBoundaryForCompletedToolArcs, fenceBoundaryForToolArcs, buildTrueRawTokenIndex, computeRawRangeFingerprint, invalidateTrueRawTokenCache, DROPPED_INPUT_MESSAGE, droppedInputMarker, containsDroppedInputPlaceholder, isEditTool, applyEditMarkerToInput, setRawMessageProvider, withRawMessageProvider, cleanUserText, withRawSessionMessageCache, readRawSessionMessages, primeTailRawMessageCache, getCachedAbsoluteMessageCount, primeInMemoryTailRawMessageCache, getRawSessionMessageCount, getRawSessionTagKeysThrough, getLegacyProtectedTailStartOrdinal, readSessionChunk, logSlowWriteTransaction, clearCompressionDepth, clearCompressionDepthRange, getMessageIndexSourceIdentity, isMessageIndexSourceCurrent, getLastIndexedOrdinal, getMessageIndexReconciliationStartOrdinal, isMessageIndexReconciledThrough, indexSingleMessage, indexMessagesAfterOrdinal, sweepOrphanedOpenCodeMessageIndexes, recordSessionProjectIdentity, COMPARTMENT_LEASE_RENEWAL_MS, acquireCompartmentLease, renewCompartmentLease, releaseCompartmentLease, releaseCompartmentLeaseBestEffort, isCompartmentLeaseHeld, isNoContentCompartment, HAS_COMPARTMENT_CONTENT_SQL, persistCachedM0, clearCachedM0M1, getCompartments, getLastCompartmentEndMessage, getLastCompartmentEndMessageId, getCompartmentsByEndMessageId, appendCompartments, saveRecompStagingPass, getRecompStaging, clearRecompStaging, getRecompPartialRange, setRecompPartialRange, escapeXmlAttr, escapeXmlContent, getModuleNoteEvaluationBridge, getContextStoreUuid, drainMirrorPages, parseCompartmentOutput, resolveWorkspaceShareCategories, resolveWorkspaceIdentitySet, expandWorkspaceIdentitySetWithAliases, sourceNameForMemory, computeWorkspaceEpochFingerprint, bumpEpochsForWorkspaceMembers, readProjectDocsCanonical, encodePiContentDecision, getPiContentDecisions, freezePiContentDecision, getNativeReplayState, saveNativeToolInputs, addNativeReasoningIds, copySessionStateForClone, getErrorMessage, describeError, piHarnessKindFromExecutable, setStoragePrivatePermissionEnforcement, getSchemaFenceRejection, getMigrationOnOpenRefusal, LATEST_SUPPORTED_VERSION, getDatabasePath, getPersistedSchemaVersion, setSqlitePragmaConfig, applySqliteTuningPragmas, runSqliteOptimize, openDatabase, openDatabaseAsync, queueM0Mutation, getMaxM0MutationId, queueMemoryMutation, getMemoryMutationsForRender, getMemoryMutationsForRenderByProjects, getMaxMemoryMutationId, getMaxMemoryMutationIdForProjects, MAX_EXECUTE_THRESHOLD, escalationBands, computeProtectionWindow, readEpochFloorSnapshot, getProtectionWindowForSession, isProviderOverflowFailClosedProven, describeProtectedTailDrainBudgetSkip, loadProtectedTailMeta, markProtectedTailPolicyV3Seeded, recordProtectedTailPublicationFloor, recordProtectedTailNoEligibleHead, getWrapupInProgressState, isWrapupInProgress, acquireWrapupInProgress, updateWrapupInProgress, releaseWrapupInProgress, resolveCompactionModeRecord, getCompactionModeRecord, setCompactionModeRecord, reserveProtectedTailDrainTokens, clearEmergencyDrainLatch, recordHistorianDrainFailure, clearHistorianDrainFailure, rollbackProtectedTailDrainReservation, clearPersistedReasoningWatermark, getEmergencyInputSample, setEmergencyDropSample, clearEmergencyDropSample, getLastNudgeUndropped, setLastNudgeUndropped, getChannel1NudgeState, setChannel1NudgeState, markChannel1PostReduceGracePending, captureChannel1PostReduceGraceBaseline, getChannel2NudgeState, getChannel2NudgeClaim, setChannel2NudgeState, casChannel2NudgeState, claimChannel2NudgeState, casChannel2NudgeClaim, getPersistedNoteNudge, setPersistedNoteNudgeTrigger, setPersistedNoteNudgeTriggerMessageId, getNoteNudgeAnchors, getAutoSearchHintDecisions, deliverNoteNudgeAtomic, appendAutoSearchHintDecision, pruneNoteNudgeAnchors, pruneAutoSearchHintDecisions, getPersistedTodoSyntheticAnchor, setPersistedTodoSyntheticAnchor, clearPersistedTodoSyntheticAnchor, getNoteLastReadAt, incrementHistorianFailure, clearHistorianFailureState, getOverflowState, recordOverflowDetected, clearEmergencyRecovery, clearDetectedContextLimit, getStrippedPlaceholderIds, applyStrippedPlaceholderDelta, NEWEST_REASONING_BEARING_ASSISTANT, THINKING_BINDING_RECOVERY_FROZEN_PREFIX, thinkingBindingRecoveryFrozenId, getThinkingBindingRecoveryTarget, armThinkingBindingRecovery, clearThinkingBindingRecoveryIf, getMergedReasoningStrippedIds, addMergedReasoningStrippedIds, getProcessedImageStrippedIds, addProcessedImageStrippedIds, getPendingCompactionMarkerState, clearPendingCompactionMarkerStateIf, getPendingPiCompactionMarkerState, setPendingPiCompactionMarkerState, clearPendingPiCompactionMarkerStateIf, getSessionsWithPendingPiMarker, setSessionWorkMetrics, getSessionWorkMetrics, resolveEpochFloorForPass, getOrCreateSessionMeta, updateSessionMeta, advanceToolReclaimWatermark, retryPendingSessionCleanups, retryPendingRustSessionCleanupsForProject, getNotes, getSessionNotes, getPendingSmartNotes, getReadySmartNotes, markNoteReady, markNoteChecked, queuePendingOp, getPendingOps, getPendingOpsCount, clearPendingOps, removePendingOp, PRIMER_CANDIDATE_TTL_MS, PRIMER_CANDIDATE_MAX_AGE_MS, primerOccurrenceKey, primerOccurrenceUtcDay, insertPrimerCandidates, updatePrimerCandidateEmbedding, getPrimerCandidatesByIds, getPrimerCandidatesForPromotion, countPrimerCandidatesForProject, getActivePrimers, createPrimer, updatePrimerSupport, updatePrimerAnswer, GLOBAL_USER_PROFILE_PROJECT_PATH, getProjectState, bumpProjectUserProfileVersion, saveSourceContent, getSourceContents, recordSubagentInvocation, getLatestHistorianInvocationId, BoundedSessionMap, MIN_PLAUSIBLE_CONTEXT_LIMIT, reloadWindowOverlay, getWindowOverlay, resolveWindowOverlayFacts, deriveWindowGeometry, hasTrustedAbsoluteWall, applyProvenInputFloor, formatWindowDerivationLine, isSaneLimit, resolveOutputReserve, getSdkContextLimit, formatConfigParseStatusLine, formatConfigParseNotice, claimConfigParseFailuresOnce, promptSurfaceHashMaterial, createPromptSurfaceRuntime, createPromptSurfaceGuidanceEpochCache, SYNTH_USER_ID_PREFIX, resolvePiStableId, readPiSessionSnapshot, readPiSessionMessages, readPiSessionMessagePage, findLastModelKeyFromBranch, convertEntriesToRawMessages, convertEntriesToRawMessagePage, computeCueContentHash, hasMuralCueColumns, getMuralCueState, memoryNeedsCue, setMuralCue, recordMuralCueRejection, invalidateMemory, computeNormalizedHash, hasMemoryShareableColumn, hasMemoryClassifiedAtColumn, getUnclassifiedMemoryIds, insertMemory, getMemoryByHash, getMemoriesByProject, getMemoriesByProjects, getMaxMemoryIdForProjects, getAllActiveMemoriesForMigration, getMemoryById, setMemoryClassification, archiveMemory, deleteMemory, getMemoryCount, getMemoryCountsByStatus, USER_MEMORY_CANDIDATE_TTL_MS, insertUserMemoryCandidates, getUserMemoryCandidates, deleteUserMemoryCandidates, pruneExpiredUserMemoryCandidates, insertUserMemory, getActiveUserMemories, updateUserMemoryContent, dismissUserMemory, getTaskScheduleState, getMostRecentTaskRunAt, pruneNonCanonicalTaskRows, deleteTaskScheduleRowsForProject, seedTaskScheduleState, writeTaskScheduleState, isRetrospectiveWindowProcessed, recordRetrospectiveWindowProcessed, curateCategoryForMemoryCategory, peekCurateCategoryScope, beginCurateCategoryRun, curateTaskStateAfterSuccess, formatSynapseLaneDescriptor, buildCanonicalChunkTextFromFts, buildCompartmentSummaryFallbackText, canonicalizeInMemoryChunkTextForEmbedding, chunkCanonicalText, chunkEmbeddingWindowsAreCurrent, replaceCompartmentChunkEmbeddings, cosineSimilarity, GIT_SWEEP_LEASE_RENEWAL_MS, acquireGitSweepLease, renewGitSweepLease, markGitSweepSuccessAndRelease, parkGitSweepNonIndexable, releaseGitSweepLease, describeShadowBackfillWriteRefusal, contentSha256, sweepStaleEmbeddingIdentitiesForProject, enqueueShadowEmbeddingItems, getProjectEmbeddingSnapshot, getProjectChunkEmbeddingModelId, getProjectEmbeddingMaxInputTokens, embedTextForProject, embedBatchForProject, embedItemsForProject, embedUnembeddedMemoriesForProject, drainCommitBacklogForProject, embedSessionCompartmentChunks, getEmbeddingCoverageStatus, promoteSessionFactsDurable, embedPromotedFacts, recordMemoryMapping, recordMemoryVerifications, getUnmappedMemoryIds, clearMemoryVerifications, getMemoryVerifications, resolveGitTopLevel, readGitHead, readGitChangedFilesSince, readGitFileChangeTimesSince, verificationFileExists, normalizeVerificationFiles, isDirectiveShapedProjectRule, takeCurateSafetyRefusalCount, wakePlaneStatus, indexCommitsForProject, embedUnembeddedCommits, loadPiConfig, ensureProjectRegisteredFromPiDirectory, resolvePiHarnessDetection, resolvePiHarnessKind, resolveMuralWire, updateCompactionMarkerAfterPublication, COMPARTMENT_RENDER_EPOCH, encodeCachedM0UpgradeIdentity, decodeCachedM0UpgradeIdentity, DEFAULT_HISTORY_BUDGET_TOKENS, renderCompartmentAtTier, renderDecayedCompartments, extractM0Block, TEMPORAL_MARKER_PATTERN, temporalMarkerPrefix, clearInjectionCache, getVisibleMemoryIds, renderMemoryBlock, DEFAULT_MEMORY_BUDGET_TOKENS, DEFAULT_USER_PROFILE_BUDGET_TOKENS, trimMemoriesToBudgetV2, trimWorkspaceMemoriesToBudgetV2, trimUserMemoriesToBudget, renderMemoryBlockV2, stripMemoryMuralBlock, unifiedSearch, rememberTodowriteToolCallTodos, parseTodos, setTodoSnapshot, registerTodoOverlay, registerTodoStateLifecycle, syncCtxMemoryToolEnabled, registerMagicContextTools };
