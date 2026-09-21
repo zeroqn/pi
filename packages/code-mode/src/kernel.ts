@@ -35,9 +35,19 @@ import { errorText } from "./util";
  * that reaches it can no longer make progress.
  */
 export const MAX_SUSPENSIONS = 100_000;
-/** Where the kernel rotates to a fresh checkout — proactively, with the last tenth held
- * back as headroom for the cell in flight and for a rotation that has to be retried. */
-export const ROTATE_AT = Math.floor(MAX_SUSPENSIONS * 0.9);
+/**
+ * Where the kernel rotates to a fresh checkout — proactively, with the last tenth held back as
+ * headroom for the cell in flight and for a rotation that has to be retried.
+ *
+ * The rule is a function because the *derivation* is the thing worth testing, and testing it at
+ * 90 000 suspensions is a twenty-minute run: `createKernel` takes an optional `limits`, whose
+ * default is the constant above, so a test can drive the same code at 100. Nothing in production
+ * passes it — there is still one number, and no environment knob to drift out of sync with it.
+ */
+export function rotateAtFor(maxSuspensions: number): number {
+	return Math.floor(maxSuspensions * 0.9);
+}
+export const ROTATE_AT = rotateAtFor(MAX_SUSPENSIONS);
 /** The reserve, split into retry steps so a broken rotation cannot retry per suspension. */
 export const ROTATE_BACKOFF = Math.max(1, Math.floor((MAX_SUSPENSIONS - ROTATE_AT) / 8));
 /** Consecutive failed rotations after which rotation stops until the next turn. */
@@ -74,8 +84,20 @@ export function sessionFilePath(ctx: any): string | undefined {
 	return file ? resolve(file) : undefined;
 }
 
-export function createKernel(options: { pi: any; sessionKey: string; ledger: Ledger }): Kernel {
+export function createKernel(options: {
+	pi: any;
+	sessionKey: string;
+	ledger: Ledger;
+	/** Test seam, and only that: production passes nothing and gets the constants above. A
+	 * small `maxSuspensions` lets a test cross the reserve in seconds, which is the difference
+	 * between asserting the rotation's *outcomes* and waiting twenty minutes for them. */
+	limits?: { maxMemory?: number; maxSuspensions?: number };
+}): Kernel {
 	const { pi, ledger } = options;
+	const maxSuspensions = options.limits?.maxSuspensions ?? MAX_SUSPENSIONS;
+	const checkoutLimits = { maxMemory: options.limits?.maxMemory ?? CHECKOUT_LIMITS.maxMemory, maxSuspensions };
+	const rotateAt = rotateAtFor(maxSuspensions);
+	const rotateBackoff = Math.max(1, Math.floor((maxSuspensions - rotateAt) / 8));
 	let pool: MontyPool | null = null;
 	let session: Awaited<ReturnType<MontyPool["checkout"]>> | null = null;
 	let mount: InstanceType<typeof MontyModule.MountDir> | null = null;
@@ -95,7 +117,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 	/** Suspensions this checkout has received; reset by every rotation, as the pool's count is. */
 	let suspensions = 0;
 	/** The count at which the next rotation attempt is allowed (backoff after a failure). */
-	let rotateRetryAt = ROTATE_AT < MAX_SUSPENSIONS ? ROTATE_AT : Number.POSITIVE_INFINITY;
+	let rotateRetryAt = rotateAt < maxSuspensions ? rotateAt : Number.POSITIVE_INFINITY;
 	let rotateFailures = 0;
 	/** Rotations performed inside the current cell, for the notice. */
 	let cellRotations = 0;
@@ -192,7 +214,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 		mkdirSync(scratch, { recursive: true });
 		const started = await monty.Monty.create();
 		pool = started;
-		session = await started.checkout({ limits: CHECKOUT_LIMITS });
+		session = await started.checkout({ limits: checkoutLimits });
 		mount = new monty.MountDir({ hostPath: cwd, virtualPath: cwd, mode: "read-write" });
 		scratchMount = new monty.MountDir({ hostPath: scratch, virtualPath: scratch, mode: "read-write" });
 		root = cwd;
@@ -282,7 +304,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 	 */
 	async function rotateKernel(snap: any, feedOptions: any): Promise<any> {
 		const bytes = await snap.dump();
-		const next = await pool!.checkout({ limits: CHECKOUT_LIMITS });
+		const next = await pool!.checkout({ limits: checkoutLimits });
 		let resumed: any;
 		try {
 			resumed = await next.loadSnapshot(bytes, feedOptions);
@@ -324,7 +346,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 					snap = await rotateKernel(snap, feedOptions);
 					cellRotations += 1;
 					rotateFailures = 0;
-					rotateRetryAt = ROTATE_AT;
+					rotateRetryAt = rotateAt;
 					suspensions = 0;
 					rotateTrace("ok", at);
 				} catch (error) {
@@ -334,7 +356,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 					rotateFailures += 1;
 					cellRotateFailure = errorText(error);
 					rotateRetryAt =
-						rotateFailures >= ROTATE_FAILURE_CAP ? Number.POSITIVE_INFINITY : suspensions + ROTATE_BACKOFF;
+						rotateFailures >= ROTATE_FAILURE_CAP ? Number.POSITIVE_INFINITY : suspensions + rotateBackoff;
 					rotateTrace("failed", suspensions, cellRotateFailure);
 				}
 			}
@@ -360,7 +382,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 	function isSuspensionAbort(error: unknown): boolean {
 		const exception = (error as { exception?: { typeName?: string; message?: string } } | null)?.exception;
 		return (
-			exception?.typeName === "RuntimeError" && exception?.message === `suspension limit ${MAX_SUSPENSIONS} exceeded`
+			exception?.typeName === "RuntimeError" && exception?.message === `suspension limit ${maxSuspensions} exceeded`
 		);
 	}
 
@@ -373,7 +395,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 	async function recoverFromAbort(): Promise<string | null> {
 		try {
 			const bytes = await session!.dump();
-			const next = await pool!.checkout({ limits: CHECKOUT_LIMITS });
+			const next = await pool!.checkout({ limits: checkoutLimits });
 			await next.loadSession(bytes);
 			const previous = session;
 			session = next;
@@ -384,7 +406,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 			}
 			suspensions = 0;
 			rotateFailures = 0;
-			rotateRetryAt = ROTATE_AT;
+			rotateRetryAt = rotateAt;
 			return null;
 		} catch (error) {
 			await dropKernel();
@@ -405,7 +427,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 		starting = null;
 		suspensions = 0;
 		rotateFailures = 0;
-		rotateRetryAt = ROTATE_AT;
+		rotateRetryAt = rotateAt;
 		try {
 			await doomedSession?.close();
 		} catch {
@@ -529,9 +551,9 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 			);
 		}
 		const workerPath = process.env.MONTY_BIN;
-		if (ROTATE_AT >= MAX_SUSPENSIONS) {
+		if (rotateAt >= maxSuspensions) {
 			found.push(
-				`rotation is disabled: ROTATE_AT (${ROTATE_AT}) is not below MAX_SUSPENSIONS (${MAX_SUSPENSIONS}), so a rotation would fire on every suspension`,
+				`rotation is disabled: ROTATE_AT (${rotateAt}) is not below MAX_SUSPENSIONS (${maxSuspensions}), so a rotation would fire on every suspension`,
 			);
 		}
 		if (workerPath) {
@@ -755,7 +777,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 		// A failed rotation is usually transient (pool exhaustion), so the failure cap is per
 		// turn rather than per session.
 		rotateFailures = 0;
-		rotateRetryAt = ROTATE_AT < MAX_SUSPENSIONS ? ROTATE_AT : Number.POSITIVE_INFINITY;
+		rotateRetryAt = rotateAt < maxSuspensions ? rotateAt : Number.POSITIVE_INFINITY;
 		await dumpKernel();
 	}
 
