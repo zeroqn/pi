@@ -1,0 +1,377 @@
+/**
+ * The seam between `pi-code-mode` and a package that contributes to a kernel it does not
+ * own — the whole contract from The published contract (map ticket 01), recorded as
+ * `docs/adr/0001-code-mode-registry-seam.md`.
+ *
+ * Nothing here imports pi or monty. `mount` is handed a kernel factory, and the ledger is
+ * handed a base surface, so every rule in this file is testable with no kernel at all —
+ * which is what makes `test/contract.test.ts` a test of the rules rather than of monty.
+ *
+ * Three rules are worth restating where they are enforced, because each one is a decision
+ * and not a convenience:
+ *
+ *  - **Published at module load, first wins.** Discovery must not depend on which
+ *    extension pi loaded first (02 measured that both modules exist before any handler
+ *    runs), and a consumer must never capture `mount` — read it off the registry.
+ *  - **Validation is all-or-nothing.** One rejected name means nothing from that call is
+ *    applied. A half-contributed kernel is worse than a bare one: a prelude line whose
+ *    host function was rejected is a `NameError` at call time.
+ *  - **`mount` is idempotent by session key.** pi will happily host two kernels behind one
+ *    session and never say a word (02 §2), so the rule has to live here, and the mount
+ *    count is the observable that proves it.
+ */
+import { resolve } from "node:path";
+
+/** The rendezvous. Read off `globalThis` at call time, never captured (ticket 01). */
+export const REGISTRY_KEY = Symbol.for("pi-code-mode:registry");
+export const PUBLISHER = "pi-code-mode";
+/** An integer, bumped on any breaking change to this file's surface. pi has no version
+ * query of its own, so this field is the only way a consumer can tell an old code mode
+ * from an absent one (02 §5). */
+export const API_VERSION = 1;
+
+export type HostFn = (...args: unknown[]) => Promise<unknown>;
+
+export type Notice = {
+	key: string;
+	content: string;
+	customType?: string;
+	/** A notice is dropped when this says the reader already knows — the read rule. */
+	cancelled?: () => boolean;
+};
+
+/** Which journals a session replays, and which scratch to seed from. rlm owns the rule
+ * (provenance, v1 ticket 13); code mode only asks (ticket 03, C4). */
+export type Provenance = {
+	journals: string[];
+	seedScratchFrom?: string;
+};
+
+export type Contribution = {
+	owner: string;
+	hostFns?: Record<string, HostFn>;
+	/** Appended after the base prelude, verbatim. */
+	prelude?: string;
+	/** Appended after the base description, verbatim — the contributor owns its separators. */
+	description?: string;
+	/** Appended after the base snippet, verbatim, for the same reason. */
+	snippet?: string;
+	/** Appended to the base guidelines, in owner order. */
+	guidelines?: string[];
+	/** Called by the base host functions that opt in (today `bash_host`); first owner wins. */
+	onHostCall?: (name: string, args: unknown[]) => void;
+	/** How a kernel that has no rlm tells the model something; first owner wins. */
+	onNotice?: (notice: Notice) => void;
+	provenance?: (ctx: unknown) => Provenance;
+};
+
+export type Rejection = { name: string; reason: string };
+export type Receipt = { owner: string; accepted: string[]; rejected: Rejection[] };
+
+/** What a kernel must provide for the mounter to wrap it into a handle. */
+export type KernelHandleCore = {
+	currentCell: () => string;
+	root: () => string;
+	scratch: () => string;
+	problems: () => string[];
+	contribute: (contribution: Contribution) => Receipt;
+};
+
+export type KernelHandle = KernelHandleCore & {
+	readonly publisher: string;
+	readonly apiVersion: number;
+	readonly sessionKey: string;
+	/** 1 = the one kernel for this session; >1 = the idempotency rule doing its job. */
+	readonly mounts: number;
+};
+
+export type RegistryEntry = {
+	publisher: string;
+	apiVersion: number;
+	sessions: Map<string, KernelHandle>;
+	mount: (pi: unknown, ctx: unknown) => KernelHandle;
+};
+
+/** The names code mode's own kernel answers. No contribution may take one. */
+export const BASE_HOST_FNS = [
+	"bash_host",
+	"find",
+	"grep",
+	"read_image",
+	"bg_poll",
+	"bg_read",
+	"bg_kill",
+	"bg_list",
+];
+
+/** The exact surface of a contribution: an unknown field is a typo, and a typo is loud. */
+const CONTRIBUTION_FIELDS = [
+	"owner",
+	"hostFns",
+	"prelude",
+	"description",
+	"snippet",
+	"guidelines",
+	"onHostCall",
+	"onNotice",
+	"provenance",
+];
+
+/** The static half of what the model and the kernel see. The *prelude's* base is not here:
+ * it is a function of `ROOT` and `SCRATCH`, so the kernel builds it and the ledger only
+ * appends (`preludeTail`). */
+export type BaseSurface = {
+	description: string;
+	snippet: string;
+	guidelines: string[];
+};
+
+export type SessionKeys = { of: (ctx: unknown) => string };
+
+export type EntryLookup =
+	| { status: "absent" }
+	| { status: "wrong-shape"; reason: string }
+	| { status: "found"; entry: RegistryEntry };
+
+export type Mounter = {
+	mount: (pi: unknown, ctx: unknown) => KernelHandle;
+	retire: (ctx: unknown) => boolean;
+	sessions: Map<string, KernelHandle>;
+};
+
+/**
+ * The session key, resolved from `ctx.sessionManager` and never from the `ctx` object:
+ * `createContext()` hands out a fresh object per call (pi's `runner.js:503-560`), so ctx
+ * identity is not stable — not across the double `session_start` an RPC replacement fires,
+ * and not between two handlers in one bind. An unpersisted session keys on the session
+ * manager's identity instead, so it stays shareable in-process without a second kernel.
+ */
+export function createSessionKeys(): SessionKeys {
+	const unpersisted = new WeakMap<object, string>();
+	let next = 0;
+	return {
+		of(ctx: unknown) {
+			const anyCtx = ctx as { sessionManager?: { getSessionFile?: () => string | undefined } } | null;
+			const file = anyCtx?.sessionManager?.getSessionFile?.();
+			if (file) return resolve(file);
+			const anchor: object = (anyCtx?.sessionManager as object) ?? (ctx as object) ?? {};
+			let key = unpersisted.get(anchor);
+			if (!key) {
+				next += 1;
+				key = `unpersisted#${next}`;
+				unpersisted.set(anchor, key);
+			}
+			return key;
+		},
+	};
+}
+
+/** Publish, first wins. A second publisher joins the first entry rather than replacing it,
+ * so a duplicate install cannot fork the session map. */
+export function publish(entry: RegistryEntry, glob: Record<symbol, unknown> = globalThis as never): {
+	published: boolean;
+	reason?: string;
+} {
+	const existing = glob[REGISTRY_KEY];
+	if (existing !== undefined && existing !== null) {
+		return { published: false, reason: `already published by ${String((existing as RegistryEntry).publisher)}` };
+	}
+	glob[REGISTRY_KEY] = entry;
+	return { published: true };
+}
+
+export function findEntry(glob: Record<symbol, unknown> = globalThis as never): EntryLookup {
+	const raw = glob?.[REGISTRY_KEY];
+	if (raw === undefined || raw === null) return { status: "absent" };
+	const problem = shapeProblem(raw);
+	if (problem) return { status: "wrong-shape", reason: problem };
+	return { status: "found", entry: raw as RegistryEntry };
+}
+
+function shapeProblem(raw: unknown): string | null {
+	if (typeof raw !== "object" || raw === null) return "the registry entry is not an object";
+	const entry = raw as Partial<RegistryEntry>;
+	if (typeof entry.publisher !== "string") return "the entry has no publisher name";
+	if (typeof entry.apiVersion !== "number") return "the entry has no numeric apiVersion";
+	if (!(entry.sessions instanceof Map)) return "the entry has no sessions map";
+	if (typeof entry.mount !== "function") return "the entry has no mount function";
+	return null;
+}
+
+/** The consumer's version check: the entry must be at least as new as what this build
+ * needs. A newer entry with an unchanged shape is fine — the shape check is the guard. */
+export function versionProblem(entry: { apiVersion: number }, minimum = API_VERSION): string | null {
+	if (typeof entry.apiVersion !== "number") return "the entry has no numeric apiVersion";
+	if (entry.apiVersion >= minimum) return null;
+	return `code mode's contract is version ${entry.apiVersion}, and this build needs ${minimum}`;
+}
+
+/**
+ * The mounter: one kernel per session key, whoever asks first. `create` is called at most
+ * once per key; every later call returns the same handle and counts itself.
+ */
+export function createMounter(options: {
+	keys: SessionKeys;
+	create: (pi: unknown, ctx: unknown, sessionKey: string) => KernelHandleCore;
+	onExtraMount?: (sessionKey: string, mounts: number) => void;
+	sessions?: Map<string, KernelHandle>;
+}): Mounter {
+	const sessions = options.sessions ?? new Map<string, KernelHandle>();
+	const counts = new Map<string, number>();
+	const wrap = (core: KernelHandleCore, key: string): KernelHandle => ({
+		...core,
+		publisher: PUBLISHER,
+		apiVersion: API_VERSION,
+		sessionKey: key,
+		get mounts() {
+			return counts.get(key) ?? 1;
+		},
+	});
+	return {
+		sessions,
+		mount(pi: unknown, ctx: unknown) {
+			const key = options.keys.of(ctx);
+			const existing = sessions.get(key);
+			if (existing) {
+				const mounts = (counts.get(key) ?? 1) + 1;
+				counts.set(key, mounts);
+				options.onExtraMount?.(key, mounts);
+				return existing;
+			}
+			counts.set(key, 1);
+			const handle = wrap(options.create(pi, ctx, key), key);
+			sessions.set(key, handle);
+			return handle;
+		},
+		retire(ctx: unknown) {
+			const key = options.keys.of(ctx);
+			counts.delete(key);
+			return sessions.delete(key);
+		},
+	};
+}
+
+const NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * The contribution ledger: what has been contributed, and the composed surface it adds up
+ * to. Owner order is the order of first acceptance, so the composed description and
+ * guidelines are deterministic across runs — which is what makes the byte-identical check
+ * in `acceptance.md` mean something.
+ */
+export function createLedger(spec: { reserved: string[]; base: BaseSurface }) {
+	const accepted = new Map<string, Contribution>();
+	let closed: string | null = null;
+
+	const fieldsOf = (contribution: Contribution): string[] => {
+		const names = Object.keys(contribution.hostFns ?? {});
+		for (const field of CONTRIBUTION_FIELDS) {
+			if (field === "owner" || field === "hostFns") continue;
+			if (contribution[field as keyof Contribution] !== undefined) names.push(field);
+		}
+		return names;
+	};
+
+	const refuse = (owner: string, rejected: Rejection[]): Receipt => ({ owner, accepted: [], rejected });
+
+	return {
+		/** The window closes at the first cell: the prelude is fed once, so a late
+		 * contribution could only half-arrive. */
+		close(reason = "kernel already started") {
+			closed ??= reason;
+		},
+		isOpen() {
+			return closed === null;
+		},
+		owners(): string[] {
+			return [...accepted.keys()];
+		},
+		accept(contribution: Contribution): Receipt {
+			const owner = typeof contribution?.owner === "string" ? contribution.owner.trim() : "";
+			if (!owner) return refuse(String(contribution?.owner ?? ""), [{ name: "owner", reason: "a contribution needs a non-empty owner" }]);
+			if (closed) return refuse(owner, [{ name: "<contribution>", reason: closed }]);
+
+			const rejected: Rejection[] = [];
+			for (const key of Object.keys(contribution)) {
+				if (!CONTRIBUTION_FIELDS.includes(key)) rejected.push({ name: key, reason: "unknown contribution field" });
+			}
+			for (const field of ["prelude", "description", "snippet"]) {
+				const value = contribution[field as "prelude" | "description" | "snippet"];
+				if (value !== undefined && typeof value !== "string") rejected.push({ name: field, reason: "not a string" });
+			}
+			if (contribution.guidelines !== undefined) {
+				if (!Array.isArray(contribution.guidelines)) rejected.push({ name: "guidelines", reason: "not an array" });
+				else if (contribution.guidelines.some((line) => typeof line !== "string"))
+					rejected.push({ name: "guidelines", reason: "an entry is not a string" });
+			}
+			for (const field of ["onHostCall", "onNotice", "provenance"]) {
+				const value = contribution[field as "onHostCall" | "onNotice" | "provenance"];
+				if (value !== undefined && typeof value !== "function") rejected.push({ name: field, reason: "not a function" });
+			}
+			// Names other owners already hold: an owner may replace its own, never steal.
+			const taken = new Map<string, string>();
+			for (const [otherOwner, other] of accepted) {
+				if (otherOwner === owner) continue;
+				for (const name of Object.keys(other.hostFns ?? {})) taken.set(name, otherOwner);
+			}
+			for (const [name, fn] of Object.entries(contribution.hostFns ?? {})) {
+				if (!NAME_RE.test(name)) rejected.push({ name, reason: "not a usable host-function name" });
+				else if (spec.reserved.includes(name)) rejected.push({ name, reason: "code mode's own host function" });
+				else if (taken.has(name)) rejected.push({ name, reason: `already contributed by ${taken.get(name)}` });
+				else if (typeof fn !== "function") rejected.push({ name, reason: "not a function" });
+			}
+			if (rejected.length > 0) return refuse(owner, rejected);
+			// Replace wholesale, keeping the owner's position: a second `session_start` costs nothing.
+			accepted.set(owner, contribution);
+			return { owner, accepted: fieldsOf(contribution), rejected: [] };
+		},
+		hostFns(): Record<string, HostFn> {
+			const merged: Record<string, HostFn> = {};
+			for (const contribution of accepted.values()) Object.assign(merged, contribution.hostFns ?? {});
+			return merged;
+		},
+		/** Only the contributed half: the base prelude is built from `ROOT`/`SCRATCH` at kernel
+		 * start, and the kernel prepends it. */
+		preludeTail(): string {
+			return [...accepted.values()].map((c) => c.prelude ?? "").join("");
+		},
+		description(): string {
+			return spec.base.description + [...accepted.values()].map((c) => c.description ?? "").join("");
+		},
+		snippet(): string {
+			return spec.base.snippet + [...accepted.values()].map((c) => c.snippet ?? "").join("");
+		},
+		guidelines(): string[] {
+			const lines = [...spec.base.guidelines];
+			for (const contribution of accepted.values()) lines.push(...(contribution.guidelines ?? []));
+			return lines;
+		},
+		/** The base host functions call this; the first owner that asked to observe gets it. */
+		hostCall(name: string, args: unknown[]) {
+			for (const contribution of accepted.values()) {
+				if (contribution.onHostCall) {
+					contribution.onHostCall(name, args);
+					return;
+				}
+			}
+		},
+		/** How a kernel with no rlm reaches the model. */
+		notify(notice: Notice): boolean {
+			for (const contribution of accepted.values()) {
+				if (contribution.onNotice) {
+					contribution.onNotice(notice);
+					return true;
+				}
+			}
+			return false;
+		},
+		provenance(ctx: unknown): Provenance | undefined {
+			for (const contribution of accepted.values()) {
+				if (contribution.provenance) return contribution.provenance(ctx);
+			}
+			return undefined;
+		},
+	};
+}
+
+export type Ledger = ReturnType<typeof createLedger>;

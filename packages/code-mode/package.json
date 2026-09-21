@@ -1,0 +1,22 @@
+{
+	"name": "pi-code-mode",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"keywords": ["pi-package"],
+	"description": "Code-mode Python kernel for pi, backed by monty",
+	"pi": {
+		"extensions": ["./src/index.ts"]
+	},
+	"dependencies": {
+		"@pydantic/monty": "0.0.23"
+	},
+	"scripts": {
+		"test": "bun test",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"typescript": "^5.8.0"
+	}
+}
