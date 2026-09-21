@@ -173,10 +173,14 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 	function provenanceFor(ctx: any): { records: CellRecord[]; seedFrom?: string } {
 		const ownFile = sessionFilePath(ctx);
 		const ownRecords = ownFile ? readJournal(`${ownFile}.rlm-journal.jsonl`) : [];
-		const answer: Provenance | undefined = ledger.provenance(ctx, {
-			sessionFile: ownFile,
-			firstIndex: ownRecords[0]?.index,
-		});
+		const answer: Provenance | undefined =
+			ledger.provenance(ctx, { sessionFile: ownFile, firstIndex: ownRecords[0]?.index }) ??
+			// With no contributor the rule is the trivial one: this session's own journal and no
+			// seeding. rlm refines it (a fork's fragment plus its parent's prefix, a child's own
+			// journal only) — but "my own cells" is a fact code mode already holds, and a
+			// code-mode-only resume that silently started empty instead of replaying its own
+			// journal is the outcome ticket 04's Q1 forbids.
+			(ownFile ? { journals: [ownFile] } : undefined);
 		if (!answer || !Array.isArray(answer.journals) || answer.journals.length === 0) return { records: [] };
 		return { records: readJournals(answer.journals), seedFrom: answer.seedScratchFrom };
 	}
