@@ -25,7 +25,7 @@ describe("the base surface (acceptance check 2)", () => {
 
 	it("keeps the first six pre-split guidelines, in order", () => {
 		expect(BASE_GUIDELINES.length).toBe(6);
-		expect(sha(JSON.stringify(BASE_GUIDELINES))).toBe("abd00a3be369b09ccf2ca5b9ec4929b30c17c1f8cb0cf08ffcda7f3fd392a4f4");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("121aeb851dc4c2420a17bb849ef3baa0d178c9c47aac0c5ac9d52ba29667d01a");
 		expect(BASE_GUIDELINES[0]).toStartWith("Use python for work that is stateful");
 	});
 });
