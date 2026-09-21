@@ -44,6 +44,31 @@ const ZG = process.env.RLM_ZG ?? "zg";
 const SHELL = process.env.RLM_SHELL ?? process.env.SHELL ?? "/bin/bash";
 const MAX_LINES = 2000;
 const MAX_BYTES = 50 * 1024;
+
+// ---------------------------------------------------------------------------
+// The kernel's suspension budget (see .scratch/kernel-budget/acceptance.md)
+// ---------------------------------------------------------------------------
+
+/**
+ * monty's per-checkout host-round-trip budget. Every `bash`/`find`/`os` call,
+ * every name lookup and every future resolution is one suspension, counted for
+ * the whole session; when it runs out the pool aborts every later feed on its
+ * first suspension, so a session that reaches it can no longer make progress.
+ */
+const MAX_SUSPENSIONS = 100_000;
+/**
+ * Where the kernel rotates to a fresh checkout — proactively, with the last
+ * tenth held back as headroom for the cell in flight and for a rotation that
+ * has to be retried. Derived rather than written down, so retuning the budget
+ * cannot leave a literal reserve behind that never fires.
+ */
+const ROTATE_AT = Math.floor(MAX_SUSPENSIONS * 0.9);
+/** The reserve, split into retry steps so a broken rotation cannot retry per suspension. */
+const ROTATE_BACKOFF = Math.max(1, Math.floor((MAX_SUSPENSIONS - ROTATE_AT) / 8));
+/** Consecutive failed rotations after which rotation stops until the next turn. */
+const ROTATE_FAILURE_CAP = 3;
+/** Every checkout, so the limits are stated once. */
+const CHECKOUT_LIMITS = { maxMemory: 1_000_000_000, maxSuspensions: MAX_SUSPENSIONS };
 const MAX_DEPTH = 2;
 const MAX_LIVE_CHILDREN = 8;
 const MAX_LIVE_BACKGROUND = 8;
@@ -415,6 +440,15 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	let parentSessionFile: string | undefined;
 	/** Set when a restore stopped early, so the state is never dumped as if complete. */
 	let kernelIncomplete = false;
+	/** Suspensions this checkout has received; reset by every rotation, as the pool's count is. */
+	let suspensions = 0;
+	/** The count at which the next rotation attempt is allowed (backoff after a failure). */
+	let rotateRetryAt = ROTATE_AT < MAX_SUSPENSIONS ? ROTATE_AT : Number.POSITIVE_INFINITY;
+	let rotateFailures = 0;
+	/** Rotations performed inside the current cell, for the notice. */
+	let cellRotations = 0;
+	let cellRotateFailure: string | null = null;
+	let cellAbort: string | null = null;
 	let sessionCtx: any = null;
 	let currentCell = "";
 	// v2 ticket 10: this session's own depth, resolved from its artifacts rather than
@@ -493,7 +527,7 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 		mkdirSync(scratch, { recursive: true });
 		const started = await monty.Monty.create();
 		pool = started;
-		session = await started.checkout({ limits: { maxMemory: 1_000_000_000, maxSuspensions: 100_000 } });
+		session = await started.checkout({ limits: CHECKOUT_LIMITS });
 		mount = new monty.MountDir({ hostPath: cwd, virtualPath: cwd, mode: "read-write" });
 		scratchMount = new monty.MountDir({ hostPath: scratch, virtualPath: scratch, mode: "read-write" });
 		root = cwd;
@@ -571,6 +605,158 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 			writeFileSync(`${dumpPath}.json`, JSON.stringify({ client: clientVersion(), cells: journal.length, at: new Date().toISOString() }));
 		} catch {
 			// A dump is an optimisation; failing to write one must never fail a turn.
+		}
+	}
+
+	/**
+	 * Mid-feed rotation (kernel-budget 02): dump the snapshot in hand, load it into a
+	 * fresh checkout on the same pool, close the old session, and hand back the
+	 * snapshot the new session is holding. Nothing is lost — the dump carries both
+	 * the heap and the suspended frame — and the new checkout's suspension count
+	 * starts at zero, which is the whole point.
+	 *
+	 * `snapshot.dump()` is not destructive, so a failed rotation leaves the caller
+	 * holding a snapshot it can still resume in the old session.
+	 */
+	async function rotateKernel(snap: any, options: any): Promise<any> {
+		const bytes = await snap.dump();
+		const next = await pool!.checkout({ limits: CHECKOUT_LIMITS });
+		let resumed: any;
+		try {
+			resumed = await next.loadSnapshot(bytes, options);
+		} catch (error) {
+			// A failed load poisons the session it was attempted on; the old one is
+			// untouched, so only this one has to go.
+			try {
+				await next.close();
+			} catch {
+				/* already gone */
+			}
+			throw error;
+		}
+		const previous = session;
+		session = next;
+		try {
+			await previous?.close();
+		} catch {
+			/* the pool releases the worker either way */
+		}
+		return resumed;
+	}
+
+	/**
+	 * Runs one cell, rotating the kernel as its budget nears the ceiling.
+	 *
+	 * `feedStart` + `resumeAuto` rather than `feedRun`: `feedRun` answers every
+	 * suspension internally, so neither the count nor the point of interruption is
+	 * reachable from here — and a rotation has to happen *at* a suspension, with
+	 * the snapshot in hand. The two drives measure the same (probe P11), so the
+	 * observability costs nothing.
+	 */
+	async function driveCell(code: string, options: any): Promise<unknown> {
+		const monty = await loadMonty();
+		let snap: any = await session!.feedStart(code, options);
+		while (!(snap instanceof monty.MontyComplete)) {
+			suspensions += 1;
+			if (suspensions >= rotateRetryAt) {
+				try {
+					const at = suspensions;
+					snap = await rotateKernel(snap, options);
+					cellRotations += 1;
+					rotateFailures = 0;
+					rotateRetryAt = ROTATE_AT;
+					suspensions = 0;
+					rotateTrace("ok", at);
+				} catch (error) {
+					// The snapshot we still hold resumes in the old session, so a failed
+					// rotation costs the retry and nothing else — but it must not be retried
+					// on every suspension, which inside the reserve would be thousands of
+					// checkouts.
+					rotateFailures += 1;
+					cellRotateFailure = errorText(error);
+					rotateRetryAt =
+						rotateFailures >= ROTATE_FAILURE_CAP ? Number.POSITIVE_INFINITY : suspensions + ROTATE_BACKOFF;
+					rotateTrace("failed", suspensions, cellRotateFailure);
+				}
+			}
+			snap = await snap.resumeAuto();
+		}
+		return snap.output;
+	}
+
+	/** One line per rotation attempt, for the transcript: this is the thing to grep after the fact. */
+	function rotateTrace(outcome: string, at: number, reason?: string): void {
+		try {
+			pi.appendEntry("rlm-rotation", { outcome, at, cell: currentCell, ...(reason ? { reason } : {}) });
+		} catch {
+			/* diagnostics must never break a kernel */
+		}
+	}
+
+	/**
+	 * True for monty's own over-budget abort — a `RuntimeError` whose message names
+	 * this session's limit — and for nothing else. The inner exception arrives
+	 * structured, so a user's own `RuntimeError` cannot be mistaken for it.
+	 */
+	function isSuspensionAbort(error: unknown): boolean {
+		const exception = (error as { exception?: { typeName?: string; message?: string } } | null)?.exception;
+		return (
+			exception?.typeName === "RuntimeError" && exception?.message === `suspension limit ${MAX_SUSPENSIONS} exceeded`
+		);
+	}
+
+	/**
+	 * Last-resort recovery (kernel-budget 06). The abort leaves the worker idle and
+	 * dumpable, so the session rotates reactively; if that fails the session is
+	 * dropped and the next cell rebuilds it through the ordinary restore path.
+	 * A kernel that silently refuses every call is the one outcome this forbids.
+	 * Returns null on success, or the reason it could not be rebuilt.
+	 */
+	async function recoverFromAbort(): Promise<string | null> {
+		try {
+			const bytes = await session!.dump();
+			const next = await pool!.checkout({ limits: CHECKOUT_LIMITS });
+			await next.loadSession(bytes);
+			const previous = session;
+			session = next;
+			try {
+				await previous?.close();
+			} catch {
+				/* the pool releases the worker either way */
+			}
+			suspensions = 0;
+			rotateFailures = 0;
+			rotateRetryAt = ROTATE_AT;
+			return null;
+		} catch (error) {
+			await dropKernel();
+			return errorText(error);
+		}
+	}
+
+	/**
+	 * Drops the session *and* its pool, so the next cell's `ensureKernel` rebuilds
+	 * both. Closing the pool is not tidiness: `startKernel` creates a new one, so a
+	 * session dropped without it leaks a whole set of workers.
+	 */
+	async function dropKernel(): Promise<void> {
+		const doomedSession = session;
+		const doomedPool = pool;
+		session = null;
+		pool = null;
+		starting = null;
+		suspensions = 0;
+		rotateFailures = 0;
+		rotateRetryAt = ROTATE_AT;
+		try {
+			await doomedSession?.close();
+		} catch {
+			/* the pool is about to go */
+		}
+		try {
+			await doomedPool?.close();
+		} catch {
+			/* workers exit with it */
 		}
 	}
 
@@ -685,6 +871,11 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 			);
 		}
 		const workerPath = process.env.MONTY_BIN;
+		if (ROTATE_AT >= MAX_SUSPENSIONS) {
+			problems.push(
+				`rotation is disabled: ROTATE_AT (${ROTATE_AT}) is not below MAX_SUSPENSIONS (${MAX_SUSPENSIONS}), so a rotation would fire on every suspension`,
+			);
+		}
 		if (workerPath) {
 			if (!existsSync(workerPath)) {
 				problems.push(`MONTY_BIN does not exist: ${workerPath}`);
@@ -1023,6 +1214,10 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 	pi.on("agent_end", async () => {
 		parentBusy = false;
 		flushNotices();
+		// A new turn is a fresh chance to rotate: a failed one is usually transient
+		// (pool exhaustion), so the failure cap is per turn rather than per session.
+		rotateFailures = 0;
+		rotateRetryAt = ROTATE_AT < MAX_SUSPENSIONS ? ROTATE_AT : Number.POSITIVE_INFINITY;
 		await dumpKernel();
 	});
 
@@ -1103,27 +1298,39 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 				const started = Date.now();
 				let value: unknown;
 				let failure: string | null = null;
-				try {
-					value = await session?.feedRun(params.code, {
-						mount: [mount, scratchMount],
-						printCallback: streams,
-						externalLookup: recordingHost(makeHost(root, attachments, progress, { ...hostExtensions(), ...seamHostFns(), ...webFns }, background), (name, args, result, error) => {
-							// A call that raised is journaled too, so the cell that caught it replays
-							// (ticket 11) instead of stopping the rebuild.
-							cellCalls.push(error ? { name, args, error } : { name, args, result });
-						}),
-						os: (name: string) => {
-							if (/getenv|environ/i.test(name)) {
-								const env: Record<string, string> = {};
-								for (const [key, v] of Object.entries(process.env)) {
-									if (key.startsWith("PI_") && v !== undefined) env[key] = v;
-								}
-								return env;
+				cellRotations = 0;
+				cellRotateFailure = null;
+				cellAbort = null;
+				const feedOptions = {
+					mount: [mount, scratchMount],
+					printCallback: streams,
+					externalLookup: recordingHost(makeHost(root, attachments, progress, { ...hostExtensions(), ...seamHostFns(), ...webFns }, background), (name, args, result, error) => {
+						// A call that raised is journaled too, so the cell that caught it replays
+						// (ticket 11) instead of stopping the rebuild.
+						cellCalls.push(error ? { name, args, error } : { name, args, result });
+					}),
+					os: (name: string) => {
+						if (/getenv|environ/i.test(name)) {
+							const env: Record<string, string> = {};
+							for (const [key, v] of Object.entries(process.env)) {
+								if (key.startsWith("PI_") && v !== undefined) env[key] = v;
 							}
-							return monty.NOT_HANDLED;
-						},
-					});
+							return env;
+						}
+						return monty.NOT_HANDLED;
+					},
+				};
+				try {
+					value = await driveCell(params.code, feedOptions);
 				} catch (error) {
+					if (isSuspensionAbort(error)) {
+						const reason = await recoverFromAbort();
+						rotateTrace("recovered", suspensions, reason ?? undefined);
+						cellAbort =
+							reason === null
+								? "# kernel budget exhausted: this cell was stopped at a host call and its work is lost.\n# The kernel has been rebuilt; your definitions and values are intact.\n"
+								: `# kernel budget exhausted: this cell was stopped at a host call and its work is lost.\n# the kernel could not be rebuilt: ${reason} — the next cell will try again.\n`;
+					}
 					if (error instanceof monty.MontyRuntimeError || error instanceof monty.MontySyntaxError) {
 						failure = error.display("traceback");
 					} else if (error instanceof monty.MontyError) {
@@ -1148,6 +1355,16 @@ export function createKernel(pi: any, childContext: ChildKernelContext | null) {
 				if (restored) {
 					body += `${restoredLine(restored)}\n`;
 					restored = null;
+				}
+				if (cellAbort) {
+					body += cellAbort;
+					cellAbort = null;
+				}
+				if (cellRotations > 0) {
+					body += `# kernel reclaimed mid-cell (${cellRotations}x); nothing was lost.\n`;
+				}
+				if (cellRotateFailure) {
+					body += `# kernel rotation failed (${cellRotateFailure}); the current budget is partly spent, so a later cell may fail before the next turn. Nothing was lost.\n`;
 				}
 				body += stdout;
 				if (value !== undefined && value !== null) {
