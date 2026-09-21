@@ -787,6 +787,7 @@ export function createKernel(options: { pi: any; sessionKey: string; ledger: Led
 		currentCell: () => currentCell,
 		root: () => root,
 		scratch: () => scratch,
+		progress: () => currentProgress,
 		problems: () => ensurePreflight(),
 		contribute: (contribution) => ledger.accept(contribution),
 	};

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import { isAbsolute, join } from "node:path";
-import { sessionFilePath } from "../src/index";
+import { sessionFilePath } from "../src/kernel";
 
 const ctx = (file: string | undefined) => ({ sessionManager: { getSessionFile: () => file } });
 

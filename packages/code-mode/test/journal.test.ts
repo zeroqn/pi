@@ -10,6 +10,7 @@ import { join } from "node:path";
 import {
 	appendJournal,
 	readJournal,
+	readJournals,
 	recordingHost,
 	replayHost,
 	restoredLine,
@@ -219,5 +220,28 @@ describe("a host call that raises is journaled and replayed (ticket 11)", () => 
 		};
 		appendJournal(path, record);
 		expect(readJournal(path)).toEqual([record]);
+	});
+});
+
+/** Moved here with `journal.ts` itself: reading a fork's fragment plus its parent's prefix
+ * is the journal's job, while *which* files those are is rlm's rule (ticket 03, C4). */
+describe("the cells a fork replays, from its own journal and its parent's", () => {
+	it("replays the parent's prefix and then the fork's own fragment, in index order", () => {
+		const dir = mkdtempSync(join(tmpdir(), "rlm-journals-"));
+		try {
+			const parent = join(dir, "parent.jsonl");
+			const fork = join(dir, "fork.jsonl");
+			appendJournal(`${parent}.rlm-journal.jsonl`, cell(0, "x = 1"));
+			appendJournal(`${parent}.rlm-journal.jsonl`, cell(1, "y = 2"));
+			appendJournal(`${fork}.rlm-journal.jsonl`, cell(2, "z = 3"));
+			expect(readJournals([parent, fork]).map((record) => record.index)).toEqual([0, 1, 2]);
+			// One journal is the ordinary case.
+			expect(readJournals([fork]).map((record) => record.index)).toEqual([2]);
+			// A fork with two of its own cells takes the parent's two, not the parent's all.
+			appendJournal(`${fork}.rlm-journal.jsonl`, cell(3, "w = 4"));
+			expect(readJournals([parent, fork]).map((record) => record.index)).toEqual([0, 1, 2, 3]);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
 	});
 });

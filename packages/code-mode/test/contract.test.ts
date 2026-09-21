@@ -36,6 +36,7 @@ function core(): KernelHandleCore & { calls: number } {
 		currentCell: () => "cell",
 		root: () => "/root",
 		scratch: () => "/scratch",
+		progress: () => undefined,
 		problems: async () => [],
 		contribute: () => ({ owner: "", accepted: [], rejected: [] }),
 	};

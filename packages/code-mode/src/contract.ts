@@ -80,6 +80,9 @@ export type KernelHandleCore = {
 	currentCell: () => string;
 	root: () => string;
 	scratch: () => string;
+	/** The running cell's progress sink, for a contributor that has something to say while it
+	 * works (web-code's fetches do). Undefined between cells. */
+	progress: () => ((text: string) => void) | undefined;
 	/** The preflight's answer. Async because the checks are: a caller that needs them (rlm,
 	 * to report them on its own surface) awaits, and the answer is memoised. */
 	problems: () => Promise<string[]>;

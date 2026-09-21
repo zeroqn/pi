@@ -8,11 +8,6 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { forkSourceFile, headerParentSession, journalSourceOf } from "../src/children";
-import { appendJournal, readJournals, type CellRecord } from "../src/journal";
-
-function cell(index: number, code: string): CellRecord {
-	return { index, code, hostCalls: [], durationMs: 1, at: new Date(0).toISOString() };
-}
 
 describe("a fork's source is read from the event and the header (ticket 13)", () => {
 	it("takes the event's source for an interactive /fork", () => {
@@ -133,26 +128,5 @@ describe("which journal a kernel replays, and whether a scratch comes with it", 
 	it("has nothing to replay for a plain session with no journal and no fork", () => {
 		expect(journalSourceOf({ ...base, ownSessionFile: "/tmp/s/plain.jsonl" })).toEqual({ files: ["/tmp/s/plain.jsonl"] });
 		expect(journalSourceOf({ ...base })).toBeUndefined();
-	});
-});
-
-describe("the cells a fork replays, from its own journal and its parent's (ticket 14)", () => {
-	it("replays the parent's prefix and then the fork's own fragment, in index order", () => {
-		const dir = mkdtempSync(join(tmpdir(), "rlm-journals-"));
-		try {
-			const parent = join(dir, "parent.jsonl");
-			const fork = join(dir, "fork.jsonl");
-			appendJournal(`${parent}.rlm-journal.jsonl`, cell(0, "x = 1"));
-			appendJournal(`${parent}.rlm-journal.jsonl`, cell(1, "y = 2"));
-			appendJournal(`${fork}.rlm-journal.jsonl`, cell(2, "z = 3"));
-			expect(readJournals([parent, fork]).map((record) => record.index)).toEqual([0, 1, 2]);
-			// One journal is the ordinary case.
-			expect(readJournals([fork]).map((record) => record.index)).toEqual([2]);
-			// A fork with two of its own cells takes the parent's two, not the parent's all.
-			appendJournal(`${fork}.rlm-journal.jsonl`, cell(3, "w = 4"));
-			expect(readJournals([parent, fork]).map((record) => record.index)).toEqual([0, 1, 2, 3]);
-		} finally {
-			rmSync(dir, { recursive: true, force: true });
-		}
 	});
 });
