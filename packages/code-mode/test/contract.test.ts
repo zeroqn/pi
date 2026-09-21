@@ -17,6 +17,7 @@ import {
 	createMounter,
 	createSessionKeys,
 	findEntry,
+	registrySessions,
 	publish,
 	versionProblem,
 	type KernelHandleCore,
@@ -35,7 +36,7 @@ function core(): KernelHandleCore & { calls: number } {
 		currentCell: () => "cell",
 		root: () => "/root",
 		scratch: () => "/scratch",
-		problems: () => [],
+		problems: async () => [],
 		contribute: () => ({ owner: "", accepted: [], rejected: [] }),
 	};
 	return state;
@@ -63,6 +64,30 @@ describe("the registry entry (ticket 01)", () => {
 		expect(result.published).toBe(false);
 		expect(result.reason).toContain("already published");
 		expect(glob[REGISTRY_KEY]).toBe(entry);
+	});
+
+	it("is replaced by the same publisher — a reload — without losing the sessions map", () => {
+		const glob = {} as Record<symbol, unknown>;
+		const first = { ...entry, sessions: new Map() } as RegistryEntry;
+		publish(first, glob);
+		const shared = registrySessions(glob);
+		expect(shared).toBe(first.sessions);
+		const reloadedMount = () => {
+			throw new Error("not called");
+		};
+		const second = { ...entry, mount: reloadedMount, sessions: shared } as RegistryEntry;
+		expect(publish(second, glob).published).toBe(true);
+		// The fresh mount takes over; the map the live consumers hold is the same object.
+		expect((glob[REGISTRY_KEY] as RegistryEntry).mount).toBe(reloadedMount);
+		expect((glob[REGISTRY_KEY] as RegistryEntry).sessions).toBe(shared);
+	});
+
+	it("gives a fresh map when nothing is published, and the published one afterwards", () => {
+		const glob = {} as Record<symbol, unknown>;
+		const before = registrySessions(glob);
+		expect(before.size).toBe(0);
+		publish({ ...entry, sessions: before } as RegistryEntry, glob);
+		expect(registrySessions(glob)).toBe(before);
 	});
 
 	it("is absent before anyone publishes", () => {
@@ -225,6 +250,25 @@ describe("contributing (tickets 01 and 03)", () => {
 		// Replaced wholesale: the name it no longer declares is free again.
 		expect(Object.keys(l.hostFns())).toEqual(["rlm_poll"]);
 		expect(l.accept({ owner: "rsi", hostFns: { rlm_spawn: async () => ({}) } }).rejected).toEqual([]);
+	});
+
+	it("tells the entry to re-register the tool when a contribution lands", () => {
+		let changes = 0;
+		const l = createLedger({
+			reserved: BASE_HOST_FNS,
+			base: BASE,
+			onChange: () => {
+				changes += 1;
+			},
+		});
+		l.accept({ owner: "rlm", description: " RLM" });
+		expect(changes).toBe(1);
+		// A refused contribution changes nothing, so nothing is re-registered.
+		l.accept({ owner: "rsi", hostFns: { bash_host: async () => ({}) } });
+		expect(changes).toBe(1);
+		l.close();
+		l.accept({ owner: "web-code", description: " WEB" });
+		expect(changes).toBe(1);
 	});
 
 	it("refuses everything once the window has closed", () => {

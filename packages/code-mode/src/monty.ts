@@ -14,20 +14,42 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // Loading the napi addon inside a compiled Bun binary
 // ---------------------------------------------------------------------------
 
-/** Find the platform package's `.node` without using a resolver that cannot see disk. */
+/**
+ * Find the platform package's `.node` without using a resolver that cannot see disk.
+ *
+ * This matters because the compiled pi binary's runtime resolver does not reach an on-disk
+ * dependency the way bun's development resolver does, and when it fails the addon reports
+ * only "Cannot find native binding". Two layouts have to be searched, both ordinary in a
+ * bun workspace: the hoisted one (`<dir>/node_modules/@pydantic/monty-*`) and bun's store
+ * (`<dir>/node_modules/.bun/@pydantic+monty-*\/node_modules/@pydantic/monty-*`).
+ */
 export function findBinding(startDir: string): string | null {
-	let dir = startDir;
-	for (let hop = 0; hop < 8; hop++) {
-		const scope = join(dir, "node_modules", "@pydantic");
-		if (existsSync(scope)) {
-			for (const entry of readdirSync(scope)) {
-				if (!entry.startsWith("monty-")) continue;
-				const packageDir = join(scope, entry);
-				for (const file of readdirSync(packageDir)) {
-					if (file.endsWith(".node")) return join(packageDir, file);
-				}
+	const inScope = (scope: string): string | null => {
+		if (!existsSync(scope)) return null;
+		for (const entry of readdirSync(scope)) {
+			if (!entry.startsWith("monty-")) continue;
+			const packageDir = join(scope, entry);
+			for (const file of readdirSync(packageDir)) {
+				if (file.endsWith(".node")) return join(packageDir, file);
 			}
 		}
+		return null;
+	};
+	const inStore = (store: string): string | null => {
+		if (!existsSync(store)) return null;
+		for (const entry of readdirSync(store)) {
+			if (!entry.startsWith("@pydantic+monty-")) continue;
+			const found = inScope(join(store, entry, "node_modules", "@pydantic"));
+			if (found) return found;
+		}
+		return null;
+	};
+	let dir = startDir;
+	for (let hop = 0; hop < 8; hop++) {
+		const hoisted = inScope(join(dir, "node_modules", "@pydantic"));
+		if (hoisted) return hoisted;
+		const stored = inStore(join(dir, "node_modules", ".bun"));
+		if (stored) return stored;
 		const parent = dirname(dir);
 		if (parent === dir) break;
 		dir = parent;

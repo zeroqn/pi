@@ -47,6 +47,13 @@ export type Provenance = {
 	seedScratchFrom?: string;
 };
 
+/** The one fact the provenance rule needs from code mode: this session's own file, and the
+ * index of its first journaled cell. Reading journals is code mode's; the rule is rlm's. */
+export type OwnSession = {
+	sessionFile?: string;
+	firstIndex?: number;
+};
+
 export type Contribution = {
 	owner: string;
 	hostFns?: Record<string, HostFn>;
@@ -62,7 +69,7 @@ export type Contribution = {
 	onHostCall?: (name: string, args: unknown[]) => void;
 	/** How a kernel that has no rlm tells the model something; first owner wins. */
 	onNotice?: (notice: Notice) => void;
-	provenance?: (ctx: unknown) => Provenance;
+	provenance?: (ctx: unknown, own: OwnSession) => Provenance;
 };
 
 export type Rejection = { name: string; reason: string };
@@ -73,7 +80,9 @@ export type KernelHandleCore = {
 	currentCell: () => string;
 	root: () => string;
 	scratch: () => string;
-	problems: () => string[];
+	/** The preflight's answer. Async because the checks are: a caller that needs them (rlm,
+	 * to report them on its own surface) awaits, and the answer is memoised. */
+	problems: () => Promise<string[]>;
 	contribute: (contribution: Contribution) => Receipt;
 };
 
@@ -168,13 +177,35 @@ export function createSessionKeys(): SessionKeys {
 
 /** Publish, first wins. A second publisher joins the first entry rather than replacing it,
  * so a duplicate install cannot fork the session map. */
+/**
+ * The sessions map both the publisher and its consumers must use. Read it *before* building
+ * the mounter: a second code-mode instance in one process (pi's `/reload` re-imports the
+ * entry) must join the existing map rather than start a second one, or the reloaded entry
+ * would mount kernels nobody can see.
+ */
+export function registrySessions(glob: Record<symbol, unknown> = globalThis as never): Map<string, KernelHandle> {
+	const existing = glob?.[REGISTRY_KEY] as RegistryEntry | undefined;
+	return existing?.sessions instanceof Map ? existing.sessions : new Map<string, KernelHandle>();
+}
+
+/**
+ * Publish. A different publisher is refused outright — that is a duplicate install, and it
+ * must not fork the map. The *same* publisher republishing is a reload: the fresh `mount`
+ * takes over (it is the one whose handlers are live) while the sessions map, which the
+ * caller obtained from `registrySessions`, is carried across untouched.
+ */
 export function publish(entry: RegistryEntry, glob: Record<symbol, unknown> = globalThis as never): {
 	published: boolean;
 	reason?: string;
 } {
-	const existing = glob[REGISTRY_KEY];
+	const existing = glob?.[REGISTRY_KEY] as RegistryEntry | undefined;
 	if (existing !== undefined && existing !== null) {
-		return { published: false, reason: `already published by ${String((existing as RegistryEntry).publisher)}` };
+		if (existing.publisher !== entry.publisher) {
+			return { published: false, reason: `already published by ${String(existing.publisher)}` };
+		}
+		if (existing.sessions instanceof Map && existing.sessions !== entry.sessions) {
+			entry.sessions = existing.sessions;
+		}
 	}
 	glob[REGISTRY_KEY] = entry;
 	return { published: true };
@@ -259,7 +290,7 @@ const NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
  * guidelines are deterministic across runs — which is what makes the byte-identical check
  * in `acceptance.md` mean something.
  */
-export function createLedger(spec: { reserved: string[]; base: BaseSurface }) {
+export function createLedger(spec: { reserved: string[]; base: BaseSurface; onChange?: () => void }) {
 	const accepted = new Map<string, Contribution>();
 	let closed: string | null = null;
 
@@ -323,6 +354,13 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface }) {
 			if (rejected.length > 0) return refuse(owner, rejected);
 			// Replace wholesale, keeping the owner's position: a second `session_start` costs nothing.
 			accepted.set(owner, contribution);
+			// The tool's description is composed from this ledger, so an accepted contribution
+			// means the registration has to be re-made (ticket 01 §4).
+			try {
+				spec.onChange?.();
+			} catch {
+				/* a registration that fails must not fail the contribution */
+			}
 			return { owner, accepted: fieldsOf(contribution), rejected: [] };
 		},
 		hostFns(): Record<string, HostFn> {
@@ -365,9 +403,9 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface }) {
 			}
 			return false;
 		},
-		provenance(ctx: unknown): Provenance | undefined {
+		provenance(ctx: unknown, own: OwnSession = {}): Provenance | undefined {
 			for (const contribution of accepted.values()) {
-				if (contribution.provenance) return contribution.provenance(ctx);
+				if (contribution.provenance) return contribution.provenance(ctx, own);
 			}
 			return undefined;
 		},
