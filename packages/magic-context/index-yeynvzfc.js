@@ -9341,11 +9341,11 @@ import {
   existsSync as existsSync7,
   mkdirSync as mkdirSync4,
   readdirSync as readdirSync2,
-  readFileSync as readFileSync5,
+  readFileSync as readFileSync6,
   statSync as statSync6,
   unlinkSync as unlinkSync2
 } from "node:fs";
-import { basename as basename2, dirname as dirname4, join as join5, resolve as resolve3 } from "node:path";
+import { basename as basename3, dirname as dirname5, join as join6, resolve as resolve3 } from "node:path";
 
 // ../plugin/src/shared/error-message.ts
 function getErrorMessage(error) {
@@ -14634,6 +14634,72 @@ function backfillToolOwnersInChunks(db, result) {
   }
 }
 
+// ../plugin/src/features/magic-context/wal-filesystem.ts
+import { readFileSync as readFileSync5, realpathSync as realpathSync3 } from "node:fs";
+import { basename as basename2, dirname as dirname4, join as join5 } from "node:path";
+var WAL_UNSAFE_FILESYSTEMS = new Set(["virtiofs"]);
+var PROC_SELF_MOUNTS = "/proc/self/mounts";
+function unescapeMountField(field) {
+  return field.replace(/\\([0-7]{3})/g, (_match, octal) => String.fromCharCode(Number.parseInt(octal, 8)));
+}
+function parseMountTable(text) {
+  const entries = [];
+  for (const line of text.split(`
+`)) {
+    const fields = line.trim().split(/\s+/);
+    if (fields.length < 3)
+      continue;
+    entries.push({
+      mountPoint: unescapeMountField(fields[1]),
+      filesystemType: unescapeMountField(fields[2])
+    });
+  }
+  return entries;
+}
+function isWithinMount(mountPoint, path) {
+  if (mountPoint === path)
+    return true;
+  const prefix = mountPoint.endsWith("/") ? mountPoint : `${mountPoint}/`;
+  return path.startsWith(prefix);
+}
+function filesystemTypeFor(path, mounts) {
+  let best = null;
+  for (const entry of mounts) {
+    if (!isWithinMount(entry.mountPoint, path))
+      continue;
+    if (best === null || entry.mountPoint.length > best.mountPoint.length)
+      best = entry;
+  }
+  return best === null ? null : best.filesystemType;
+}
+function readProcSelfMounts() {
+  try {
+    return readFileSync5(PROC_SELF_MOUNTS, "utf8");
+  } catch {
+    return null;
+  }
+}
+var mountTableReader = readProcSelfMounts;
+function canonicalizeForLookup(path) {
+  try {
+    return realpathSync3(path);
+  } catch {}
+  try {
+    return join5(realpathSync3(dirname4(path)), basename2(path));
+  } catch {
+    return path;
+  }
+}
+function detectWalUnsafeFilesystem(dbPath) {
+  const mountTable = mountTableReader();
+  if (mountTable === null)
+    return null;
+  const filesystemType = filesystemTypeFor(canonicalizeForLookup(dbPath), parseMountTable(mountTable));
+  if (filesystemType === null)
+    return null;
+  return WAL_UNSAFE_FILESYSTEMS.has(filesystemType) ? filesystemType : null;
+}
+
 // ../plugin/src/features/magic-context/storage-db.ts
 registerSlowWriteReporter(logSlowWriteTransaction);
 var databases = new Map;
@@ -14695,10 +14761,10 @@ function installBootBusyTimeout(db, dbPath, timeoutMs, report = log) {
 }
 function resolveDatabasePath(dbPathOverride) {
   if (dbPathOverride) {
-    return { dbDir: dirname4(dbPathOverride), dbPath: dbPathOverride };
+    return { dbDir: dirname5(dbPathOverride), dbPath: dbPathOverride };
   }
   const dbDir = getMagicContextStorageDir();
-  return { dbDir, dbPath: join5(dbDir, "context.db") };
+  return { dbDir, dbPath: join6(dbDir, "context.db") };
 }
 function getDatabasePath(db) {
   return pathByDatabase.get(db) ?? null;
@@ -14707,7 +14773,7 @@ function migrateLegacyStorageIfNeeded(targetDbPath, targetDbDir) {
   if (existsSync7(targetDbPath))
     return;
   const legacyDir = getLegacyOpenCodeMagicContextStorageDir();
-  const legacyDbPath = join5(legacyDir, "context.db");
+  const legacyDbPath = join6(legacyDir, "context.db");
   if (!existsSync7(legacyDbPath))
     return;
   log(`[magic-context] migrating legacy plugin storage: ${legacyDir} -> ${targetDbDir} (legacy left in place as backup)`);
@@ -14724,7 +14790,7 @@ function migrateLegacyStorageIfNeeded(targetDbPath, targetDbDir) {
   }
   for (const suffix of ["", "-wal", "-shm"]) {
     const src = `${legacyDbPath}${suffix}`;
-    const dst = join5(targetDbDir, `context.db${suffix}`);
+    const dst = join6(targetDbDir, `context.db${suffix}`);
     if (existsSync7(src)) {
       try {
         copyFileSync(src, dst);
@@ -14733,8 +14799,8 @@ function migrateLegacyStorageIfNeeded(targetDbPath, targetDbDir) {
       }
     }
   }
-  const legacyModelsDir = join5(legacyDir, "models");
-  const targetModelsDir = join5(targetDbDir, "models");
+  const legacyModelsDir = join6(legacyDir, "models");
+  const targetModelsDir = join6(targetDbDir, "models");
   if (existsSync7(legacyModelsDir) && !existsSync7(targetModelsDir)) {
     try {
       cpSync(legacyModelsDir, targetModelsDir, { recursive: true });
@@ -14789,7 +14855,7 @@ function unreadableDiscovery(path, arm) {
 var RPC_DISCOVERY_PARSE_GRACE_MS = 10 * 60 * 1000;
 var defaultRpcDiscoveryFs = {
   readdirSync: (path, options) => options?.withFileTypes ? readdirSync2(path, { withFileTypes: true }) : readdirSync2(path),
-  readFileSync: (path, encoding) => String(readFileSync5(path, encoding)),
+  readFileSync: (path, encoding) => String(readFileSync6(path, encoding)),
   statSync: (path) => ({ mtimeMs: statSync6(path).mtimeMs }),
   unlinkSync: (path) => unlinkSync2(path)
 };
@@ -14849,7 +14915,7 @@ function classifyJunkDiscovery(portFile, raw, staleFiles) {
   return null;
 }
 function inspectRpcServerDiscovery(storageDir) {
-  const rpcRoot = join5(storageDir, "rpc");
+  const rpcRoot = join6(storageDir, "rpc");
   let projectEntries;
   try {
     projectEntries = rpcDiscoveryFs.readdirSync(rpcRoot, { withFileTypes: true });
@@ -14863,7 +14929,7 @@ function inspectRpcServerDiscovery(storageDir) {
   for (const projectEntry of projectEntries) {
     if (!projectEntry.isDirectory())
       continue;
-    const projectDir = join5(rpcRoot, projectEntry.name);
+    const projectDir = join6(rpcRoot, projectEntry.name);
     let entries;
     try {
       entries = rpcDiscoveryFs.readdirSync(projectDir);
@@ -14874,7 +14940,7 @@ function inspectRpcServerDiscovery(storageDir) {
     }
     for (const entry of entries) {
       if (entry === "port" || entry.startsWith("port-") && entry.endsWith(".json")) {
-        portFiles.push(join5(projectDir, entry));
+        portFiles.push(join6(projectDir, entry));
       }
     }
   }
@@ -14894,7 +14960,7 @@ function inspectRpcServerDiscovery(storageDir) {
         continue;
       return unreadableDiscovery(portFile, "io");
     }
-    const filename = basename2(portFile);
+    const filename = basename3(portFile);
     const pidFromName = /^port-(\d+)/.exec(filename)?.[1];
     const fallbackPid = pidFromName ? Number(pidFromName) : 0;
     const record = parseRpcPortFile(raw, fallbackPid);
@@ -14978,7 +15044,7 @@ function isDefaultSharedDatabasePath(dbPath) {
   if (!process.env.XDG_DATA_HOME && (process.env.MAGIC_CONTEXT_TEST_DATA_DIR || false)) {
     return false;
   }
-  return resolve3(dbPath) === resolve3(join5(getMagicContextStorageDir(), "context.db"));
+  return resolve3(dbPath) === resolve3(join6(getMagicContextStorageDir(), "context.db"));
 }
 function migrationBlockingPiPids(dbPath, discovery, discoveredPiPids) {
   if (isDefaultSharedDatabasePath(dbPath))
@@ -15080,10 +15146,40 @@ function finishDatabaseOpen(db, dbPath, explicitDbPath, latestSupportedVersion) 
   }
   return db;
 }
-function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS) {
+function journalMode(db) {
+  try {
+    const row = db.prepare("PRAGMA journal_mode").get();
+    const value = row === undefined ? undefined : row.journal_mode ?? Object.values(row)[0];
+    return typeof value === "string" ? value.toLowerCase() : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+function applyJournalMode(db, dbPath) {
+  const unsafeFilesystem = dbPath === undefined ? null : detectWalUnsafeFilesystem(dbPath);
+  if (unsafeFilesystem === null) {
+    db.exec("PRAGMA journal_mode=WAL");
+    return;
+  }
+  db.exec("PRAGMA synchronous=FULL");
+  if (journalMode(db) !== "delete") {
+    try {
+      db.exec("PRAGMA journal_mode=DELETE");
+    } catch (error) {
+      log(`[magic-context] could not switch ${dbPath} to journal_mode=delete: ${getErrorMessage(error)}`);
+    }
+  }
+  const mode = journalMode(db);
+  if (mode === "delete") {
+    log(`[magic-context] ${unsafeFilesystem} cannot support SQLite WAL: using journal_mode=delete with synchronous=FULL for ${dbPath}`);
+    return;
+  }
+  log(`[magic-context] WARNING ${unsafeFilesystem} cannot support SQLite WAL, but ${dbPath} is still in journal_mode=${mode}: durability is not guaranteed until a connection can take the database to itself`);
+}
+function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS, dbPath) {
   db.exec(`PRAGMA busy_timeout=${resolveBootBusyTimeoutMs(busyTimeoutMs)}`);
   db.exec("PRAGMA foreign_keys=ON");
-  db.exec("PRAGMA journal_mode=WAL");
+  applyJournalMode(db, dbPath);
   applySqliteTuningPragmas(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS tags (
@@ -16267,7 +16363,7 @@ function openDatabase(dbPathOrOptions) {
       closeQuietly(db);
       return null;
     }
-    initializeDatabase(db, busyTimeoutMs);
+    initializeDatabase(db, busyTimeoutMs, dbPath);
     runMigrations(db);
     ensureContextStoreUuid(db);
     return finishDatabaseOpen(db, dbPath, explicitDbPath, latestSupportedVersion);
@@ -16332,7 +16428,7 @@ async function openDatabaseAsync(dbPathOrOptions) {
       }
       guardMs = performance.now() - guardStartedAt;
       migrateStartedAt = performance.now();
-      initializeDatabase(db, busyTimeoutMs);
+      initializeDatabase(db, busyTimeoutMs, dbPath);
       await runMigrationsWithRetry(db);
       ensureContextStoreUuid(db);
       const opened = finishDatabaseOpen(db, dbPath, explicitDbPath, latestSupportedVersion);
@@ -22174,7 +22270,7 @@ function sweepOrphanedOpenCodeMessageIndexes(db, openReadableOpenCodeDb, options
 }
 // ../plugin/src/features/magic-context/project-docs-hash.ts
 import { createHash as createHash7 } from "node:crypto";
-import { lstatSync, readFileSync as readFileSync6, statSync as statSync7 } from "node:fs";
+import { lstatSync, readFileSync as readFileSync7, statSync as statSync7 } from "node:fs";
 import path4 from "node:path";
 var PROJECT_DOC_FILES = ["ARCHITECTURE.md", "STRUCTURE.md"];
 var PROJECT_DOCS_DELIMITER = `
@@ -22249,7 +22345,7 @@ function readCanonicalPieces(projectDirectory, files) {
     if (!safeToRead) {
       continue;
     }
-    const canonicalContent = canonicalizeDocContent(readFileSync6(filePath, "utf8"));
+    const canonicalContent = canonicalizeDocContent(readFileSync7(filePath, "utf8"));
     hashPieces.push(`file:${filename}
 ${canonicalContent}`);
     renderedSections.push(`<file name="${escapeXmlAttr(filename)}">
@@ -23733,8 +23829,8 @@ var ERROR_CLASSES = new Set([
   "unknown"
 ]);
 // ../plugin/src/shared/window-geometry.ts
-import { readFileSync as readFileSync7 } from "node:fs";
-import { join as join6 } from "node:path";
+import { readFileSync as readFileSync8 } from "node:fs";
+import { join as join7 } from "node:path";
 var WINDOW_OVERLAY_SCHEMA = "fusiform-window-overlay/v1";
 var PROMPT_WALL_MARGIN = 4096;
 var PI_OUTPUT_FLOOR = 4096;
@@ -23894,12 +23990,12 @@ function parseWindowOverlay(value) {
   };
 }
 function defaultWindowOverlayPath() {
-  return join6(getDataDir(), "fusiform", "window-overlay.json");
+  return join7(getDataDir(), "fusiform", "window-overlay.json");
 }
 function readWindowOverlayFile(path, log = (message) => sessionLog("global", message)) {
   let raw;
   try {
-    raw = readFileSync7(path, "utf8");
+    raw = readFileSync8(path, "utf8");
   } catch (error) {
     if (error.code === "ENOENT")
       return;
@@ -24186,8 +24282,8 @@ function claimConfigParseFailuresOnce(surface, failures) {
 }
 
 // ../plugin/src/shared/prompt-surface-runtime.ts
-import { existsSync as existsSync9, readFileSync as readFileSync9, statSync as statSync8 } from "node:fs";
-import { dirname as dirname5, isAbsolute as isAbsolute4, resolve as resolve4 } from "node:path";
+import { existsSync as existsSync9, readFileSync as readFileSync10, statSync as statSync8 } from "node:fs";
+import { dirname as dirname6, isAbsolute as isAbsolute4, resolve as resolve4 } from "node:path";
 
 // ../plugin/src/tools/light-descriptions.ts
 var CTX_REDUCE_LIGHT_DESCRIPTION = `Marking QUEUES content for release. It stays fully visible to you until it is actually released, which may be the next turn or many turns later. Newest tags stay protected until they age out. Release leaves a placeholder; recover only by rerunning the source or recovery tool. Mark only finished material. Mark analyzed, redundant, saved, or confirmatory outputs; keep user messages, unresolved errors, unextracted evidence, and exact wording. NEVER blanket-mark a large range: review every tag first.`;
@@ -24197,7 +24293,7 @@ var CTX_MEMORY_LIGHT_DESCRIPTION = `For ctx_memory users, write one standalone d
 var CTX_SEARCH_LIGHT_DESCRIPTION = `For ctx_search users, retrieve only hidden recall: memories not in <project-memory>, compacted messages outside the live tail, commits, and notes; phrase query as a question carrying exact terms. Omit sources for broad search; select memory, message, git_commit, or note, or pass memory IDs directly. Hits expand through ctx_expand.`;
 
 // ../plugin/src/shared/jsonc-parser.ts
-import { existsSync as existsSync8, readFileSync as readFileSync8 } from "node:fs";
+import { existsSync as existsSync8, readFileSync as readFileSync9 } from "node:fs";
 function stripJsonComments(content) {
   let result = "";
   let inString = false;
@@ -24411,13 +24507,13 @@ function resolveUserConfigDirectory(options) {
   const sharedBase = cortexKitUserConfigBasePath();
   const shared = detectConfigFile(sharedBase);
   if (shared.format !== "none")
-    return dirname5(shared.path);
+    return dirname6(shared.path);
   if (options.harness) {
     const legacy = resolveLegacyConfigSourcesForHarness(options.directory ?? process.cwd(), options.harness === "omp" ? "pi" : options.harness === "opencode2" ? "opencode" : options.harness).user.find((source) => existsSync9(source.path));
     if (legacy)
-      return dirname5(legacy.path);
+      return dirname6(legacy.path);
   }
-  return dirname5(sharedBase);
+  return dirname6(sharedBase);
 }
 function markerCount(content) {
   return content.match(GUIDANCE_MARKER_LINE)?.length ?? 0;
@@ -24441,7 +24537,7 @@ function createPromptSurfaceRuntime(options) {
         warnOnce(`guidance-not-file:${path}`, `prompt_surface.guidance_override_path (${path}) is not a file; using built-in guidance.`);
         return;
       }
-      content = readFileSync9(path, "utf8");
+      content = readFileSync10(path, "utf8");
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       warnOnce(`guidance-unreadable:${path}:${reason}`, `prompt_surface.guidance_override_path (${path}) could not be read (${reason}); using built-in guidance.`);
@@ -25186,13 +25282,13 @@ import {
   existsSync as existsSync10,
   linkSync,
   openSync as openSync3,
-  readFileSync as readFileSync10,
+  readFileSync as readFileSync11,
   renameSync as renameSync2,
   statSync as statSync9,
   unlinkSync as unlinkSync3,
   writeFileSync as writeFileSync3
 } from "node:fs";
-import { basename as basename3, dirname as dirname6, join as join7 } from "node:path";
+import { basename as basename4, dirname as dirname7, join as join8 } from "node:path";
 var MODEL_FIELDS = ["model", "fallback_models"];
 var QUALIFIER_FIELDS = ["variant", "thinking_level"];
 var TASK_MODEL_FIELDS = [...MODEL_FIELDS, ...QUALIFIER_FIELDS, "timeout_minutes"];
@@ -25391,7 +25487,7 @@ function writeExclusiveBackup(backupPath, bytes, mode) {
       if (error.code !== "EEXIST")
         throw error;
     }
-    const existingBytes = readFileSync10(backupPath);
+    const existingBytes = readFileSync11(backupPath);
     if (existingBytes.equals(bytes))
       return;
     if (bytes.subarray(0, existingBytes.length).equals(existingBytes)) {
@@ -25405,11 +25501,11 @@ function writeExclusiveBackup(backupPath, bytes, mode) {
   }
 }
 function writeTemporaryCandidate(configPath, bytes, mode) {
-  const directory = dirname6(configPath);
-  const stem = basename3(configPath);
+  const directory = dirname7(configPath);
+  const stem = basename4(configPath);
   for (let attempt = 0;attempt < 32; attempt++) {
     temporaryFileSequence += 1;
-    const path = join7(directory, `.${stem}.per-harness-${process.pid}-${temporaryFileSequence}.tmp`);
+    const path = join8(directory, `.${stem}.per-harness-${process.pid}-${temporaryFileSequence}.tmp`);
     let descriptor;
     try {
       descriptor = openSync3(path, "wx", mode);
@@ -25439,7 +25535,7 @@ function loadRawConfigFile(options) {
     return null;
   let observedBytes;
   try {
-    observedBytes = readFileSync10(options.configPath);
+    observedBytes = readFileSync11(options.configPath);
   } catch (error) {
     throw new Error(`failed to read config: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -25483,7 +25579,7 @@ function loadRawConfigFile(options) {
       writeExclusiveBackup(backupPath, observedBytes, mode);
       temporaryPath = writeTemporaryCandidate(options.configPath, migration.bytes, mode);
       options.afterTemporaryWrite?.();
-      const currentBytes = readFileSync10(options.configPath);
+      const currentBytes = readFileSync11(options.configPath);
       if (!hasFlatKeys(currentBytes)) {
         unlinkSync3(temporaryPath);
         return {
@@ -25565,9 +25661,9 @@ function stripRemovedAgentConfig(rawConfig, warnings) {
 }
 
 // ../plugin/src/config/variable.ts
-import { existsSync as existsSync11, readFileSync as readFileSync11 } from "node:fs";
+import { existsSync as existsSync11, readFileSync as readFileSync12 } from "node:fs";
 import { homedir as homedir8 } from "node:os";
-import { dirname as dirname7, isAbsolute as isAbsolute5, resolve as resolve5 } from "node:path";
+import { dirname as dirname8, isAbsolute as isAbsolute5, resolve as resolve5 } from "node:path";
 var ENV_PATTERN = /\{env:([^}]+)\}/g;
 var FILE_PATTERN = /\{file:([^}]+)\}/g;
 function sensitiveFilePathReason(resolvedPath) {
@@ -25616,7 +25712,7 @@ function substituteConfigVariables(input) {
   if (fileMatches.length === 0) {
     return { text, warnings };
   }
-  const configDir = input.configPath ? dirname7(input.configPath) : process.cwd();
+  const configDir = input.configPath ? dirname8(input.configPath) : process.cwd();
   let output = "";
   let cursor = 0;
   for (const match of fileMatches) {
@@ -25648,7 +25744,7 @@ function substituteConfigVariables(input) {
     }
     let contents;
     try {
-      contents = readFileSync11(filePath, "utf-8").trim();
+      contents = readFileSync12(filePath, "utf-8").trim();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       warnings.push(`Failed to read file for ${token} (${filePath}): ${message}; using empty string`);
@@ -25661,8 +25757,8 @@ function substituteConfigVariables(input) {
 }
 
 // ../plugin/src/shared/models-dev-cache.ts
-import { mkdirSync as mkdirSync5, readFileSync as readFileSync12, renameSync as renameSync3, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join8 } from "node:path";
+import { mkdirSync as mkdirSync5, readFileSync as readFileSync13, renameSync as renameSync3, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join9 } from "node:path";
 var MIN_SANE_LIMIT = 20000;
 var MAX_SANE_LIMIT = 3000000;
 function isSaneLimit(limit) {
@@ -25676,14 +25772,14 @@ var reserveClampLogSeen = new Set;
 var apiCache = null;
 var persistSeedLoaded = false;
 function persistFilePath() {
-  return join8(getMagicContextStorageDir(), `model-context-limits-${getHarness()}.json`);
+  return join9(getMagicContextStorageDir(), `model-context-limits-${getHarness()}.json`);
 }
 function loadPersistedApiCacheOnce() {
   if (persistSeedLoaded || apiCache !== null)
     return;
   persistSeedLoaded = true;
   try {
-    const raw = readFileSync12(persistFilePath(), "utf-8");
+    const raw = readFileSync13(persistFilePath(), "utf-8");
     const obj = JSON.parse(raw);
     const map = new Map;
     for (const [key, persisted] of Object.entries(obj)) {
@@ -29458,7 +29554,7 @@ function getEmbeddingProviderIdentity(config) {
 // ../plugin/src/features/magic-context/memory/embedding-local.ts
 import { chmodSync as chmodSync3, mkdirSync as mkdirSync6, readdirSync as readdirSync3, statSync as statSync10 } from "node:fs";
 import { open, stat, unlink, writeFile } from "node:fs/promises";
-import { dirname as dirname8, join as join9 } from "node:path";
+import { dirname as dirname9, join as join10 } from "node:path";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
 
 // ../plugin/src/features/magic-context/memory/embedding-failure.ts
@@ -29671,7 +29767,7 @@ var importTransformersNodeWasmFallbackForRuntime = async () => {
   const nodeWasmEntry = new URL("./transformers-node-wasm.js", import.meta.url).href;
   return await import(nodeWasmEntry);
 };
-var modelCacheDirForRuntime = () => join9(getMagicContextStorageDir(), "models");
+var modelCacheDirForRuntime = () => join10(getMagicContextStorageDir(), "models");
 var logForRuntime = log;
 var injectWasmOrtForRuntime = injectWasmOrt;
 var loadedLocalEmbeddingRuntimes = new Map;
@@ -29691,7 +29787,7 @@ async function injectWasmOrt() {
     const { module: ortWeb, entryPath } = await importWasmOrtForRuntime();
     if (ortWeb.env?.wasm) {
       ortWeb.env.wasm.numThreads = 1;
-      ortWeb.env.wasm.wasmPaths = `${pathToFileURL2(dirname8(entryPath)).href}/`;
+      ortWeb.env.wasm.wasmPaths = `${pathToFileURL2(dirname9(entryPath)).href}/`;
     }
     globalThis[Symbol.for("onnxruntime")] = ortWeb;
     wasmRuntimeInjected = true;
@@ -29949,7 +30045,7 @@ class LocalEmbeddingProvider {
           log("[magic-context] could not create model cache dir, using library default");
         }
         const createPipeline = transformersModule.pipeline;
-        const lockPath = join9(modelCacheDir, ".load.lock");
+        const lockPath = join10(modelCacheDir, ".load.lock");
         const releaseLock = await acquireModelLoadLock(lockPath);
         const stopHeartbeat = startLockHeartbeat(lockPath);
         try {
@@ -33174,8 +33270,8 @@ async function ensureProjectRegisteredFromPiDirectory(directory, db) {
 }
 
 // src/pi-harness-kind.ts
-import { existsSync as existsSync13, readFileSync as readFileSync13, realpathSync as realpathSync3 } from "node:fs";
-import { dirname as dirname9, join as join10, parse as parse6, resolve as resolve6 } from "node:path";
+import { existsSync as existsSync13, readFileSync as readFileSync14, realpathSync as realpathSync4 } from "node:fs";
+import { dirname as dirname10, join as join11, parse as parse6, resolve as resolve6 } from "node:path";
 import { pathToFileURL as pathToFileURL3 } from "node:url";
 var OMP_UTILS_MODULE = "@oh-my-pi/pi-utils";
 var OMP_HOST_PACKAGE = "@oh-my-pi/pi-coding-agent";
@@ -33194,7 +33290,7 @@ function hostEntries() {
     const requestedPath = resolve6(candidate);
     let resolvedPath;
     try {
-      resolvedPath = realpathSync3(requestedPath);
+      resolvedPath = realpathSync4(requestedPath);
     } catch {
       resolvedPath = requestedPath;
     }
@@ -33207,23 +33303,23 @@ function hostEntries() {
 }
 function readPackageJson(path) {
   try {
-    return JSON.parse(readFileSync13(path, "utf8"));
+    return JSON.parse(readFileSync14(path, "utf8"));
   } catch {
     return;
   }
 }
 function nearestPackageName(entryPath) {
-  let directory = dirname9(entryPath);
+  let directory = dirname10(entryPath);
   const root = parse6(directory).root;
   while (true) {
-    const packagePath = join10(directory, "package.json");
+    const packagePath = join11(directory, "package.json");
     if (existsSync13(packagePath)) {
       const name = readPackageJson(packagePath)?.name;
       return typeof name === "string" ? name : undefined;
     }
     if (directory === root)
       return;
-    directory = dirname9(directory);
+    directory = dirname10(directory);
   }
 }
 function packageNameDetection(entries) {
@@ -33240,15 +33336,15 @@ function packageNameDetection(entries) {
 }
 function dependencyPackageRoot(entryPath, moduleName) {
   const moduleParts = moduleName.split("/");
-  let directory = dirname9(entryPath);
+  let directory = dirname10(entryPath);
   const root = parse6(directory).root;
   while (true) {
-    const packageRoot = join10(directory, "node_modules", ...moduleParts);
-    if (existsSync13(join10(packageRoot, "package.json")))
+    const packageRoot = join11(directory, "node_modules", ...moduleParts);
+    if (existsSync13(join11(packageRoot, "package.json")))
       return packageRoot;
     if (directory === root)
       return;
-    directory = dirname9(directory);
+    directory = dirname10(directory);
   }
 }
 function importTarget(exportsValue) {
@@ -33267,7 +33363,7 @@ function hostModuleImportUrl(entryPath) {
   const packageRoot = dependencyPackageRoot(entryPath, OMP_UTILS_MODULE);
   if (!packageRoot)
     return;
-  const packageJson = readPackageJson(join10(packageRoot, "package.json"));
+  const packageJson = readPackageJson(join11(packageRoot, "package.json"));
   const target = importTarget(packageJson?.exports) ?? (typeof packageJson?.module === "string" ? packageJson.module : typeof packageJson?.main === "string" ? packageJson.main : undefined);
   if (!target?.startsWith("./"))
     return;
@@ -35820,7 +35916,7 @@ function getMemoryVerifications(db, memoryIds) {
 }
 // ../plugin/src/features/magic-context/memory/verification-paths.ts
 import { execFile } from "node:child_process";
-import { existsSync as existsSync14, realpathSync as realpathSync4, statSync as statSync12 } from "node:fs";
+import { existsSync as existsSync14, realpathSync as realpathSync5, statSync as statSync12 } from "node:fs";
 import path5 from "node:path";
 import { promisify } from "node:util";
 var execFileAsync = promisify(execFile);
@@ -35849,7 +35945,7 @@ function isWithin(root, candidate) {
 }
 function safeRealpath(value) {
   try {
-    return realpathSync4.native(value);
+    return realpathSync5.native(value);
   } catch {
     return null;
   }
@@ -36569,7 +36665,7 @@ import { isAbsolute as isAbsolute7 } from "node:path";
 // ../retina-local-fs/src/path-fence.ts
 import { lstat, readlink, realpath } from "node:fs/promises";
 import { homedir as homedir9 } from "node:os";
-import { basename as basename4, dirname as dirname10, isAbsolute as isAbsolute6, join as join11, relative, resolve as resolve7, sep } from "node:path";
+import { basename as basename5, dirname as dirname11, isAbsolute as isAbsolute6, join as join12, relative, resolve as resolve7, sep } from "node:path";
 
 // ../retina-local-fs/src/errors.ts
 class ProviderError extends Error {
@@ -36584,7 +36680,7 @@ class ProviderError extends Error {
 // ../retina-local-fs/src/path-fence.ts
 async function resolveAndFenceProviderPath(configuredPath, options) {
   const { home, dataDirectory } = await resolveFenceRoots(options);
-  const expanded = configuredPath.startsWith("~/") ? join11(home, configuredPath.slice(2)) : configuredPath === "~" ? home : configuredPath;
+  const expanded = configuredPath.startsWith("~/") ? join12(home, configuredPath.slice(2)) : configuredPath === "~" ? home : configuredPath;
   const absolute = isAbsolute6(expanded) ? resolve7(expanded) : resolve7(options.cwd ?? process.cwd(), expanded);
   const canonical = await canonicalPath(absolute, options.allowMissing);
   if (isFencedPath(canonical, home, dataDirectory)) {
@@ -36600,7 +36696,7 @@ async function resolveFenceRoots(options) {
   } catch (error) {
     throw fsError(configuredHomePath, error);
   }
-  const configuredDataDirectory = resolve7(options.dataDirectory ?? process.env.XDG_DATA_HOME ?? join11(home, ".local", "share"));
+  const configuredDataDirectory = resolve7(options.dataDirectory ?? process.env.XDG_DATA_HOME ?? join12(home, ".local", "share"));
   const dataDirectory = await canonicalPath(configuredDataDirectory, true);
   return { home, dataDirectory };
 }
@@ -36618,22 +36714,22 @@ async function canonicalPath(path, allowMissing) {
         const metadata = await lstat(candidate);
         if (metadata.isSymbolicLink()) {
           const target = await readlink(candidate);
-          const resolvedTarget = resolve7(dirname10(candidate), target);
-          return canonicalPath(join11(resolvedTarget, ...suffix), true);
+          const resolvedTarget = resolve7(dirname11(candidate), target);
+          return canonicalPath(join12(resolvedTarget, ...suffix), true);
         }
       } catch (candidateError) {
         if (!isMissingError(candidateError)) {
           throw fsError(path, candidateError);
         }
       }
-      const parent = dirname10(candidate);
+      const parent = dirname11(candidate);
       if (parent === candidate) {
         throw fsError(path, error);
       }
-      suffix.unshift(basename4(candidate));
+      suffix.unshift(basename5(candidate));
       candidate = parent;
       try {
-        return join11(await realpath(candidate), ...suffix);
+        return join12(await realpath(candidate), ...suffix);
       } catch (parentError) {
         if (!isMissingError(parentError)) {
           throw fsError(path, parentError);
@@ -36642,13 +36738,13 @@ async function canonicalPath(path, allowMissing) {
     }
   }
 }
-function isFencedPath(canonicalPath, homeDirectory, dataDirectory = process.env.XDG_DATA_HOME ?? join11(resolve7(homeDirectory), ".local", "share")) {
-  const cortexkitRoot = join11(resolve7(dataDirectory), "cortexkit");
+function isFencedPath(canonicalPath, homeDirectory, dataDirectory = process.env.XDG_DATA_HOME ?? join12(resolve7(homeDirectory), ".local", "share")) {
+  const cortexkitRoot = join12(resolve7(dataDirectory), "cortexkit");
   const relativeToCortexkit = relative(cortexkitRoot, canonicalPath);
   const insideCortexkit = relativeToCortexkit !== "" && relativeToCortexkit !== ".." && !relativeToCortexkit.startsWith(`..${sep}`) && !isAbsolute6(relativeToCortexkit);
   const parts = insideCortexkit ? relativeToCortexkit.split(sep) : [];
   const pathParts = canonicalPath.split(sep).filter(Boolean);
-  const name = basename4(canonicalPath);
+  const name = basename5(canonicalPath);
   const catalogDirectoryCarveIn = pathParts.includes("catalog");
   const moduleBinCarveIn = parts.length >= 2 && parts[1] === "bin";
   const catalogJsonCarveIn = name.endsWith(".json") && name.includes("catalog");
@@ -37052,7 +37148,7 @@ function singleLine(value) {
 }
 
 // ../plugin/src/features/magic-context/smart-notes/wake-plane.ts
-import { join as join12 } from "node:path";
+import { join as join13 } from "node:path";
 var WAKE_PLANE_CAPABILITY = "wake.create";
 var WAKE_PLANE_STATUS_TTL_MS = 5 * 60 * 1000;
 var WAKE_PLANE_HANDSHAKE_TIMEOUT_MS = 2000;
@@ -37061,7 +37157,7 @@ var inFlightProbe = null;
 var catalogProbe = probeWakePlaneCatalog;
 var now = () => Date.now();
 function connectionFile() {
-  return join12(getDataDir(), "cortexkit", "run", "subc-connection.json");
+  return join13(getDataDir(), "cortexkit", "run", "subc-connection.json");
 }
 async function probeWakePlaneCatalog() {
   const file = connectionFile();
