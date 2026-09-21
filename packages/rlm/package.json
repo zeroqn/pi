@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "keywords": ["pi-package"],
-  "description": "Code-mode Python kernel for pi, backed by monty (RLM extension)",
+  "description": "Delegation and the agent-side seams for pi, inside the code-mode Python kernel",
   "pi": {
     "extensions": ["./src/index.ts"]
   },
-  "dependencies": {
-    "@pydantic/monty": "0.0.23"
+  "peerDependencies": {
+    "pi-code-mode": "*"
   },
   "scripts": {
     "test": "bun test",

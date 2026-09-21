@@ -67,12 +67,12 @@
     "packages/rlm": {
       "name": "@rlm/pi-python-kernel",
       "version": "0.0.1",
-      "dependencies": {
-        "@pydantic/monty": "0.0.23",
-      },
       "devDependencies": {
         "@types/node": "^24.0.0",
         "typescript": "^5.8.0",
+      },
+      "peerDependencies": {
+        "pi-code-mode": "*",
       },
     },
     "packages/rpiv-advisor-pi-native": {
