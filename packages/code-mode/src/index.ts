@@ -35,10 +35,17 @@ export default function codeMode(pi: any) {
 	const sessions = registrySessions();
 	const kernels = new Map<string, Kernel>();
 
-	function registerPythonTool(surface: { description: string; snippet: string; guidelines: string[] }) {
+	// The api is a parameter, not the closure's `pi`: a child mounts through the registry from
+	// *this* instance, so its `sessionPi` is the child's own registry while `pi` is the spawner's.
+	// Registering on the closure would leave the child with no `python` tool at all, and its
+	// `setActiveTools(["python"])` would silently empty its active set.
+	function registerPythonTool(
+		api: any,
+		surface: { description: string; snippet: string; guidelines: string[] },
+	) {
 		// Re-registering the same name from the same extension replaces it silently (measured
 		// in ticket 02 §2) — which is exactly what an accepted contribution needs (ticket 01 §4).
-		pi.registerTool({
+		api.registerTool({
 			name: "python",
 			label: "Python",
 			description: surface.description,
@@ -70,7 +77,7 @@ export default function codeMode(pi: any) {
 				reserved: [...BASE_HOST_FNS],
 				base: { description: BASE_DESCRIPTION, snippet: BASE_SNIPPET, guidelines: BASE_GUIDELINES },
 				onChange: () =>
-					registerPythonTool({
+					registerPythonTool(sessionPi, {
 						description: ledger.description(),
 						snippet: ledger.snippet(),
 						guidelines: ledger.guidelines(),
@@ -78,7 +85,7 @@ export default function codeMode(pi: any) {
 			});
 			const kernel = createKernel({ pi: sessionPi, sessionKey, ledger });
 			kernels.set(sessionKey, kernel);
-			registerPythonTool({
+			registerPythonTool(sessionPi, {
 				description: ledger.description(),
 				snippet: ledger.snippet(),
 				guidelines: ledger.guidelines(),
