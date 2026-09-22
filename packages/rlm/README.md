@@ -39,6 +39,15 @@ One `contribute()` call, at `session_start`, before the first cell:
   matching. The caller identity lives in this session's closure, not in a module-level ref — which
   is a bug the split *fixed*: the old code kept one global caller for the whole process, so a
   child's report could be attributed to whichever session bound last.
+- **The tool bridge** (`src/tool-bridge.ts`): what other extensions publish on
+  `pi-tool-bridge`'s process-global slot (`Symbol.for("pi-tool-bridge:owners")`) becomes one host
+  function named `tool`, so a cell can call an owner's pi tools — `await tool("ctx_reduce",
+  drop="3-5")`, `await tool()` to list the catalogue — while pi's active set stays `["python"]`.
+  Contributed after the bind and before the first cell; the matching surface rule (a name a cell can
+  reach is not an active pi tool) lives in the `pi-tool-bridge` entry, which is declared after Magic
+  Context so its `session_start` re-append cannot win. Not adopted in a child: a child's allowed set
+  is Magic Context's three-name child allowlist, and the publication is answered by the owner's
+  session policy, so adopting there would widen the child's bound.
 
 ## What it keeps
 
@@ -56,7 +65,10 @@ One `contribute()` call, at `session_start`, before the first cell:
   `rlm.send()` to a finished child resumes it through the same path, so that turn notifies too.
 - **The Magic Context child shim**: looks for MC's process-global registry and, when found, binds
   the child, forwards its `context` and `session_before_compact` to its parent's MC instance,
-  scrubs tag prefixes on `message_end`, and clears the child's state on shutdown.
+  registers the three tools a bound child is granted (`ctx_search`, `ctx_reduce`, `ctx_expand`) as
+  pi tools, scrubs tag prefixes on `message_end`, and clears the child's state on shutdown. This is
+  the *child* seam only — rlm carries two Magic Context seams, and a root code-mode session reaches
+  MC through the tool bridge above, not here.
 - **The skills block**: pi renders no skills for a session whose active tools are `["python"]`, so
   rlm appends the block itself — the human tier from the event plus the learned store from the RSI
   seam.
@@ -69,13 +81,14 @@ One `contribute()` call, at `session_start`, before the first cell:
 
 ```bash
 cd /workspace/pi/extensions/packages/rlm
-bun test        # 60 tests, 0 fail
+bun test        # 64 tests, 0 fail
 ```
 
-`test/delegation`-adjacent suites are `children.test.ts` (spawning, caps, cost, provenance),
-`fork-source.test.ts` (which journals a fork replays), `prelude-tail.test.ts` (the contributed
-prelude names routing to host functions, in a real kernel), `rsi-seam.test.ts`,
-`skills-block.test.ts` and `web-hook.test.ts`.
+`test/delegation`-adjacent suites are `children.test.ts` (spawning, caps, cost, provenance, and the
+Magic Context child shim), `fork-source.test.ts` (which journals a fork replays),
+`prelude-tail.test.ts` (the contributed prelude names routing to host functions, in a real kernel),
+`rsi-seam.test.ts`, `skills-block.test.ts`, `tool-bridge.test.ts` (adopting a publication, and the
+child exclusion) and `web-hook.test.ts`.
 
 ## Run it
 
@@ -116,7 +129,5 @@ Observability: `rlm-child` (the notice), `rlm-notice-trace`, `rlm-web`, `rlm-rsi
 - **A poll or list withdraws the pending notice** for a child or background handle that has
   *finished*, by design: if the model has read the result, it will not also receive a completion
   message about it. Polling a **running** child is a status check, not a read.
-- **The Magic Context shim is inert until MC ships the registry** (`.scratch/rlm-extension/`). Until
-  then children use pi's native compaction, reported once per session as `rlm-magic-context`.
 - **`rlm-notice-trace` entries** are written for each notice; they exist because the delivery path
   is otherwise invisible when it works.
