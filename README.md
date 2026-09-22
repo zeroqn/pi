@@ -11,15 +11,18 @@ one is a fork.
 | [`web-code`](packages/web-code) | `web_search` and `fetch_content` host functions for the kernel. |
 | [`zvec-grep`](packages/zvec-grep) | zvec-grep search and managed ripgrep as native pi tools. |
 | [`pi-web-guard`](packages/pi-web-guard) | Fences pi-web-access tool output as untrusted, plus a prompt rule. |
+| [`tool-bridge`](packages/tool-bridge) | Another extension's published pi tools, callable from inside a cell as `await tool(...)`. |
 | [`readonly-mode`](packages/readonly-mode) | Query-only mode: removes writer tools, gates bash, injects a prompt. |
 | [`rpiv-advisor-pi-native`](packages/rpiv-advisor-pi-native) | Keeps rpiv-advisor's config in pi's own config tree. |
 | [`magic-context`](packages/magic-context) | Forked. Cross-session memory and context management for pi. **Prebuilt** — see below. |
 
 The first four compose into one code-mode runtime. `code-mode` owns the kernel and the `python`
 tool; `rlm`, `web-code` and `rsi` reach it through a process-global registry — a contract, not an
-import — and each *contributes* the host functions and sentences it is responsible for. Uninstall
-any of the three and the kernel still runs, with fewer names in it; uninstall `code-mode` and the
-other three say so instead of half-working. The rest are independent.
+import — and each *contributes* the host functions and sentences it is responsible for. `tool-bridge`
+is a leaf of the same kind: it contributes one host function, `tool`, through which an owner's
+published tools are callable by name, plus the reconciler that keeps pi's active set to the tools a
+cell cannot stand in for. Uninstall any of the three and the kernel still runs, with fewer names in
+it; uninstall `code-mode` and the others say so instead of half-working. The rest are independent.
 
 ## Setup
 
@@ -48,7 +51,7 @@ Install one at a time, or the whole set from the root manifest:
 
 ```bash
 pi install ./packages/rlm      # one package
-pi install .                   # or this repo's root, whose manifest declares all nine
+pi install .                   # or this repo's root, whose manifest declares all ten
 ```
 
 ## The fork
