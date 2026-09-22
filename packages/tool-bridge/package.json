@@ -1,0 +1,27 @@
+{
+	"name": "pi-tool-bridge",
+	"version": "0.1.0",
+	"description": "Turn another extension's published pi tools into code-mode kernel host functions, so a cell can call them while pi's active set stays python-only.",
+	"type": "module",
+	"scripts": {
+		"test": "bun test",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"code-mode",
+		"tool-bridge"
+	],
+	"license": "MIT",
+	"pi": {
+		"extensions": [
+			"./src/index.ts"
+		]
+	},
+	"devDependencies": {
+		"@types/node": "^22.20.0",
+		"typescript": "^5.8.0"
+	}
+}

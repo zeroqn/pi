@@ -86,6 +86,16 @@ Published **at module load**, first publisher wins:
 - **`apiVersion` is the only version signal there is.** pi exposes no extension enumeration and no
   version query, so a consumer cannot tell *absent* from *old* from *inert* any other way.
 
+### Publishing *pi tools*, not host functions
+
+A contributor that wants the model to reach an **existing pi tool** from a cell has a different
+route: `pi-tool-bridge` (`packages/tool-bridge/`) reads publications from a `globalThis` slot
+(`Symbol.for("pi-tool-bridge:owners")`), turns them into one contributed host function named `tool`,
+and records which pi tools a cell can now call — so its own entry can strip those names from pi's
+active set. The kernel is not involved in any of that beyond accepting the contribution; code mode
+learns nothing about Magic Context, which is the point. See `packages/tool-bridge/README.md` for the
+publisher contract, and `.scratch/tool-bridge/` for the decisions.
+
 ## Run it
 
 ```bash
