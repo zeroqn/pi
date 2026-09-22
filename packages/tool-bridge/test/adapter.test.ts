@@ -277,11 +277,17 @@ describe("installing the bridge, and the surface rule", () => {
 		expect(sink.contributions).toEqual([]);
 	});
 
-	it("strips a bridged pi tool, leaves every other name alone, and does nothing without a record", () => {
+	it("strips a bridged pi tool, puts back a native-only one, and does nothing without a record", () => {
 		const calls: string[][] = [];
-		let active = ["python", "ctx_memory", "ask_user_question", "todowrite"];
+		let active = ["python", "ctx_memory", "ask_user_question"];
 		const pi = {
 			getActiveTools: () => [...active],
+			getAllTools: () => [
+				{ name: "python" },
+				{ name: "ctx_memory" },
+				{ name: "ask_user_question" },
+				{ name: "todowrite" },
+			],
 			setActiveTools: (names: string[]) => {
 				calls.push(names);
 				active = [...names];
@@ -301,11 +307,37 @@ describe("installing the bridge, and the surface rule", () => {
 			ctx,
 			owners: [owner("mc", { owner: "magic-context", catalogue: () => [{ name: "ctx_memory" }] })],
 		});
+		// `todowrite` was never active — code mode's reset removed it and nothing re-appends it — so
+		// the rule is what makes it reachable, and it lands after every name it did not touch.
 		expect(reconcileToolSurface(pi, ctx)).toEqual(["ctx_memory"]);
 		expect(calls).toEqual([["python", "ask_user_question", "todowrite"]]);
 
 		// Idempotent: with the name gone there is nothing left to strip, so nothing is written.
 		expect(reconcileToolSurface(pi, ctx)).toEqual([]);
 		expect(calls).toHaveLength(1);
+	});
+
+	it("does not activate a native-only tool that is not registered", () => {
+		const calls: string[][] = [];
+		let active = ["python", "ctx_memory"];
+		const pi = {
+			getActiveTools: () => [...active],
+			// Magic Context absent or `todowrite` disabled: the name is not in the registry, and
+			// `setActiveTools` would silently ignore it, so the rule must not claim it either.
+			getAllTools: () => [{ name: "python" }, { name: "ctx_memory" }],
+			setActiveTools: (names: string[]) => {
+				calls.push(names);
+				active = [...names];
+			},
+		};
+
+		const sink = accepting();
+		installToolBridge({
+			contribute: sink.contribute,
+			ctx,
+			owners: [owner("mc", { owner: "magic-context", catalogue: () => [{ name: "ctx_memory" }] })],
+		});
+		expect(reconcileToolSurface(pi, ctx)).toEqual(["ctx_memory"]);
+		expect(calls).toEqual([["python"]]);
 	});
 });

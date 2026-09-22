@@ -8,10 +8,13 @@
  * entry *after* it. Move this line up and the rule silently stops working: nothing fails, the
  * tools simply come back.
  *
- * It strips nothing by itself. The rule reads the session's record, and that record exists only
+ * It changes nothing by itself. The rule reads the session's record, and that record exists only
  * when a cell route was installed for that session (`installToolBridge`). No bridge, no change —
  * which is what keeps a code-mode session without the bridge from losing Magic Context's
- * `ctx_memory` re-append, its only route to memory.
+ * `ctx_memory` re-append, its only route to memory. In a bridged session it does both halves of
+ * the rule: it strips the names a cell can reach, and it puts back the native-only tools the
+ * convention forbids publishing (`NATIVE_ONLY_TOOLS` — today `todowrite`, whose state Magic
+ * Context captures from pi's dispatch, so a bridged call would record nothing).
  */
 import { type ActiveToolSurface, reconcileToolSurface } from "./adapter";
 import { forgetSession, sessionKey } from "./convention";

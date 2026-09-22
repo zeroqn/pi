@@ -6,8 +6,9 @@ agent. This is the vocabulary this repo uses about its own machinery.
 ## Code mode
 
 **Code mode**:
-The pi surface in which the agent's whole tool set is one persistent Python kernel, reached through
-a single tool named `python`.
+The pi surface in which the agent's work runs in one persistent Python kernel, reached through a tool
+named `python`. (Other active tools — `ask_user_question`, `todowrite` — are not code mode's own; the
+tool bridge is what keeps them there.)
 _Avoid_: code-mode session, REPL mode
 
 **Kernel**:

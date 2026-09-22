@@ -12,11 +12,13 @@
  *    `await tool("ctx_reduce", drop="3-5")` calls one, and the answer is the tool's own text,
  *    refusals included. An unpublished name throws a `NameError` that lists what was published,
  *    which is the one failure a model can repair by itself.
- * 3. **The surface rule** (ticket 03). Once a name is reachable from a cell, its pi tool is
- *    stripped from the active set for that session — and only then, because a session with no
- *    cell route must keep the pi tool it had. This is the half an entry runs per turn, and the
- *    same function is what a child factory would call, since ambient extensions are not loaded
- *    in a child.
+ * 3. **The surface rule** (ticket 03, extended by ticket 12). Once a name is reachable from a
+ *    cell, its pi tool is stripped from the active set for that session — and only then, because a
+ *    session with no cell route must keep the pi tool it had. The rule has a second direction: a
+ *    *native-only* tool, whose effect is pi's dispatch rather than its own `execute`, must be
+ *    **active**, because the convention forbids publishing it. This is the half an entry runs per
+ *    turn, and the same function is what a child factory would call, since ambient extensions are
+ *    not loaded in a child.
  *
  * Nothing here imports pi: the surface is typed structurally, so the rules are testable with no
  * extension host, no kernel and no monty — the same property that makes code mode's
@@ -52,8 +54,22 @@ export type KernelContribute = (contribution: BridgeContribution) => BridgeRecei
 /** What a pi extension api has to offer for the surface rule — nothing else is used. */
 export type ActiveToolSurface = {
 	getActiveTools(): string[];
+	/** pi's real api has this; a minimal test stub may not. It is the only way to tell whether a
+	 *  native-only tool is registered at all — activating an unknown name is a silent no-op. */
+	getAllTools?(): { name: string }[];
 	setActiveTools(names: string[]): void;
 };
+
+/**
+ * Tools the convention forbids publishing, so a bridged session must keep them as real pi tools.
+ *
+ * Their effect is pi's *dispatch*, not their own `execute` — Magic Context's `todowrite` writes
+ * nothing itself (its state is captured from `tool_execution_start` / `message_end`), so a call
+ * routed through the bridge would succeed and record nothing. Code mode's mount-time reset is what
+ * removes them from the active set, and no owner re-appends this one, so the rule has to put it
+ * back. See `.scratch/tool-bridge/issues/12-activate-todowrite.md`.
+ */
+export const NATIVE_ONLY_TOOLS = ["todowrite"] as const;
 
 export type BridgeProblem = {
 	owner: string;
@@ -398,7 +414,8 @@ export function installToolBridge(input: BridgeInstallInput): BridgeInstallResul
 }
 
 /**
- * The surface rule: a name a cell can reach is not a pi tool in that session.
+ * The surface rule, both directions: a name a cell can reach is not a pi tool in that session, and
+ * a native-only tool is.
  *
  * Reads the session's record first, so a session with no installed bridge is left exactly as it
  * was — which is what keeps a code-mode session without the bridge from losing Magic Context's
@@ -411,6 +428,34 @@ export function reconcileToolSurface(pi: ActiveToolSurface, ctx: unknown): strin
 	const active = pi.getActiveTools();
 	const next = active.filter((name) => !bridged.has(name));
 	const stripped = active.filter((name) => bridged.has(name));
-	if (next.length !== active.length) pi.setActiveTools(next);
+	for (const name of nativeOnlyToActivate(pi, next, bridged)) next.push(name);
+	if (!sameNames(next, active)) pi.setActiveTools(next);
 	return stripped;
+}
+
+/**
+ * The native-only tools that are registered and not already active, in declared order.
+ *
+ * A name an owner published is excluded even if it is on this list: the convention forbids
+ * publishing these, so a publication is the owner's claim that a cell *can* do it, and the strip is
+ * the direction that honours the claim. The two directions must not fight over one name.
+ */
+function nativeOnlyToActivate(
+	pi: ActiveToolSurface,
+	next: string[],
+	bridged: Set<string>,
+): string[] {
+	const registered = pi.getAllTools?.();
+	return NATIVE_ONLY_TOOLS.filter(
+		(name) =>
+			!next.includes(name) &&
+			!bridged.has(name) &&
+			// No registry to ask (a minimal stub): offer the name anyway — pi's `setActiveTools`
+			// ignores a name that is not registered, so the worst case is a no-op.
+			(registered === undefined || registered.some((tool) => tool.name === name)),
+	);
+}
+
+function sameNames(a: string[], b: string[]): boolean {
+	return a.length === b.length && a.every((name, index) => name === b[index]);
 }

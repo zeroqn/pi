@@ -6,9 +6,10 @@ tools stay registered but unreachable, and Magic Context's `ctx_reduce` answers 
 found` in exactly the sessions where the model is doing the most work.
 
 This package closes that gap the only way pi allows: by turning another extension's published tools
-into **kernel host functions**, which a cell calls by bare name. The model's tool surface stays
-`python`, and the tools it was already told about (by the owner's own system prompt) become
-reachable again as `await tool("ctx_reduce", drop="3-5")`.
+into **kernel host functions**, which a cell calls by bare name. The model's tool surface stays the
+tools a cell cannot stand in for — `python`, plus `ask_user_question` (its whole value is the TUI) and
+`todowrite` (its effect is pi's dispatch) — and the tools it was already told about (by the owner's
+own system prompt) become reachable again as `await tool("ctx_reduce", drop="3-5")`.
 
 ## For an extension that wants to publish its tools
 
@@ -44,7 +45,9 @@ Four rules, each one load-bearing:
    produces — the transcript, an overlay, a renderer — must not be published: called from a cell it
    would appear to succeed and do nothing. Magic Context's `todowrite` is the live example: its
    `execute` only prints, and the state is captured from pi's `tool_execution_start` /
-   `message_end` events, so it stays a pi tool.
+   `message_end` events, so it stays a pi tool. Because it is *not* published, the surface rule owes
+   it the other half — it keeps it **active** (`NATIVE_ONLY_TOOLS`), which is what makes it reachable
+   at all after code mode's mount-time reset.
 3. **Publishing is keyed and replaces.** pi's jiti loader re-imports an extension entry per session
    while `globalThis` survives, so a re-import must overwrite its own key rather than append.
 4. **`apiVersion` is the only version signal there is.** pi has no extension enumeration, so a
@@ -74,6 +77,11 @@ workspace's list. Move the entry up and the rule silently stops working.
 
 `reconcileToolSurface(pi, ctx)` is exported for the case the entry cannot cover: ambient extensions
 are not loaded in a child session, so a child's kernel owner calls it from its own factory.
+
+The rule has **two directions**, and a bridged session gets both: a name a cell can reach is stripped,
+and a native-only tool (`NATIVE_ONLY_TOOLS`, today `todowrite`) is put back if it is registered and not
+already active. A session with no bridge record is left exactly as it was, so nothing here can take a
+tool away from a session that has no cell route to it.
 
 ## What the model sees
 
