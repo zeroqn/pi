@@ -15393,87 +15393,6 @@ function commitPiCompactionModeRecord(db, sessionId, record) {
 // src/context-handler.ts
 import * as crypto3 from "node:crypto";
 
-// src/pi-child-mode.ts
-var CHILD_TOOL_ALLOWLIST = new Set([
-  "ctx_search",
-  "ctx_reduce",
-  "ctx_expand"
-]);
-var CHILD_TAG_SENTENCE = "Messages and tool outputs are tagged with §N§ identifiers (e.g. §1§, §42§). " + "Use ctx_reduce to drop tool outputs you have already processed. " + "ctx_search queries this project's memory; ctx_expand opens a tagged item.";
-var CHILD_TAG_MARKER = "tagged with §N§ identifiers";
-var reducedSessions = new Set;
-function markReducedSession(sessionId) {
-  if (typeof sessionId === "string" && sessionId.length > 0)
-    reducedSessions.add(sessionId);
-}
-function unmarkReducedSession(sessionId) {
-  if (typeof sessionId === "string" && sessionId.length > 0)
-    reducedSessions.delete(sessionId);
-}
-function isReducedSession(sessionId) {
-  return typeof sessionId === "string" && reducedSessions.has(sessionId);
-}
-var tagSentenceLogged = new Set;
-function shouldLogTagSentence(sessionId) {
-  if (typeof sessionId !== "string" || sessionId.length === 0)
-    return false;
-  if (tagSentenceLogged.has(sessionId))
-    return false;
-  tagSentenceLogged.add(sessionId);
-  return true;
-}
-function textOf(value) {
-  if (typeof value === "string")
-    return value;
-  if (Array.isArray(value)) {
-    let out = "";
-    for (const part of value) {
-      if (typeof part === "string")
-        out += part;
-      else if (part && typeof part === "object" && typeof part.text === "string") {
-        out += part.text;
-      }
-    }
-    return out;
-  }
-  return "";
-}
-function alreadyTold(messages) {
-  for (const message of messages) {
-    if (textOf(message?.content).includes(CHILD_TAG_MARKER))
-      return true;
-  }
-  return false;
-}
-function withAppendedText(message, text) {
-  const content = message.content;
-  if (typeof content === "string")
-    return { ...message, content: `${content}
-
-${text}` };
-  if (Array.isArray(content)) {
-    return { ...message, content: [...content, { type: "text", text }] };
-  }
-  return message;
-}
-function ensureChildTagSentence(result, sessionId) {
-  if (!result || !Array.isArray(result.messages))
-    return result;
-  if (!isReducedSession(sessionId))
-    return result;
-  if (alreadyTold(result.messages))
-    return result;
-  for (let index = result.messages.length - 1;index >= 0; index -= 1) {
-    const message = result.messages[index];
-    if (message?.role !== "user")
-      continue;
-    const messages = result.messages.slice();
-    messages[index] = withAppendedText(message, CHILD_TAG_SENTENCE);
-    return { messages };
-  }
-  return result;
-}
-
 // ../plugin/src/features/magic-context/scheduler.ts
 var TTL_PATTERN = /^(\d+)([smh])$/;
 var NUMERIC_PATTERN = /^\d+$/;
@@ -24593,6 +24512,87 @@ function isSentinelPart(part) {
   return p.type === "text" && typeof p.text === "string" && (p.text === "" || p.text === WHOLE_MESSAGE_PLACEHOLDER_TEXT);
 }
 
+// src/pi-child-mode.ts
+var CHILD_TOOL_ALLOWLIST = new Set([
+  "ctx_search",
+  "ctx_reduce",
+  "ctx_expand"
+]);
+var CHILD_TAG_SENTENCE = "Messages and tool outputs are tagged with §N§ identifiers (e.g. §1§, §42§). " + "Use ctx_reduce to drop tool outputs you have already processed. " + "ctx_search queries this project's memory; ctx_expand opens a tagged item.";
+var CHILD_TAG_MARKER = "tagged with §N§ identifiers";
+var reducedSessions = new Set;
+function markReducedSession(sessionId) {
+  if (typeof sessionId === "string" && sessionId.length > 0)
+    reducedSessions.add(sessionId);
+}
+function unmarkReducedSession(sessionId) {
+  if (typeof sessionId === "string" && sessionId.length > 0)
+    reducedSessions.delete(sessionId);
+}
+function isReducedSession(sessionId) {
+  return typeof sessionId === "string" && reducedSessions.has(sessionId);
+}
+var tagSentenceLogged = new Set;
+function shouldLogTagSentence(sessionId) {
+  if (typeof sessionId !== "string" || sessionId.length === 0)
+    return false;
+  if (tagSentenceLogged.has(sessionId))
+    return false;
+  tagSentenceLogged.add(sessionId);
+  return true;
+}
+function textOf(value) {
+  if (typeof value === "string")
+    return value;
+  if (Array.isArray(value)) {
+    let out = "";
+    for (const part of value) {
+      if (typeof part === "string")
+        out += part;
+      else if (part && typeof part === "object" && typeof part.text === "string") {
+        out += part.text;
+      }
+    }
+    return out;
+  }
+  return "";
+}
+function alreadyTold(messages) {
+  for (const message of messages) {
+    if (textOf(message?.content).includes(CHILD_TAG_MARKER))
+      return true;
+  }
+  return false;
+}
+function withAppendedText(message, text) {
+  const content = message.content;
+  if (typeof content === "string")
+    return { ...message, content: `${content}
+
+${text}` };
+  if (Array.isArray(content)) {
+    return { ...message, content: [...content, { type: "text", text }] };
+  }
+  return message;
+}
+function ensureChildTagSentence(result, sessionId) {
+  if (!result || !Array.isArray(result.messages))
+    return result;
+  if (!isReducedSession(sessionId))
+    return result;
+  if (alreadyTold(result.messages))
+    return result;
+  for (let index = result.messages.length - 1;index >= 0; index -= 1) {
+    const message = result.messages[index];
+    if (message?.role !== "user")
+      continue;
+    const messages = result.messages.slice();
+    messages[index] = withAppendedText(message, CHILD_TAG_SENTENCE);
+    return { messages };
+  }
+  return result;
+}
+
 // src/pi-context-limit.ts
 var MIN_SANE_LIMIT = 16000;
 var MAX_SANE_LIMIT = 1e7;
@@ -30040,7 +30040,7 @@ async function runPipeline(args) {
     onRejectedProjectOverride: (warning) => sessionLog(args.sessionId, warning)
   });
   let protectionFloorResolution = resolveProtectionFloor();
-  let shouldRunHeuristics = args.heuristics !== undefined && isCacheBustingPass && (rideSignals.publishedHistory || args.forceMaterialization === true || hasPendingMaterializeSignal || deferredMaterializeEligible || foldExecutedThisPass || firstRenderBust || args.schedulerDecision === "execute" && !alreadyRanHeuristicsThisTurn);
+  const shouldRunHeuristics = args.heuristics !== undefined && isCacheBustingPass && (rideSignals.publishedHistory || args.forceMaterialization === true || hasPendingMaterializeSignal || deferredMaterializeEligible || foldExecutedThisPass || firstRenderBust || args.schedulerDecision === "execute" && !alreadyRanHeuristicsThisTurn);
   const tFallbackIdentity = performance.now();
   const hasFallbackMessageTags = hasPiFallbackMessageTags(args.db, args.sessionId);
   const entryFingerprintByMessageId = buildEntryFingerprintMap(args.messages, stableIdResolver, args.reusableMessageIds, hasFallbackMessageTags);
@@ -34202,106 +34202,6 @@ function readBranchEntries(ctx) {
   return Array.isArray(branch?.entries) ? branch.entries : [];
 }
 
-// src/pi-native-config.ts
-import {
-  copyFileSync,
-  existsSync as existsSync8,
-  lstatSync,
-  mkdirSync as mkdirSync5,
-  readFileSync as readFileSync5,
-  readlinkSync,
-  renameSync,
-  rmSync as rmSync2,
-  statSync as statSync5,
-  symlinkSync
-} from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { dirname as dirname4, isAbsolute as isAbsolute2, join as join7 } from "node:path";
-var PI_NATIVE_PATH = join7(homedir2(), ".pi", "agent", "extension-configs", "magic-context", "magic-context.jsonc");
-function homeDir() {
-  if (process.platform === "win32") {
-    return process.env.USERPROFILE || process.env.HOME || homedir2();
-  }
-  return process.env.HOME || homedir2();
-}
-function configHome() {
-  const xdg = process.env.XDG_CONFIG_HOME;
-  return xdg && isAbsolute2(xdg) ? xdg : join7(homeDir(), ".config");
-}
-function cortexKitPath() {
-  return join7(configHome(), "cortexkit", "magic-context.jsonc");
-}
-function isSymlink(path) {
-  try {
-    return lstatSync(path).isSymbolicLink();
-  } catch {
-    return false;
-  }
-}
-function pointsAt(path, target) {
-  try {
-    return readlinkSync(path) === target;
-  } catch {
-    return false;
-  }
-}
-function sameContent(a, b) {
-  try {
-    return readFileSync5(a).equals(readFileSync5(b));
-  } catch {
-    return false;
-  }
-}
-function mtimeMs(path) {
-  try {
-    return statSync5(path).mtimeMs;
-  } catch {
-    return 0;
-  }
-}
-function moveFile(from, to) {
-  try {
-    renameSync(from, to);
-  } catch (err) {
-    if (err.code !== "EXDEV")
-      throw err;
-    copyFileSync(from, to);
-    rmSync2(from);
-  }
-}
-function backupPathFor(path) {
-  const base = `${path}.pre-symlink`;
-  return existsSync8(base) ? `${base}.${Date.now()}` : base;
-}
-function ensureLink() {
-  const target = cortexKitPath();
-  mkdirSync5(dirname4(PI_NATIVE_PATH), { recursive: true });
-  if (isSymlink(target)) {
-    if (pointsAt(target, PI_NATIVE_PATH))
-      return;
-    rmSync2(target);
-  } else if (existsSync8(target)) {
-    if (!existsSync8(PI_NATIVE_PATH)) {
-      moveFile(target, PI_NATIVE_PATH);
-    } else if (sameContent(target, PI_NATIVE_PATH)) {
-      rmSync2(target);
-    } else if (mtimeMs(target) >= mtimeMs(PI_NATIVE_PATH)) {
-      copyFileSync(PI_NATIVE_PATH, backupPathFor(PI_NATIVE_PATH));
-      moveFile(target, PI_NATIVE_PATH);
-    } else {
-      copyFileSync(target, backupPathFor(target));
-      rmSync2(target);
-    }
-  }
-  if (!existsSync8(PI_NATIVE_PATH))
-    return;
-  mkdirSync5(dirname4(target), { recursive: true });
-  symlinkSync(PI_NATIVE_PATH, target);
-}
-function ensurePiNativeConfigLink() {
-  ensureLink();
-}
-
 // src/dropped-input-guard-pi.ts
 function createPiDroppedInputGuard() {
   return (event) => {
@@ -34457,27 +34357,153 @@ async function bootPiRuntimeWithDeadline(args) {
   return { status: "timed_out", lateAdoption };
 }
 
-// src/strip-tag-prefix.ts
-function stripTagPrefixFromAssistantMessage(message) {
-  if (message.role !== "assistant")
+// src/pi-native-config.ts
+import {
+  copyFileSync,
+  existsSync as existsSync8,
+  lstatSync,
+  mkdirSync as mkdirSync5,
+  readFileSync as readFileSync5,
+  readlinkSync,
+  renameSync,
+  rmSync as rmSync2,
+  statSync as statSync5,
+  symlinkSync
+} from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { dirname as dirname4, isAbsolute as isAbsolute2, join as join7 } from "node:path";
+var PI_NATIVE_PATH = join7(homedir2(), ".pi", "agent", "extension-configs", "magic-context", "magic-context.jsonc");
+function homeDir() {
+  if (process.platform === "win32") {
+    return process.env.USERPROFILE || process.env.HOME || homedir2();
+  }
+  return process.env.HOME || homedir2();
+}
+function configHome() {
+  const xdg = process.env.XDG_CONFIG_HOME;
+  return xdg && isAbsolute2(xdg) ? xdg : join7(homeDir(), ".config");
+}
+function cortexKitPath() {
+  return join7(configHome(), "cortexkit", "magic-context.jsonc");
+}
+function isSymlink(path) {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
     return false;
-  if (!Array.isArray(message.content))
+  }
+}
+function pointsAt(path, target) {
+  try {
+    return readlinkSync(path) === target;
+  } catch {
     return false;
-  let mutated = false;
-  for (const part of message.content) {
-    if (part === null || typeof part !== "object" || part.type !== "text") {
-      continue;
-    }
-    const textPart = part;
-    if (typeof textPart.text !== "string")
-      continue;
-    const stripped = stripPersistedAssistantText(textPart.text);
-    if (stripped !== textPart.text) {
-      textPart.text = stripped;
-      mutated = true;
+  }
+}
+function sameContent(a, b) {
+  try {
+    return readFileSync5(a).equals(readFileSync5(b));
+  } catch {
+    return false;
+  }
+}
+function mtimeMs(path) {
+  try {
+    return statSync5(path).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+function moveFile(from, to) {
+  try {
+    renameSync(from, to);
+  } catch (err) {
+    if (err.code !== "EXDEV")
+      throw err;
+    copyFileSync(from, to);
+    rmSync2(from);
+  }
+}
+function backupPathFor(path) {
+  const base = `${path}.pre-symlink`;
+  return existsSync8(base) ? `${base}.${Date.now()}` : base;
+}
+function ensureLink() {
+  const target = cortexKitPath();
+  mkdirSync5(dirname4(PI_NATIVE_PATH), { recursive: true });
+  if (isSymlink(target)) {
+    if (pointsAt(target, PI_NATIVE_PATH))
+      return;
+    rmSync2(target);
+  } else if (existsSync8(target)) {
+    if (!existsSync8(PI_NATIVE_PATH)) {
+      moveFile(target, PI_NATIVE_PATH);
+    } else if (sameContent(target, PI_NATIVE_PATH)) {
+      rmSync2(target);
+    } else if (mtimeMs(target) >= mtimeMs(PI_NATIVE_PATH)) {
+      copyFileSync(PI_NATIVE_PATH, backupPathFor(PI_NATIVE_PATH));
+      moveFile(target, PI_NATIVE_PATH);
+    } else {
+      copyFileSync(target, backupPathFor(target));
+      rmSync2(target);
     }
   }
-  return mutated;
+  if (!existsSync8(PI_NATIVE_PATH))
+    return;
+  mkdirSync5(dirname4(target), { recursive: true });
+  symlinkSync(PI_NATIVE_PATH, target);
+}
+function ensurePiNativeConfigLink() {
+  ensureLink();
+}
+
+// src/pi-tool-publication.ts
+var BRIDGE_OWNERS_SYMBOL = Symbol.for("pi-tool-bridge:owners");
+var BRIDGE_API_VERSION = 1;
+var BRIDGE_OWNER = "magic-context";
+var BRIDGE_PUBLISHABLE_TOOL_NAMES = new Set([
+  "ctx_search",
+  "ctx_memory",
+  "ctx_note",
+  "ctx_expand",
+  "ctx_reduce"
+]);
+function isBridgePublishable(name) {
+  return BRIDGE_PUBLISHABLE_TOOL_NAMES.has(name);
+}
+function bridgeSlot() {
+  const holder = globalThis;
+  const existing = holder[BRIDGE_OWNERS_SYMBOL];
+  if (existing instanceof Map)
+    return existing;
+  const created = new Map;
+  holder[BRIDGE_OWNERS_SYMBOL] = created;
+  return created;
+}
+function publishBridgeTools(key, publication) {
+  const slot = bridgeSlot();
+  slot.set(key, publication);
+  return () => {
+    if (slot.get(key) === publication)
+      slot.delete(key);
+  };
+}
+function bridgeToolEntries(definitions, names) {
+  const entries = [];
+  for (const name of names) {
+    if (!isBridgePublishable(name))
+      continue;
+    const definition = definitions.get(name);
+    if (!definition)
+      continue;
+    entries.push({
+      name,
+      description: definition.description,
+      snippet: definition.promptSnippet ?? definition.description,
+      parameters: definition.parameters
+    });
+  }
+  return entries;
 }
 
 // src/pi-registry.ts
@@ -34505,6 +34531,17 @@ function resolve3(ctx) {
       return registration;
   }
   return registrations.size === 1 ? [...registrations][0] : undefined;
+}
+function bridgeRefusal(toolName, reason) {
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Error: '${toolName}' is not available — ${reason}.`
+      }
+    ],
+    details: undefined
+  };
 }
 function registerPiRegistry(options) {
   const registration = {
@@ -34570,11 +34607,51 @@ function registerPiRegistry(options) {
     }
   };
   globalThis[REGISTRY_KEY] = facade;
+  const bridge = options.bridge;
+  const grantedNames = (ctx) => (bridge?.publishableNames(ctx) ?? []).filter(isBridgePublishable);
+  const unpublishBridge = bridge ? publishBridgeTools(`${BRIDGE_OWNER}\x00${options.dbPath}\x00${options.projectDir}`, {
+    owner: BRIDGE_OWNER,
+    apiVersion: BRIDGE_API_VERSION,
+    catalogue: (ctx) => resolve3(ctx) === registration ? bridgeToolEntries(registration.tools, grantedNames(ctx)) : [],
+    execute: async (name, params, ctx) => {
+      if (resolve3(ctx) !== registration) {
+        return bridgeRefusal(name, "Magic Context has no instance serving this session");
+      }
+      if (!grantedNames(ctx).includes(name)) {
+        return bridgeRefusal(name, "not available in this session");
+      }
+      return bridge.execute(name, params, ctx);
+    }
+  }) : () => {};
   return () => {
+    unpublishBridge();
     registrations.delete(registration);
     if (registrations.size === 0)
       delete globalThis[REGISTRY_KEY];
   };
+}
+
+// src/strip-tag-prefix.ts
+function stripTagPrefixFromAssistantMessage(message) {
+  if (message.role !== "assistant")
+    return false;
+  if (!Array.isArray(message.content))
+    return false;
+  let mutated = false;
+  for (const part of message.content) {
+    if (part === null || typeof part !== "object" || part.type !== "text") {
+      continue;
+    }
+    const textPart = part;
+    if (typeof textPart.text !== "string")
+      continue;
+    const stripped = stripPersistedAssistantText(textPart.text);
+    if (stripped !== textPart.text) {
+      textPart.text = stripped;
+      mutated = true;
+    }
+  }
+  return mutated;
 }
 
 // src/index.ts
@@ -35335,6 +35412,28 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
     dbPath,
     projectDir,
     tools: registeredTools,
+    bridge: {
+      publishableNames: (ctx) => {
+        const memoryEnabled = resolveCurrentProjectDeps(ctx).config.memory.enabled;
+        const registered = new Set(pi.getAllTools().map((tool) => tool.name));
+        return [...registeredTools.keys()].filter((name) => registered.has(name) && (name !== "ctx_memory" || memoryEnabled));
+      },
+      execute: async (name, params, ctx) => {
+        const definition = registeredTools.get(name);
+        if (!definition) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error: '${name}' is not available in this session.`
+              }
+            ],
+            details: undefined
+          };
+        }
+        return definition.execute(`bridge-${name}-${Date.now()}`, params, undefined, undefined, ctx);
+      }
+    },
     registry: {
       transformContext: async (event, ctx) => {
         const sessionId = ctx?.sessionManager?.getSessionId?.();
