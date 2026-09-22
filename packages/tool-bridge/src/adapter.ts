@@ -132,23 +132,27 @@ export function gatherToolBridge(
 		const seen = new Set<string>();
 		let refused: string | undefined;
 		for (const candidate of raw) {
-			const entry = asEntry(candidate);
-			if (!entry.ok) {
-				problems.push({ owner, reason: entry.reason, entry: entry.name });
+			const checked = asEntry(candidate);
+			if (checked.ok && checked.value) {
+				const name = checked.value.name;
+				if (seen.has(name)) {
+					refused = `publishes '${name}' twice`;
+					break;
+				}
+				const holder = claimed.get(name);
+				if (holder !== undefined && holder !== owner) {
+					refused = `publishes '${name}', which ${holder} already holds`;
+					break;
+				}
+				seen.add(name);
+				kept.push({ owner, entry: checked.value, publication });
 				continue;
 			}
-			const name = entry.value.name;
-			if (seen.has(name)) {
-				refused = `publishes '${name}' twice`;
-				break;
-			}
-			const holder = claimed.get(name);
-			if (holder !== undefined && holder !== owner) {
-				refused = `publishes '${name}', which ${holder} already holds`;
-				break;
-			}
-			seen.add(name);
-			kept.push({ owner, entry: entry.value, publication });
+			problems.push({
+				owner,
+				reason: checked.reason ?? "malformed catalogue entry was dropped",
+				entry: checked.name,
+			});
 		}
 		if (refused !== undefined) {
 			problems.push({ owner, reason: `${refused} — refused whole` });
@@ -162,9 +166,17 @@ export function gatherToolBridge(
 	return { tools, problems };
 }
 
-type EntryCheck =
-	| { ok: true; value: BridgeToolEntry }
-	| { ok: false; name?: string; reason: string };
+/**
+ * A deliberately undiscriminated result: a consumer typechecks this file with *its own* tsconfig,
+ * and a boolean-literal discriminant does not narrow under `strict: false` — which rlm's config
+ * is. Every field is optional and the reader checks `ok` and `value` at runtime.
+ */
+type EntryCheck = {
+	ok: boolean;
+	value?: BridgeToolEntry;
+	name?: string;
+	reason?: string;
+};
 
 function asEntry(candidate: unknown): EntryCheck {
 	if (!isRecord(candidate)) {
