@@ -180,6 +180,9 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			reason: "code-mode kernel: write_text/edit_text/bash host functions exist",
 		});
 
+		// A resumed child is a child even though no `childContext` is in play; computed once, since
+		// both the provenance rule and the bridge's child exclusion read it.
+		const isChild = childContext !== null || readChildProvenance(ctx?.sessionManager) !== null;
 		const problems: string[] = [];
 		let bridge: BridgeReport | undefined;
 		const bound = await bindCodeMode({
@@ -207,8 +210,7 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 							startReason,
 							previousSessionFile,
 							parentSessionFile,
-							// A resumed child is a child even though no `childContext` is in play.
-							isChild: childContext !== null || readChildProvenance(ctx?.sessionManager) !== null,
+							isChild,
 						},
 					}),
 				];
@@ -237,11 +239,10 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			// Not in a child. What a child's kernel may reach is Magic Context's child allowlist
 			// (`ctx_search`, `ctx_reduce`, `ctx_expand`), and a *published* tool set is chosen by the
 			// owner's session policy rather than by that allowlist — so adopting here would widen the
-			// child's bound, which is the one thing this seam must not do. A child's kernel is
-			// unreachable today (children have no `python` tool since the code-mode split, which is
-			// out of scope for this effort); when that is fixed, Magic Context's own policy is where
-			// the narrowing belongs, and the map's fog records it.
-			const isChild = childContext !== null || readChildProvenance(ctx?.sessionManager) !== null;
+			// child's bound, which is the one thing this seam must not do. A child has its own
+			// `python` tool again, so a child *could* call a bridge; the narrowing belongs in Magic
+			// Context's own `publishableNames`, which already carries `isReducedSession` for exactly
+			// this kind of session-scoped decision, and the map's fog records it.
 			if (!isChild) {
 				bridge = adoptToolBridge({ contribute: bound.handle.contribute, ctx });
 			}

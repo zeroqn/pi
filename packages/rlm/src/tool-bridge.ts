@@ -62,7 +62,7 @@ export function adoptToolBridge(input: {
 		return {
 			installed: [],
 			problems: [],
-			reason: `the bridge threw — ${str(error)}`,
+			reason: `the bridge threw — ${describeError(error)}`,
 		};
 	}
 }
@@ -72,7 +72,7 @@ function describe(problem: { owner: string; reason: string; entry?: string }): s
 	return `${problem.owner}: ${problem.reason}${where}`;
 }
 
-function str(error: unknown): string {
+function describeError(error: unknown): string {
 	return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
