@@ -40,7 +40,10 @@ way to run it; `packages/web-code` adds web host functions the same way.
 - **Mid-cell rotation** (`.scratch/kernel-budget/`): monty's per-checkout suspension budget is
   spent per host round-trip, so a long cell would eventually die on its first call. The drive loop
   uses `feedStart` + `resumeAuto` and rotates to a fresh checkout at 90 % of the budget, carrying
-  the suspended frame with it — `# kernel reclaimed mid-cell (1x); nothing was lost.`
+  the suspended frame with it — `# kernel reclaimed mid-cell (1x); nothing was lost.` A suspension
+  whose only work is pending async host calls (monty's `FutureSnapshot`) cannot be dumped and
+  re-loaded, so rotation defers to the next suspension that can be; 90 % is a floor, not a ceiling,
+  and the tenth held back absorbs the deferral.
 
 ## The contribution contract
 
@@ -135,9 +138,10 @@ contract violations that must fail a test rather than reach a session.
   stale dump is ignored and replay takes over.
 - **A partial rebuild is never dumped.** If replay stopped early, the kernel is marked incomplete and
   the next resume replays again rather than trusting a dump that would look complete.
-- **Rotating mid-host-call with a *fast* in-process host function loses the in-flight call**
-  (`worker reported unknown pending call id`) — measured identically before and after the split, so
-  it is monty's behaviour rather than this code's. `bash`-style calls are unaffected.
+- **A rotation lands at the first *dumpable* suspension at or past 90 %**, not exactly at 90 %: a
+  `FutureSnapshot` cannot be restored from a dump (its pending promises lived in the old worker), so
+  the loop answers it and rotates on the next suspension. The reserve is never crossed without a
+  rotation; it is only ever a few suspensions later.
 - **The compiled pi binary cannot resolve the napi addon on its own.** `src/monty.ts` points
   `NAPI_RS_NATIVE_LIBRARY_PATH` at the platform `.node`, searching both a hoisted
   `node_modules/@pydantic/monty-*` and bun's store — without the store case, every *spawned* pi

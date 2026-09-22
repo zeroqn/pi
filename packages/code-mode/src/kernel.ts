@@ -340,7 +340,14 @@ export function createKernel(options: {
 		let snap: any = await session!.feedStart(code, feedOptions);
 		while (!(snap instanceof monty.MontyComplete)) {
 			suspensions += 1;
-			if (suspensions >= rotateRetryAt) {
+			// A FutureSnapshot's pending promises are tracked by the session that created it,
+			// and `loadSnapshot` cannot restore them (monty's own note: "resolve those manually
+			// with resume([...])"). Rotating there makes the resumed session's next call die on
+			// `worker reported unknown pending call id N`. Rotate at the first suspension that
+			// carries no futures instead, so the reserve is a floor rather than an exact landing
+			// point — the dump then holds settled results, not a promise nobody can settle.
+			const rotatable = !(snap instanceof monty.FutureSnapshot);
+			if (rotatable && suspensions >= rotateRetryAt) {
 				try {
 					const at = suspensions;
 					snap = await rotateKernel(snap, feedOptions);

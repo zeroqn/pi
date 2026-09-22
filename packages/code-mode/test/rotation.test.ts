@@ -8,21 +8,13 @@
  * option is a test seam (production passes nothing, and `rotateAtFor` is the same derivation the
  * constant is built from, so a retune of the reserve moves both).
  *
- * **The second test is `it.failing`, and that is a finding, not a shortcut.** Rotating does not
- * currently preserve the cell: the rotation fires, the notice lands, and then the resumed session
- * answers a stale pending call —
- *
- *     # kernel reclaimed mid-cell (1x); nothing was lost.
- *     worker reported unknown pending call id 44
- *
- * — and the cell dies there. Measured four ways, all identical: 90 calls (nothing after the
- * rotation) and 95 (work after it); a limit of 100 and of 1000; an in-process contributed host
- * function and real `bash`; and — the point that makes it *not* this split's — the same workload
- * under the pre-split code at `85d9db2`, byte-identical output. So this is a pre-existing defect in
- * a mechanism kernel-budget's map records as "loses nothing": its acceptance file holds the checks
- * and their methods, and no recorded run of this one. When rotation is fixed, this test passes and
- * bun reports it as a failure until the `it.failing` is flipped back to `it` — which is exactly the
- * prompt we want.
+ * **A rotation must land on a suspension that can be dumped.** A `FutureSnapshot` — every sandbox
+ * task blocked on an async host call — cannot be restored by `loadSnapshot`: its pending promises
+ * lived in the old worker, so the resumed session's next call died on
+ * `worker reported unknown pending call id N`. The kernel therefore rotates at the first suspension
+ * *at or past* the reserve that carries no futures, so the reserve is a floor rather than an exact
+ * landing point. These two tests run the same crossing: the first pins the trigger, the second the
+ * survival.
  */
 import { describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
@@ -82,20 +74,23 @@ describe("rotateAtFor", () => {
 });
 
 describe.skipIf(!montyReady)("a cell that crosses the reserve", () => {
-	it("rotates at exactly the reserve, and says so", async () => {
+	it("rotates at the reserve, or the first dumpable suspension past it", async () => {
 		const { text, rotations, dir } = await crossTheReserve();
 		try {
-			expect(rotations.length).toBe(1);
-			expect(rotations[0].outcome).toBe("ok");
-			expect(rotations[0].at).toBe(RESERVE);
-			expect(text).toContain("kernel reclaimed mid-cell (1x); nothing was lost.");
+			// This workload is long enough to cross the reserve twice, so the count is a lower
+			// bound; what matters is that every attempt succeeded and that the trigger is never
+			// below the reserve. The first suspension at the reserve is a FutureSnapshot (async
+			// host call), so the first rotation defers to the next suspension.
+			expect(rotations.length).toBeGreaterThanOrEqual(1);
+			expect(rotations.every((rotation) => rotation.outcome === "ok")).toBe(true);
+			expect(rotations[0].at).toBeGreaterThanOrEqual(RESERVE);
+			expect(text).toMatch(/kernel reclaimed mid-cell \(\d+x\); nothing was lost\./);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}
 	});
 
-	// Expected to fail while the defect above stands; it turns into a reported failure when fixed.
-	it.failing("keeps the cell running after the rotation", async () => {
+	it("keeps the cell running after the rotation", async () => {
 		const { text, dir } = await crossTheReserve();
 		try {
 			expect(text).toContain("done 94");
