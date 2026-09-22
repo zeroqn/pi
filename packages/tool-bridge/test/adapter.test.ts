@@ -250,12 +250,25 @@ describe("installing the bridge, and the surface rule", () => {
 		expect(contribution.owner).toBe("pi-tool-bridge");
 		expect(Object.keys(contribution.hostFns)).toEqual(["tool"]);
 		expect(contribution.guidelines).toEqual([
-			'Tools published by magic-context are callable from a cell: await tool() lists them, and await tool("ctx_search", query=…) calls one.',
+			'magic-context publishes ctx_search, ctx_reduce. None of them is a pi tool or a bare name in a cell — call one as await tool("ctx_search", query=…); await tool() lists them all.',
 		]);
 		expect(bridgedSession(sessionKey(ctx))).toEqual({
 			toolNames: ["ctx_search", "ctx_reduce"],
 			owners: ["magic-context"],
 		});
+	});
+
+	it("names every published tool, and keeps the example runnable when a tool has no parameters", () => {
+		const sink = accepting();
+		installToolBridge({
+			contribute: sink.contribute,
+			ctx,
+			owners: [owner("mc", { owner: "magic-context", catalogue: () => [{ name: "ctx_memory" }] })],
+		});
+		const contribution = sink.contributions[0] as { guidelines: string[] };
+		expect(contribution.guidelines).toEqual([
+			'magic-context publishes ctx_memory. None of them is a pi tool or a bare name in a cell — call one as await tool("ctx_memory"); await tool() lists them all.',
+		]);
 	});
 
 	it("contributes nothing and records nothing when the ledger refuses the kernel name", () => {

@@ -86,9 +86,11 @@ tool away from a session that has no cell route to it.
 ## What the model sees
 
 - **One instruction line per publishing owner**, generated from the catalogue that was actually
-  contributed, so it cannot name a tool the session does not have:
-  `Tools published by magic-context are callable from a cell: await tool() lists them, and await
-  tool("ctx_search", query=…) calls one.`
+  contributed, so it cannot name a tool the session does not have. It names every published tool,
+  says that none of them is a pi tool or a bare name in a cell, and gives one worked example:
+  `magic-context publishes ctx_search, ctx_memory, ctx_note, ctx_expand, ctx_reduce. None of them is
+  a pi tool or a bare name in a cell — call one as await tool("ctx_search", query=…); await tool()
+  lists them all.`
 - **`await tool()`** lists everything published, grouped by owner, with parameter names.
 - **`await tool("ctx_reduce", drop="3-5")`** runs one and returns **the tool's own text**, verbatim.
   A refusal (`isError: true`) is text the model reads, not an exception.

@@ -252,15 +252,21 @@ function ownersOf(gathered: Gathered): string[] {
 }
 
 /**
- * One instruction line per publishing owner (ticket 02). Generated from the catalogue that was
- * actually contributed, so it cannot name a tool this session does not have — and the worked
- * example is the load-bearing part: an owner's own prompt may have told the model to call
- * `ctx_reduce`, and only this closes the gap to *how*.
+ * One instruction line per publishing owner (ticket 02, widened by ticket 13). Generated from the
+ * catalogue that was actually contributed, so it cannot name a tool this session does not have.
+ *
+ * It carries three things, and the second is the one ticket 13 had to add. The line names **every**
+ * tool the owner published, because an owner's own prompt may have told the model to call
+ * `ctx_reduce` — Magic Context's does, in every session — and a line naming only the first entry
+ * (`ctx_search`) left that model writing `await ctx_reduce(drop="3-5")`: a bare name no kernel has,
+ * to which monty answers with a `NameError` that teaches nothing. So the line states the negative
+ * too, and then closes the gap to *how* with a worked example.
  */
 export function bridgeGuidelines(gathered: Gathered): string[] {
 	const lines: string[] = [];
 	for (const owner of ownersOf(gathered)) {
-		const first = gathered.tools.find((tool) => tool.owner === owner);
+		const published = gathered.tools.filter((tool) => tool.owner === owner);
+		const first = published[0];
 		if (!first) continue;
 		const names = parameterNames(first.entry);
 		const call =
@@ -268,7 +274,7 @@ export function bridgeGuidelines(gathered: Gathered): string[] {
 				? `await tool("${first.entry.name}", ${names[0]}=…)`
 				: `await tool("${first.entry.name}")`;
 		lines.push(
-			`Tools published by ${owner} are callable from a cell: await tool() lists them, and ${call} calls one.`,
+			`${owner} publishes ${published.map((tool) => tool.entry.name).join(", ")}. None of them is a pi tool or a bare name in a cell — call one as ${call}; await tool() lists them all.`,
 		);
 	}
 	return lines;
