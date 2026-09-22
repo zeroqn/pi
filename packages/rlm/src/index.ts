@@ -18,6 +18,7 @@
  *    failure table; a throwing factory would kill the whole process — ticket 02 §1).
  */
 import { bindCodeMode, type CodeModeHandle } from "./bind";
+import { type BridgeReport, adoptToolBridge, bridgeStatusLine } from "./tool-bridge";
 import { createChildManager, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
 import type { ChildKernelContext, Notice } from "./children";
 import { rlmContribution, webCodeContribution } from "./contribution";
@@ -180,6 +181,7 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 		});
 
 		const problems: string[] = [];
+		let bridge: BridgeReport | undefined;
 		const bound = await bindCodeMode({
 			pi,
 			ctx,
@@ -226,6 +228,23 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 
 		if (bound.status === "bound") {
 			codeMode = bound.handle;
+			// The tool bridge (ticket 06), after the bind and before the first cell: an owner's
+			// published pi tools become host functions a cell can call, and the names that became
+			// reachable are recorded for the surface entry to strip. Contributed here rather than
+			// through `bindCodeMode` because the bridge has to see its own receipt, and a session
+			// whose contribution was refused records nothing and keeps the pi tools it had.
+			//
+			// Not in a child. What a child's kernel may reach is Magic Context's child allowlist
+			// (`ctx_search`, `ctx_reduce`, `ctx_expand`), and a *published* tool set is chosen by the
+			// owner's session policy rather than by that allowlist — so adopting here would widen the
+			// child's bound, which is the one thing this seam must not do. A child's kernel is
+			// unreachable today (children have no `python` tool since the code-mode split, which is
+			// out of scope for this effort); when that is fixed, Magic Context's own policy is where
+			// the narrowing belongs, and the map's fog records it.
+			const isChild = childContext !== null || readChildProvenance(ctx?.sessionManager) !== null;
+			if (!isChild) {
+				bridge = adoptToolBridge({ contribute: bound.handle.contribute, ctx });
+			}
 			problems.push(...bound.problems);
 			for (const rejection of bound.rejections) {
 				const names = rejection.rejected.map((r) => r.name).join(", ");
@@ -240,7 +259,7 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			// Recorded unconditionally — including on failure — because this entry is the only
 			// durable evidence of whether the kernel and Magic Context were available.
 			try {
-				pi.appendEntry("rlm-magic-context", { status: magicContextStatus(), problems, startReason });
+				pi.appendEntry("rlm-magic-context", { status: magicContextStatus(), bridge: bridgeStatusLine(bridge), problems, startReason });
 			} catch {
 				/* diagnostics must never fail a session */
 			}
