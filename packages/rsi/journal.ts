@@ -29,7 +29,10 @@ export function journalPathFor(sessionFile: string | undefined): string | undefi
 export interface HostCallRecord {
 	name: string;
 	args: unknown[];
-	result: unknown;
+	/** The call's answer. Absent when the call threw — the journal writes `error` instead. */
+	result?: unknown;
+	/** A throw from the host function (`{ name, message }`), as RLM records it. */
+	error?: unknown;
 }
 
 export interface CellRecord {
@@ -85,7 +88,7 @@ export function kernelActivity(records: readonly CellRecord[]): KernelActivity {
 		hostCalls += calls.length;
 		if ((record.code ?? "").trim().length > 0) cells++;
 		for (const call of calls) {
-			const failedHere = callFailed(call.result);
+			const failedHere = callFailed(call);
 			if (failedHere) failed.add(call.name);
 			else if (failed.has(call.name)) errorThenSuccess = true;
 		}
@@ -93,8 +96,16 @@ export function kernelActivity(records: readonly CellRecord[]): KernelActivity {
 	return { cells, hostCalls, errorThenSuccess };
 }
 
-/** True when a host call's result reads as a failure. */
-function callFailed(result: unknown): boolean {
+/**
+ * True when a host call failed. A throwing host function is recorded with `error` *instead of*
+ * `result` (`{"name":"skill_host","args":["grilling"],"error":{"name":"Error","message":"…"}}`),
+ * so reading `result` alone misses it entirely — which is why this takes the whole record, not
+ * just its result. A `result` that reads as a failure (bash's exit code, a tool's own `{ error }`)
+ * still counts; a refusal returned as an ordinary `Error: …` string is an answer, not a failure.
+ */
+function callFailed(call: HostCallRecord): boolean {
+	if (call.error !== undefined && call.error !== null) return true;
+	const result = call.result;
 	if (typeof result !== "object" || result === null) return false;
 	const record = result as { exit_code?: unknown; error?: unknown };
 	if (typeof record.exit_code === "number") return record.exit_code !== 0;
@@ -113,6 +124,7 @@ export function buildJournalDigest(records: readonly CellRecord[]): string | und
 	if (records.length === 0) return undefined;
 
 	const commands: string[] = [];
+	const bridged: string[] = [];
 	const errors: string[] = [];
 	const byName = new Map<string, number>();
 	const skillsConsulted = new Set<string>();
@@ -127,6 +139,12 @@ export function buildJournalDigest(records: readonly CellRecord[]): string | und
 				if (typeof command === "string" && command.trim().length > 0) commands.push(command);
 				const failure = bashFailure(call.result);
 				if (failure) errors.push(`bash: ${failure}`);
+			}
+			if (call.name === "tool") {
+				const name = toolName(call);
+				bridged.push(bridgedCall(name, call.args?.[1]));
+				const failure = toolFailure(name, call);
+				if (failure) errors.push(`tool: ${failure}`);
 			}
 			if (call.name === "skill_host") {
 				const name = call.args?.[0];
@@ -143,6 +161,7 @@ export function buildJournalDigest(records: readonly CellRecord[]): string | und
 	];
 
 	if (commands.length > 0) sections.push(...bullets("Commands run in the kernel", commands));
+	if (bridged.length > 0) sections.push(...bullets("Bridged pi tools called", bridged));
 	if (skillsConsulted.size > 0) sections.push(...bullets("Learned skills consulted", [...skillsConsulted]));
 	if (errors.length > 0) sections.push(...bullets("Kernel errors", errors));
 
@@ -188,6 +207,55 @@ function bashFailure(result: unknown): string | undefined {
 	const stderr = typeof record.stderr === "string" ? record.stderr.trim() : "";
 	const detail = stderr.length > 0 ? stderr : typeof record.stdout === "string" ? record.stdout.trim() : "";
 	return `exit ${code}${detail ? `: ${excerpt(detail)}` : ""}`;
+}
+
+/** The pi tool a bridged `tool(...)` call reached — `args[0]` — when it named one. */
+function toolName(call: HostCallRecord): string | undefined {
+	const name = call.args?.[0];
+	return typeof name === "string" && name.length > 0 ? name : undefined;
+}
+
+/**
+ * One bullet for a bridged call: the pi tool reached, then monty's single trailing kwargs object
+ * as compact JSON (`tool("ctx_reduce", drop="…")` and `tool("ctx_reduce", {"drop": "…"})` arrive
+ * the same way). A name-only call has no second argument and renders as the name alone; the
+ * no-argument catalogue call, `await tool()`, renders as `tool()`.
+ */
+function bridgedCall(name: string | undefined, kwargs: unknown): string {
+	const args = isPlainObject(kwargs) ? ` ${JSON.stringify(kwargs)}` : "";
+	return `${name ?? "tool()"}${args}`;
+}
+
+/**
+ * A bridged call that failed, as a one-line reason — or `undefined` when it did not. A throw is
+ * recorded as `error` and renders as "threw"; a refusal is an ordinary `result` string starting
+ * `Error: ` (by design — `tool-bridge/src/adapter.ts:274-278`) and renders as "answered with an
+ * error". The wording stops there deliberately: a tool whose own answer happens to begin with
+ * `Error: ` is indistinguishable from a refusal, so the digest must not claim one.
+ */
+function toolFailure(name: string | undefined, call: HostCallRecord): string | undefined {
+	const who = name ?? "tool()";
+	if (call.error !== undefined && call.error !== null) {
+		return `${who} threw — ${excerpt(errorMessage(call.error))}`;
+	}
+	const result = call.result;
+	if (typeof result === "string" && result.startsWith("Error: ")) {
+		return `${who} answered with an error: ${excerpt(result)}`;
+	}
+	return undefined;
+}
+
+/** `{ name, message }` as RLM writes it; anything else stringified. */
+function errorMessage(error: unknown): string {
+	if (isPlainObject(error)) {
+		const message = error.message;
+		if (typeof message === "string" && message.length > 0) return message;
+	}
+	return String(error);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function bullets(heading: string, items: readonly string[]): string[] {

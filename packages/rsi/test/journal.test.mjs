@@ -148,3 +148,118 @@ test("long output in a command is excerpted rather than dumped", () => {
 	assert.ok(digest);
 	assert.ok(!digest.includes("x".repeat(300)));
 });
+
+// ---------------------------------------------------------------------------
+// Bridged pi tools — the `tool(...)` host call (ticket 12). A bridged call is evidence,
+// never a consultation, so it gets a named section and its failures go with bash's.
+// ---------------------------------------------------------------------------
+
+test("a successful bridged call renders the pi tool reached and its kwargs", () => {
+	const digest = buildJournalDigest([
+		cell(0, {
+			hostCalls: [
+				{ name: "tool", args: ["ctx_search", { query: "how does the drop window work" }], result: "…" },
+			],
+		}),
+	]);
+	assert.ok(digest);
+	assert.match(digest, /## Bridged pi tools called/);
+	assert.match(digest, /- ctx_search \{"query":"how does the drop window work"\}/);
+});
+
+test("a bridged call with no kwargs renders as the tool name alone", () => {
+	const digest = buildJournalDigest([
+		cell(0, { hostCalls: [{ name: "tool", args: ["ctx_search"], result: "…" }] }),
+	]);
+	assert.ok(digest);
+	assert.match(digest, /## Bridged pi tools called\n- ctx_search\n/);
+});
+
+test("a bridged refusal renders as 'answered with an error', not as a throw", () => {
+	const digest = buildJournalDigest([
+		cell(0, {
+			hostCalls: [
+				{
+					name: "tool",
+					args: ["ctx_memory", { action: "update", id: 9 }],
+					result: "Error: 'ids' must contain exactly one integer memory ID when action is 'update'.",
+				},
+			],
+		}),
+	]);
+	assert.ok(digest);
+	assert.match(digest, /## Kernel errors/);
+	assert.match(digest, /tool: ctx_memory answered with an error: Error: 'ids' must contain/);
+	assert.doesNotMatch(digest, /threw/);
+});
+
+test("a bridged throw renders as 'threw' with the message, never as an answer", () => {
+	const digest = buildJournalDigest([
+		cell(0, {
+			hostCalls: [
+				{
+					name: "tool",
+					args: ["nope", {}],
+					error: { name: "NameError", message: "no tool named 'nope'. Nothing is published in this session." },
+				},
+			],
+		}),
+	]);
+	assert.ok(digest);
+	assert.match(digest, /tool: nope threw — no tool named 'nope'\./);
+	assert.doesNotMatch(digest, /answered with an error/);
+});
+
+test("the bridged section sits between the commands and the skills", () => {
+	const digest = buildJournalDigest([
+		cell(0, {
+			hostCalls: [
+				{ name: "bash_host", args: ["ls"], result: { exit_code: 0 } },
+				{ name: "tool", args: ["ctx_search", { query: "x" }], result: "…" },
+				{ name: "skill_host", args: ["research"], result: { content: "…" } },
+			],
+		}),
+	]);
+	assert.ok(digest);
+	const commands = digest.indexOf("## Commands run in the kernel");
+	const bridged = digest.indexOf("## Bridged pi tools called");
+	const skills = digest.indexOf("## Learned skills consulted");
+	assert.ok(commands >= 0 && bridged > commands && skills > bridged, digest);
+});
+
+test("long bridged arguments are excerpted rather than dumped", () => {
+	const digest = buildJournalDigest([
+		cell(0, { hostCalls: [{ name: "tool", args: ["ctx_search", { query: "x".repeat(5_000) }], result: "…" }] }),
+	]);
+	assert.ok(digest);
+	assert.ok(!digest.includes("x".repeat(300)));
+	assert.match(digest, /\.\.\./);
+});
+
+test("a throw the HostCallRecord used to hide is visible to errorThenSuccess", () => {
+	const activity = kernelActivity([
+		cell(0, {
+			hostCalls: [
+				{ name: "skill_host", args: ["grilling"], error: { name: "Error", message: 'no learned skill named "grilling"' } },
+			],
+		}),
+		cell(1, { hostCalls: [{ name: "skill_host", args: ["research"], result: { content: "…" } }] }),
+	]);
+	assert.equal(activity.errorThenSuccess, true);
+});
+
+test("a bridged refusal is an answer, so it is not error-then-success", () => {
+	const activity = kernelActivity([
+		cell(0, { hostCalls: [{ name: "tool", args: ["ctx_memory", {}], result: "Error: no." }] }),
+		cell(1, { hostCalls: [{ name: "tool", args: ["ctx_memory", {}], result: "ok" }] }),
+	]);
+	assert.equal(activity.errorThenSuccess, false);
+});
+
+test("a bridged tool call counts toward kernelActivity().hostCalls", () => {
+	const activity = kernelActivity([
+		cell(0, { hostCalls: [{ name: "tool", args: ["ctx_search", { query: "x" }], result: "…" }] }),
+		cell(1, { hostCalls: [{ name: "bash_host", args: ["ls"], result: { exit_code: 0 } }] }),
+	]);
+	assert.equal(activity.hostCalls, 2);
+});
