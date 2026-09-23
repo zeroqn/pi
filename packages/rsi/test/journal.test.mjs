@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { buildJournalDigest, journalPathFor, kernelActivity, readJournal } from "../journal.ts";
+import { buildJournalDigest, consultationsSince, journalPathFor, kernelActivity, readJournal } from "../journal.ts";
 
 function tempDir(t) {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rsi-journal-"));
@@ -262,4 +262,53 @@ test("a bridged tool call counts toward kernelActivity().hostCalls", () => {
 		cell(1, { hostCalls: [{ name: "bash_host", args: ["ls"], result: { exit_code: 0 } }] }),
 	]);
 	assert.equal(activity.hostCalls, 2);
+});
+
+// ---------------------------------------------------------------------------
+// The counting pull (one-way map ticket 11).
+// ---------------------------------------------------------------------------
+
+test("consultationsSince reads a cell's host calls in recorded order", () => {
+	const records = [
+		cell(1, { hostCalls: [{ name: "skill_host", args: ["grifting"] }] }),
+		cell(2, {
+			hostCalls: [
+				{ name: "bash_host", args: ["cat /abs/skills/general/x/SKILL.md"] },
+				{ name: "skill_host", args: ["why"] },
+				{ name: "echo", args: [] },
+				{ name: "bash_host", args: ["echo hi"] },
+			],
+		}),
+	];
+	assert.deepEqual(consultationsSince(records, null, "/w"), [
+		{ kind: "skill", value: "grifting" },
+		{ kind: "read", value: "/abs/skills/general/x/SKILL.md" },
+		{ kind: "skill", value: "why" },
+	]);
+});
+
+test("consultationsSince resolves a relative read against the session's cwd", () => {
+	const records = [cell(1, { hostCalls: [{ name: "bash_host", args: ["cat rsi/skills/general/z/SKILL.md"] }] })];
+	assert.deepEqual(consultationsSince(records, null, "/workspace"), [
+		{ kind: "read", value: "/workspace/rsi/skills/general/z/SKILL.md" },
+	]);
+});
+
+test("consultationsSince excludes cells at or before the cursor, and keeps the newer ones", () => {
+	const records = [
+		cell(1, { at: "2026-09-18T00:00:00.000Z", hostCalls: [{ name: "skill_host", args: ["old"] }] }),
+		cell(2, { at: "2026-09-18T00:00:01.000Z", hostCalls: [{ name: "skill_host", args: ["at-cursor"] }] }),
+		cell(3, { at: "2026-09-18T00:00:02.000Z", hostCalls: [{ name: "skill_host", args: ["new"] }] }),
+	];
+	// The cursor is exclusive: a cell recorded at exactly the cursor has already been counted.
+	assert.deepEqual(consultationsSince(records, "2026-09-18T00:00:01.000Z", "/w"), [
+		{ kind: "skill", value: "new" },
+	]);
+});
+
+test("consultationsSince ignores a call whose argument is missing or not a string", () => {
+	const records = [
+		cell(1, { hostCalls: [{ name: "skill_host", args: [] }, { name: "skill_host", args: [7] }, { name: "bash_host", args: [] }] }),
+	];
+	assert.deepEqual(consultationsSince(records, null, "/w"), []);
 });

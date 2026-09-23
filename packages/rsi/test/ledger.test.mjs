@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { ensureLedger, ensureSkillEntry, ledgerLockPath, ledgerPath, readLedger, recordUsage, setLastCurateAt, setLastPassAt, setSkillState, takeStatusSnapshot, withLedgerLock, writeLedger } from "../ledger.ts";
+import { ensureLedger, ensureSkillEntry, ledgerLockPath, ledgerPath, readLedger, recordCountedUsage, recordUsage, sessionCountedAt, sessionPassAt, setLastCurateAt, setLastPassAt, setSessionPassAt, setSkillState, takeStatusSnapshot, withLedgerLock, writeLedger } from "../ledger.ts";
 
 function tempRoot(t) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "rsi-ledger-"));
@@ -160,4 +160,58 @@ test("setLastCurateAt advances and clears the curation clock", async (t) => {
 	assert.equal(readLedger(root).ledger.last_curate_at, "2026-09-14T12:00:00.000Z");
 	await setLastCurateAt(root, null);
 	assert.equal(readLedger(root).ledger.last_curate_at, undefined);
+});
+
+// ---------------------------------------------------------------------------
+// The counting cursor (one-way map ticket 11).
+// ---------------------------------------------------------------------------
+
+test("recordCountedUsage writes the counts and the cursor together", async (t) => {
+	const root = tempRoot(t);
+	const at = "2026-09-18T00:00:01.000Z";
+	const written = await recordCountedUsage(root, {
+		sessionFile: "/tmp/s.jsonl",
+		at,
+		usages: [
+			{ skill: "one", scope: "general", kind: "read" },
+			{ skill: "two", scope: "general", kind: "expansion" },
+		],
+	});
+	assert.equal(written, true);
+	const { ledger } = readLedger(root);
+	assert.equal(sessionCountedAt(ledger, "/tmp/s.jsonl"), at);
+	// The same counters `recordUsage` writes: a read moves both, an expansion moves the use count.
+	assert.equal(ledger.skills.one.use_count, 1);
+	assert.equal(ledger.skills.one.read_count, 1);
+	assert.equal(ledger.skills.two.use_count, 1);
+	assert.equal(ledger.skills.two.read_count, undefined);
+});
+
+test("recordCountedUsage advances the cursor even with nothing to count", async (t) => {
+	// A cell that consulted nothing has still been seen. Without this, every settle would re-read it
+	// and the pull would never make progress.
+	const root = tempRoot(t);
+	const at = "2026-09-18T00:00:02.000Z";
+	await recordCountedUsage(root, { sessionFile: "/tmp/s.jsonl", at, usages: [] });
+	assert.equal(sessionCountedAt(readLedger(root).ledger, "/tmp/s.jsonl"), at);
+	assert.deepEqual(readLedger(root).ledger.skills, {});
+});
+
+test("the counting cursor is not the interval clock", async (t) => {
+	// Two fields on purpose: counting runs at every settle, a pass runs on its own schedule, and a
+	// pass that fails rolls its stamp back. If they shared a field, a failed pass would re-count.
+	const root = tempRoot(t);
+	await setSessionPassAt(root, "/tmp/s.jsonl", "2026-09-18T00:00:00.000Z");
+	assert.equal(sessionCountedAt(readLedger(root).ledger, "/tmp/s.jsonl"), null, "a pass is not a count");
+
+	await recordCountedUsage(root, { sessionFile: "/tmp/s.jsonl", at: "2026-09-18T00:00:03.000Z", usages: [] });
+	const { ledger } = readLedger(root);
+	assert.equal(sessionCountedAt(ledger, "/tmp/s.jsonl"), "2026-09-18T00:00:03.000Z");
+	assert.equal(sessionPassAt(ledger, "/tmp/s.jsonl"), "2026-09-18T00:00:00.000Z", "counting does not move the pass stamp");
+});
+
+test("sessionCountedAt is null without a session file, and null before anything is counted", (t) => {
+	const root = tempRoot(t);
+	assert.equal(sessionCountedAt(readLedger(root).ledger, undefined), null);
+	assert.equal(sessionCountedAt(readLedger(root).ledger, "/tmp/never.jsonl"), null);
 });

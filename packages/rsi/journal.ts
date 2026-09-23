@@ -20,6 +20,8 @@
  */
 
 import * as fs from "node:fs";
+import * as path from "node:path";
+import { bashReadCandidates } from "./telemetry.ts";
 
 /** The journal RLM writes beside a session file. */
 export function journalPathFor(sessionFile: string | undefined): string | undefined {
@@ -267,4 +269,51 @@ function bullets(heading: string, items: readonly string[]): string[] {
 function excerpt(text: string): string {
 	const collapsed = text.replace(/\s+/g, " ").trim();
 	return collapsed.length > 200 ? `${collapsed.slice(0, 197)}...` : collapsed;
+}
+
+/** One observation a kernel cell made about a learned skill, in the order the cell recorded it. */
+export type JournalConsultation = {
+	/** `"skill"` is a `skill(name)` call; `"read"` is a command that reads a skill's file. */
+	kind: "skill" | "read";
+	/** The skill's name for `"skill"`, or an absolute path for `"read"`. */
+	value: string;
+};
+
+/**
+ * The consultations in cells newer than a cursor, in recorded order.
+ *
+ * The **order** is what makes this reproduce the live push it replaced. The old path fed the
+ * tracker one observation at a time as the cell ran, and the tracker deduped by skill name per turn;
+ * pi starts one turn per cell, so a cell's `hostCalls` in recorded order *is* that window, in that
+ * order. The caller feeds these to the same tracker, which resolves paths and names and dedupes.
+ *
+ * Two things the caller must know: a `"read"` value is already absolute (the command's
+ * path-looking tokens are resolved against `cwd`, exactly as a `bash` tool call's are), and a cell
+ * that died is not in the journal at all, so its consultations are not counted.
+ */
+export function consultationsSince(
+	records: readonly CellRecord[],
+	since: string | null,
+	cwd: string,
+): JournalConsultation[] {
+	const out: JournalConsultation[] = [];
+	for (const record of records) {
+		if (since && !((record.at ?? "") > since)) continue;
+		for (const call of record.hostCalls ?? []) {
+			if (call.name === "skill_host") {
+				const name = call.args?.[0];
+				if (typeof name === "string" && name.length > 0) out.push({ kind: "skill", value: name });
+				continue;
+			}
+			if (call.name === "bash_host") {
+				const command = call.args?.[0];
+				if (typeof command !== "string") continue;
+				for (const candidate of bashReadCandidates(command)) {
+					if (candidate.length === 0) continue;
+					out.push({ kind: "read", value: path.isAbsolute(candidate) ? candidate : path.resolve(cwd, candidate) });
+				}
+			}
+		}
+	}
+	return out;
 }

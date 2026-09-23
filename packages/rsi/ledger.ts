@@ -56,8 +56,12 @@ export interface Ledger {
 	 * Each session's own interval stamp, keyed by session file. A session's pass no longer
 	 * consumes another session's interval — which as shipped it did, throttling a tree of N
 	 * learners to one pass per interval in total.
+	 *
+	 * `last_counted_at` is the **counting cursor** and a separate field on purpose: it is advanced
+	 * by the settle-time pull rather than by a pass, so counting is independent of the interval
+	 * clock and of a pass's rollback (RSI, one-way map ticket 11).
 	 */
-	sessions?: Record<string, { last_pass_at?: string }>;
+	sessions?: Record<string, { last_pass_at?: string; last_counted_at?: string }>;
 	skills: Record<string, LedgerEntry>;
 	last_status_at?: string;
 	last_status?: StatusCounts;
@@ -187,18 +191,54 @@ export async function withLedgerLock<T>(root: string, fn: () => T): Promise<T | 
  * Record one usage observation. A read moves both counters; a `/skill:name`
  * expansion moves only `use_count`. Every use resets the disuse clock.
  */
+/** Fold one consultation into the ledger's counters. Shared, so the two writers cannot drift. */
+function applyUsage(ledger: Ledger, usage: UsageRecord, at: string): void {
+	const entry = ledger.skills[usage.skill] ?? {};
+	entry.first_seen_at ??= at;
+	entry.last_used_at = at;
+	entry.use_count = (entry.use_count ?? 0) + 1;
+	if (usage.kind === "read") entry.read_count = (entry.read_count ?? 0) + 1;
+	entry.scope = usage.scope;
+	entry.state ??= "active";
+	ledger.skills[usage.skill] = entry;
+}
+
 export async function recordUsage(root: string, usage: UsageRecord): Promise<boolean> {
 	const written = await withLedgerLock(root, () => {
 		const { ledger } = readLedger(root);
-		const at = usage.at ?? new Date().toISOString();
-		const entry = ledger.skills[usage.skill] ?? {};
-		entry.first_seen_at ??= at;
-		entry.last_used_at = at;
-		entry.use_count = (entry.use_count ?? 0) + 1;
-		if (usage.kind === "read") entry.read_count = (entry.read_count ?? 0) + 1;
-		entry.scope = usage.scope;
-		entry.state ??= "active";
-		ledger.skills[usage.skill] = entry;
+		applyUsage(ledger, usage, usage.at ?? new Date().toISOString());
+		writeLedger(root, ledger);
+		return true;
+	});
+	return written ?? false;
+}
+
+/** This session's counting cursor, or `null` when it has never counted anything. */
+export function sessionCountedAt(ledger: Ledger, sessionFile: string | undefined): string | null {
+	if (!sessionFile) return null;
+	return ledger.sessions?.[sessionFile]?.last_counted_at ?? null;
+}
+
+/**
+ * Record one turn's consultations **and** advance the session's cursor, in a single locked write.
+ *
+ * One write rather than two, and that is the whole of the idempotency: there is no window in which
+ * the counts are durable and the cursor is not, so a crash between them cannot double-count. The
+ * cursor is advanced whenever the caller has seen cells, even when they consulted nothing — a cell
+ * already read must not be read again next turn.
+ */
+export async function recordCountedUsage(
+	root: string,
+	input: { sessionFile?: string; at: string; usages: readonly UsageRecord[] },
+): Promise<boolean> {
+	const written = await withLedgerLock(root, () => {
+		const { ledger } = readLedger(root);
+		for (const usage of input.usages) applyUsage(ledger, usage, usage.at ?? input.at);
+		if (input.sessionFile) {
+			const sessions = ledger.sessions ?? (ledger.sessions = {});
+			const entry = sessions[input.sessionFile] ?? (sessions[input.sessionFile] = {});
+			entry.last_counted_at = input.at;
+		}
 		writeLedger(root, ledger);
 		return true;
 	});

@@ -22,10 +22,10 @@ import { bindKernel, type KernelHandle } from "./code-mode.ts";
 import { loadConfig, saveConfig } from "./config.ts";
 import { buildCandidates, buildCurationReport, buildCuratorPrompt, curationDueForSession, isCurationDue, retirementCandidates } from "./curation.ts";
 import { buildDigest } from "./digest.ts";
-import { buildJournalDigest, journalPathFor, kernelActivity, readJournal } from "./journal.ts";
+import { buildJournalDigest, consultationsSince, journalPathFor, kernelActivity, readJournal } from "./journal.ts";
 import { runLearningFork, type ForkSession } from "./fork.ts";
 import { discoverSkillNames } from "./frontmatter.ts";
-import { readLedger, recordUsage, setSkillState, takeStatusSnapshot } from "./ledger.ts";
+import { readLedger, recordCountedUsage, recordUsage, sessionCountedAt, setSkillState, takeStatusSnapshot } from "./ledger.ts";
 import { buildReport, emptyTally, formatPassNotification, tallyChanged } from "./pass.ts";
 import { projectKeyFor } from "./project-key.ts";
 import { lastTurnWasAborted, toScanMessages } from "./prescan.ts";
@@ -214,14 +214,41 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	}
 
 	/**
-	 * One consultation, counted once. The tracker owns the per-turn dedupe, so a `skill()` call and
-	 * a bash read of the same skill in the same turn are one act, exactly as an expansion and a read
-	 * already are.
+	 * Count what the kernel consulted, at the turn boundary (map ticket 11).
+	 *
+	 * The live push is gone: rlm used to report every `skill()` call and every bash command as it
+	 * happened, and RSI did the matching. Now RSI reads the journal it already reads for the digest
+	 * — the record is there either way — and the window falls out of the shape of the data: pi
+	 * starts one turn per cell, so a cell's host calls in recorded order are the same window, in the
+	 * same order, that the tracker used to see. They are fed to the *same* tracker, which owns the
+	 * per-turn dedupe and the name/path resolution, so a `skill()` call and a bash read of the same
+	 * skill in the same turn are still one act.
+	 *
+	 * Idempotent by a cursor rather than by memory: `last_counted_at` advances in the same locked
+	 * write as the counts it covers, so a resumed session — whose replayed cells keep their original
+	 * timestamps — is not counted twice, and neither is a second settle.
 	 */
-	async function countSkillUse(name: string): Promise<void> {
+	async function countKernelUsage(ctx: ExtensionContext): Promise<void> {
 		if (!config.enabled) return;
-		const event = tracker.noteExpansion(name);
-		if (event) await recordUsage(store.root, event);
+		const sessionFile = sessionFileOf(ctx);
+		const cells = readJournal(journalPathFor(sessionFile));
+		if (cells.length === 0) return;
+		const since = sessionCountedAt(readLedger(store.root).ledger, sessionFile);
+		const fresh = cells.filter((cell) => !since || (cell.at ?? "") > since);
+		if (fresh.length === 0) return;
+
+		const usages = [];
+		for (const consultation of consultationsSince(fresh, since, ctx?.cwd ?? currentCwd)) {
+			const event =
+				consultation.kind === "skill"
+					? tracker.noteExpansion(consultation.value)
+					: tracker.noteRead(consultation.value);
+			if (event) usages.push(event);
+		}
+		// The cursor moves even when a cell consulted nothing: the cell has been seen, and re-reading
+		// it every turn would never end.
+		const newest = fresh[fresh.length - 1]?.at ?? new Date().toISOString();
+		await recordCountedUsage(store.root, { sessionFile, at: newest, usages });
 	}
 
 	/**
@@ -242,7 +269,8 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 					if (!wanted) throw new Error("skill(name) requires a name");
 					const found = skillContent(wanted);
 					if (!found) throw new Error(`no learned skill named "${wanted}" — call skills() for the ones this session can see`);
-					await countSkillUse(wanted);
+					// The count is not made here: it is pulled from the journal at the turn boundary,
+					// where this same call is visible with its neighbours (ticket 11).
 					return found;
 				},
 			},
@@ -351,6 +379,8 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 
 	pi.on("agent_settled", async (_event, ctx) => {
 		currentCtx = ctx;
+		// Before the scheduler: a pass reads the ledger, and this turn's consultations belong in it.
+		await countKernelUsage(ctx);
 		scheduler.settled();
 		return undefined;
 	});
