@@ -46,8 +46,9 @@ Four rules, each one load-bearing:
    would appear to succeed and do nothing. Magic Context's `todowrite` is the live example: its
    `execute` only prints, and the state is captured from pi's `tool_execution_start` /
    `message_end` events, so it stays a pi tool. Because it is *not* published, the surface rule owes
-   it the other half — it keeps it **active** (`NATIVE_ONLY_TOOLS`), which is what makes it reachable
-   at all after code mode's mount-time reset.
+   it the other half — it keeps it **active**, which is what makes it reachable at all after code
+   mode's mount-time reset. An owner declares that set on its own descriptor (`nativeOnly`), and the
+   rule receives it as an input.
 3. **Publishing is keyed and replaces.** pi's jiti loader re-imports an extension entry per session
    while `globalThis` survives, so a re-import must overwrite its own key rather than append.
 4. **`apiVersion` is the only version signal there is.** pi has no extension enumeration, so a
@@ -75,13 +76,27 @@ the mechanism**: it must be declared *after* every owner whose tools it strips. 
 order, and Magic Context — which re-appends `ctx_memory` on `session_start` — is last in this
 workspace's list. Move the entry up and the rule silently stops working.
 
-`reconcileToolSurface(pi, ctx)` is exported for the case the entry cannot cover: ambient extensions
-are not loaded in a child session, so a child's kernel owner calls it from its own factory.
+`reconcileToolSurface(pi, ctx, nativeOnly)` is exported for the case the entry cannot cover: ambient
+extensions are not loaded in a child session, so a child's kernel owner calls it from its own factory.
+The native-only set is an input, composed from the owners by `nativeOnlyTools()`, so the reader itself
+stays owner-agnostic.
 
 The rule has **two directions**, and a bridged session gets both: a name a cell can reach is stripped,
-and a native-only tool (`NATIVE_ONLY_TOOLS`, today `todowrite`) is put back if it is registered and not
+and a native-only tool (`nativeOnlyTools()`, today `todowrite`) is put back if it is registered and not
 already active. A session with no bridge record is left exactly as it was, so nothing here can take a
 tool away from a session that has no cell route to it.
+
+`adoptToolBridge` (`src/adopter.ts`) is the adopter's whole call: read the publications for this
+session, contribute the bridge to the kernel handle, and report what happened — including the case
+where the ledger refused it, which leaves pi's active set untouched.
+
+## For an owner that serves a child session
+
+A child loads no ambient extensions, so an owner that wants to serve one injects an extension factory
+into it instead. That is this package's other half, and it is deliberately generic: `src/child-seam.ts`
+exports `childFactories(request)`, `bindChild(input)` and `childStatus()`, and knows only that an owner
+may declare them. The owners themselves live in `src/owners/` — the one place in the package that names
+an extension.
 
 ## What the model sees
 
@@ -114,9 +129,15 @@ Every drop is reported with a reason (`problems` from `installToolBridge`) rathe
 
 - `src/convention.ts` — the symbols, the types, the slot, the session record and `sessionKey`.
 - `src/adapter.ts` — gathering, the `tool` host function, `installToolBridge`, and the surface rule.
+- `src/adopter.ts` — `adoptToolBridge` and `bridgeStatusLine`: what an extension with a kernel calls.
+- `src/child-seam.ts` — the generic child seam: the three hooks an adopter calls, over `ChildRequest`
+  and `ChildBindInput`.
+- `src/owners/` — **the only place that names an owner**. `index.ts` holds the `OwnerModule` list and
+  `nativeOnlyTools()`; `magic-context.ts` is the first owner's child shim.
 - `src/index.ts` — the entry: `before_agent_start` reconciliation and the `session_shutdown` cleanup.
 - `test/` — the rules, testable with no pi, no kernel and no monty (the surface is typed
-  structurally, so nothing here imports pi).
+  structurally, so nothing here imports pi). `child-seam.test.ts` also pins that every file in `src/`
+  outside `owners/` names no owner.
 
 The decisions behind all of this are in the host repo's wayfinder map, `.scratch/tool-bridge/`
 (tickets 01-11), with the acceptance bar in its `acceptance.md`.

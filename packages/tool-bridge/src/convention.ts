@@ -6,8 +6,8 @@
  *
  * A code-mode session drives the model through one tool: code mode resets pi's active set to
  * `["python"]`, and pi resolves a tool call against the active list. Every other extension's
- * tools stay registered but unreachable, so Magic Context's `ctx_reduce` answers "Tool
- * ctx_reduce not found" in exactly the sessions where the model is doing the most work. Host
+ * tools stay registered but unreachable, so an owner's tool answers "Tool not found" in exactly the
+ * sessions where the model is doing the most work. Host
  * functions are the way in — a contributed host function is callable from a cell by bare
  * name, which is how rlm's delegation vocabulary already reaches the kernel.
  *
@@ -36,8 +36,8 @@
  *   shaped like pi's (`{ content: [{ type: "text", text }], isError? }`).
  * - **Publish only tools whose effect lives in `execute`.** A tool whose effect pi's dispatch
  *   produces — the transcript, an overlay, a renderer — must not be published: called from a
- *   cell it would appear to succeed and do nothing. Magic Context's `todowrite` is the live
- *   example, and it stays a pi tool.
+ *   cell it would appear to succeed and do nothing. A tool whose state pi captures from its own
+ *   dispatch is the live example, and it stays a pi tool.
  *
  * Publishing is **keyed by instance and replaces**: pi's jiti loader re-imports an extension
  * entry per session while `globalThis` survives, so an appending publish would leave one live
@@ -50,7 +50,7 @@
  * - A malformed *entry* is dropped; the owner's other entries still work.
  * - The first owner to publish a tool name holds it. A second owner claiming that name is
  *   refused whole, so names are never qualified and a cell always writes
- *   `tool("ctx_search", query="…")`.
+ *   `tool("<name>", arg="…")`.
  * - Nothing here touches pi's active set. That is the surface rule in `adapter.ts`, and it
  *   strips a name only when a cell route for it was actually installed.
  */

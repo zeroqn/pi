@@ -24,6 +24,12 @@ import {
 	type SlotOwner,
 } from "../src/convention";
 
+/**
+ * The native-only set the entry hands the surface rule. A literal here, not the owner's declaration:
+ * the rule takes it as an input, and this file tests the rule rather than who declares what.
+ */
+const NATIVE_ONLY = ["todowrite"];
+
 function fakeCtx(id: string) {
 	return {
 		sessionManager: {
@@ -309,7 +315,7 @@ describe("installing the bridge, and the surface rule", () => {
 
 		// No bridge installed for this session: not one call to setActiveTools, because a session
 		// with no cell route must keep the pi tool it had.
-		expect(reconcileToolSurface(pi, ctx)).toEqual([]);
+		expect(reconcileToolSurface(pi, ctx, NATIVE_ONLY)).toEqual([]);
 		expect(calls).toEqual([]);
 
 		const sink = accepting();
@@ -322,11 +328,11 @@ describe("installing the bridge, and the surface rule", () => {
 		});
 		// `todowrite` was never active — code mode's reset removed it and nothing re-appends it — so
 		// the rule is what makes it reachable, and it lands after every name it did not touch.
-		expect(reconcileToolSurface(pi, ctx)).toEqual(["ctx_memory"]);
+		expect(reconcileToolSurface(pi, ctx, NATIVE_ONLY)).toEqual(["ctx_memory"]);
 		expect(calls).toEqual([["python", "ask_user_question", "todowrite"]]);
 
 		// Idempotent: with the name gone there is nothing left to strip, so nothing is written.
-		expect(reconcileToolSurface(pi, ctx)).toEqual([]);
+		expect(reconcileToolSurface(pi, ctx, NATIVE_ONLY)).toEqual([]);
 		expect(calls).toHaveLength(1);
 	});
 
@@ -350,7 +356,7 @@ describe("installing the bridge, and the surface rule", () => {
 			ctx,
 			owners: [owner("mc", { owner: "magic-context", catalogue: () => [{ name: "ctx_memory" }] })],
 		});
-		expect(reconcileToolSurface(pi, ctx)).toEqual(["ctx_memory"]);
+		expect(reconcileToolSurface(pi, ctx, NATIVE_ONLY)).toEqual(["ctx_memory"]);
 		expect(calls).toEqual([["python"]]);
 	});
 });

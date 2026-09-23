@@ -9,7 +9,7 @@
  *    version, has no executor, or throws while answering is refused whole; a malformed *entry*
  *    is dropped and the owner keeps the rest (ticket 08).
  * 2. **The single host function** (tickets 01 and 08). `await tool()` lists what is published,
- *    `await tool("ctx_reduce", drop="3-5")` calls one, and the answer is the tool's own text,
+ *    `await tool(name, …)` calls one, and the answer is the tool's own text,
  *    refusals included. An unpublished name throws a `NameError` that lists what was published,
  *    which is the one failure a model can repair by itself.
  * 3. **The surface rule** (ticket 03, extended by ticket 12). Once a name is reachable from a
@@ -59,17 +59,6 @@ export type ActiveToolSurface = {
 	getAllTools?(): { name: string }[];
 	setActiveTools(names: string[]): void;
 };
-
-/**
- * Tools the convention forbids publishing, so a bridged session must keep them as real pi tools.
- *
- * Their effect is pi's *dispatch*, not their own `execute` — Magic Context's `todowrite` writes
- * nothing itself (its state is captured from `tool_execution_start` / `message_end`), so a call
- * routed through the bridge would succeed and record nothing. Code mode's mount-time reset is what
- * removes them from the active set, and no owner re-appends this one, so the rule has to put it
- * back. See `.scratch/tool-bridge/issues/12-activate-todowrite.md`.
- */
-export const NATIVE_ONLY_TOOLS = ["todowrite"] as const;
 
 export type BridgeProblem = {
 	owner: string;
@@ -221,7 +210,7 @@ function asEntry(candidate: unknown): EntryCheck {
 }
 
 /** The property names of a tool's published schema. Only the names are read, never required-ness:
- * every schema Magic Context publishes is all-optional. */
+ * an owner's schemas are often all-optional, so the names are all the reader can honestly state. */
 export function parameterNames(entry: BridgeToolEntry): string[] {
 	const parameters = entry.parameters;
 	if (!isRecord(parameters)) return [];
@@ -256,11 +245,11 @@ function ownersOf(gathered: Gathered): string[] {
  * catalogue that was actually contributed, so it cannot name a tool this session does not have.
  *
  * It carries three things, and the second is the one ticket 13 had to add. The line names **every**
- * tool the owner published, because an owner's own prompt may have told the model to call
- * `ctx_reduce` — Magic Context's does, in every session — and a line naming only the first entry
- * (`ctx_search`) left that model writing `await ctx_reduce(drop="3-5")`: a bare name no kernel has,
- * to which monty answers with a `NameError` that teaches nothing. So the line states the negative
- * too, and then closes the gap to *how* with a worked example.
+ * tool the owner published, because an owner's own prompt may have told the model to call one of
+ * them — an owner that introduces the vocabulary usually does, in every session — and a line naming
+ * only the first entry left that model writing the bare name: a name no kernel has, to which monty
+ * answers with a `NameError` that teaches nothing. So the line states the negative too, and then
+ * closes the gap to *how* with a worked example.
  */
 export function bridgeGuidelines(gathered: Gathered): string[] {
 	const lines: string[] = [];
@@ -338,7 +327,7 @@ export function toolHostFn(
 		const found = gathered.tools.find((tool) => tool.entry.name === requested);
 		if (!found) throw unknownTool(requested, gathered);
 		// monty delivers a host function's keyword arguments as one trailing object, so
-		// `tool("ctx_search", query="x")` and `tool("ctx_search", {"query": "x"})` arrive the same
+		// `tool(name, arg="x")` and `tool(name, {"arg": "x"})` arrive the same
 		// way — and a call with no second argument means "no parameters".
 		const params = isRecord(args[1]) ? args[1] : {};
 		return textOfResult(await found.publication.execute(requested, params, ctx));
@@ -424,17 +413,24 @@ export function installToolBridge(input: BridgeInstallInput): BridgeInstallResul
  * a native-only tool is.
  *
  * Reads the session's record first, so a session with no installed bridge is left exactly as it
- * was — which is what keeps a code-mode session without the bridge from losing Magic Context's
- * `ctx_memory` re-append, the only route it has. Returns the names it stripped.
+ * was — which is what keeps a code-mode session without the bridge from losing an owner's
+ * session-start re-append of its own tool, the only route it has. Returns the names it stripped.
+ *
+ * `nativeOnly` is an input rather than a constant here: which tools the convention forbids
+ * publishing is the owners' own declaration (`owners/index.ts`), and this file stays owner-agnostic.
  */
-export function reconcileToolSurface(pi: ActiveToolSurface, ctx: unknown): string[] {
+export function reconcileToolSurface(
+	pi: ActiveToolSurface,
+	ctx: unknown,
+	nativeOnly: readonly string[],
+): string[] {
 	const record = bridgedSession(sessionKey(ctx));
 	if (!record || record.toolNames.length === 0) return [];
 	const bridged = new Set(record.toolNames);
 	const active = pi.getActiveTools();
 	const next = active.filter((name) => !bridged.has(name));
 	const stripped = active.filter((name) => bridged.has(name));
-	for (const name of nativeOnlyToActivate(pi, next, bridged)) next.push(name);
+	for (const name of nativeOnlyToActivate(pi, next, bridged, nativeOnly)) next.push(name);
 	if (!sameNames(next, active)) pi.setActiveTools(next);
 	return stripped;
 }
@@ -450,9 +446,10 @@ function nativeOnlyToActivate(
 	pi: ActiveToolSurface,
 	next: string[],
 	bridged: Set<string>,
+	nativeOnly: readonly string[],
 ): string[] {
 	const registered = pi.getAllTools?.();
-	return NATIVE_ONLY_TOOLS.filter(
+	return nativeOnly.filter(
 		(name) =>
 			!next.includes(name) &&
 			!bridged.has(name) &&

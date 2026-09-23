@@ -1,22 +1,27 @@
 /**
- * rlm's adoption of the tool bridge (wayfinder ticket 06) — the boundary, not the bridge's own
- * rules: what this session records, what a session with nothing published looks like, and that a
- * refused contribution leaves pi's active set alone.
+ * The adopter — the boundary, not the bridge's own rules: what a session records, what a session with
+ * nothing published looks like, and that a refused contribution leaves pi's active set alone.
  *
  * The publications and the kernel handle are fakes, which is the point: the adoption has to work
  * against a *structural* handle, and a real kernel would test monty rather than this call.
+ *
+ * Moved here from `packages/rlm/test/tool-bridge.test.ts` when the adopter did (wayfinder ticket 06,
+ * `.scratch/tool-ownership/`).
  */
 import { beforeEach, describe, expect, it } from "bun:test";
-import { reconcileToolSurface } from "../../tool-bridge/src/adapter";
+import { reconcileToolSurface } from "../src/adapter";
+import { adoptToolBridge, bridgeStatusLine } from "../src/adopter";
 import {
 	__resetToolBridgeForTests,
 	bridgedSession,
 	sessionKey,
 	type BridgePublication,
-} from "../../tool-bridge/src/convention";
-import { adoptToolBridge, bridgeStatusLine } from "../src/tool-bridge";
+} from "../src/convention";
 
 const OWNERS = Symbol.for("pi-tool-bridge:owners");
+
+/** The native-only set the surface rule is handed by the entry. */
+const NATIVE_ONLY = ["todowrite"];
 
 function ctx(id: string) {
 	return {
@@ -101,7 +106,7 @@ describe("adopting the bridge in a session", () => {
 		expect(bridgedSession(sessionKey(session))).toBeUndefined();
 		// Nothing was recorded, so the surface rule has nothing to strip: ctx_memory stays a pi tool,
 		// which is the only route this session would otherwise have.
-		expect(reconcileToolSurface(pi, session)).toEqual([]);
+		expect(reconcileToolSurface(pi, session, NATIVE_ONLY)).toEqual([]);
 		expect(active).toContain("ctx_memory");
 	});
 

@@ -17,10 +17,11 @@ const REGISTRY_KEY = Symbol.for("@cortexkit/magic-context:pi-registry");
 /**
  * The files that must stay owner-agnostic, and the strings that would betray an owner.
  *
- * Ticket 06 adds `adapter.ts`, `convention.ts` and `index.ts` here as it rewrites the Magic Context
- * examples in their comments; until then they name the owner, so listing them would fail this suite.
+ * Every file in `src/` outside `owners/` belongs here: the seam, the reader, the convention, the
+ * entry and the adopter describe a mechanism, not an owner. `owners/index.ts` is excluded because
+ * naming its owners is its whole job.
  */
-const GENERIC_FILES = ["child-seam.ts"];
+const GENERIC_FILES = ["child-seam.ts", "adapter.ts", "adopter.ts", "convention.ts", "index.ts"];
 const OWNER_PATTERNS = [/\bmagic/i, /cortexkit/i, /\bctx_/];
 
 /** A registry that answers the shape the owner looks for, with per-test overrides. */
