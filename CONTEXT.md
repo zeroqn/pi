@@ -85,3 +85,13 @@ _Avoid_: child tool list
 A tool that must stay a real pi tool because its effect is pi's dispatch rather than its own
 `execute`, so the convention forbids publishing it.
 _Avoid_: pi-only tool
+
+**Ceiling**:
+The most a child session may be offered — its spawning session's surface, narrowed to what a child may
+hold.
+_Avoid_: limit, cap
+
+**Child-eligible**:
+A tool a child session may hold, declared by whoever owns it: a tool whose effect is pi's dispatch, or
+code mode's own tool. Every other tool is reached from a cell instead of being offered to the model.
+_Avoid_: allowed tool, child tool
