@@ -233,6 +233,21 @@ export function createKernel(options: {
 	}
 
 	/**
+	 * Swaps in a fresh checkout on the same pool and closes the one it replaces. A session monty
+	 * has poisoned (a failed `loadSession`) or left suspended can never be fed again, so the
+	 * fallback replay needs a clean one — that is the whole reason this exists.
+	 */
+	async function replaceSession(): Promise<void> {
+		const previous = session;
+		session = await pool!.checkout({ limits: checkoutLimits });
+		try {
+			await previous?.close();
+		} catch {
+			/* the pool releases the worker either way */
+		}
+	}
+
+	/**
 	 * The dump fast path. A **stale** dump — the client changed, so the version-locked bytes
 	 * are unreadable — is ignored silently, because replay is the fallback rather than an
 	 * error. A dump that matches but still fails to load is a bug, so it is recorded.
@@ -244,6 +259,10 @@ export function createKernel(options: {
 	async function restoreFromDump(ctx: any): Promise<boolean> {
 		const { records } = provenanceFor(ctx);
 		if (records.length === 0 || !existsSync(dumpPath)) return false;
+		// monty poisons the session a failed *load* was attempted on (its `failedLoad`
+		// releases the worker), so the journal fallback in the catch below must not be
+		// handed the corpse: `attempted` is what says whether there is one to replace.
+		let attempted = false;
 		try {
 			const meta = JSON.parse(readFileSync(`${dumpPath}.json`, "utf8")) as {
 				client?: string;
@@ -255,6 +274,7 @@ export function createKernel(options: {
 			// partially rebuilt kernel (or from before a fork's fragment existed) is stale
 			// here and replay is the honest path.
 			if (meta.client !== clientVersion() || meta.cells !== records.length) return false;
+			attempted = true;
 			await session?.loadSession(readFileSync(dumpPath));
 			journal = records.slice();
 			restored = {
@@ -265,6 +285,7 @@ export function createKernel(options: {
 			};
 			return true;
 		} catch (error) {
+			if (attempted) await replaceSession();
 			try {
 				pi.appendEntry("rlm-dump", { problem: errorText(error), cells: records.length });
 			} catch {
@@ -280,6 +301,11 @@ export function createKernel(options: {
 		// accept it as complete (the cell count matches) and the missing cells would be gone
 		// for good. Replay stays the path until the session is rebuilt in full.
 		if (kernelIncomplete) return;
+		// A dump taken while a cell is in flight (quitting mid-cell) is a *suspended* snapshot:
+		// `loadSession` refuses it, and `loadSnapshot` cannot resume it in a later process whose
+		// host calls are long gone. Writing one only plants a trap for the next resume, so the
+		// journal stays this cell's record and the next dump is a clean one.
+		if (cellRunning) return;
 		if (!session || !dumpPath || journal.length === 0) return;
 		try {
 			const bytes = await session.dump();
@@ -539,7 +565,13 @@ export function createKernel(options: {
 	}
 
 	function ensureKernel(ctx: any) {
-		starting ??= startKernel(ctx);
+		starting ??= startKernel(ctx).catch(async (error) => {
+			// A rejected start must not be cached: `starting` is the only thing between a
+			// later cell and a retry, and a poisoned session or half-built pool has to go
+			// first. Without this one bad start wedges every python call in the session.
+			await dropKernel();
+			throw error;
+		});
 		return starting;
 	}
 
