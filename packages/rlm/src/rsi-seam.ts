@@ -15,9 +15,9 @@
  *     reported as it happens, and *RSI* does the matching, resolving and per-turn
  *     dedupe. Policy stays in RSI; RLM reports facts.
  *
- * The shape is the one Magic Context uses (`magic-context.ts`), for the same reason: pi's
- * jiti loader re-imports modules per session (`moduleCache: false`), so module-level state
- * does not survive across sessions in one process. Resolution happens at call time, not
+ * The shape is the process-global one every seam here uses, for the same reason: pi's jiti
+ * loader re-imports modules per session (`moduleCache: false`), so module-level state does
+ * not survive across sessions in one process. Resolution happens at call time, not
  * at load, so an RSI that appears later is found and an RSI that is absent is a
  * degradation rather than a failure.
  *

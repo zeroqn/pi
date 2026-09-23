@@ -5,8 +5,8 @@
  * The kernel belongs to `pi-code-mode`. This file binds to it through the registry
  * (`bind.ts`), contributes rlm's delegation surface and the seams it owns (`contribution.ts`),
  * and keeps every handler that is about the *agent* rather than the sandbox: children and
- * their notices, the Magic Context shim for a spawned or resumed child, the skills block, the
- * learned-skill seam, the web hook's bookkeeping and the human-facing status.
+ * their notices, the child factories its owners provide for a spawned or resumed child, the skills
+ * block, the learned-skill seam, the web hook's bookkeeping and the human-facing status.
  *
  * Two rules are worth restating here because this is where they are obeyed:
  *
@@ -18,12 +18,20 @@
  *    failure table; a throwing factory would kill the whole process — ticket 02 §1).
  */
 import { bindCodeMode, type CodeModeHandle } from "./bind";
-import { type BridgeReport, adoptToolBridge, bridgeStatusLine } from "./tool-bridge";
+import {
+	type BridgeReport,
+	adoptToolBridge,
+	bridgeStatusLine,
+} from "../../tool-bridge/src/adopter";
 import { createChildManager, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
 import type { ChildKernelContext, Notice } from "./children";
 import { rlmContribution, webCodeContribution } from "./contribution";
 import { delegationHostFns } from "./delegation";
-import { bindToParentInstance, magicContextChildShim, magicContextStatus } from "./magic-context";
+import {
+	bindChild,
+	childFactories as ownerChildFactories,
+	childStatus,
+} from "../../tool-bridge/src/child-seam";
 import { reportCapability, reportHostCall, rsiChildFactory, rsiStatus } from "./rsi-seam";
 import { beforeAgentStartResult } from "./skills-block";
 import { errorText, str } from "./util";
@@ -80,9 +88,10 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				// module instance: pi calls an inline factory directly, so the child's code mode
 				// is the parent's, in the parent's process (ticket 02 §3).
 				kernelFactoryFor: (child) => (childPi: any) => createRlm(childPi, child),
-				// RSI offers its child factory through the seam; rlm never names RSI, and an RSI
-				// that is absent or too old contributes nothing.
-				childFactories: (request) => [magicContextChildShim(request.parentSessionFile), ...rsiChildFactory(request)],
+				// The owners' factories come from the bridge's child seam, and RSI offers its own
+				// through the same kind of seam; rlm names neither, and a seam that is absent or
+				// too old contributes nothing.
+				childFactories: (request) => [...ownerChildFactories(request), ...rsiChildFactory(request)],
 				runtime: () => modelRuntime(),
 				maxDepth: MAX_DEPTH,
 				maxLive: MAX_LIVE_CHILDREN,
@@ -164,7 +173,7 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 		ownDepth = childContext ? childContext.depth : resolvedDepth.depth;
 		if (!childContext && resolvedDepth.depth > 0) {
 			const provenance = readChildProvenance(ctx?.sessionManager);
-			bindToParentInstance({
+			bindChild({
 				childSessionFile: ctx?.sessionManager?.getSessionFile?.(),
 				parentSessionFile: provenance?.parentSessionFile,
 				cwd: ctx?.cwd,
@@ -236,13 +245,12 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			// through `bindCodeMode` because the bridge has to see its own receipt, and a session
 			// whose contribution was refused records nothing and keeps the pi tools it had.
 			//
-			// Not in a child. What a child's kernel may reach is Magic Context's child allowlist
-			// (`ctx_search`, `ctx_reduce`, `ctx_expand`), and a *published* tool set is chosen by the
-			// owner's session policy rather than by that allowlist — so adopting here would widen the
-			// child's bound, which is the one thing this seam must not do. A child has its own
-			// `python` tool again, so a child *could* call a bridge; the narrowing belongs in Magic
-			// Context's own `publishableNames`, which already carries `isReducedSession` for exactly
-			// this kind of session-scoped decision, and the map's fog records it.
+			// Not in a child. A child's reachable set is its *owners'* policy — the factories and the
+			// bound they gave it — while a *published* tool set is chosen by the owner's own session
+			// policy, so adopting here would widen the child's bound, which is the one thing this
+			// seam must not do. A child has its own `python` tool again, so a child *could* call a
+			// bridge; the narrowing belongs in the owner's own session-scoped policy, and the
+			// tool-bridge map's fog records it.
 			if (!isChild) {
 				bridge = adoptToolBridge({ contribute: bound.handle.contribute, ctx });
 			}
@@ -258,9 +266,9 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 
 		if (!childContext) {
 			// Recorded unconditionally — including on failure — because this entry is the only
-			// durable evidence of whether the kernel and Magic Context were available.
+			// durable evidence of whether the kernel and the session's owners were available.
 			try {
-				pi.appendEntry("rlm-magic-context", { status: magicContextStatus(), bridge: bridgeStatusLine(bridge), problems, startReason });
+				pi.appendEntry("rlm-tools", { tools: childStatus(), bridge: bridgeStatusLine(bridge), problems, startReason });
 			} catch {
 				/* diagnostics must never fail a session */
 			}

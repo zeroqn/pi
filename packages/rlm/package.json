@@ -9,7 +9,8 @@
     "extensions": ["./src/index.ts"]
   },
   "peerDependencies": {
-    "pi-code-mode": "*"
+    "pi-code-mode": "*",
+    "pi-tool-bridge": "*"
   },
   "scripts": {
     "test": "bun test",

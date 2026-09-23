@@ -4,8 +4,8 @@
  * A child is an in-process pi `AgentSession`, created the way pi-subagents creates
  * one, with the two differences ticket 07 decided:
  *
- *   - it loads **no ambient extensions** (`noExtensions: true`), so Magic Context,
- *     pi-lens and the rest never initialise inside it. Ticket 07's structural
+ *   - it loads **no ambient extensions** (`noExtensions: true`), so no ambient extension —
+ *     a memory store, a lens, anything — initialises inside it. Ticket 07's structural
  *     isolation, and the reason issue #247's OOM cannot recur.
  *   - the kernel is injected **inline** through `extensionFactories`, so a child
  *     has the same tool surface as its parent.
@@ -84,8 +84,9 @@ export interface ChildManagerDeps {
 	ownSessionFile?: () => string | undefined;
 	kernelFactoryFor: (child: ChildKernelContext) => (pi: any) => void;
 	/**
-	 * Extra extension factories injected into a child — currently the Magic Context
-	 * shim (tickets 07/16). Children still load no *ambient* extensions.
+	 * Extra extension factories injected into a child — whatever the tool bridge's owners
+	 * and the other seams provide (tickets 07/16). Children still load no *ambient*
+	 * extensions.
 	 */
 	childFactories?: (request: SpawnRequest) => Array<(pi: any) => void>;
 	runtime: () => Promise<any>;
@@ -521,8 +522,8 @@ export function createChildManager(deps: ChildManagerDeps) {
 					// travels with the request instead of being dropped (a gap v2's depth-2 run
 					// found: the entry recorded no spawn cell for grandchildren).
 					spawnCell: inner.spawnCell ?? "",
-					// Provenance matters: a grandchild must record *its* parent, or Magic
-					// Context cannot bind it (ticket 16).
+					// Provenance matters: a grandchild must record *its* parent, or an
+					// owner seam cannot bind it (ticket 16).
 					parentSessionFile: inner.parentSessionFile,
 					ownerDispatch: request.ownerDispatch,
 				}),
@@ -547,7 +548,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 		await loader.reload();
 
 		// A child lands beside its parent so the transcript tree is findable, and the
-		// header's parentSession is what lets Magic Context recognise it (ticket 16).
+		// header's parentSession is the provenance an owner seam binds by (ticket 16).
 		const parentFile = request.parentSessionFile;
 		const sessionManager = parentFile
 			? piModule.SessionManager.create(cwd, dirname(parentFile), { parentSession: parentFile })
