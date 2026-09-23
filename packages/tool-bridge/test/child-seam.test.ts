@@ -55,6 +55,95 @@ function applyFactories(pi: any): void {
 	for (const factory of childFactories({ parentSessionFile: "/parent.jsonl" })) factory(pi);
 }
 
+/**
+ * The three definitions as they were **before** the move (acceptance check 3b).
+ *
+ * Resolved from `b050adb:packages/rlm/src/magic-context.ts` — the commit before `b8eb692` moved the
+ * shim — with:
+ *
+ *     git show b050adb:packages/rlm/src/magic-context.ts \
+ *       | sed -n '/^const CHILD_TOOLS/,/^];/p'
+ *
+ * The same JSON is kept as evidence at `.scratch/tool-ownership/fixtures/child-tools-before.json`; it
+ * is inlined here rather than read from there so the test is self-contained and runs where the map
+ * directory is absent. Capturing it from the *moved* module would prove nothing.
+ */
+const DEFINITIONS_BEFORE = [
+		{
+			"name": "ctx_search",
+			"description": "Search this project's memory (and your own session's messages) for anything relevant. Returns tagged hits you can open with ctx_expand.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"description": "Search query."
+					},
+					"limit": {
+						"type": "number",
+						"description": "Maximum results to return (default: 10)"
+					},
+					"sources": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"description": "Which sources to search, e.g. memory, message, git_commit, primer, note"
+					}
+				},
+				"required": [
+					"query"
+				]
+			}
+		},
+		{
+			"name": "ctx_reduce",
+			"description": "Reclaim context in your own window by dropping tagged items you have already processed. Ranges: '3-5', '1,2,9'.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"drop": {
+						"type": "string",
+						"description": "Tag IDs to drop entirely. Ranges: '3-5', '1,2,9'"
+					}
+				},
+				"required": [
+					"drop"
+				]
+			}
+		},
+		{
+			"name": "ctx_expand",
+			"description": "Open a tagged item that is currently compacted, or read a range of your session's messages.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"start": {
+						"type": "number",
+						"description": "First message ordinal to expand — a compartment's start=\"N\" attribute"
+					},
+					"end": {
+						"type": "number",
+						"description": "Last message ordinal to expand (inclusive)"
+					},
+					"verbose": {
+						"type": "boolean",
+						"description": "Include more detail per message"
+					},
+					"message": {
+						"type": "number",
+						"description": "A single message ordinal to expand"
+					}
+				},
+				"required": []
+			}
+		}
+	];
+
+function comparable(tool: any) {
+	return { name: tool.name, description: tool.description, parameters: tool.parameters };
+}
+
 describe("the granted tool surface (v2 ticket 02)", () => {
 	it("is exactly the three tools, and never the withheld ones", () => {
 		expect([...GRANTED_CHILD_TOOLS].sort()).toEqual(["ctx_expand", "ctx_reduce", "ctx_search"]);
@@ -85,6 +174,18 @@ describe("the granted tool surface (v2 ticket 02)", () => {
 			const result = await tools.get("ctx_search")!.execute("call-1", { query: "x" }, undefined, undefined, { cwd: "/w" });
 			expect(result.content[0].text).toBe("ran ctx_search");
 			expect(calls).toEqual([{ name: "ctx_search", params: { query: "x" } }]);
+		} finally {
+			clearRegistry();
+		}
+	});
+
+	it("registers the pre-move definitions unchanged (acceptance check 3b)", async () => {
+		installRegistry({ runTool: async () => ({ content: [{ type: "text", text: "ok" }] }) });
+		try {
+			const { pi, handlers, tools } = childSurface();
+			applyFactories(pi);
+			await handlers.get("session_start")!({}, { sessionManager: { getSessionFile: () => "/child.jsonl" }, cwd: "/w" });
+			expect([...tools.values()].map(comparable)).toEqual(DEFINITIONS_BEFORE);
 		} finally {
 			clearRegistry();
 		}

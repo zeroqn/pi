@@ -3,8 +3,8 @@
  * and dump that outlive it, mid-feed rotation when the suspension budget nears its ceiling,
  * the host functions it reaches the host with, and the `python` tool that drives all of it.
  *
- * Everything agent-shaped has left (map ticket 03's table): children, notices, the Magic
- * Context shim, the RSI seam, the skills block and the web hook are contributions now. What
+ * Everything agent-shaped has left (map ticket 03's table): children, notices, the owner seams,
+ * the RSI seam, the skills block and the web hook are contributions now. What
  * stays is the sandbox and its durability — and three things the kernel *asks for* rather
  * than owns: the provenance rule (`provenance`), the host-call observer (`onHostCall`) and
  * a notice sink (`onNotice`).
