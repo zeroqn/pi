@@ -62,3 +62,26 @@ _Avoid_: subagent, task, worker
 A message the model receives about work it is not currently watching — a child or a background
 handle reaching a terminal state.
 _Avoid_: alert, notification, event
+
+## The tool bridge
+
+**Surface**:
+The list of pi tools a session offers the model — pi's *active set*, which is also what the turn's
+prompt is built from.
+_Avoid_: tool list, tool set, catalogue
+
+**Catalogue**:
+What an owner publishes for one session: the tools a cell may call, with their descriptions and
+parameter schemas. Not a surface — a catalogue is reached from inside a cell, a surface is offered
+to the model.
+_Avoid_: publication, tool list
+
+**Child surface**:
+A child's surface — the root's surface narrowed to what a child may hold. A child is never offered a
+tool its root does not have.
+_Avoid_: child tool list
+
+**Native-only tool**:
+A tool that must stay a real pi tool because its effect is pi's dispatch rather than its own
+`execute`, so the convention forbids publishing it.
+_Avoid_: pi-only tool
