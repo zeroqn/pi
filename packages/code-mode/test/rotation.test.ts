@@ -12,9 +12,15 @@
  * task blocked on an async host call — cannot be restored by `loadSnapshot`: its pending promises
  * lived in the old worker, so the resumed session's next call died on
  * `worker reported unknown pending call id N`. The kernel therefore rotates at the first suspension
- * *at or past* the reserve that carries no futures, so the reserve is a floor rather than an exact
- * landing point. These two tests run the same crossing: the first pins the trigger, the second the
- * survival.
+ * *at or past* the reserve that it can prove leaves no host promise outstanding, so the reserve is a
+ * floor rather than an exact landing point.
+ *
+ * Skipping `FutureSnapshot` alone is not enough, which is what the last two tests pin: a
+ * *concurrent* cell suspends on one task's host call while another task's promise is still in
+ * flight, and that suspension is a plain `FunctionSnapshot`. Whether the chain is clean is decided
+ * by `newHostChain` in `kernel.ts`; here it is only observable as *where* the rotation fired.
+ * The first two tests run the sequential crossing (trigger, then survival); the last two run the
+ * concurrent one (the deferral, then every reserve phase it can land on).
  */
 import { describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
@@ -65,6 +71,44 @@ async function crossTheReserve(limit = LIMIT, calls = CALLS) {
 	return { text, rotations: entries.filter((entry) => entry.type === "rlm-rotation").map((entry) => entry.data), dir };
 }
 
+/**
+ * The crossing for a **concurrent** cell. `asyncio.gather` puts two host calls in flight at once,
+ * so the cycle suspends `FunctionSnapshot -> FunctionSnapshot -> FutureSnapshot`: the middle one is
+ * a plain suspension that still has the *first* task's promise outstanding. Rotating there is what
+ * the `FutureSnapshot` guard alone let through, and the resumed session died on it.
+ *
+ * `limit` decides which of the three phases the reserve lands on, which is why the tests below
+ * sweep it: 99/103/106 used to break the cell, 100/104/107 were lucky.
+ */
+async function crossTheReserveConcurrently(limit: number) {
+	const dir = mkdtempSync(join(tmpdir(), "cm-concurrent-"));
+	const sessionFile = join(dir, "rotation.jsonl");
+	writeFileSync(sessionFile, `${JSON.stringify({ type: "session", version: 3, id: "x", timestamp: "", cwd: dir })}\n`);
+	const entries: Array<{ type: string; data: any }> = [];
+	const pi = {
+		appendEntry: (type: string, data: unknown) => entries.push({ type, data }),
+		sendMessage: () => {},
+	};
+	const ctx = { cwd: dir, sessionManager: { getSessionFile: () => sessionFile, getEntries: () => [] } };
+	const ledger = createLedger({
+		reserved: [...BASE_HOST_FNS],
+		base: { description: BASE_DESCRIPTION, snippet: BASE_SNIPPET, guidelines: BASE_GUIDELINES },
+	});
+	ledger.accept({ owner: "probe", hostFns: { ping: async () => ({ ok: true }) } });
+	const kernel = createKernel({ pi, sessionKey: sessionFile, ledger, limits: { maxSuspensions: limit } });
+	const code = `import asyncio\nfor i in range(45):\n    await asyncio.gather(ping(), ping())\nprint("done", i)`;
+	const text = textOf(await kernel.execute({ code }, undefined, ctx));
+	// A kernel left poisoned by a bad rotation fails this one too, with the same error text.
+	const next = textOf(await kernel.execute({ code: "1+1" }, undefined, ctx));
+	await kernel.shutdown();
+	return {
+		text,
+		next,
+		rotations: entries.filter((entry) => entry.type === "rlm-rotation").map((entry) => entry.data),
+		dir,
+	};
+}
+
 describe("rotateAtFor", () => {
 	it("is the same derivation for any limit, including the real one", () => {
 		expect(rotateAtFor(100_000)).toBe(90_000);
@@ -98,6 +142,36 @@ describe.skipIf(!montyReady)("a cell that crosses the reserve", () => {
 			expect(text).toContain("root True");
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("defers past a suspension another task's promise makes unsafe", async () => {
+		// Reserve 89 is the *middle* suspension of a gather cycle: the first task's promise is
+		// still undelivered, so the chain cannot prove itself clean. 90 is the `resolveFutures`
+		// pass, and 91 is the first suspension that is safe.
+		const { text, next, rotations, dir } = await crossTheReserveConcurrently(99);
+		try {
+			expect(text).toContain("done 44");
+			expect(rotations.length).toBeGreaterThanOrEqual(1);
+			expect(rotations.every((rotation) => rotation.outcome === "ok")).toBe(true);
+			expect(rotations[0].at).toBe(91);
+			expect(next).toContain("# => 2");
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("survives every reserve phase a concurrent cell can land on", async () => {
+		// Before the chain accounting these three killed the cell (and then every cell after it,
+		// on `worker reported unknown pending call id N`); 100/104/107 were the safe phases.
+		for (const limit of [99, 103, 106]) {
+			const { text, next, dir } = await crossTheReserveConcurrently(limit);
+			try {
+				expect(text).toContain("done 44");
+				expect(next).toContain("# => 2");
+			} finally {
+				rmSync(dir, { recursive: true, force: true });
+			}
 		}
 	});
 });

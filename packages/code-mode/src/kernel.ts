@@ -56,6 +56,95 @@ export const ROTATE_FAILURE_CAP = 3;
 export const CHECKOUT_LIMITS = { maxMemory: 1_000_000_000, maxSuspensions: MAX_SUSPENSIONS };
 const MAX_LIVE_BACKGROUND = 8;
 
+/**
+ * The host calls a cell has made that monty is still holding as **futures**.
+ *
+ * Every promise-returning host call is registered by monty's driver against a call id, and a
+ * dump carries the ids the worker still waits on but *not* the promises themselves — those live
+ * in the driver that answered the call. A rotated session gets a fresh driver, so any id the
+ * restored state still refers to is one it has never seen: `worker reported unknown pending call
+ * id N`, a `ProtocolError` that poisons the new session.
+ *
+ * `FutureSnapshot` is the case where *every* sandbox task is blocked on a future, which is why
+ * the guard skips it — but it is not the only way to hold one. A concurrent cell
+ * (`asyncio.gather`) suspends on a second task's host call while the first promise is still
+ * outstanding, and that suspension is a plain `FunctionSnapshot`; rotating there breaks the cell
+ * too. So rotation needs the chain to *prove* the driver's map is empty, and this is the only
+ * proof the client API offers: monty deletes every future that was already settled when a
+ * `resolveFutures` pass ran, so a pass that was asked about at least as many ids as there are
+ * outstanding calls — with all of them settled before the pass started — leaves nothing behind.
+ *
+ * Reading the flags strictly *before* the pass is what makes it sound: a call that settles while
+ * the pass runs may or may not have been in the filter, and only the ones settled beforehand are
+ * certainly delivered. Over-counting only defers a rotation; under-counting breaks the cell.
+ */
+function newHostChain() {
+	const pending: Array<{ settled: boolean }> = [];
+	return {
+		/** Every host call, before its promise reaches monty. */
+		answer(): { settled: boolean } {
+			const call = { settled: false };
+			pending.push(call);
+			return call;
+		},
+		/** True only when nothing is outstanding, so a dump of this chain can be reloaded. */
+		empty(): boolean {
+			return pending.length === 0;
+		},
+		/** What a `resolveFutures` pass knows as it starts; monty's filter runs after this. */
+		passStart(asked: number): { asked: number; count: number; allSettled: boolean } {
+			return { asked, count: pending.length, allSettled: pending.every((call) => call.settled) };
+		},
+		/** The pass delivered every future that was done, so a full account empties the chain. */
+		passEnd(pass: { asked: number; count: number; allSettled: boolean }): void {
+			if (pass.asked >= pass.count && pass.allSettled) pending.length = 0;
+		},
+		/** A rotation (or an abort recovery) hands the work to a driver with an empty map. */
+		reset(): void {
+			pending.length = 0;
+		},
+	};
+}
+
+/** The kernel's one chain: created once, reset whenever the session it describes is replaced. */
+type HostChain = ReturnType<typeof newHostChain>;
+
+/**
+ * Wraps the host surface so the chain sees every call and its settle. Deliberately **not**
+ * `async`: monty has to receive the very promise its driver registers as a future, and the settle
+ * handler has to be attached before monty's own so the flag is never behind it.
+ */
+function countHostCalls(host: HostFns, chain: HostChain): HostFns {
+	const wrapped: HostFns = {};
+	for (const [name, fn] of Object.entries(host)) {
+		const wrapper = (...args: unknown[]): Promise<unknown> => {
+			const returned = fn(...args);
+			// monty registers a future only for a thenable, so a sync return never reaches the
+			// driver's map and must not be counted — the count has to match that set exactly.
+			if (isThenable(returned)) {
+				const call = chain.answer();
+				const settled = () => {
+					call.settled = true;
+				};
+				returned.then(settled, settled);
+			}
+			return returned;
+		};
+		Object.defineProperty(wrapper, "name", { value: name });
+		wrapped[name] = wrapper;
+	}
+	return wrapped;
+}
+
+function isThenable(value: unknown): value is Promise<unknown> {
+	return typeof (value as { then?: unknown } | null)?.then === "function";
+}
+
+/** How many futures a `resolveFutures` pass was asked about, defensively. */
+function pendingCount(snap: { pendingCallIds?: unknown }): number {
+	return Array.isArray(snap.pendingCallIds) ? snap.pendingCallIds.length : 0;
+}
+
 type MontyPool = Awaited<ReturnType<typeof MontyModule.Monty.create>>;
 
 /** What the entry needs from a mounted kernel, beyond `KernelHandleCore`. */
@@ -123,6 +212,10 @@ export function createKernel(options: {
 	let cellRotations = 0;
 	let cellRotateFailure: string | null = null;
 	let cellAbort: string | null = null;
+	/** Set when a protocol failure forced the kernel to be dropped; reported instead of quietly. */
+	let cellRebuild: string | null = null;
+	/** What the current session's driver holds as undelivered host futures (see `newHostChain`). */
+	const hostChain = newHostChain();
 	let sessionCtx: any = null;
 	let currentCell = "";
 	let problemsPromise: Promise<string[]> | null = null;
@@ -344,6 +437,9 @@ export function createKernel(options: {
 			}
 			throw error;
 		}
+		// The new session answers from a driver with an empty map, so the old chain's
+		// accounting describes nothing any more.
+		hostChain.reset();
 		const previous = session;
 		session = next;
 		try {
@@ -369,10 +465,12 @@ export function createKernel(options: {
 			// A FutureSnapshot's pending promises are tracked by the session that created it,
 			// and `loadSnapshot` cannot restore them (monty's own note: "resolve those manually
 			// with resume([...])"). Rotating there makes the resumed session's next call die on
-			// `worker reported unknown pending call id N`. Rotate at the first suspension that
-			// carries no futures instead, so the reserve is a floor rather than an exact landing
-			// point — the dump then holds settled results, not a promise nobody can settle.
-			const rotatable = !(snap instanceof monty.FutureSnapshot);
+			// `worker reported unknown pending call id N`, so the reserve is a floor rather than
+			// an exact landing point. Being a plain suspension is not enough either: a concurrent
+			// cell suspends on one task's host call while another promise is still outstanding,
+			// and the chain has to prove its driver holds none before this is safe.
+			const pass = snap instanceof monty.FutureSnapshot ? hostChain.passStart(pendingCount(snap)) : null;
+			const rotatable = pass === null && hostChain.empty();
 			if (rotatable && suspensions >= rotateRetryAt) {
 				try {
 					const at = suspensions;
@@ -394,6 +492,7 @@ export function createKernel(options: {
 				}
 			}
 			snap = await snap.resumeAuto();
+			if (pass) hostChain.passEnd(pass);
 		}
 		return snap.output;
 	}
@@ -432,6 +531,7 @@ export function createKernel(options: {
 			await next.loadSession(bytes);
 			const previous = session;
 			session = next;
+			hostChain.reset();
 			try {
 				await previous?.close();
 			} catch {
@@ -683,6 +783,7 @@ export function createKernel(options: {
 				cellRotations = 0;
 				cellRotateFailure = null;
 				cellAbort = null;
+				cellRebuild = null;
 				const hostFns = makeHost({
 					root,
 					attachments,
@@ -694,11 +795,16 @@ export function createKernel(options: {
 				const feedOptions = {
 					mount: [mount, scratchMount],
 					printCallback: streams,
-					externalLookup: recordingHost(hostFns, (name, args, result, error) => {
-						// A call that raised is journaled too, so the cell that caught it replays
-						// (rlm-web ticket 11) instead of stopping the rebuild.
-						cellCalls.push(error ? { name, args, error } : { name, args, result });
-					}),
+					// The counting wrapper goes outside the recording one: it has to hand monty the
+					// very promise its driver registers, so the settle it sees is the one that matters.
+					externalLookup: countHostCalls(
+						recordingHost(hostFns, (name, args, result, error) => {
+							// A call that raised is journaled too, so the cell that caught it replays
+							// (rlm-web ticket 11) instead of stopping the rebuild.
+							cellCalls.push(error ? { name, args, error } : { name, args, result });
+						}),
+						hostChain,
+					),
 					os: (name: string) => {
 						if (/getenv|environ/i.test(name)) {
 							const env: Record<string, string> = {};
@@ -713,6 +819,15 @@ export function createKernel(options: {
 				try {
 					value = await driveCell(params.code, feedOptions);
 				} catch (error) {
+					// A protocol error (or a crashed worker) poisons the session monty raised it on, and
+					// `recoverFromAbort` cannot help: there is nothing to dump. Dropping the kernel is what
+					// keeps the next cell from inheriting the corpse — a rotation that lands badly would
+					// otherwise wedge every later cell in the session.
+					if (error instanceof monty.ProtocolError || error instanceof monty.MontyCrashedError) {
+						await dropKernel();
+						cellRebuild =
+							"# the kernel died with a monty protocol error and has been dropped; this cell's work is lost.\n# The next cell rebuilds it from the journal and the scratch.\n";
+					}
 					if (isSuspensionAbort(error)) {
 						const reason = await recoverFromAbort();
 						rotateTrace("recovered", suspensions, reason ?? undefined);
@@ -749,6 +864,10 @@ export function createKernel(options: {
 				if (cellAbort) {
 					body += cellAbort;
 					cellAbort = null;
+				}
+				if (cellRebuild) {
+					body += cellRebuild;
+					cellRebuild = null;
 				}
 				if (cellRotations > 0) {
 					body += `# kernel reclaimed mid-cell (${cellRotations}x); nothing was lost.\n`;
