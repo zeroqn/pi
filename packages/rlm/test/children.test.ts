@@ -1,6 +1,10 @@
 /**
  * v2's additions to the child manager — tickets 07 (cost), 09 (re-serve) and 10
- * (durable depth), plus ticket 02's granted tool surface.
+ * (durable depth).
+ *
+ * Ticket 02's granted tool surface moved to `packages/tool-bridge/test/child-seam.test.ts`
+ * with the shim itself (`.scratch/tool-ownership/` ticket 05): the child seam is the
+ * bridge's now, so its tests are the bridge's.
  *
  * These are the parts that can be tested without spawning a real child session, so
  * they are the parts that should never regress silently: a depth that reads as zero
@@ -26,9 +30,6 @@ import {
 	resolveOwnDepth,
 	treeTokens,
 } from "../src/children";
-import { GRANTED_CHILD_TOOLS, magicContextChildShim } from "../src/magic-context";
-
-const REGISTRY_KEY = Symbol.for("@cortexkit/magic-context:pi-registry");
 
 function scratch(): string {
 	return mkdtempSync(join(tmpdir(), "rlm-children-"));
@@ -165,71 +166,6 @@ describe("tree cost (v2 ticket 07)", () => {
 		registerManagerView("/a.jsonl", () => [{ session_file: "/b.jsonl", tokens: 1 }]);
 		registerManagerView("/b.jsonl", () => [{ session_file: "/a.jsonl", tokens: 1 }]);
 		expect(treeTokens("/a.jsonl")).toBe(2);
-	});
-});
-
-describe("the granted tool surface (v2 ticket 02)", () => {
-	it("is exactly the three tools, and never the withheld ones", () => {
-		expect([...GRANTED_CHILD_TOOLS].sort()).toEqual(["ctx_expand", "ctx_reduce", "ctx_search"]);
-		for (const withheld of ["ctx_memory", "ctx_note", "todowrite", "todo_view"]) {
-			expect(GRANTED_CHILD_TOOLS).not.toContain(withheld);
-		}
-	});
-
-	it("registers the proxies and routes them through runTool", async () => {
-		const calls: Array<{ name: string; params: unknown }> = [];
-		const bound: unknown[] = [];
-		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = {
-			transformContext: async () => undefined,
-			compact: async () => undefined,
-			scrubMessage: () => {},
-			bindChild: (input: unknown) => bound.push(input),
-			runTool: async (name: string, params: unknown) => {
-				calls.push({ name, params });
-				return { content: [{ type: "text", text: `ran ${name}` }] };
-			},
-		};
-		try {
-			const handlers = new Map<string, Function>();
-			const tools = new Map<string, any>();
-			const fakePi = {
-				on: (event: string, handler: Function) => handlers.set(event, handler),
-				registerTool: (definition: any) => tools.set(definition.name, definition),
-			};
-			magicContextChildShim("/parent.jsonl")(fakePi);
-
-			expect(tools.size).toBe(0); // nothing registers before the session starts
-			await handlers.get("session_start")!({}, { sessionManager: { getSessionFile: () => "/child.jsonl" }, cwd: "/w" });
-			expect([...tools.keys()].sort()).toEqual(["ctx_expand", "ctx_reduce", "ctx_search"]);
-			expect(bound).toEqual([{ childSessionFile: "/child.jsonl", parentSessionFile: "/parent.jsonl", cwd: "/w" }]);
-
-			const result = await tools.get("ctx_search")!.execute("call-1", { query: "x" }, undefined, undefined, { cwd: "/w" });
-			expect(result.content[0].text).toBe("ran ctx_search");
-			expect(calls).toEqual([{ name: "ctx_search", params: { query: "x" } }]);
-		} finally {
-			delete (globalThis as Record<symbol, unknown>)[REGISTRY_KEY];
-		}
-	});
-
-	it("registers nothing when the registry cannot execute tools (older MC)", async () => {
-		(globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = {
-			transformContext: async () => undefined,
-			compact: async () => undefined,
-			scrubMessage: () => {},
-			bindChild: () => {},
-		};
-		try {
-			const handlers = new Map<string, Function>();
-			const tools = new Map<string, any>();
-			magicContextChildShim("/parent.jsonl")({
-				on: (event: string, handler: Function) => handlers.set(event, handler),
-				registerTool: (definition: any) => tools.set(definition.name, definition),
-			});
-			await handlers.get("session_start")!({}, { sessionManager: { getSessionFile: () => "/child.jsonl" }, cwd: "/w" });
-			expect(tools.size).toBe(0);
-		} finally {
-			delete (globalThis as Record<symbol, unknown>)[REGISTRY_KEY];
-		}
 	});
 });
 
