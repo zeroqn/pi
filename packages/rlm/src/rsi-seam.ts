@@ -1,155 +1,92 @@
 /**
- * The RLM side of the RSI seam — tickets 02, 03, 04, 15 and 16 of the RSI x RLM map.
+ * The RLM side of the RSI seam — which is now one thing: how RSI reaches a child session.
  *
- * RSI learns skills and surfaces them to pi through `resources_discover`. In code-mode
- * neither half of that works: pi renders no `<available_skills>` block at all unless
- * `read` or `bash` is active (the block is a name check on the active tool set), and the
- * learned store sits outside the kernel's mounts, so `open()` cannot reach it. RSI
- * therefore publishes a facade on `globalThis`, and this module is the client:
+ * rlm spawns children, so rlm is what must inject RSI into a spawned child's loader and tell RSI
+ * that a session *is* a child. Everything else the two used to say to each other went where the
+ * knowledge belongs (wayfinder map `.scratch/rsi-oneway`): the learned store is RSI's own
+ * contribution to code mode's ledger, the skills block is RSI's own `before_agent_start`, usage is
+ * counted from the journal RSI already reads, and the write capability is the kernel handle RSI
+ * holds.
  *
- *   - **`skills()` / `skill(name)`** as *kernel host functions*. They must be host
- *     functions rather than registered tools: `registerTool` produces a model-callable
- *     pi tool, while the kernel's surface is the fixed set RLM builds (RSI x RLM ticket
- *     08 measured this).
- *   - **live usage reporting**: every `skill()` call and every `bash` host call is
- *     reported as it happens, and *RSI* does the matching, resolving and per-turn
- *     dedupe. Policy stays in RSI; RLM reports facts.
+ * **RSI's shapes stop here.** rlm fills in an RSI-shaped interface at the call site — no spawn
+ * request, no descriptor crosses it — and the only literal the two share is the `Symbol.for` key,
+ * which is the agreed contract.
  *
- * The shape is the process-global one every seam here uses, for the same reason: pi's jiti
- * loader re-imports modules per session (`moduleCache: false`), so module-level state does
- * not survive across sessions in one process. Resolution happens at call time, not
- * at load, so an RSI that appears later is found and an RSI that is absent is a
- * degradation rather than a failure.
+ * The shape is the process-global one every seam here uses, for the same reason: pi's jiti loader
+ * re-imports modules per session (`moduleCache: false`), so module-level state does not survive
+ * across sessions in one process. Resolution happens at call time, so an RSI that appears later is
+ * found and an RSI that is absent is a degradation rather than a failure.
  *
- * **With RSI absent every function here is inert** and RLM behaves exactly as it did
- * before: no skills block, no reports, no error. That is the symmetric-degradation rule
- * (ticket 15), and it is why nothing in this file throws into a cell.
+ * **With RSI absent both functions are inert** and a child runs exactly as it did before: no
+ * factory, no bind, no error.
  */
 
 const REGISTRY_KEY = Symbol.for("@earendil/rsi:pi-registry");
 
-/** One learned skill, as RSI lists it. */
-export interface SeamSkill {
-	name: string;
-	description: string;
-	location: string;
-	scope: string;
-}
-
-export interface SeamSkillContent {
-	content: string;
-	files: string[];
-}
-
-/** The caller's identity: which session is asking, and where it is. */
-export interface SeamCaller {
-	sessionFile?: string;
-	cwd?: string;
-}
-
+/** The child interface, in RSI's vocabulary. Deliberately the whole of what this build calls. */
 interface RsiFacade {
-	skills(caller?: SeamCaller): SeamSkill[];
-	skill(name: string, caller?: SeamCaller): SeamSkillContent | undefined;
-	noteUsage?(usage: { sessionFile?: string; cwd?: string; kind: "skill" | "read"; target: string }): void;
-	noteHostCall?(call: { sessionFile?: string; cwd?: string; command: string }): void;
-	capability?(fact: { sessionFile?: string; canWrite: boolean; reason?: string }): void;
-	childFactory?(pi: unknown, request: unknown): (pi: unknown) => void;
+	childExtension?(): ((pi: unknown) => void) | undefined;
+	bindChild?(fact: { sessionFile?: string }): void;
 }
 
 /**
- * Finds RSI's facade. The key is part of the interface RSI agrees to; the fallback scan
- * exists so a differently-named registry with the right shape still works rather than
- * silently degrading.
+ * Finds RSI's facade.
+ *
+ * The key above is the agreed contract; the shape check is what turns "something is on that slot"
+ * into a facade this build can call. There is deliberately **no fallback scan** over
+ * `Object.getOwnPropertySymbols` looking for a symbol whose description matches `/rsi/i` — that was
+ * the consumer guessing at the provider's identity on every `session_start`, and the key already
+ * answers the question.
  */
 export function findRsiSeam(): RsiFacade | null {
 	const direct = (globalThis as Record<symbol, unknown>)[REGISTRY_KEY];
-	if (isFacade(direct)) return direct;
-	for (const symbol of Object.getOwnPropertySymbols(globalThis)) {
-		if (!/rsi/i.test(String(symbol.description ?? ""))) continue;
-		const candidate = (globalThis as Record<symbol, unknown>)[symbol];
-		if (isFacade(candidate)) return candidate;
-	}
-	return null;
+	return isFacade(direct) ? direct : null;
 }
 
 function isFacade(value: unknown): value is RsiFacade {
-	return Boolean(value) && typeof (value as RsiFacade).skills === "function" && typeof (value as RsiFacade).skill === "function";
+	if (!value || typeof value !== "object") return false;
+	const shaped = value as RsiFacade;
+	return typeof shaped.childExtension === "function" && typeof shaped.bindChild === "function";
 }
 
 /** Logged once per session, so a missing RSI is visible without being noisy. */
 export function rsiStatus(): string {
 	const facade = findRsiSeam();
-	if (!facade) return "rsi: no registry — code-mode sessions see no learned skills (degradation, not failure)";
-	const count = safe(() => facade.skills({}).length) ?? 0;
-	return `rsi: registry found — ${count} learned skill(s) visible in code-mode`;
-}
-
-/** Reads the store's list for a caller. `[]` when RSI is absent or the read fails. */
-export function seamSkills(caller: SeamCaller): SeamSkill[] {
-	const facade = findRsiSeam();
-	if (!facade) return [];
-	return safe(() => facade.skills(caller)) ?? [];
-}
-
-/** Reads one skill's content. `undefined` when RSI is absent, or the name is unknown. */
-export function seamSkill(name: string, caller: SeamCaller): SeamSkillContent | undefined {
-	const facade = findRsiSeam();
-	if (!facade) return undefined;
-	return safe(() => facade.skill(name, caller));
-}
-
-/** Reports one consultation. Fire-and-forget: a lost count must never fail a cell. */
-export function reportUsage(input: { kind: "skill" | "read"; target: string; caller: SeamCaller }): void {
-	const facade = findRsiSeam();
-	if (!facade?.noteUsage) return;
-	try {
-		facade.noteUsage({ ...input.caller, kind: input.kind, target: input.target });
-	} catch {
-		/* a report must never surface as an error */
-	}
-}
-
-/** Offers one bash command's path-looking tokens to RSI, which owns the matching. */
-export function reportHostCall(command: string, caller: SeamCaller): void {
-	const facade = findRsiSeam();
-	if (!facade?.noteHostCall) return;
-	try {
-		facade.noteHostCall({ ...caller, command });
-	} catch {
-		/* see above */
-	}
-}
-
-/** Publishes this session's write capability, so RSI's gate can admit a code-mode session. */
-export function reportCapability(fact: { sessionFile?: string; canWrite: boolean; reason?: string }): void {
-	const facade = findRsiSeam();
-	if (!facade?.capability) return;
-	try {
-		facade.capability(fact);
-	} catch {
-		/* see above */
-	}
+	if (!facade) return "rsi: no registry — a child runs without it (degradation, not failure)";
+	return "rsi: registry found — a child is served by it";
 }
 
 /**
- * The factory a child session is given, when RSI offers one (ticket 11). `undefined` when
- * RSI is absent or too old, which leaves a child running without RSI exactly as today.
+ * The extension factories a spawned child's loader is given, or `[]` when RSI is absent or too old.
+ *
+ * The factory takes no argument. Every field the old descriptor carried was unread, and the child
+ * signal now arrives through {@link rsiBindChild} for a spawned child and a resumed one alike.
  */
-export function rsiChildFactory(request: unknown): Array<(pi: unknown) => void> {
+export function rsiChildExtensions(): Array<(pi: unknown) => void> {
 	const facade = findRsiSeam();
-	if (!facade?.childFactory) return [];
+	if (!facade?.childExtension) return [];
 	try {
-		const factory = facade.childFactory(undefined, request);
+		const factory = facade.childExtension();
 		return typeof factory === "function" ? [factory] : [];
 	} catch {
 		return [];
 	}
 }
 
-function safe<T>(fn: () => T): T | undefined {
+/**
+ * Tells RSI that a session is a child.
+ *
+ * Called for a spawned child and a resumed one alike, because rlm is what computes `isChild`
+ * (`childContext !== null || readChildProvenance(...) !== null`). Best effort: a seam that throws
+ * must not fail a session's start, and a child whose bind is lost is served as a root rather than
+ * not at all.
+ */
+export function rsiBindChild(input: { sessionFile?: string }): void {
+	const facade = findRsiSeam();
+	if (!facade?.bindChild) return;
 	try {
-		return fn();
+		facade.bindChild({ sessionFile: input.sessionFile });
 	} catch {
-		return undefined;
+		/* see above */
 	}
 }

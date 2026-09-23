@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import {
 	findRsiSeam,
-	publishedCapability,
+	isChildSession,
 	pruneRegistrations,
 	registerRsiSeam,
 	rsiSeamStatus,
@@ -13,19 +13,16 @@ import {
 	__seamSizeForTests,
 } from "../seam.ts";
 
-/** A stand-in instance: records what it was asked, answers from a fixed list. */
-function fakeWork(skills = [{ name: "seeded", description: "d", location: "/x/SKILL.md", scope: "general" }]) {
-	const calls = { usage: [], hostCalls: [], scopes: [] };
+/** A stand-in instance: records how often its factory was handed out, and what it built. */
+function fakeWork() {
+	const calls = { handed: 0, built: [] };
 	return {
 		calls,
 		work: {
-			skills: (scope) => {
-				calls.scopes.push(scope);
-				return skills;
+			childExtension: () => {
+				calls.handed += 1;
+				return (pi) => calls.built.push(pi);
 			},
-			skill: (name) => (name === "seeded" ? { content: "body", files: [] } : undefined),
-			noteUsage: (usage) => calls.usage.push(usage),
-			noteHostCall: (call) => calls.hostCalls.push(call),
 		},
 	};
 }
@@ -43,7 +40,7 @@ test("nothing is published until an instance registers, and the status says so",
 	__resetSeamForTests();
 	assert.equal(findRsiSeam(), undefined);
 	assert.equal(rsiSeamStatus(), "rsi seam: no instance published");
-	assert.equal(publishedCapability(undefined), undefined);
+	assert.equal(isChildSession(undefined), false);
 });
 
 test("publishing makes the facade findable, and withdrawing it removes it", (t) => {
@@ -63,78 +60,77 @@ test("publishing makes the facade findable, and withdrawing it removes it", (t) 
 	assert.equal(__seamSizeForTests(), 0);
 });
 
-test("skills() is process-wide: any live instance answers, so a grandchild is served", (t) => {
+test("childExtension() is process-wide: any live instance answers, so a grandchild is served", (t) => {
 	t.after(() => __resetSeamForTests());
 	__resetSeamForTests();
-	const first = fakeWork([{ name: "one", description: "d", location: "/1/SKILL.md", scope: "general" }]);
-	const second = fakeWork([{ name: "two", description: "d", location: "/2/SKILL.md", scope: "general" }]);
+	const first = fakeWork();
+	const second = fakeWork();
 	const withdrawA = registerRsiSeam({ work: first.work, sessionFile: tempSessionFile(t, "a.jsonl") });
 	const withdrawB = registerRsiSeam({ work: second.work, sessionFile: tempSessionFile(t, "b.jsonl") });
 
-	// A caller no instance owns still gets an answer, because the store is global.
-	const seam = findRsiSeam();
-	assert.deepEqual(
-		seam.skills({ sessionFile: "/nowhere/else.jsonl" }).map((skill) => skill.name),
-		["one"],
-	);
-	assert.equal(seam.skill("seeded", { sessionFile: "/nowhere/else.jsonl" })?.content, "body");
-	assert.equal(seam.skill("absent", { sessionFile: "/nowhere/else.jsonl" }), undefined);
+	// Every instance would build the same factory, so which one answers is immaterial - which is
+	// what makes a grandchild, whose parent instance is gone, still work.
+	const factory = findRsiSeam().childExtension();
+	assert.equal(typeof factory, "function");
+	factory({ marker: "childPi" });
+	// `any()` is the first registered instance; which one answers is immaterial in production,
+	// because every instance builds the same factory.
+	assert.deepEqual(first.calls.built, [{ marker: "childPi" }]);
+	assert.equal(second.calls.handed, 0);
+
 	withdrawA();
 	withdrawB();
 });
 
-test("the facade resolves the scope; a client never computes a project key", (t) => {
+test("a facade whose work omits the child factory returns undefined rather than throwing", (t) => {
 	t.after(() => __resetSeamForTests());
 	__resetSeamForTests();
-	const { work, calls } = fakeWork();
-	const withdraw = registerRsiSeam({ work, sessionFile: tempSessionFile(t) });
-	const seam = findRsiSeam();
-
-	seam.skills({ cwd: "/tmp/not-a-repo-at-all" });
-	assert.equal(calls.scopes.at(-1), "general", "an unkeyable cwd resolves to general");
-
-	withdraw();
+	// An older RSI, or a partial instance: rlm must run the child without RSI rather than fail.
+	registerRsiSeam({ work: {}, sessionFile: tempSessionFile(t) });
+	assert.equal(findRsiSeam().childExtension(), undefined);
 });
 
-test("a session-scoped report reaches its own instance, and only that one", (t) => {
+test("a bind marks its own session, and no other", (t) => {
 	t.after(() => __resetSeamForTests());
 	__resetSeamForTests();
-	const mine = fakeWork();
-	const theirs = fakeWork();
-	const myFile = tempSessionFile(t, "mine.jsonl");
-	const theirFile = tempSessionFile(t, "theirs.jsonl");
-	const withdrawMine = registerRsiSeam({ work: mine.work, sessionFile: myFile });
-	const withdrawTheirs = registerRsiSeam({ work: theirs.work, sessionFile: theirFile });
+	const mine = tempSessionFile(t, "mine.jsonl");
+	const theirs = tempSessionFile(t, "theirs.jsonl");
+	const third = tempSessionFile(t, "third.jsonl");
+	const withdrawA = registerRsiSeam({ work: fakeWork().work, sessionFile: mine });
+	const withdrawB = registerRsiSeam({ work: fakeWork().work, sessionFile: theirs });
 
-	const seam = findRsiSeam();
-	seam.noteUsage({ sessionFile: myFile, kind: "skill", target: "seeded" });
-	seam.noteHostCall({ sessionFile: theirFile, command: "cat /x/SKILL.md" });
+	findRsiSeam().bindChild({ sessionFile: mine });
+	assert.equal(isChildSession(mine), true);
+	assert.equal(isChildSession(theirs), false, "the sibling instance is not a child");
+	assert.equal(isChildSession(third), false, "a session nobody bound is not a child");
+	assert.equal(isChildSession(undefined), false);
 
-	assert.equal(mine.calls.usage.length, 1);
-	assert.equal(mine.calls.hostCalls.length, 0);
-	assert.equal(theirs.calls.usage.length, 0);
-	assert.equal(theirs.calls.hostCalls.length, 1);
+	// Binding twice is idempotent: the same fact set twice is the same fact.
+	findRsiSeam().bindChild({ sessionFile: mine });
+	assert.equal(isChildSession(mine), true);
 
-	withdrawMine();
-	withdrawTheirs();
+	withdrawA();
+	withdrawB();
 });
 
-test("a capability fact is per session, so a child never inherits the root's", (t) => {
+test("a bind that arrives before the session file is known still lands, and is readable", (t) => {
 	t.after(() => __resetSeamForTests());
 	__resetSeamForTests();
-	const rootFile = tempSessionFile(t, "root.jsonl");
-	const childFile = tempSessionFile(t, "child.jsonl");
-	const withdraw = registerRsiSeam({ work: fakeWork().work, sessionFile: rootFile });
+	// The load-order case: rlm's `session_start` runs before RSI's (the manifest loads rlm first),
+	// so at bind time `resolve()` cannot find RSI's instance - `currentCtx` is still unset - and the
+	// write falls back to the publishing registration. The read scans every registration, so where
+	// the write landed does not matter. This is the failure the rsi-rlm acceptance check caught for
+	// the capability fact, and the shape here is deliberately the same.
+	let file;
+	const withdraw = registerRsiSeam({ work: fakeWork().work, sessionFile: () => file });
 	const seam = findRsiSeam();
 
-	seam.capability({ sessionFile: rootFile, canWrite: true, reason: "kernel can write" });
-	assert.equal(publishedCapability(rootFile), true);
-	assert.equal(publishedCapability(childFile), undefined, "an unpublished session falls back to the tool heuristic");
+	seam.bindChild({ sessionFile: undefined });
+	assert.equal(isChildSession(undefined), true, "the session-less key is bound");
 
-	// A child publishing its own fact must not be mistaken for the root.
-	seam.capability({ sessionFile: childFile, canWrite: false, reason: "read-only kernel" });
-	assert.equal(publishedCapability(childFile), false);
-	assert.equal(publishedCapability(rootFile), true);
+	file = tempSessionFile(t, "late.jsonl");
+	seam.bindChild({ sessionFile: file });
+	assert.equal(isChildSession(file), true);
 
 	withdraw();
 });
@@ -164,78 +160,20 @@ test("pruning drops registrations by session-file mtime, never a fresh one", (t)
 	withdrawB();
 });
 
-test("a registration with no session file is never pruned, and still serves reads", (t) => {
+test("a registration with no session file is never pruned, and still offers its factory", (t) => {
 	t.after(() => __resetSeamForTests());
 	__resetSeamForTests();
 	const { work } = fakeWork();
 	const withdraw = registerRsiSeam({ work });
 	assert.equal(pruneRegistrations(1), 0, "there is no mtime to judge it by");
-	assert.equal(findRsiSeam().skills({}).length, 1);
-	withdraw();
-});
-
-test("a registration published before its session starts still receives facts", (t) => {
-	t.after(() => __resetSeamForTests());
-	__resetSeamForTests();
-	// The load-order case: the facade is published at load time, before any `session_start`
-	// handler has run, so the session file is not known yet. A client that publishes its fact
-	// in its own `session_start` must still land on the right instance - otherwise the fact is
-	// dropped silently, which is the failure the acceptance check caught when RLM was loaded
-	// before RSI.
-	let file;
-	const { work } = fakeWork();
-	const withdraw = registerRsiSeam({ work, sessionFile: () => file });
-	const seam = findRsiSeam();
-
-	// No session file yet: the fact still registers, under the session-less key.
-	seam.capability({ canWrite: true, reason: "published before the session file existed" });
-	assert.equal(publishedCapability(undefined), true);
-
-	// And once the session file is known, a fact keyed by it resolves normally.
-	file = tempSessionFile(t, "late.jsonl");
-	seam.capability({ sessionFile: file, canWrite: false, reason: "read-only" });
-	assert.equal(publishedCapability(file), false);
-
+	assert.equal(typeof findRsiSeam().childExtension(), "function");
 	withdraw();
 });
 
 test("a half-shaped slot is not mistaken for the seam", (t) => {
 	t.after(() => __resetSeamForTests());
 	__resetSeamForTests();
-	(globalThis)[Symbol.for("@earendil/rsi:pi-registry")] = { skills: () => [] };
-	assert.equal(findRsiSeam(), undefined, "a facade without skill() is not ours");
+	globalThis[Symbol.for("@earendil/rsi:pi-registry")] = { childExtension: () => undefined };
+	assert.equal(findRsiSeam(), undefined, "a facade without bindChild() is not ours");
 	__resetSeamForTests();
-});
-
-test("a child factory is offered through the facade, and a grandchild resolves the same one", (t) => {
-	t.after(() => __resetSeamForTests());
-	__resetSeamForTests();
-	const built = [];
-	const { work } = fakeWork();
-	work.childFactory = (_pi, request) => (childPi) => built.push({ request, childPi });
-
-	// Two instances, as a root and a child session would be: either can hand out the factory,
-	// because every instance would build the same one (ticket 11).
-	const withdrawA = registerRsiSeam({ work, sessionFile: tempSessionFile(t, "a.jsonl") });
-	const withdrawB = registerRsiSeam({ work: fakeWork().work, sessionFile: tempSessionFile(t, "b.jsonl") });
-
-	const seam = findRsiSeam();
-	assert.equal(typeof seam.childFactory, "function");
-	const factory = seam.childFactory(undefined, { name: "kid", depth: 1 });
-	assert.equal(typeof factory, "function");
-	factory({ marker: "childPi" });
-	assert.equal(built.length, 1);
-	assert.equal(built[0].request.name, "kid");
-	assert.deepEqual(built[0].childPi, { marker: "childPi" });
-
-	withdrawA();
-	withdrawB();
-});
-
-test("a facade whose work omits the child factory returns undefined rather than throwing", (t) => {
-	t.after(() => __resetSeamForTests());
-	__resetSeamForTests();
-	registerRsiSeam({ work: fakeWork().work, sessionFile: tempSessionFile(t) });
-	const factory = findRsiSeam().childFactory(undefined, {});
-	assert.equal(factory, undefined, "an older RSI runs children without itself");
 });

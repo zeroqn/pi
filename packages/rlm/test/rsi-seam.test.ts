@@ -1,114 +1,86 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import {
-	findRsiSeam,
-	reportCapability,
-	reportHostCall,
-	reportUsage,
-	rsiChildFactory,
-	rsiStatus,
-	seamSkill,
-	seamSkills,
-} from "../src/rsi-seam";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { findRsiSeam, rsiBindChild, rsiChildExtensions, rsiStatus } from "../src/rsi-seam";
 
 const KEY = Symbol.for("@earendil/rsi:pi-registry");
 
-interface Recorded {
-	usage: Array<{ kind: string; target: string }>;
-	hostCalls: string[];
-	facts: Array<{ sessionFile?: string; canWrite: boolean }>;
+function publish(facade: unknown, key: symbol = KEY) {
+	(globalThis as Record<symbol, unknown>)[key] = facade;
 }
 
-function publish(overrides: Record<string, unknown> = {}): Recorded {
-	const recorded: Recorded = { usage: [], hostCalls: [], facts: [] };
-	(globalThis as Record<symbol, unknown>)[KEY] = {
-		skills: () => [{ name: "seeded", description: "d", location: "/x/SKILL.md", scope: "general" }],
-		skill: (name: string) => (name === "seeded" ? { content: "body", files: ["scripts/x.sh"] } : undefined),
-		noteUsage: (usage: { kind: string; target: string }) => recorded.usage.push(usage),
-		noteHostCall: (call: { command: string }) => recorded.hostCalls.push(call.command),
-		capability: (fact: { sessionFile?: string; canWrite: boolean }) => recorded.facts.push(fact),
-		...overrides,
-	};
-	return recorded;
+function unpublish() {
+	delete (globalThis as Record<symbol, unknown>)[KEY];
 }
 
-beforeEach(() => {
-	delete (globalThis as Record<symbol, unknown>)[KEY];
-});
-afterEach(() => {
-	delete (globalThis as Record<symbol, unknown>)[KEY];
-});
+beforeEach(unpublish);
+afterEach(unpublish);
 
-describe("with RSI absent, every call is inert", () => {
-	test("reads return empty and reports do nothing", () => {
+describe("with RSI absent, both calls are inert", () => {
+	test("nothing is found, and the status says why", () => {
 		expect(findRsiSeam()).toBeNull();
-		expect(seamSkills({})).toEqual([]);
-		expect(seamSkill("seeded", {})).toBeUndefined();
-		expect(() => reportUsage({ kind: "skill", target: "seeded", caller: {} })).not.toThrow();
-		expect(() => reportHostCall("cat /x", {})).not.toThrow();
-		expect(() => reportCapability({ canWrite: true })).not.toThrow();
-		expect(rsiChildFactory({})).toEqual([]);
+		expect(rsiChildExtensions()).toEqual([]);
+		expect(() => rsiBindChild({ sessionFile: "/tmp/s.jsonl" })).not.toThrow();
+		expect(rsiStatus()).toContain("no registry");
 	});
 
-	test("the status line says so rather than staying silent", () => {
-		expect(rsiStatus()).toContain("no registry");
-		expect(rsiStatus()).toContain("degradation, not failure");
+	test("a differently-named slot is not guessed at", () => {
+		// The key is the contract. The old build scanned `Object.getOwnPropertySymbols` for a symbol
+		// whose description matched `/rsi/i` — the consumer guessing at the provider's identity on
+		// every `session_start`. It is gone, and this is the case that would have found it.
+		publish(
+			{ childExtension: () => () => {}, bindChild: () => {} },
+			Symbol.for("something-else:rsi-ish"),
+		);
+		expect(findRsiSeam()).toBeNull();
 	});
 });
 
 describe("with RSI present", () => {
-	test("skills() and skill(name) read through the facade", () => {
-		publish();
-		expect(seamSkills({ sessionFile: "s.jsonl" })).toHaveLength(1);
-		expect(seamSkill("seeded", {})?.content).toBe("body");
-		expect(seamSkill("absent", {})).toBeUndefined();
-		expect(rsiStatus()).toContain("1 learned skill(s)");
+	test("the child factory is handed out verbatim", () => {
+		const factory = (pi: unknown) => pi;
+		publish({ childExtension: () => factory, bindChild: () => {} });
+		expect(rsiChildExtensions()).toEqual([factory]);
+		expect(rsiStatus()).toContain("registry found");
 	});
 
-	test("a consultation is reported, and a bash call is offered for matching", () => {
-		const recorded = publish();
-		reportUsage({ kind: "skill", target: "seeded", caller: { sessionFile: "s.jsonl" } });
-		reportHostCall("cat /home/x/SKILL.md", { sessionFile: "s.jsonl" });
-		expect(recorded.usage).toEqual([{ kind: "skill", target: "seeded", sessionFile: "s.jsonl" }]);
-		expect(recorded.hostCalls).toEqual(["cat /home/x/SKILL.md"]);
+	test("a bind carries the session file and nothing of rlm's", () => {
+		const seen: unknown[] = [];
+		publish({ childExtension: () => () => {}, bindChild: (fact: unknown) => seen.push(fact) });
+		rsiBindChild({ sessionFile: "/tmp/s.jsonl" });
+		expect(seen).toEqual([{ sessionFile: "/tmp/s.jsonl" }]);
+		// The whole payload. A spawn request, a depth or a name crossing here would be rlm's shape
+		// leaking into RSI, which is what this effort exists to remove.
+		expect(Object.keys(seen[0] as object)).toEqual(["sessionFile"]);
 	});
 
-	test("a capability fact carries the session file, so a child's is its own", () => {
-		const recorded = publish();
-		reportCapability({ sessionFile: "child.jsonl", canWrite: true, reason: "kernel" });
-		expect(recorded.facts[0]?.sessionFile).toBe("child.jsonl");
+	test("a bind with no session file is passed through as undefined, not dropped", () => {
+		const seen: unknown[] = [];
+		publish({ childExtension: () => () => {}, bindChild: (fact: unknown) => seen.push(fact) });
+		rsiBindChild({});
+		expect(seen).toEqual([{ sessionFile: undefined }]);
 	});
 
-	test("a facade that throws is contained: a report must never fail a cell", () => {
+	test("a facade that is partial or throwing degrades to nothing", () => {
+		// An older RSI, whose facade is the six-method one: not this build's shape.
+		publish({ skills: () => [] });
+		expect(findRsiSeam()).toBeNull();
+
+		publish({ childExtension: () => undefined, bindChild: () => {} });
+		expect(rsiChildExtensions()).toEqual([]);
+
 		publish({
-			skills: () => {
-				throw new Error("store exploded");
+			childExtension: () => {
+				throw new Error("boom");
 			},
-			noteUsage: () => {
-				throw new Error("ledger exploded");
+			bindChild: () => {},
+		});
+		expect(rsiChildExtensions()).toEqual([]);
+
+		publish({
+			childExtension: () => () => {},
+			bindChild: () => {
+				throw new Error("boom");
 			},
 		});
-		expect(seamSkills({})).toEqual([]);
-		expect(() => reportUsage({ kind: "skill", target: "x", caller: {} })).not.toThrow();
-	});
-
-	test("an older RSI without the optional methods still serves reads", () => {
-		publish({ noteUsage: undefined, noteHostCall: undefined, capability: undefined, childFactory: undefined });
-		expect(seamSkills({})).toHaveLength(1);
-		expect(() => reportUsage({ kind: "skill", target: "seeded", caller: {} })).not.toThrow();
-		expect(rsiChildFactory({})).toEqual([]);
-	});
-
-	test("a child factory is only handed over when RSI offers one", () => {
-		const factory = () => {};
-		publish({ childFactory: () => factory });
-		expect(rsiChildFactory({ name: "c1" })).toEqual([factory]);
-
-		publish({ childFactory: () => "not a function" });
-		expect(rsiChildFactory({})).toEqual([]);
-	});
-
-	test("a half-shaped slot is not mistaken for the seam", () => {
-		(globalThis as Record<symbol, unknown>)[KEY] = { skills: () => [] };
-		expect(findRsiSeam()).toBeNull();
+		expect(() => rsiBindChild({})).not.toThrow();
 	});
 });

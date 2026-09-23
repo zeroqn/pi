@@ -1,157 +1,85 @@
 /**
- * The RSI side of the seam — the facade other extensions reach RSI through.
+ * RSI's facade — the seam rlm reaches RSI through, and the only one.
  *
- * RLM turns a session into a Python kernel, and in code-mode pi renders no skills block
- * at all: its `<available_skills>` gate is a name check on the active tool set
- * (`core/system-prompt.js`), and the kernel's only tool is `python`. The learned store is
- * also unreachable from the kernel, because RLM mounts only the cwd and its scratch. So
- * RLM asks this facade for the skills and renders them itself, and reports what it
- * consulted back here, where the matching, resolving and counting live.
+ * It used to be six methods wide: `skills`/`skill` so rlm could render the skills block, the
+ * `noteUsage`/`noteHostCall` pushes so rlm could report what a cell consulted, the `capability`
+ * fact so rlm could tell RSI a code-mode session can write, and a `childFactory`. All of those
+ * moved to where the knowledge belongs (wayfinder map `.scratch/rsi-oneway`): the skills surface is
+ * RSI's own contribution to code mode's ledger, the block is RSI's own `before_agent_start`, the
+ * write capability is the kernel handle RSI holds, and usage is pulled from the journal at settle
+ * time. What is left is the one thing only rlm can answer — how a child session is built.
  *
- * The shape is Magic Context's (`magic-context/packages/pi-plugin/src/pi-registry.ts`),
- * for the same reason: pi's jiti loader re-imports modules per session
- * (`moduleCache: false`), so module-level state does not survive across sessions within
- * one process. One `Symbol.for` slot holds a **facade of methods, never state**;
- * instances register into a module-level set; the facade serves by the caller's session
- * file.
+ * The shape is Magic Context's, for the same reason: pi's jiti loader re-imports modules per
+ * session (`moduleCache: false`), so module-level state does not survive across sessions within one
+ * process. One `Symbol.for` slot holds a **facade of methods, never state**; instances register
+ * into a module-level set; the facade serves by the caller's session file.
  *
- * Two rules the design settled and this file must keep (tickets 11 and 15):
- *   - **Process-wide reads.** Every instance serves the same global store, so `skills()`
- *     and `skill()` answer correctly even when the caller is a grandchild whose parent
- *     instance is gone. Only session-scoped facts resolve to a particular instance.
- *   - **Resolvable, never released.** A child session never emits `session_shutdown`
- *     (ticket 09), so nothing may depend on a release hook. Registrations are dropped
- *     only as hygiene, by session-file mtime, which cannot take a live session down.
+ * Two rules the design settled and this file must keep:
+ *   - **Process-wide reads.** Every instance builds the same child factory, so it answers correctly
+ *     even when the caller is a grandchild whose parent instance is gone. Only the child *fact*
+ *     resolves to a particular session.
+ *   - **Resolvable, never released.** A child session never emits `session_shutdown`, so nothing may
+ *     depend on a release hook. Registrations are dropped only as hygiene, by session-file mtime,
+ *     which cannot take a live session down.
  *
- * Degradation is symmetric: with RSI absent the lookup misses and the client behaves as
- * it did before; with RLM absent nothing calls in.
+ * Degradation is symmetric: with RSI absent the lookup misses and rlm's child path contributes
+ * nothing; with rlm absent nothing calls in, and RSI serves code mode on its own.
  */
 
 import * as fs from "node:fs";
-import { projectKeyFor } from "./project-key.ts";
-import type { Scope, SkillStore } from "./store.ts";
 
 export const RSI_REGISTRY_KEY = Symbol.for("@earendil/rsi:pi-registry");
 
-/** One learned skill, in the shape pi itself lists them. */
-export interface SeamSkill {
-	name: string;
-	description: string;
-	/** Absolute path of the SKILL.md, so a bash-capable kernel can read it. */
-	location: string;
-	/** `"general"` or the project key, so a consumer can tell them apart. */
-	scope: string;
-}
-
-export interface SeamSkillContent {
-	content: string;
-	/** Payload files relative to the skill directory. */
-	files: string[];
-}
-
-/** The caller's identity and context. Both optional: a caller that knows neither still gets the union of what exists. */
-export interface SeamCaller {
-	sessionFile?: string;
-	cwd?: string;
-}
-
-/** RLM's own knowledge of this session's surface (ticket 03). */
-export interface SeamCapability {
-	sessionFile?: string;
-	/** True when the session's kernel can write files — `write_text`/`edit_text`/`bash` exist. */
-	canWrite: boolean;
-	/** Why, for the log and for `/rsi status`. */
-	reason?: string;
-}
-
-/** A consultation reported live (ticket 15). */
-export interface SeamUsage {
-	sessionFile?: string;
-	cwd?: string;
-	/**
-	 * How the consultation happened. `"skill"` is an explicit `skill(name)` call, counted
-	 * like a `/skill:name` expansion; `"read"` is content read from a path, counted as a
-	 * read. Both move the use count, which is what the lifecycle turns on.
-	 */
-	kind: "skill" | "read";
-	/** The skill name for kind `"skill"`, or the absolute path for kind `"read"`. */
-	target: string;
-}
-
-/** A bash host call, whose command RSI matches against the store (ticket 02's backstop). */
-export interface SeamHostCall {
-	sessionFile?: string;
-	cwd?: string;
-	command: string;
-}
-
-/** What an instance supplies. The facade adds the dispatch and the process-wide reads. */
+/** What an instance offers a child session: one factory, and nothing else. */
 export interface RsiSeamWork {
-	/**
-	 * The factory a child session is given (ticket 11), built per child at spawn time so it can
-	 * carry the child's descriptor. Optional: a consumer that finds it missing runs children
-	 * without RSI, exactly as before.
-	 */
-	childFactory?: (pi: unknown, request: unknown) => (pi: unknown) => void;
-	/** The union for a scope: `general` always, plus the project scope when the cwd resolves to one. */
-	skills(scope: Scope): SeamSkill[];
-	skill(name: string, scope: Scope): SeamSkillContent | undefined;
-	/** Record one consultation. Fire-and-forget: a lost count must never surface as an error. */
-	noteUsage(usage: SeamUsage, scope: Scope): void;
-	/** Offer one bash command's path-looking tokens as candidate reads. */
-	noteHostCall(call: SeamHostCall, scope: Scope): void;
+	/** The factory a spawned child's loader is given. */
+	childExtension(): (pi: unknown) => void;
 }
 
 /**
- * The facade other extensions consume.
- *
- * Its shape is the **caller's**, not the work's: a consumer asks what *this* session can see,
- * and the facade resolves that to a store scope with `scopeFor`. It therefore does not extend
- * {@link RsiSeamWork}, whose methods already take the resolved `Scope`.
+ * The facade other extensions consume — two members, both about children, both in RSI's own
+ * vocabulary. Nothing an RLM type names crosses this wire.
  */
 export interface RsiSeam {
-	/** The union for the caller's scope: `general` always, plus the project scope when the caller's cwd resolves to one. */
-	skills(caller?: SeamCaller): SeamSkill[];
-	skill(name: string, caller?: SeamCaller): SeamSkillContent | undefined;
-	/** Record one consultation. Fire-and-forget: a lost count must never surface as an error. */
-	noteUsage(usage: SeamUsage): void;
-	/** Offer one bash command's path-looking tokens as candidate reads. */
-	noteHostCall(call: SeamHostCall): void;
 	/**
-	 * Register a session's facts. Published by the client at `session_start`, so a child's
-	 * fact is its own and the root's is never inherited.
+	 * The factory rlm spreads into a spawned child's loader. Process-wide, like the store: every
+	 * instance builds the same one, and a grandchild resolves the same facade.
 	 */
-	capability(fact: SeamCapability): void;
+	childExtension(): ((pi: unknown) => void) | undefined;
 	/**
-	 * The factory a child session is given, when RLM asks for one (ticket 11). May return
-	 * `undefined`: the facade always exists, but an older instance has no factory to offer,
-	 * and the consumer runs the child without RSI rather than throwing.
+	 * The child signal, for a spawned child and a resumed one alike.
+	 *
+	 * **The method name is the signal**: a bind only ever means "this session is a child", so there
+	 * is no flag to carry and no un-bind to express — a session's child-ness cannot change.
+	 * `sessionFile` is the routing key, and it is optional because pi allows an in-memory session.
 	 */
-	childFactory?(pi: unknown, request: unknown): ((pi: unknown) => void) | undefined;
-}
-
-/** True when the facade can put RSI into a child session. */
-export function hasChildFactory(seam: RsiSeam | undefined): boolean {
-	return typeof seam?.childFactory === "function";
+	bindChild(fact: { sessionFile?: string }): void;
 }
 
 interface Registration {
 	work: RsiSeamWork;
 	/**
-	 * This instance's own session file; the key the facade serves by. A getter rather than a
-	 * value, because the facade is published at load time - before any `session_start`
-	 * handler of any extension has run - while the session file is only known later.
+	 * This instance's own session file; the key the facade serves by. A getter rather than a value,
+	 * because the facade is published at load time — before any `session_start` handler of any
+	 * extension has run — while the session file is only known later.
 	 */
 	sessionFile: () => string | undefined;
-	/** Per-session facts this instance published, keyed by session file. */
-	facts: Map<string, SeamCapability>;
+	/**
+	 * Session keys bound as children, on whichever instance took the bind.
+	 *
+	 * A **set of keys**, and that is what makes the bind order-proof: rlm's `session_start` runs
+	 * before RSI's (the manifest loads rlm first), so at bind time `resolve()` cannot find RSI's
+	 * instance — `currentCtx` is still unset — and the write falls back to the publishing
+	 * registration. The read scans every registration, so where the write landed does not matter.
+	 */
+	children: Set<string>;
 	registeredAt: number;
 }
 
 /** Live instances, in registration order. Insertion order is what a fallback resolves to. */
 const registrations = new Set<Registration>();
 
-/** The fact a session with no file publishes under, so a session-less client is still served. */
+/** The key a session with no file is served under, so a session-less caller is still served. */
 const NO_FILE = "(no session file)";
 
 function keyFor(sessionFile: string | undefined): string {
@@ -159,10 +87,10 @@ function keyFor(sessionFile: string | undefined): string {
 }
 
 /**
- * The instance that owns this caller, or the single one when there is only one. `undefined`
- * when several are registered and none owns the caller — only session-scoped facts care.
+ * The instance that owns this caller, or the single one when there is only one. `undefined` when
+ * several are registered and none owns the caller — only session-scoped facts care.
  */
-function resolve(caller: SeamCaller | undefined): Registration | undefined {
+function resolve(caller: { sessionFile?: string } | undefined): Registration | undefined {
 	const file = caller?.sessionFile;
 	if (file && file.length > 0) {
 		for (const registration of registrations) {
@@ -173,23 +101,17 @@ function resolve(caller: SeamCaller | undefined): Registration | undefined {
 }
 
 /**
- * Any live instance, for a process-wide read. Every instance serves the same global store,
- * so which one answers `skills()` is immaterial — which is what makes a grandchild work.
+ * Any live instance, for a process-wide read. Every instance builds the same child factory, so
+ * which one answers is immaterial — which is what makes a grandchild work.
  */
 function any(): Registration | undefined {
 	return registrations.values().next().value;
 }
 
-/** The scope a caller resolves to. RSI owns this policy; a client never computes a key. */
-function scopeFor(caller: SeamCaller | undefined): Scope {
-	const project = projectKeyFor(caller?.cwd ?? process.cwd());
-	return project ? { project } : "general";
-}
-
 /**
- * Drop registrations whose session file has not been written for longer than `maxAgeMs`.
- * Hygiene, not correctness: a session that is doing anything keeps a fresh mtime, and a
- * session that is not is already served by any other instance. Returns how many went.
+ * Drop registrations whose session file has not been written for longer than `maxAgeMs`. Hygiene,
+ * not correctness: a session that is doing anything keeps a fresh mtime, and a session that is not
+ * is already served by any other instance. Returns how many went.
  */
 export function pruneRegistrations(maxAgeMs: number): number {
 	const now = Date.now();
@@ -215,47 +137,39 @@ export function pruneRegistrations(maxAgeMs: number): number {
 }
 
 /**
- * Publish an instance and return the function that withdraws it. Idempotent, because
- * shutdown paths can run more than once.
+ * Publish an instance and return the function that withdraws it. Idempotent, because shutdown paths
+ * can run more than once.
  */
 export function registerRsiSeam(options: {
 	work: RsiSeamWork;
 	/**
-	 * This instance's session file, or a getter for it. A getter lets the facade be published
-	 * at load time - which is what makes the seam exist before any extension's `session_start`
-	 * handler runs, whatever order the extensions were loaded in - while the session file is
-	 * only known once the session starts.
+	 * This instance's session file, or a getter for it. A getter lets the facade be published at
+	 * load time — which is what makes the seam exist before any extension's `session_start` handler
+	 * runs, whatever order the extensions were loaded in — while the session file is only known once
+	 * the session starts.
 	 */
 	sessionFile?: string | (() => string | undefined);
 }): () => void {
-	const sessionFile = typeof options.sessionFile === "function" ? options.sessionFile : () => options.sessionFile as string | undefined;
+	const sessionFile =
+		typeof options.sessionFile === "function" ? options.sessionFile : () => options.sessionFile as string | undefined;
 	const registration: Registration = {
 		work: options.work,
 		sessionFile,
-		facts: new Map(),
+		children: new Set(),
 		registeredAt: Date.now(),
 	};
 	registrations.add(registration);
 
 	const facade: RsiSeam = {
-		// Process-wide reads: any instance answers, because the store is global.
-		skills: (caller) => any()?.work.skills(scopeFor(caller)) ?? [],
-		skill: (name, caller) => any()?.work.skill(name, scopeFor(caller)),
-		noteUsage: (usage) => {
-			resolve(usage)?.work.noteUsage(usage, scopeFor(usage));
-		},
-		noteHostCall: (call) => {
-			resolve(call)?.work.noteHostCall(call, scopeFor(call));
-		},
-		// Process-wide, like the reads: any instance can hand out the child factory, because
-		// every instance would build the same one. A grandchild resolves the same facade.
-		childFactory: (childPi, request) => any()?.work.childFactory?.(childPi, request),
-		capability: (fact) => {
-			// The fact belongs to the session that published it, on the instance that owns that
-			// session — a child's own instance, never its parent's. Falling back to this
-			// registration matters at load time, when no session file is known yet.
+		// Process-wide, like the store: any instance can hand out the child factory, because every
+		// instance would build the same one. A grandchild resolves the same facade.
+		childExtension: () => any()?.work.childExtension?.(),
+		bindChild: (fact) => {
+			// The fact belongs to the session it names, on the instance that owns that session — a
+			// child's own instance, never its parent's. Falling back to this registration matters at
+			// load time, when no session file is known yet.
 			const owner = resolve({ sessionFile: fact.sessionFile }) ?? registration;
-			owner.facts.set(keyFor(fact.sessionFile), fact);
+			owner.children.add(keyFor(fact.sessionFile));
 		},
 	};
 
@@ -267,25 +181,35 @@ export function registerRsiSeam(options: {
 	};
 }
 
-/** The published facade, or `undefined` when no RSI instance is live. */
+/**
+ * The published facade, or `undefined` when no RSI instance is live.
+ *
+ * The shape check is anchored on the two child members, which are the whole of what rlm may call.
+ * There is deliberately **no fallback scan** over `Object.getOwnPropertySymbols` looking for a
+ * symbol whose description matches `/rsi/i`: the `Symbol.for` key above *is* the agreed contract,
+ * and a scan is the consumer guessing at the provider's identity on every `session_start`.
+ */
 export function findRsiSeam(): RsiSeam | undefined {
 	const candidate = (globalThis as Record<symbol, unknown>)[RSI_REGISTRY_KEY];
 	if (!candidate) return undefined;
 	const shaped = candidate as Partial<RsiSeam>;
-	return typeof shaped.skills === "function" && typeof shaped.skill === "function" ? (candidate as RsiSeam) : undefined;
+	return typeof shaped.childExtension === "function" && typeof shaped.bindChild === "function"
+		? (candidate as RsiSeam)
+		: undefined;
 }
 
 /**
- * The capability a session published, or `undefined` when it published none — which is the
- * signal for the gate to fall back to its tool-name heuristic.
+ * Whether a session was bound as a child.
+ *
+ * Read lazily, at pass and settle time, by the three places that used to consult a spawn-time
+ * descriptor. Before any bind the answer is `false`, which is correct by construction: a session RSI
+ * reaches without a bind is not a child — a spawned child is built by `childExtension()` and bound
+ * in the same `session_start`, and a resumed child is bound by rlm.
  */
-export function publishedCapability(sessionFile: string | undefined): boolean | undefined {
+export function isChildSession(sessionFile: string | undefined): boolean {
 	const key = keyFor(sessionFile);
-	for (const registration of registrations) {
-		const fact = registration.facts.get(key);
-		if (fact) return fact.canWrite;
-	}
-	return undefined;
+	for (const registration of registrations) if (registration.children.has(key)) return true;
+	return false;
 }
 
 /** One line for the session log, so a missing seam is visible rather than mysterious. */

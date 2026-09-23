@@ -34,8 +34,7 @@ import {
 	childStatus,
 	setChildDetector,
 } from "../../tool-bridge/src/child-seam";
-import { reportCapability, reportHostCall, rsiChildFactory, rsiStatus } from "./rsi-seam";
-import { beforeAgentStartResult } from "./skills-block";
+import { rsiBindChild, rsiChildExtensions, rsiStatus } from "./rsi-seam";
 import { errorText, str } from "./util";
 import { resolveWebHook } from "./web-hook";
 
@@ -76,11 +75,6 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	const notices: Notice[] = [];
 	let parentBusy = false;
 
-	/** Every seam report carries this identity, as a closure over *this* session — never a
-	 * module-level ref, which in a process with several kernels is whoever bound last
-	 * (ticket 03, C6). */
-	const seamCaller = () => ({ sessionFile: sessionCtx?.sessionManager?.getSessionFile?.(), cwd: sessionCtx?.cwd ?? root });
-
 	// The bridge's entry learns that a session is a child from *this* reader, not from a marker
 	// vocabulary it would have to learn (ticket 03 §5). Installed before any handler runs, so the
 	// entry's own `session_start` — a resumed child's only corrector — already has it.
@@ -98,7 +92,7 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				// The owners' factories come from the bridge's child seam, and RSI offers its own
 				// through the same kind of seam; rlm names neither, and a seam that is absent or
 				// too old contributes nothing.
-				childFactories: (request) => [...ownerChildFactories(request), ...rsiChildFactory(request)],
+				childFactories: (request) => [...ownerChildFactories(request), ...rsiChildExtensions()],
 			// The ceiling's first operand: this session's *live* surface, read at spawn time and never
 			// read back from a record (ticket 01 §1-2). A grandchild reads its own `pi` here, which is
 			// what makes "a child is a subset of its parent" transitive by construction.
@@ -156,18 +150,20 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	}
 
 	/**
-	 * The code-mode skills block: pi renders no skills for a session whose active tools are
-	 * `["python"]`, so rlm appends the block itself — the human tier from the event plus the
-	 * learned store from the seam. In any other session this returns `undefined` and pi's
-	 * prompt is untouched. When there is no kernel at all, one line says so, once.
+	 * One line saying code mode is unavailable, once, when there is no kernel at all. The skills
+	 * block is RSI's own now, so this handler renders nothing else.
+	 *
+	 * It **appends to `event.systemPrompt`** rather than replacing it, and that is the invariant the
+	 * two extensions depend on: `before_agent_start` handlers chain, each seeing the previous one's
+	 * result, so rlm's line (load order 2) and RSI's block (load order 3) both survive. A handler
+	 * that returned a bare string would silently drop the other's text.
 	 */
 	pi.on("before_agent_start", async (event: any) => {
 		try {
-			const base = await beforeAgentStartResult(event, seamCaller());
-			if (!inertReason || toldModel) return base;
+			if (!inertReason || toldModel) return undefined;
 			toldModel = true;
 			const line = `\n\n## Code mode is unavailable\n${inertReason}\nThere is no \`python\` tool in this session.\n`;
-			return { systemPrompt: `${base?.systemPrompt ?? event.systemPrompt}${line}` };
+			return { systemPrompt: `${event.systemPrompt}${line}` };
 		} catch {
 			// A prompt we cannot build must never take a turn down.
 			return undefined;
@@ -203,16 +199,11 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				parentSessionFile: readChildProvenance(ctx?.sessionManager)?.parentSessionFile,
 				cwd: ctx?.cwd,
 			});
+			// RSI's own child signal, in RSI's own vocabulary: the bind carries the session file and
+			// nothing else, and being built by `childExtension()` is not enough on its own — a
+			// *resumed* child loads the ambient manifest and never sees that factory.
+			rsiBindChild({ sessionFile: ctx?.sessionManager?.getSessionFile?.() });
 		}
-
-		// The capability fact (RSI x RLM ticket 03): RSI's gate suppresses a session whose
-		// active tools lack `write`/`edit`, which is every code-mode session — the kernel can
-		// write, but not through a pi tool. The surface is fixed by this point.
-		reportCapability({
-			sessionFile: ctx?.sessionManager?.getSessionFile?.(),
-			canWrite: true,
-			reason: "code-mode kernel: write_text/edit_text/bash host functions exist",
-		});
 
 		const problems: string[] = [];
 		let bridge: BridgeReport | undefined;
@@ -239,12 +230,6 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 							},
 							ownerDispatch: dispatchNotice,
 						}),
-						caller: seamCaller,
-						// The one observer hook: `bash_host` reports every command, and RSI's counted
-						// backstop owns the matching (ticket 03, C1).
-						onHostCall: (name, args) => {
-							if (name === "bash_host") reportHostCall(str(args[0]), seamCaller());
-						},
 						onNotice: dispatchNotice,
 						provenance: {
 							startReason,

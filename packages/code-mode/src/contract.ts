@@ -65,10 +65,15 @@ export type Contribution = {
 	snippet?: string;
 	/** Appended to the base guidelines, in owner order. */
 	guidelines?: string[];
-	/** Called by the base host functions that opt in (today `bash_host`); first owner wins. */
-	onHostCall?: (name: string, args: unknown[]) => void;
-	/** How a kernel that has no rlm tells the model something; first owner wins. */
+	/**
+	 * How a kernel that has no rlm tells the model something.
+	 *
+	 * **One owner only.** A second declarer is refused, in the same shape and with the same severity
+	 * a *malformed* slot already gets — see the slot check in `accept`. Silently ignoring the second
+	 * declaration is the failure this rule exists to prevent; an owner may replace its own.
+	 */
 	onNotice?: (notice: Notice) => void;
+	/** Which journals this session replays, and what to seed its scratch from. One owner only. */
 	provenance?: (ctx: unknown, own: OwnSession) => Provenance;
 };
 
@@ -124,7 +129,6 @@ const CONTRIBUTION_FIELDS = [
 	"description",
 	"snippet",
 	"guidelines",
-	"onHostCall",
 	"onNotice",
 	"provenance",
 ];
@@ -338,8 +342,8 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 				else if (contribution.guidelines.some((line) => typeof line !== "string"))
 					rejected.push({ name: "guidelines", reason: "an entry is not a string" });
 			}
-			for (const field of ["onHostCall", "onNotice", "provenance"]) {
-				const value = contribution[field as "onHostCall" | "onNotice" | "provenance"];
+			for (const field of ["onNotice", "provenance"]) {
+				const value = contribution[field as "onNotice" | "provenance"];
 				if (value !== undefined && typeof value !== "function") rejected.push({ name: field, reason: "not a function" });
 			}
 			// Names other owners already hold: an owner may replace its own, never steal.
@@ -353,6 +357,20 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 				else if (spec.reserved.includes(name)) rejected.push({ name, reason: "code mode's own host function" });
 				else if (taken.has(name)) rejected.push({ name, reason: `already contributed by ${taken.get(name)}` });
 				else if (typeof fn !== "function") rejected.push({ name, reason: "not a function" });
+			}
+			// The observer slots are single-owner as well, and the check is deliberately the same
+			// shape: a second declarer is **refused** rather than silently ignored, which is what a
+			// slot dispatched first-owner-wins would otherwise do. An owner may still replace its own,
+			// which is what keeps a second `session_start` free.
+			for (const field of ["onNotice", "provenance"] as const) {
+				if (contribution[field] === undefined) continue;
+				for (const [otherOwner, other] of accepted) {
+					if (otherOwner === owner) continue;
+					if (other[field] !== undefined) {
+						rejected.push({ name: field, reason: `already declared by ${otherOwner}` });
+						break;
+					}
+				}
 			}
 			if (rejected.length > 0) return refuse(owner, rejected);
 			// Replace wholesale, keeping the owner's position: a second `session_start` costs nothing.
@@ -386,15 +404,6 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 			const lines = [...spec.base.guidelines];
 			for (const contribution of accepted.values()) lines.push(...(contribution.guidelines ?? []));
 			return lines;
-		},
-		/** The base host functions call this; the first owner that asked to observe gets it. */
-		hostCall(name: string, args: unknown[]) {
-			for (const contribution of accepted.values()) {
-				if (contribution.onHostCall) {
-					contribution.onHostCall(name, args);
-					return;
-				}
-			}
 		},
 		/** How a kernel with no rlm reaches the model. */
 		notify(notice: Notice): boolean {

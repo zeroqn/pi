@@ -1,8 +1,12 @@
 /**
  * rlm's half of the prelude (code-mode map tickets 03 C4/C5 and 05): `_Rlm`/`rlm`,
- * `agent_message`, `find_models` and the RSI seam's `skills`/`skill`, fed on their own —
- * which is how they arrive in a real kernel, appended to code mode's base prelude at
- * kernel start.
+ * `agent_message`, `find_models` — and *not* the learned-skill wrappers, which are RSI's own half
+ * now (wayfinder map `.scratch/rsi-oneway` ticket 04). Fed on its own, which is how it arrives in a
+ * real kernel: appended to code mode's base prelude at kernel start, with RSI's half concatenated
+ * after it.
+ *
+ * The composed tail is checked against the pre-split capture by the acceptance tool
+ * (`tools/prelude-tail.ts`); this file checks each half's own content.
  *
  * The real-kernel half needs a worker: set `MONTY_BIN` (see README.md).
  */
@@ -20,7 +24,7 @@ if (!montyReady) {
 }
 
 describe("the delegation prelude", () => {
-	it("defines the delegation and skills surface, and nothing else", () => {
+	it("defines the delegation surface, and nothing else", () => {
 		for (const name of [
 			"class _Rlm",
 			"def spawn",
@@ -28,13 +32,16 @@ describe("the delegation prelude", () => {
 			"class _AgentMessage",
 			"agent_message = _AgentMessage()",
 			"def find_models",
-			"async def skills",
-			"async def skill",
 		]) {
 			expect(PRELUDE_TAIL).toContain(name);
 		}
 		// It is a tail: the base prelude's names are code mode's, not rlm's.
 		for (const name of ["ROOT =", "def read_text", "async def bash", "class BgHandle"]) {
+			expect(PRELUDE_TAIL).not.toContain(name);
+		}
+		// And the learned-skill wrappers are RSI's half, not rlm's. Their absence here is the whole
+		// point of the split: rlm contributes no skills surface at all.
+		for (const name of ["async def skills", "async def skill", "skills_host", "skill_host"]) {
 			expect(PRELUDE_TAIL).not.toContain(name);
 		}
 	});
@@ -63,7 +70,7 @@ describe.skipIf(!montyReady)("the delegation prelude in a real kernel", () => {
 		return { pool, run, cleanup: () => rmSync(base, { recursive: true, force: true }) };
 	};
 
-	it("routes delegation, the child message channel and the skill seam", async () => {
+	it("routes delegation and the child message channel", async () => {
 		const { pool, run, cleanup } = await load();
 		try {
 			const spawned = await run('h = await rlm.spawn("do it", name="probe")\nh["child_id"]', {
@@ -83,16 +90,6 @@ describe.skipIf(!montyReady)("the delegation prelude in a real kernel", () => {
 				rlm_find_models: async () => [{ id: "deepseek/one" }, { id: "deepseek/two" }],
 			});
 			expect(models).toBe(2);
-
-			// The RSI seam's kernel surface (RSI x RLM tickets 02, 15).
-			const visible = await run('(await skills())[0]["name"]', {
-				skills_host: async () => [{ name: "seeded", description: "d", location: "/x/SKILL.md", scope: "general" }],
-			});
-			expect(visible).toBe("seeded");
-			const loaded = await run('(await skill("seeded"))["content"]', {
-				skill_host: async (name: unknown) => ({ content: `body of ${name}`, files: [] }),
-			});
-			expect(loaded).toBe("body of seeded");
 		} finally {
 			await pool.close();
 			cleanup();

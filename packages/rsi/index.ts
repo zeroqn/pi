@@ -18,6 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { buildSessionContext, convertToLlm, getAgentDir, parseSkillBlock, serializeConversation } from "@earendil-works/pi-coding-agent";
+import { bindKernel, type KernelHandle } from "./code-mode.ts";
 import { loadConfig, saveConfig } from "./config.ts";
 import { buildCandidates, buildCurationReport, buildCuratorPrompt, curationDueForSession, isCurationDue, retirementCandidates } from "./curation.ts";
 import { buildDigest } from "./digest.ts";
@@ -33,7 +34,9 @@ import type { LearnerReason, PassOutcome } from "./scheduler.ts";
 import { PassScheduler } from "./scheduler.ts";
 import { applyProposal, discardProposal, formatProposal } from "./review.ts";
 import type { SkillActionDeps } from "./skill-actions.ts";
-import { publishedCapability, registerRsiSeam, type RsiSeamWork, type SeamHostCall, type SeamSkill, type SeamSkillContent, type SeamUsage } from "./seam.ts";
+import { isChildSession, registerRsiSeam, type RsiSeamWork } from "./seam.ts";
+import { RSI_PRELUDE } from "./prelude-rsi.ts";
+import { beforeAgentStartResult, type PromptSkill } from "./skills-block.ts";
 import { SkillStore, treeWrittenSkills, type Scope, type SkillProvenance } from "./store.ts";
 import { bashReadCandidates, formatStatus, scopeKey, summarizeStatus, UsageTracker } from "./telemetry.ts";
 
@@ -41,19 +44,14 @@ import { bashReadCandidates, formatStatus, scopeKey, summarizeStatus, UsageTrack
 const MAX_TRANSCRIPT_CHARS = 120_000;
 
 /**
- * What a child session's instance knows about itself (RSI x RLM ticket 11). RLM builds the
- * factory per child at spawn time, so this is available before the child's session starts.
+ * RSI, as one session's instance.
+ *
+ * No child descriptor: a spawned child is built by `childExtension()` and a resumed child is
+ * loaded from the ambient manifest, and *both* are told they are children by `bindChild`. What
+ * used to arrive here as a descriptor was three fields that no code ever read — the whole of a
+ * child's self-knowledge is the one bit `isChildSession()` answers.
  */
-export interface RsiChildDescriptor {
-	/** The child's name, as its spawner gave it. */
-	name?: string;
-	/** How deep it is: 1 for a direct child of the root. */
-	depth?: number;
-	/** The session file of the session that spawned it. */
-	parentSessionFile?: string;
-}
-
-export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescriptor): void {
+export default function rsiExtension(pi: ExtensionAPI): void {
 	const agentDir = getAgentDir();
 	const { config, warnings } = loadConfig({ agentDir });
 
@@ -70,6 +68,17 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 	let currentCtx: ExtensionContext | undefined;
 	// The running fork, so a session shutdown can abort it.
 	let activeFork: ForkSession | undefined;
+	/**
+	 * The kernel for this session, and whether RSI's contribution landed in it.
+	 *
+	 * Two facts, not one (tickets 07 and 10): the learner gate asks whether the session has a
+	 * kernel, so a mount that succeeded while the contribution was refused still counts as
+	 * writable; the block and the refusal policy ask whether RSI is *in* that kernel. Both are
+	 * per-instance, and one `rsiExtension()` call per session means the instance is the session.
+	 */
+	let codeMode: KernelHandle | null = null;
+	let contributed = false;
+	let warnedRefusal = false;
 
 	const scheduler = new PassScheduler({
 		root: store.root,
@@ -79,7 +88,7 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 		 * tree-wide floor and left no trace anywhere — the worst kind of silent absence.
 		 */
 		notify: (line, type) => {
-			if (child) {
+			if (isChildSession(sessionFileOf(currentCtx))) {
 				try {
 					pi.appendEntry("rsi-pass", { line, level: type ?? "info", failed: true });
 				} catch {
@@ -90,11 +99,10 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 			currentCtx?.ui?.notify?.(line, type);
 		},
 		getActiveTools: () => pi.getActiveTools(),
-		// A code-mode session's surface is `["python"]`, which the tool-name heuristic reads
-		// as query-only — but its kernel can write. RLM publishes that fact (ticket 03) and
-		// the gate consults it first; with RLM absent the fact is absent and the heuristic
-		// decides, exactly as before.
-		publishedCanWrite: () => publishedCapability(sessionFileOf(currentCtx)),
+		// A code-mode session's surface is `["python"]`, which the tool-name heuristic reads as
+		// query-only — but its kernel can write, and RSI holds the handle that proves it. Nothing
+		// crosses a process boundary, so no load order can affect it.
+		kernelCanWrite: () => (codeMode ? true : undefined),
 		// The per-session interval is keyed by session file (ticket 12), so a child's pass does
 		// not consume the root's.
 		getSessionFile: () => sessionFileOf(currentCtx),
@@ -102,7 +110,7 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 		// settle again, so re-arm its quiet timer and let it try again (ticket 12).
 		onLockContention: () => scheduler.settled(),
 		// A child lives for one delegated task, so its quiet period is shorter (ticket 13).
-		quietMinutes: () => (child ? config.childQuietMinutes : config.quietMinutes),
+		quietMinutes: () => (isChildSession(sessionFileOf(currentCtx)) ? config.childQuietMinutes : config.quietMinutes),
 		// A child killed mid-task still settles, which would otherwise run a pass over a
 		// deliberately truncated session (ticket 13).
 		lastTurnWasAborted: () =>
@@ -117,7 +125,7 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 		},
 		curationDue: () =>
 			curationDueForSession({
-				isChild: child !== undefined,
+				isChild: isChildSession(sessionFileOf(currentCtx)),
 				lastCurateAt: readLedger(store.root).ledger.last_curate_at,
 				activeCount: store.listSkills().length,
 				config,
@@ -132,63 +140,72 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 	// -- the seam (RSI x RLM, tickets 07, 15) -----------------------------------
 
 	/**
-	 * RSI's half of the seam. The store is global and every instance serves the same one,
-	 * so reads answer process-wide; only session-scoped facts (a capability, a usage
-	 * report) resolve to a particular instance. Each session publishes its own - the
-	 * root's and a child's are separate instances, and a child's fact is never inherited.
-	 *
-	 * Nothing here runs unless another extension calls in: with RLM absent the facade is
-	 * published and never used.
+	 * RSI's half of the seam - one method, and the only thing rlm still needs from RSI: the factory
+	 * a spawned child is built from. The store, the skills surface and the write capability all
+	 * moved to where the knowledge belongs (map tickets 04, 08, 10). Nothing here runs unless
+	 * another extension calls in, and with rlm absent the facade is published and never used.
 	 */
 	const seamWork: RsiSeamWork = {
-		skills: (scope) => listForSeam(scope),
-		skill: (name, scope) => contentForSeam(name, scope),
 		/**
-		 * The factory RLM spreads into a child's loader (ticket 11). One implementation with a
-		 * descriptor, not a reduced child module: the store, config, gate and pass wiring are
-		 * exactly the parts that must not drift between root and child. The descriptor's only
-		 * effects are that a child does not curate, and that its provenance is its own.
+		 * One implementation with no descriptor, not a reduced child module: the store, config, gate
+		 * and pass wiring are exactly the parts that must not drift between root and child. What a
+		 * child knows about itself arrives through `bindChild`, for a spawned child and a resumed one
+		 * alike.
 		 */
-		childFactory: (_childPi, request) => (childPi) => {
-			rsiExtension(childPi as ExtensionAPI, descriptorFrom(request));
-		},
-		noteUsage: (usage, scope) => {
-			void recordSeamUsage(usage);
-		},
-		noteHostCall: (call, scope) => {
-			void recordSeamHostCall(call);
+		childExtension: () => (childPi: unknown) => {
+			rsiExtension(childPi as ExtensionAPI);
 		},
 	};
 
 	/**
-	 * The instance registers at **load time**, not at `session_start`. Another extension's
-	 * `session_start` handler may run before ours - the load order decides - and RLM publishes
-	 * its capability there, so a facade that appeared later would miss it and the session would
-	 * silently never be learned from. The session file is passed as a getter instead, so the
-	 * registration is keyed correctly once the session actually starts.
+	 * The instance registers at **load time**, not at `session_start`, and the session file is
+	 * passed as a getter. rlm's child path calls in during *its own* `session_start`, which the load
+	 * order puts before ours, so a facade that appeared at `session_start` would miss the bind and
+	 * that child would never know it was one.
 	 */
 	const withdrawSeam = registerRsiSeam({ work: seamWork, sessionFile: () => sessionFileOf(currentCtx) });
 
-	/** The learned skills a scope resolves to, in pi's own skill shape. */
-	function listForSeam(scope: Scope): SeamSkill[] {
-		const shape = (skill: { name: string; description: string; filePath: string; scope: Scope }): SeamSkill => ({
+	/** This session's scope: the general store plus its own project, when the cwd resolves to one. */
+	function ownScope(): Scope {
+		return scopeFor(currentCtx?.cwd ?? currentCwd);
+	}
+
+	/**
+	 * The learned skills this session can see, in the shape the prelude's `skills()` docstring
+	 * promises: `{name, description, location, scope}`. The location is absolute, so a bash-capable
+	 * kernel can genuinely read it — RSI's counted backstop rather than decoration.
+	 */
+	function seamSkills(): { name: string; description: string; location: string; scope: string }[] {
+		const shape = (skill: { name: string; description: string; filePath: string; scope: Scope }) => ({
 			name: skill.name,
 			description: skill.description,
 			location: skill.filePath,
 			scope: scopeKey(skill.scope),
 		});
 		try {
-			return store.listSkills(scope).map(shape);
+			return store.listSkills(ownScope()).map(shape);
 		} catch {
 			// An unencodable project key must not take the caller down; general alone.
 			return store.listSkills("general").map(shape);
 		}
 	}
 
-	/** One skill's content, resolved in the caller's scope union - never another project's. */
-	function contentForSeam(name: string, scope: Scope): SeamSkillContent | undefined {
+	/** The same list in pi's own skill shape, for the block. */
+	function learnedForBlock(): PromptSkill[] {
+		return seamSkills().map((skill) => ({
+			name: skill.name,
+			description: skill.description,
+			filePath: skill.location,
+			baseDir: skill.location.replace(/\/SKILL\.md$/, ""),
+			sourceInfo: { source: "rsi", scope: skill.scope },
+			disableModelInvocation: false,
+		}));
+	}
+
+	/** One skill's content, resolved in this session's scope union - never another project's. */
+	function skillContent(name: string): { content: string; files: string[] } | undefined {
 		try {
-			if (!listForSeam(scope).some((skill) => skill.name === name)) return undefined;
+			if (!seamSkills().some((skill) => skill.name === name)) return undefined;
 			const found = store.readSkillContent(name);
 			return found ? { content: found.content, files: found.files } : undefined;
 		} catch {
@@ -197,22 +214,77 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 	}
 
 	/**
-	 * One consultation, counted once. The tracker owns the per-turn dedupe and the
-	 * path-to-skill resolution, so a `skill()` call and a bash read of the same skill in
-	 * the same turn are one act, exactly as an expansion and a read already are.
+	 * One consultation, counted once. The tracker owns the per-turn dedupe, so a `skill()` call and
+	 * a bash read of the same skill in the same turn are one act, exactly as an expansion and a read
+	 * already are.
 	 */
-	async function recordSeamUsage(usage: SeamUsage): Promise<void> {
+	async function countSkillUse(name: string): Promise<void> {
 		if (!config.enabled) return;
-		const event = usage.kind === "skill" ? tracker.noteExpansion(usage.target) : tracker.noteRead(usage.target);
+		const event = tracker.noteExpansion(name);
 		if (event) await recordUsage(store.root, event);
 	}
 
-	/** A bash host call's path-looking tokens, matched exactly as a `bash` tool call is. */
-	async function recordSeamHostCall(call: SeamHostCall): Promise<void> {
-		if (!config.enabled) return;
-		for (const candidate of bashReadCandidates(call.command)) {
-			const event = tracker.noteRead(absoluteAgainst(candidate, call.cwd ?? currentCwd));
-			if (event) await recordUsage(store.root, event);
+	/**
+	 * What RSI writes into the kernel (map ticket 04). The host functions and the prelude that names
+	 * them arrive in **one** `contribute()` call, so a cell can never see a name whose host function
+	 * was rejected. No text: RSI contributes no description, snippet or guidelines, which is what
+	 * keeps the model-visible surface byte-identical across the move.
+	 */
+	function kernelContribution() {
+		return {
+			owner: "rsi",
+			hostFns: {
+				async skills_host() {
+					return seamSkills();
+				},
+				async skill_host(...args: unknown[]) {
+					const wanted = String(args[0] ?? "").trim();
+					if (!wanted) throw new Error("skill(name) requires a name");
+					const found = skillContent(wanted);
+					if (!found) throw new Error(`no learned skill named "${wanted}" — call skills() for the ones this session can see`);
+					await countSkillUse(wanted);
+					return found;
+				},
+			},
+			prelude: RSI_PRELUDE,
+		};
+	}
+
+	/**
+	 * Mount this session's kernel and contribute RSI's surface (tickets 04, 07, 10).
+	 *
+	 * Called from `session_start` and nowhere else: the contribution window is `[mount, the first
+	 * cell of that handle]`, and a cell cannot run before pi finishes awaiting the `session_start`
+	 * emission, so this is provably in time. A later retry could only ever be refused.
+	 */
+	function bindToKernel(ctx: ExtensionContext): void {
+		const bind = bindKernel({ pi, ctx, contribution: () => kernelContribution() });
+		codeMode = bind.handle;
+		if (bind.receipt && bind.receipt.rejected.length === 0) contributed = true;
+
+		// A first refusal is loud — recorded durably and told to the human, the same pair RSI uses
+		// for an unavailable store. A repeat for a session RSI has already served is silent, because
+		// nothing is lost: the host functions and the prelude are already in that kernel. That is
+		// exactly the RPC-replacement path, the only case that reaches here.
+		let problem = bind.problem ?? null;
+		const refusal = bind.receipt?.rejected?.[0];
+		if (!contributed && refusal) problem = `contribution refused whole: ${refusal.name} (${refusal.reason})`;
+		if (problem && !warnedRefusal) {
+			warnedRefusal = true;
+			try {
+				ctx.ui?.notify?.(`rsi: ${problem}`, "warning");
+			} catch {
+				/* a notice must never fail a session start */
+			}
+		}
+
+		// RSI's own durable record of whether it reached this session's kernel: rlm's `rlm-rsi`
+		// entry goes with the rest of its RSI knowledge, and without this the success case would
+		// leave no trace at all — the silent-absence shape RSI already fixed once for failed passes.
+		try {
+			pi.appendEntry("rsi-kernel", { mounted: codeMode !== null, contributed, problem });
+		} catch {
+			/* the record is best effort */
 		}
 	}
 
@@ -236,6 +308,8 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 	pi.on("session_start", async (_event, ctx) => {
 		currentCtx = ctx;
 		if (!config.enabled) return;
+		// The kernel first, so the block's gate has an answer before the first turn (tickets 07, 08).
+		bindToKernel(ctx);
 		for (const warning of warnings) {
 			ctx.ui.notify(warning, "warning");
 		}
@@ -252,12 +326,16 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 	pi.on("before_agent_start", async (event) => {
 		if (!config.enabled) return undefined;
 		tracker.beginRun();
-		const block = parseSkillBlock(event.prompt);
-		if (block) {
-			const usage = tracker.noteExpansion(block.name, block.location);
+		const expanded = parseSkillBlock(event.prompt);
+		if (expanded) {
+			const usage = tracker.noteExpansion(expanded.name, expanded.location);
 			if (usage) await recordUsage(store.root, usage);
 		}
-		return undefined;
+		// The code-mode block (ticket 08), rendered here because RSI is what knows the store: one
+		// section, both tiers, the same sentence rlm used to append. `contributed` is required
+		// rather than implied — the sentence tells the model to call `skill(name)`, which exists
+		// only when RSI's contribution was accepted.
+		return beforeAgentStartResult(event, { contributed, learned: learnedForBlock() });
 	});
 
 	pi.on("turn_start", async () => {
@@ -635,7 +713,7 @@ export default function rsiExtension(pi: ExtensionAPI, child?: RsiChildDescripto
 		const notification = formatPassNotification(tally);
 		if (notification) {
 			const line = `${notification.line}${reportNote}`;
-			if (child) {
+			if (isChildSession(sessionFileOf(ctx))) {
 				// A child's `ctx.ui` is a no-op in print mode, so the notify would vanish. Its
 				// transcript entry is durable and visible when the child's session is read, and
 				// the root still sees the skill through `/rsi status` (ticket 12).
@@ -778,19 +856,6 @@ function headerParentSession(sessionManager: unknown): string | undefined {
 	} catch {
 		return undefined;
 	}
-}
-
-/**
- * Read a child descriptor out of RLM's spawn request. Only these three fields are taken, and
- * anything else is ignored, so the request's shape can grow without this breaking.
- */
-function descriptorFrom(request: unknown): RsiChildDescriptor {
-	const source = (request ?? {}) as Record<string, unknown>;
-	return {
-		name: typeof source.name === "string" ? source.name : undefined,
-		depth: typeof source.depth === "number" ? source.depth : undefined,
-		parentSessionFile: typeof source.parentSessionFile === "string" ? source.parentSessionFile : undefined,
-	};
 }
 
 /** The session file pi recorded, or `undefined` for an in-memory session. */

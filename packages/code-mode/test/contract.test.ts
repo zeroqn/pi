@@ -282,25 +282,49 @@ describe("contributing (tickets 01 and 03)", () => {
 		expect(l.isOpen()).toBe(false);
 	});
 
-	it("routes the observers to the first owner that asked", () => {
+	it("routes each observer slot to the one owner that declared it", () => {
 		const l = ledger();
-		const seen: string[] = [];
 		const notices: string[] = [];
 		l.accept({
-			owner: "rsi",
-			onHostCall: (name) => seen.push(`rsi:${name}`),
-		});
-		l.accept({
 			owner: "rlm",
-			onHostCall: (name) => seen.push(`rlm:${name}`),
 			onNotice: (notice) => notices.push(notice.key),
 			provenance: () => ({ journals: ["/tmp/a.rlm-journal.jsonl"] }),
 		});
-		l.hostCall("bash_host", ["ls"]);
-		expect(seen).toEqual(["rsi:bash_host"]);
 		expect(l.notify({ key: "bg:1", content: "done" })).toBe(true);
 		expect(notices).toEqual(["bg:1"]);
 		expect(l.provenance({})?.journals).toEqual(["/tmp/a.rlm-journal.jsonl"]);
+	});
+
+	it("refuses a second declarer of a slot rather than ignoring it", () => {
+		// A slot dispatched first-owner-wins would silently drop the second owner's hook, which is
+		// the failure the rule exists to prevent. A *malformed* slot already refuses the whole
+		// contribution (see the case above), so this is the severity the contract already has.
+		const l = ledger();
+		l.accept({
+			owner: "rlm",
+			onNotice: () => {},
+			provenance: () => ({ journals: ["/tmp/a.rlm-journal.jsonl"] }),
+		});
+
+		const notice = l.accept({ owner: "rsi", onNotice: () => {} });
+		expect(notice.rejected[0]?.name).toBe("onNotice");
+		expect(notice.rejected[0]?.reason).toBe("already declared by rlm");
+		expect(notice.accepted).toEqual([]);
+
+		const prov = l.accept({ owner: "rsi", provenance: () => ({ journals: ["/tmp/b.rlm-journal.jsonl"] }) });
+		expect(prov.rejected[0]?.name).toBe("provenance");
+		expect(prov.rejected[0]?.reason).toBe("already declared by rlm");
+
+		// Nothing was stolen: the holder still answers.
+		expect(l.provenance({})?.journals).toEqual(["/tmp/a.rlm-journal.jsonl"]);
+	});
+
+	it("lets an owner replace its own slot, so a second session_start costs nothing", () => {
+		const l = ledger();
+		l.accept({ owner: "rlm", onNotice: () => {} });
+		const again = l.accept({ owner: "rlm", onNotice: () => {} });
+		expect(again.rejected).toEqual([]);
+		expect(again.accepted).toContain("onNotice");
 	});
 
 	it("says so when no owner wants a notice, so code mode can tell the model itself", () => {

@@ -73,7 +73,7 @@ function makeScheduler(t, options = {}) {
 		root,
 		config: makeConfig(options.config),
 		getActiveTools: options.getActiveTools ?? (() => ["read", "write", "edit"]),
-		publishedCanWrite: options.publishedCanWrite,
+		kernelCanWrite: options.kernelCanWrite,
 		getScanMessages: options.getScanMessages ?? (() => [{ role: "user", text: "remember this" }]),
 		getKernelSignal: options.getKernelSignal,
 		getSessionFile: options.getSessionFile,
@@ -100,7 +100,7 @@ function makeSchedulerAt(t, root, clock, options = {}) {
 		root,
 		config: makeConfig(options.config),
 		getActiveTools: options.getActiveTools ?? (() => ["read", "write", "edit"]),
-		publishedCanWrite: options.publishedCanWrite,
+		kernelCanWrite: options.kernelCanWrite,
 		getScanMessages: options.getScanMessages ?? (() => [{ role: "user", text: "remember this" }]),
 		getKernelSignal: options.getKernelSignal,
 		getSessionFile: options.getSessionFile,
@@ -125,17 +125,17 @@ const sessionAt = (root, file) => sessionPassAt(readLedger(root).ledger, file);
 // Pure predicates.
 // ---------------------------------------------------------------------------
 
-test("a published capability wins over the tool-name heuristic", () => {
-	// The code-mode case: the tool set looks query-only, but the session says it can write.
-	assert.equal(suppressedAsQueryOnly({ activeTools: ["python"], publishedCanWrite: true }), false);
-	// And the reverse: a session that reports it cannot write is suppressed even if a
-	// writer tool happens to be active.
-	assert.equal(suppressedAsQueryOnly({ activeTools: ["read", "write"], publishedCanWrite: false }), true);
+test("a reported kernel wins over the tool-name heuristic", () => {
+	// The code-mode case: the tool set looks query-only, but the session has a kernel.
+	assert.equal(suppressedAsQueryOnly({ activeTools: ["python"], kernelCanWrite: true }), false);
+	// And the reverse: a session that reports a kernel which cannot write is suppressed even
+	// if a writer tool happens to be active.
+	assert.equal(suppressedAsQueryOnly({ activeTools: ["read", "write"], kernelCanWrite: false }), true);
 });
 
-test("with nothing published, the tool-name heuristic decides", () => {
-	assert.equal(suppressedAsQueryOnly({ activeTools: ["python"], publishedCanWrite: undefined }), true);
-	assert.equal(suppressedAsQueryOnly({ activeTools: ["read", "write"], publishedCanWrite: undefined }), false);
+test("with no kernel reported, the tool-name heuristic decides", () => {
+	assert.equal(suppressedAsQueryOnly({ activeTools: ["python"], kernelCanWrite: undefined }), true);
+	assert.equal(suppressedAsQueryOnly({ activeTools: ["read", "write"], kernelCanWrite: undefined }), false);
 });
 
 test("isQueryOnly is true when neither writer tool is active", () => {
@@ -201,12 +201,12 @@ test("a query-only session is suppressed for both trigger kinds", async (t) => {
 	assert.ok(skips.includes("query-only session"));
 });
 
-test("a code-mode session with a published capability is admitted", async (t) => {
-	// The whole point of ticket 03: `["python"]` reads as query-only, so without the fact
-	// this session would be skipped and RLM sessions would never be learned from.
+test("a code-mode session with a kernel is admitted", async (t) => {
+	// The whole point: `["python"]` reads as query-only, so without the kernel report this
+	// session would be skipped and code-mode sessions would never be learned from.
 	const { scheduler, calls, skips } = makeScheduler(t, {
 		getActiveTools: () => ["python"],
-		publishedCanWrite: () => true,
+		kernelCanWrite: () => true,
 	});
 	const result = await scheduler.learnNow();
 	assert.equal(result.ran, true);
@@ -214,17 +214,17 @@ test("a code-mode session with a published capability is admitted", async (t) =>
 	assert.equal(skips.includes("query-only session"), false);
 });
 
-test("a session that publishes canWrite false stays suppressed", async (t) => {
+test("a session reporting canWrite false stays suppressed", async (t) => {
 	const { scheduler, calls } = makeScheduler(t, {
 		getActiveTools: () => ["read", "write"],
-		publishedCanWrite: () => false,
+		kernelCanWrite: () => false,
 	});
 	assert.deepEqual(await scheduler.learnNow(), { ran: false, skipped: "query-only session" });
 	assert.deepEqual(calls, []);
 });
 
-test("a code-mode session with no published fact is still suppressed", async (t) => {
-	// RLM absent: nothing is published, and the heuristic must keep working as it did.
+test("a code-mode session with no kernel is still suppressed", async (t) => {
+	// No code mode: nothing is reported, and the heuristic must keep working as it did.
 	const { scheduler, calls } = makeScheduler(t, { getActiveTools: () => ["python"] });
 	assert.deepEqual(await scheduler.learnNow(), { ran: false, skipped: "query-only session" });
 	assert.deepEqual(calls, []);

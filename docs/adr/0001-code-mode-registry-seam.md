@@ -23,6 +23,13 @@ session has one kernel whichever extension asks first.
 - The contract version rides on the published entry, because pi offers no extension enumeration and
   no version query: *absent*, *inert* and *too old* are distinguishable only by what code mode
   itself publishes.
+- **A contribution is all-or-nothing, and the observer slots are single-owner.** A rejected name, a
+  malformed field or a stolen host-function name refuses the whole contribution, so a cell can never
+  see a prelude line whose host function was refused. `onNotice` and `provenance` may be declared by
+  **one** owner only: a second declarer is refused rather than silently ignored, and an owner may
+  replace its own, which is what keeps a second `session_start` free. (`onHostCall` left the contract
+  with the `.scratch/rsi-oneway` effort — its only subscriber, RSI, now counts consultations from the
+  journal it already reads.)
 - rlm degrades loudly and inertly to no `python` tool. Because it never imports code mode, the
   dependency is a runtime requirement rather than a build-time one — declared as a peer so an
   install cannot be silently broken, never resolved as code.

@@ -71,18 +71,11 @@ export function makeHost(options: {
 	/** Code mode's own host functions and every accepted contribution, merged. */
 	extra: HostFns;
 	background: ReturnType<typeof createBackgroundManager>;
-	/** The seam's one observer hook (ticket 03, C1): the base functions that opt in report
-	 * every call here, and nothing else may call contributed code. */
-	onHostCall?: (name: string, args: unknown[]) => void;
 }): HostFns {
-	const { root, attachments, progress, extra, background: backgroundManager, onHostCall } = options;
+	const { root, attachments, progress, extra, background: backgroundManager } = options;
 	return {
 		async bash_host(...args: unknown[]) {
 			const { command, timeout, background } = bind(args, ["command", "timeout", "background"]);
-			// The observer (ticket 03, C1). Today the only subscriber is rlm's RSI seam, whose
-			// counted backstop needs to see every command; the caller identity travels in the
-			// subscriber's own closure, per session, rather than in a process-global (C6).
-			onHostCall?.("bash_host", [command]);
 			if (background === true) {
 				return backgroundManager.start(str(command), timeout === null ? null : num(timeout, 0) || null);
 			}
