@@ -268,6 +268,19 @@ describe("the child detector (child-surface ticket 03 §5)", () => {
 		expect(detectsChild(childCtx())).toBe(false);
 	});
 
+	it("keeps the reader where another module instance can see it", () => {
+		// pi loads each extension entry through its own jiti instance, so rlm's copy of this module and
+		// the bridge entry's copy are two module scopes. A module-level variable would be set by one and
+		// read as undefined by the other — which is what the first live run of the resumed-child path
+		// showed. The rendezvous is a process-global, like this package's session record.
+		setChildDetector(() => true);
+		const slot = (globalThis as Record<symbol, unknown>)[
+			Symbol.for("pi-tool-bridge:child-detector")
+		] as { current?: unknown } | undefined;
+		expect(typeof slot?.current).toBe("function");
+		__clearChildDetectorForTests();
+	});
+
 	it("answers from the installed reader, and contains a throwing one", () => {
 		setChildDetector((ctx: any) => ctx?.sessionManager?.getSessionId?.() === "child");
 		try {

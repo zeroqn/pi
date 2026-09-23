@@ -63,16 +63,40 @@ export function childCeiling(parentSurface?: readonly string[]): ChildCeiling {
  * once it loads: one function, no per-session table, and no rlm loaded means no child is detected and the
  * root rule applies exactly as before (map ticket 03 §5).
  */
-let childDetector: ((ctx: unknown) => boolean) | undefined;
+/**
+ * Where the detector lives: a **process-global**, not a module-level variable.
+ *
+ * pi loads each extension entry through its own jiti instance (`moduleCache: false`), so rlm's import of
+ * this module and the bridge entry's import of it are **two different module instances** with two
+ * different module scopes. A module-level variable here would be set by rlm and read as `undefined` by
+ * the entry — which is exactly what the first live acceptance run of this path showed: the child was
+ * bound (an owner narrowed its catalogue for it) and no `rlm-child-surface` entry was ever written.
+ *
+ * The record this package keeps has always been global for the same reason (`convention.ts`); this is
+ * the one piece of child state that was not.
+ */
+const DETECTOR_SYMBOL = Symbol.for("pi-tool-bridge:child-detector");
+
+type DetectorSlot = { current?: (ctx: unknown) => boolean };
+
+function detectorSlot(): DetectorSlot {
+	const holder = globalThis as Record<symbol, unknown>;
+	const existing = holder[DETECTOR_SYMBOL];
+	if (existing !== null && typeof existing === "object") return existing as DetectorSlot;
+	const created: DetectorSlot = {};
+	holder[DETECTOR_SYMBOL] = created;
+	return created;
+}
 
 export function setChildDetector(detector: (ctx: unknown) => boolean): void {
-	childDetector = detector;
+	detectorSlot().current = detector;
 }
 
 export function detectsChild(ctx: unknown): boolean {
-	if (!childDetector) return false;
+	const detector = detectorSlot().current;
+	if (!detector) return false;
 	try {
-		return childDetector(ctx) === true;
+		return detector(ctx) === true;
 	} catch {
 		// A detector that throws must not take a session's start with it; an undetected child degrades to
 		// the root rule, which is a state the session was already in.
@@ -80,9 +104,9 @@ export function detectsChild(ctx: unknown): boolean {
 	}
 }
 
-/** Test seam: forget the installed detector. */
+/** Test seam: forget the installed detector, wherever it was installed from. */
 export function __clearChildDetectorForTests(): void {
-	childDetector = undefined;
+	detectorSlot().current = undefined;
 }
 
 /** What an owner may need to build a child's factories. Grows a field when an owner needs one. */
