@@ -137,7 +137,7 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		},
 	});
 
-	// -- the seam (RSI x RLM, tickets 07, 15) -----------------------------------
+	// -- the seam (one-way map, tickets 05 and 07) ------------------------------
 
 	/**
 	 * RSI's half of the seam - one method, and the only thing rlm still needs from RSI: the factory
