@@ -26,6 +26,7 @@ import {
 } from "../src/child-seam";
 import { OWNERS, childEligibleTools, nativeOnlyTools } from "../src/owners";
 import { magicContext } from "../src/owners/magic-context";
+import { probe } from "../src/owners/probe";
 
 const REGISTRY_KEY = Symbol.for("@cortexkit/magic-context:pi-registry");
 
@@ -334,6 +335,35 @@ describe("the owner list (ticket 02)", () => {
 		// The instrument reads pi's own api, so it is the bar's independent half — and it must cost
 		// nothing to a session that is not being measured.
 		expect(OWNERS.map((owner) => owner.name)).not.toContain("probe");
+	});
+
+	it("reports a child's surface from pi's own api when it is switched on", () => {
+		// The instrument's own shape: it must read pi's api and write one entry, and it must not be in
+		// the owner list unless something is measuring (asserted just above).
+		const entries: Array<{ customType: string; data: unknown }> = [];
+		const handlers: Function[] = [];
+		const pi = {
+			on: (_event: string, handler: Function) => handlers.push(handler),
+			getActiveTools: () => ["python", "todowrite"],
+			getAllTools: () => [
+				{ name: "python", description: "Run Python", promptGuidelines: ["one", "two"] },
+				{ name: "todowrite" },
+			],
+			appendEntry: (customType: string, data: unknown) => entries.push({ customType, data }),
+		};
+		probe.childFactories?.({})[0]?.(pi);
+		for (const handler of handlers) handler({}, { sessionManager: { getSessionId: () => "child" } });
+		expect(entries).toEqual([
+			{
+				customType: "rlm-child-probe",
+				data: {
+					active: ["python", "todowrite"],
+					registered: ["python", "todowrite"],
+					session: "child",
+					python: { description: "Run Python", guidelines: ["one", "two"] },
+				},
+			},
+		]);
 	});
 
 	it("names no owner in the owner-agnostic files", () => {

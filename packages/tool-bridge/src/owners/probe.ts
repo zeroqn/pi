@@ -23,16 +23,37 @@ export type ChildProbeEntry = {
 	registered: string[];
 	/** The child's own session id, so a reader can tie the entry to the session it describes. */
 	session?: string;
+	/**
+	 * The composed `python` surface, read from pi's own definition registry — the text the model is
+	 * actually shown, which is where the bridge's generated line lands. This is what a baseline hashes;
+	 * `promptSnippet` is deliberately absent because `getAllTools()` does not carry it, and the snippet is
+	 * pinned by the code mode's own surface test instead.
+	 */
+	python?: { description: string; guidelines: string[] };
 };
 
 function probeFactory() {
 	return (childPi: any): void => {
 		childPi.on("before_agent_start", (_event: unknown, ctx: any) => {
 			try {
+				const tools: Array<{
+					name: string;
+					description?: string;
+					promptGuidelines?: string[];
+				}> = childPi.getAllTools?.() ?? [];
+				const python = tools.find((tool) => tool.name === "python");
 				const entry: ChildProbeEntry = {
 					active: childPi.getActiveTools?.() ?? [],
-					registered: (childPi.getAllTools?.() ?? []).map((tool: { name: string }) => tool.name),
+					registered: tools.map((tool) => tool.name),
 					session: ctx?.sessionManager?.getSessionId?.(),
+					...(python
+						? {
+								python: {
+									description: python.description ?? "",
+									guidelines: python.promptGuidelines ?? [],
+								},
+							}
+						: {}),
 				};
 				childPi.appendEntry?.("rlm-child-probe", entry);
 			} catch {
