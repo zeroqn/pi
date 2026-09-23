@@ -9,6 +9,7 @@
  * of it, while the request itself carried the corrected set.
  */
 import { beforeEach, describe, expect, it } from "bun:test";
+import { __clearChildDetectorForTests, setChildDetector } from "../src/child-seam";
 import { __resetToolBridgeForTests, recordBridged, sessionKey } from "../src/convention";
 import toolBridge from "../src/index";
 
@@ -78,3 +79,85 @@ describe("the entry's two moments", () => {
 		expect(active).toEqual(["python", "ctx_memory"]);
 	});
 });
+
+describe("a resumed child (child-surface ticket 03 §5)", () => {
+	beforeEach(() => {
+		__resetToolBridgeForTests();
+		__clearChildDetectorForTests();
+	});
+
+	/**
+	 * A child opened on its own loads the ambient manifest, so `createAgentSession`'s registry filter
+	 * never ran: its active set is a root's — the builtins, every published tool, and whatever an ambient
+	 * extension re-appended — and only *this* entry is late enough in the manifest to correct it before
+	 * the first turn's prompt is built. Its ceiling is the declared fallback, because there is no spawner
+	 * to read.
+	 */
+	function resumed(active: string[]) {
+		const entries: Array<{ customType: string; data: unknown }> = [];
+		const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+		const pi = {
+			on(name: string, handler: (event: unknown, ctx: unknown) => unknown) {
+				handlers.set(name, handler);
+			},
+			appendEntry(customType: string, data: unknown) {
+				entries.push({ customType, data });
+			},
+			getActiveTools: () => [...active],
+			getAllTools: () => [
+				{ name: "read" },
+				{ name: "bash" },
+				{ name: "python" },
+				{ name: "ctx_memory" },
+				{ name: "todowrite" },
+			],
+			setActiveTools(names: string[]) {
+				active.splice(0, active.length, ...names);
+			},
+		};
+		toolBridge(pi);
+		return { active, handlers, entries };
+	}
+
+	it("narrows an ambient registry to the fallback ceiling, and records where it came from", () => {
+		const ctx = ctxFor("resumed-child");
+		setChildDetector((c: any) => c?.sessionManager?.getSessionId?.() === "resumed-child");
+		const { active, handlers, entries } = resumed([
+			"read",
+			"bash",
+			"edit",
+			"write",
+			"python",
+			"ctx_memory",
+			"ctx_note",
+		]);
+		handlers.get("session_start")?.({}, ctx);
+
+		// Direction 1 of the child's reconcile — keep only ceiling ∩ registered — which no other check
+		// reaches: a spawned child's registry was already filtered by pi at construction.
+		expect(active).toEqual(["python", "todowrite"]);
+		expect(entries).toEqual([
+			{
+				customType: "rlm-child-surface",
+				data: {
+					surface: ["python", "todowrite"],
+					ceiling: ["python", "todowrite"],
+					source: "fallback",
+					deactivated: ["read", "bash", "edit", "write", "ctx_memory", "ctx_note"],
+					restored: ["todowrite"],
+				},
+			},
+		]);
+	});
+
+	it("leaves a root session to the root's rule", () => {
+		const ctx = ctxFor("root");
+		setChildDetector(() => false);
+		const { active, handlers, entries } = resumed(["python", "ctx_memory"]);
+		recordBridged(sessionKey(ctx), { toolNames: ["ctx_memory"], owners: ["magic-context"] });
+		handlers.get("session_start")?.({}, ctx);
+		expect(active).toEqual(["python", "todowrite"]);
+		expect(entries).toEqual([]);
+	});
+});
+

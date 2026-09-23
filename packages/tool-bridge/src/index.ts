@@ -24,21 +24,54 @@
  * forbids publishing (`nativeOnlyTools()` — a tool whose state pi captures from its own dispatch, so
  * a bridged call would record nothing).
  */
-import { type ActiveToolSurface, reconcileToolSurface } from "./adapter";
+import {
+	type ActiveToolSurface,
+	reconcileChildSurface,
+	reconcileToolSurface,
+	recordChildSurface,
+} from "./adapter";
+import { childCeiling, detectsChild } from "./child-seam";
 import { forgetSession, sessionKey } from "./convention";
 import { nativeOnlyTools } from "./owners";
 
 type PiEntrySurface = ActiveToolSurface & {
 	on(event: string, handler: (event: unknown, ctx: unknown) => unknown): void;
+	appendEntry?(customType: string, data: unknown): unknown;
 };
 
 export default function toolBridge(pi: PiEntrySurface): void {
-	const reconcile = (_event: unknown, ctx: unknown) => {
-		reconcileToolSurface(pi, ctx, nativeOnlyTools());
-		return undefined;
+	/**
+	 * Which rule applies to this session, and the ceiling if it is a child.
+	 *
+	 * A **resumed** child arrives here rather than through a factory: it loads the ambient manifest, so
+	 * nothing injected the child path at spawn time and `createAgentSession`'s registry filter never ran.
+	 * This entry is the only handler late enough in the manifest — it is declared last, after one
+	 * extension that re-appends one of its own tools at `session_start` and another that re-appends one
+	 * at `before_agent_start` — to correct the set before the first turn's prompt is built.
+	 *
+	 * The ceiling is the declared **fallback**: a resumed child has no spawner to read
+	 * (`.scratch/child-surface/` tickets 01 §4 and 03 §5).
+	 */
+	const reconcile = (event: unknown, ctx: unknown, record: boolean) => {
+		if (!detectsChild(ctx)) {
+			reconcileToolSurface(pi, ctx, nativeOnlyTools());
+			return;
+		}
+		const ceiling = childCeiling();
+		const report = reconcileChildSurface({ pi, ctx, ceiling: ceiling.ceiling });
+		// Once, at the session's start: the per-turn pass changes nothing a reader needs a second copy
+		// of, and a child's transcript should stay readable.
+		if (record) recordChildSurface(pi, ceiling, report);
+		void event;
 	};
-	pi.on("session_start", reconcile);
-	pi.on("before_agent_start", reconcile);
+	pi.on("session_start", (event, ctx) => {
+		reconcile(event, ctx, true);
+		return undefined;
+	});
+	pi.on("before_agent_start", (event, ctx) => {
+		reconcile(event, ctx, false);
+		return undefined;
+	});
 	// `globalThis` outlives `/new`, resume and fork, so a session that ends has to take its
 	// record with it; a stale key would keep stripping tools in a session that has no bridge.
 	pi.on("session_shutdown", (_event, ctx) => {
@@ -47,5 +80,11 @@ export default function toolBridge(pi: PiEntrySurface): void {
 	});
 }
 
-export { installToolBridge, reconcileToolSurface, gatherToolBridge } from "./adapter";
+export {
+	installToolBridge,
+	reconcileToolSurface,
+	reconcileChildSurface,
+	recordChildSurface,
+	gatherToolBridge,
+} from "./adapter";
 export * from "./convention";

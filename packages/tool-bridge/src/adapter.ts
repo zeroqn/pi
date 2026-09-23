@@ -32,6 +32,7 @@ import {
 	type SlotOwner,
 	sessionKey,
 	bridgedSession,
+	forgetSession,
 	publications,
 	recordBridged,
 } from "./convention";
@@ -406,6 +407,124 @@ export function installToolBridge(input: BridgeInstallInput): BridgeInstallResul
 		owners: ownersOf(gathered),
 	});
 	return { installed, problems: gathered.problems };
+}
+
+/** What a child may hold, and where the answer came from (`.scratch/child-surface/` ticket 01). */
+export type ChildCeiling = {
+	/** The names a child may have active: the parent's surface, narrowed to what a child may hold. */
+	ceiling: string[];
+	/** `spawner` — read from the spawning session; `fallback` — the declared list, no spawner to read. */
+	source: "spawner" | "fallback";
+	/** Names the parent's surface held that the ceiling excluded. Absent for a `fallback` ceiling. */
+	dropped?: string[];
+};
+
+/** What the child's reconcile did, in the words a reader of the session later needs. */
+export type ChildSurfaceReport = {
+	/** What the child was actually offered, after the reconcile. */
+	surface: string[];
+	/** Names that were active before it and are not after — the ceiling's and the cell's own. */
+	deactivated: string[];
+	/** Ceiling names the reconcile had to put *back* (code mode's mount resets the set to `python`). */
+	restored: string[];
+};
+
+/**
+ * The child direction of the surface rule (`.scratch/child-surface/` ticket 03 §6). Three directions,
+ * where the root's rule has two:
+ *
+ * 1. **keep only** what is in the ceiling — a spawned child's registry has already been filtered by pi,
+ *    so this is a no-op there, but a *resumed* child's ambient registry holds read/bash/edit/write,
+ *    every tool an owner publishes and whatever an ambient extension re-appended;
+ * 2. **strip** the names the child's own cell can reach — the root's direction, reused;
+ * 3. **restore** the ceiling's names the mount dropped.
+ *
+ * It does *not* return early for a session with no bridge record, which the root's rule does: the
+ * narrowing must not depend on any owner being present, so the ceiling alone decides what survives.
+ */
+export function reconcileChildSurface(input: {
+	pi: ActiveToolSurface;
+	ctx: unknown;
+	ceiling: readonly string[];
+}): ChildSurfaceReport {
+	const before = input.pi.getActiveTools();
+	const ceiling = new Set(input.ceiling);
+	const cellReachable = new Set(bridgedSession(sessionKey(input.ctx))?.toolNames ?? []);
+	const registered = input.pi.getAllTools?.();
+
+	const surface = before.filter(
+		(name) => ceiling.has(name) && !cellReachable.has(name),
+	);
+	const deactivated = before.filter((name) => !surface.includes(name));
+
+	const restored: string[] = [];
+	for (const name of input.ceiling) {
+		if (surface.includes(name) || cellReachable.has(name)) continue;
+		// No registry to ask (a minimal stub): offer the name anyway — pi ignores an unregistered name.
+		if (registered !== undefined && !registered.some((tool) => tool.name === name)) continue;
+		surface.push(name);
+		restored.push(name);
+	}
+
+	if (!sameNames(surface, before)) input.pi.setActiveTools(surface);
+	return { surface, deactivated, restored };
+}
+
+/**
+ * Records what a child ended up with, in the **child's own** transcript and nowhere else
+ * (`.scratch/child-surface/` ticket 01 §5). rlm's entry is deliberately root-only, so without this a
+ * child says nothing about its own surface and a later reader cannot tell a *narrowed* child from a
+ * *broken* one — `dropped`, `deactivated` and `restored` are what makes that distinction readable.
+ */
+export function recordChildSurface(
+	pi: { appendEntry?: (customType: string, data: unknown) => unknown },
+	ceiling: ChildCeiling,
+	report: ChildSurfaceReport,
+): void {
+	try {
+		pi.appendEntry?.("rlm-child-surface", {
+			surface: report.surface,
+			ceiling: ceiling.ceiling,
+			source: ceiling.source,
+			...(ceiling.dropped === undefined ? {} : { dropped: ceiling.dropped }),
+			deactivated: report.deactivated,
+			restored: report.restored,
+		});
+	} catch {
+		/* diagnostics must never fail a session */
+	}
+}
+
+/**
+ * The bridge's own child factory: the half of the child path that runs *inside* the child.
+ *
+ * `childFactories` appends it last, so its `session_start` handler runs after every owner's. It
+ * reconciles at `session_start` (writing the child's own record) and again at `before_agent_start`,
+ * because pi builds the turn's prompt from the active set *before* those handlers run — the same reason
+ * the root's entry does both. On shutdown it forgets the child's record: the entry is not loaded in a
+ * spawned child, so this is the only thing that releases it.
+ */
+export function childSurfaceFactory(input: { ceiling?: ChildCeiling }): (pi: any) => void {
+	return (childPi: any) => {
+		// The spawner computed the ceiling and passed it in the factory request; a caller that knows
+		// nothing about ceilings (an older adopter) gets the declared fallback instead of nothing.
+		const ceilingOf = () => input.ceiling ?? { ceiling: [], source: "fallback" as const };
+		childPi.on("session_start", (_event: unknown, ctx: unknown) => {
+			const ceiling = ceilingOf();
+			const report = reconcileChildSurface({ pi: childPi, ctx, ceiling: ceiling.ceiling });
+			recordChildSurface(childPi, ceiling, report);
+			return undefined;
+		});
+		childPi.on("before_agent_start", (_event: unknown, ctx: unknown) => {
+			const ceiling = ceilingOf();
+			reconcileChildSurface({ pi: childPi, ctx, ceiling: ceiling.ceiling });
+			return undefined;
+		});
+		childPi.on("session_shutdown", (_event: unknown, ctx: unknown) => {
+			forgetSession(sessionKey(ctx));
+			return undefined;
+		});
+	};
 }
 
 /**

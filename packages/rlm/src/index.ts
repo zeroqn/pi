@@ -23,6 +23,7 @@ import {
 	adoptToolBridge,
 	bridgeStatusLine,
 } from "../../tool-bridge/src/adopter";
+import { type ChildCeiling, childCeiling } from "../../tool-bridge/src/child-seam";
 import { createChildManager, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
 import type { ChildKernelContext, Notice } from "./children";
 import { rlmContribution, webCodeContribution } from "./contribution";
@@ -31,6 +32,7 @@ import {
 	bindChild,
 	childFactories as ownerChildFactories,
 	childStatus,
+	setChildDetector,
 } from "../../tool-bridge/src/child-seam";
 import { reportCapability, reportHostCall, rsiChildFactory, rsiStatus } from "./rsi-seam";
 import { beforeAgentStartResult } from "./skills-block";
@@ -79,6 +81,11 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	 * (ticket 03, C6). */
 	const seamCaller = () => ({ sessionFile: sessionCtx?.sessionManager?.getSessionFile?.(), cwd: sessionCtx?.cwd ?? root });
 
+	// The bridge's entry learns that a session is a child from *this* reader, not from a marker
+	// vocabulary it would have to learn (ticket 03 §5). Installed before any handler runs, so the
+	// entry's own `session_start` — a resumed child's only corrector — already has it.
+	setChildDetector((ctx: any) => readChildProvenance(ctx?.sessionManager) !== null);
+
 	const manager = childContext
 		? null
 		: createChildManager({
@@ -92,6 +99,17 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				// through the same kind of seam; rlm names neither, and a seam that is absent or
 				// too old contributes nothing.
 				childFactories: (request) => [...ownerChildFactories(request), ...rsiChildFactory(request)],
+			// The ceiling's first operand: this session's *live* surface, read at spawn time and never
+			// read back from a record (ticket 01 §1-2). A grandchild reads its own `pi` here, which is
+			// what makes "a child is a subset of its parent" transitive by construction.
+			ownSurface: () => {
+				try {
+					return pi.getActiveTools?.() ?? [];
+				} catch {
+					return [];
+				}
+			},
+			childCeiling,
 				runtime: () => modelRuntime(),
 				maxDepth: MAX_DEPTH,
 				maxLive: MAX_LIVE_CHILDREN,
@@ -171,11 +189,18 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			maxDepth: MAX_DEPTH,
 		});
 		ownDepth = childContext ? childContext.depth : resolvedDepth.depth;
-		if (!childContext && resolvedDepth.depth > 0) {
-			const provenance = readChildProvenance(ctx?.sessionManager);
+		// The owners are told which session they are serving **before** the bridge reads their
+		// publications (ticket 02 §2): an owner's own lookup finds the instance serving a child from
+		// the child's session id or file, and only falls back to "the one instance in this process"
+		// otherwise — so without this, a second instance alive in one process would leave the child
+		// bridged to nothing. It is also what makes the child *reduced* — membership is the binding
+		// (ticket 04) — and it happens for a spawned and a resumed child alike.
+		const isChild = childContext !== null || readChildProvenance(ctx?.sessionManager) !== null;
+		if (isChild) {
 			bindChild({
 				childSessionFile: ctx?.sessionManager?.getSessionFile?.(),
-				parentSessionFile: provenance?.parentSessionFile,
+				childSessionId: ctx?.sessionManager?.getSessionId?.(),
+				parentSessionFile: readChildProvenance(ctx?.sessionManager)?.parentSessionFile,
 				cwd: ctx?.cwd,
 			});
 		}
@@ -189,9 +214,6 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			reason: "code-mode kernel: write_text/edit_text/bash host functions exist",
 		});
 
-		// A resumed child is a child even though no `childContext` is in play; computed once, since
-		// both the provenance rule and the bridge's child exclusion read it.
-		const isChild = childContext !== null || readChildProvenance(ctx?.sessionManager) !== null;
 		const problems: string[] = [];
 		let bridge: BridgeReport | undefined;
 		const bound = await bindCodeMode({
@@ -206,6 +228,15 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 							ownDepth,
 							sessionFile: () => sessionCtx?.sessionManager?.getSessionFile?.(),
 							currentCell: () => handle.currentCell(),
+							// This session's own surface, whichever instance this is: at the root it is the root's, in
+							// a child it is that child's — which is what makes the ceiling transitive (ticket 01 §3).
+							ownSurface: () => {
+								try {
+									return pi.getActiveTools?.() ?? [];
+								} catch {
+									return [];
+								}
+							},
 							ownerDispatch: dispatchNotice,
 						}),
 						caller: seamCaller,
@@ -245,15 +276,13 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			// through `bindCodeMode` because the bridge has to see its own receipt, and a session
 			// whose contribution was refused records nothing and keeps the pi tools it had.
 			//
-			// Not in a child. A child's reachable set is its *owners'* policy — the factories and the
-			// bound they gave it — while a *published* tool set is chosen by the owner's own session
-			// policy, so adopting here would widen the child's bound, which is the one thing this
-			// seam must not do. A child has its own `python` tool again, so a child *could* call a
-			// bridge; the narrowing belongs in the owner's own session-scoped policy, and the
-			// tool-bridge map's fog records it.
-			if (!isChild) {
-				bridge = adoptToolBridge({ contribute: bound.handle.contribute, ctx });
-			}
+			// **In a child too**, since `.scratch/child-surface/` ticket 02. The guard that used to be
+			// here existed for one reason — a bound child's publication resolved, through the owner's
+			// own lookup, to its *parent's* instance, so the child would inherit the parent's policy
+			// and its bound would widen — and ticket 04 removed that reason: the owner now narrows its
+			// own catalogue for a bound child. The child path therefore mirrors
+			// the root path exactly: rlm installs, the bridge corrects the surface.
+			bridge = adoptToolBridge({ contribute: bound.handle.contribute, ctx });
 			problems.push(...bound.problems);
 			for (const rejection of bound.rejections) {
 				const names = rejection.rejected.map((r) => r.name).join(", ");

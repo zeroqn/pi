@@ -1,16 +1,31 @@
 /**
- * The child seam and its first owner (wayfinder ticket 05, `.scratch/tool-ownership/`).
+ * The child seam and its first owner (wayfinder ticket 05, `.scratch/tool-ownership/`; reworked by
+ * `.scratch/child-surface/` tickets 03-06).
  *
- * The three tests under "the granted tool surface" moved here from `packages/rlm/test/children.test.ts`
- * when the owner module did — the shim is the bridge's now, so its tests are the bridge's. The last two
- * describe blocks are ticket 02's decisions: the owner list is unique, and the owner-agnostic files name
- * no owner.
+ * What changed, and why this file no longer pins three tool definitions: a child no longer holds
+ * `ctx_search`/`ctx_reduce`/`ctx_expand` as proxies — it reaches them from its own cell through the tool
+ * bridge, whose generated line states how — and the *only* tool the shim registers is the one value the
+ * registry hands over, `childTodo()`. The pin that replaced check 3b asserts *that*: which names the shim
+ * registers, that the definition is the instance's own object rather than a copy, that the capture rides
+ * the `message_end` hook the bridge already has, and that a registry offering no capability registers
+ * nothing at all.
+ *
+ * The last two describe blocks are ticket 02's decisions: the owner list is unique, and the
+ * owner-agnostic files name no owner.
  */
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
-import { bindChild, childFactories, childStatus } from "../src/child-seam";
-import { OWNERS, nativeOnlyTools } from "../src/owners";
-import { GRANTED_CHILD_TOOLS, magicContext } from "../src/owners/magic-context";
+import {
+	__clearChildDetectorForTests,
+	bindChild,
+	childCeiling,
+	childFactories,
+	childStatus,
+	detectsChild,
+	setChildDetector,
+} from "../src/child-seam";
+import { OWNERS, childEligibleTools, nativeOnlyTools } from "../src/owners";
+import { magicContext } from "../src/owners/magic-context";
 
 const REGISTRY_KEY = Symbol.for("@cortexkit/magic-context:pi-registry");
 
@@ -40,168 +55,230 @@ function clearRegistry(): void {
 }
 
 /** The child's own `pi`, recording what a factory registers and which handlers it installs. */
-function childSurface(): { pi: any; handlers: Map<string, Function>; tools: Map<string, any> } {
-	const handlers = new Map<string, Function>();
+function childSurface(): {
+	pi: any;
+	handlers: Map<string, Function[]>;
+	tools: Map<string, any>;
+	active: string[];
+	run: (event: string, ...args: unknown[]) => Promise<void>;
+} {
+	const handlers = new Map<string, Function[]>();
 	const tools = new Map<string, any>();
+	const active: string[] = [];
 	const pi = {
-		on: (event: string, handler: Function) => handlers.set(event, handler),
+		on: (event: string, handler: Function) => {
+			handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+		},
 		registerTool: (definition: any) => tools.set(definition.name, definition),
+		appendEntry: () => undefined,
+		getActiveTools: () => [...active],
+		getAllTools: () => [...tools.values()].map((tool) => ({ name: tool.name })),
+		setActiveTools: (names: string[]) => {
+			active.length = 0;
+			active.push(...names);
+		},
 	};
-	return { pi, handlers, tools };
+	/** Handlers run in registration order, which is the whole mechanism (ticket 02 §3). */
+	const run = async (event: string, ...args: unknown[]) => {
+		for (const handler of handlers.get(event) ?? []) await handler(...args);
+	};
+	return { pi, handlers, tools, active, run };
 }
 
 /** Every factory a child is given, applied to a recording `pi`. */
 function applyFactories(pi: any): void {
-	for (const factory of childFactories({ parentSessionFile: "/parent.jsonl" })) factory(pi);
+	for (const factory of childFactories({
+		parentSessionFile: "/parent.jsonl",
+		ceiling: { ceiling: ["python", "todowrite"], source: "spawner", dropped: [] },
+	})) {
+		factory(pi);
+	}
 }
 
-/**
- * The three definitions as they were **before** the move (acceptance check 3b).
- *
- * Resolved from `b050adb:packages/rlm/src/magic-context.ts` — the commit before `b8eb692` moved the
- * shim — with:
- *
- *     git show b050adb:packages/rlm/src/magic-context.ts \
- *       | sed -n '/^const CHILD_TOOLS/,/^];/p'
- *
- * The same JSON is kept as evidence at `.scratch/tool-ownership/fixtures/child-tools-before.json`; it
- * is inlined here rather than read from there so the test is self-contained and runs where the map
- * directory is absent. Capturing it from the *moved* module would prove nothing.
- */
-const DEFINITIONS_BEFORE = [
-		{
-			"name": "ctx_search",
-			"description": "Search this project's memory (and your own session's messages) for anything relevant. Returns tagged hits you can open with ctx_expand.",
-			"parameters": {
-				"type": "object",
-				"properties": {
-					"query": {
-						"type": "string",
-						"description": "Search query."
-					},
-					"limit": {
-						"type": "number",
-						"description": "Maximum results to return (default: 10)"
-					},
-					"sources": {
-						"type": "array",
-						"items": {
-							"type": "string"
-						},
-						"description": "Which sources to search, e.g. memory, message, git_commit, primer, note"
-					}
-				},
-				"required": [
-					"query"
-				]
-			}
-		},
-		{
-			"name": "ctx_reduce",
-			"description": "Reclaim context in your own window by dropping tagged items you have already processed. Ranges: '3-5', '1,2,9'.",
-			"parameters": {
-				"type": "object",
-				"properties": {
-					"drop": {
-						"type": "string",
-						"description": "Tag IDs to drop entirely. Ranges: '3-5', '1,2,9'"
-					}
-				},
-				"required": [
-					"drop"
-				]
-			}
-		},
-		{
-			"name": "ctx_expand",
-			"description": "Open a tagged item that is currently compacted, or read a range of your session's messages.",
-			"parameters": {
-				"type": "object",
-				"properties": {
-					"start": {
-						"type": "number",
-						"description": "First message ordinal to expand — a compartment's start=\"N\" attribute"
-					},
-					"end": {
-						"type": "number",
-						"description": "Last message ordinal to expand (inclusive)"
-					},
-					"verbose": {
-						"type": "boolean",
-						"description": "Include more detail per message"
-					},
-					"message": {
-						"type": "number",
-						"description": "A single message ordinal to expand"
-					}
-				},
-				"required": []
-			}
-		}
-	];
-
-function comparable(tool: any) {
-	return { name: tool.name, description: tool.description, parameters: tool.parameters };
+function childCtx(id = "child", file = "/child.jsonl") {
+	return { sessionManager: { getSessionId: () => id, getSessionFile: () => file }, cwd: "/w" };
 }
 
-describe("the granted tool surface (v2 ticket 02)", () => {
-	it("is exactly the three tools, and never the withheld ones", () => {
-		expect([...GRANTED_CHILD_TOOLS].sort()).toEqual(["ctx_expand", "ctx_reduce", "ctx_search"]);
-		for (const withheld of ["ctx_memory", "ctx_note", "todowrite", "todo_view"]) {
-			expect(GRANTED_CHILD_TOOLS).not.toContain(withheld);
-		}
-	});
+const TODO = {
+	name: "todowrite",
+	label: "Todos",
+	description: "Manage the session task list.",
+	parameters: { type: "object", properties: {} },
+	execute: () => undefined,
+};
 
-	it("registers the proxies and routes them through runTool", async () => {
-		const calls: Array<{ name: string; params: unknown }> = [];
-		const bound: unknown[] = [];
-		installRegistry({
-			bindChild: (input: unknown) => bound.push(input),
-			runTool: async (name: string, params: unknown) => {
-				calls.push({ name, params });
-				return { content: [{ type: "text", text: `ran ${name}` }] };
-			},
-		});
+describe("the child's tools (child-surface ticket 06 — what replaced acceptance check 3b)", () => {
+	it("registers the capability's definition and no proxy of its own", async () => {
+		installRegistry({ childTodo: () => ({ definition: TODO, capture: () => {} }) });
 		try {
-			const { pi, handlers, tools } = childSurface();
+			const { pi, tools, run } = childSurface();
 			applyFactories(pi);
 
 			expect(tools.size).toBe(0); // nothing registers before the session starts
-			await handlers.get("session_start")!({}, { sessionManager: { getSessionFile: () => "/child.jsonl" }, cwd: "/w" });
-			expect([...tools.keys()].sort()).toEqual(["ctx_expand", "ctx_reduce", "ctx_search"]);
-			expect(bound).toEqual([{ childSessionFile: "/child.jsonl", parentSessionFile: "/parent.jsonl", cwd: "/w" }]);
-
-			const result = await tools.get("ctx_search")!.execute("call-1", { query: "x" }, undefined, undefined, { cwd: "/w" });
-			expect(result.content[0].text).toBe("ran ctx_search");
-			expect(calls).toEqual([{ name: "ctx_search", params: { query: "x" } }]);
+			await run("session_start", {}, childCtx());
+			// `todowrite`, and nothing else: the three tools a child used to hold as proxies are reached
+			// from its own cell now.
+			expect([...tools.keys()]).toEqual(["todowrite"]);
+			expect([...tools.keys()].filter((name) => name.startsWith("ctx_"))).toEqual([]);
 		} finally {
 			clearRegistry();
 		}
 	});
 
-	it("registers the pre-move definitions unchanged (acceptance check 3b)", async () => {
-		installRegistry({ runTool: async () => ({ content: [{ type: "text", text: "ok" }] }) });
+	it("registers the instance's own definition, not a copy", async () => {
+		installRegistry({ childTodo: () => ({ definition: TODO, capture: () => {} }) });
 		try {
-			const { pi, handlers, tools } = childSurface();
+			const { pi, tools, run } = childSurface();
 			applyFactories(pi);
-			await handlers.get("session_start")!({}, { sessionManager: { getSessionFile: () => "/child.jsonl" }, cwd: "/w" });
-			expect([...tools.values()].map(comparable)).toEqual(DEFINITIONS_BEFORE);
+			await run("session_start", {}, childCtx());
+			// Identity: a child's tool *is* the object the instance registered for a root, so the two can
+			// never drift and no drift pin is needed.
+			expect(tools.get("todowrite")).toBe(TODO);
 		} finally {
 			clearRegistry();
 		}
 	});
 
-	it("registers nothing when the registry cannot execute tools (older MC)", async () => {
-		installRegistry(); // no runTool
+	it("forwards message_end to the capture, with the child's own ctx", async () => {
+		const seen: Array<{ message: unknown; ctx: unknown }> = [];
+		installRegistry({
+			childTodo: () => ({
+				definition: TODO,
+				capture: (message: unknown, ctx: unknown) => seen.push({ message, ctx }),
+			}),
+		});
 		try {
-			const { pi, handlers, tools } = childSurface();
+			const { pi, run } = childSurface();
 			applyFactories(pi);
-			await handlers.get("session_start")!({}, { sessionManager: { getSessionFile: () => "/child.jsonl" }, cwd: "/w" });
+			const ctx = childCtx();
+			await run("session_start", {}, ctx);
+			const message = { role: "assistant", content: [] };
+			await run("message_end", { message }, ctx);
+			// The capture rides the hook the bridge already has for scrubbing — the one that catches a
+			// todowrite-shaped call even when pi could not execute it.
+			expect(seen).toEqual([{ message, ctx }]);
+		} finally {
+			clearRegistry();
+		}
+	});
+
+	it("registers nothing when the instance offers no capability at all", async () => {
+		installRegistry(); // no childTodo — an older Magic Context, or todowrite disabled
+		try {
+			const { pi, tools, run } = childSurface();
+			applyFactories(pi);
+			await run("session_start", {}, childCtx());
 			expect(tools.size).toBe(0);
-			// The degradation is reported rather than silent: the status line names the missing executor.
-			expect(childStatus()).toContain("no runTool");
+			expect(childStatus()).toContain("no childTodo");
 		} finally {
 			clearRegistry();
+		}
+	});
+
+	it("releases the child's session state *and its binding* when the child ends", async () => {
+		const cleared: Array<[string, string | undefined]> = [];
+		installRegistry({
+			childTodo: () => ({ definition: TODO, capture: () => {} }),
+			clearSession: (id: string, file?: string) => cleared.push([id, file]),
+		});
+		try {
+			const { pi, run } = childSurface();
+			applyFactories(pi);
+			await run("session_shutdown", {}, childCtx());
+			// The file is the binding's key: clearing only the id was a silent no-op (ticket 04).
+			expect(cleared).toEqual([["child", "/child.jsonl"]]);
+		} finally {
+			clearRegistry();
+		}
+	});
+
+	it("binds on session_start, and reports a serving instance", async () => {
+		const bound: unknown[] = [];
+		installRegistry({
+			bindChild: (input: unknown) => bound.push(input),
+			childTodo: () => ({ definition: TODO, capture: () => {} }),
+		});
+		try {
+			const { pi, run } = childSurface();
+			applyFactories(pi);
+			await run("session_start", {}, childCtx());
+			expect(bound).toEqual([
+				{
+					childSessionFile: "/child.jsonl",
+					childSessionId: "child",
+					parentSessionFile: "/parent.jsonl",
+					cwd: "/w",
+				},
+			]);
+			expect(childStatus()).toContain("registry found");
+		} finally {
+			clearRegistry();
+		}
+	});
+});
+
+describe("the ceiling (child-surface ticket 03)", () => {
+	it("narrows the spawning session's surface to what a child may hold", () => {
+		const { ceiling, source, dropped } = childCeiling([
+			"python",
+			"ask_user_question",
+			"todowrite",
+		]);
+		expect(ceiling).toEqual(["python", "todowrite"]);
+		expect(source).toBe("spawner");
+		// Neither of these is declared child-eligible by any owner — `ask_user_question` needs a UI a
+		// child does not have — and naming what was excluded is what tells a narrowed child from a
+		// broken one.
+		expect(dropped).toEqual(["ask_user_question"]);
+	});
+
+	it("names code mode's own tool once, and no owner has to declare it", () => {
+		// `python` is in the seam's own `CHILD_ALWAYS`, not in any owner's declaration — and it still has
+		// to be in the *parent's* surface to survive the intersection, so a parent that is not a
+		// code-mode session offers a child nothing.
+		expect(childCeiling(["python", "read"]).ceiling).toEqual(["python"]);
+		expect(childCeiling(["read", "bash"]).ceiling).toEqual([]);
+		expect(childEligibleTools()).not.toContain("python");
+	});
+
+	it("falls back to the declared list when there is no spawner to read", () => {
+		const fallback = childCeiling();
+		expect(fallback.source).toBe("fallback");
+		expect(fallback.ceiling).toEqual(["python", ...childEligibleTools()]);
+		expect(fallback.dropped).toBeUndefined();
+	});
+
+	it("is a subset of the surface it was given, for every surface", () => {
+		for (const surface of [
+			["python", "ask_user_question", "todowrite"],
+			["python"],
+			["read", "bash", "edit", "write"],
+			[],
+		]) {
+			const { ceiling } = childCeiling(surface);
+			expect(surface).toEqual(expect.arrayContaining(ceiling));
+		}
+	});
+});
+
+describe("the child detector (child-surface ticket 03 §5)", () => {
+	it("detects nothing until rlm installs its reader", () => {
+		__clearChildDetectorForTests();
+		expect(detectsChild(childCtx())).toBe(false);
+	});
+
+	it("answers from the installed reader, and contains a throwing one", () => {
+		setChildDetector((ctx: any) => ctx?.sessionManager?.getSessionId?.() === "child");
+		try {
+			expect(detectsChild(childCtx("child"))).toBe(true);
+			expect(detectsChild(childCtx("root"))).toBe(false);
+			setChildDetector(() => {
+				throw new Error("boom");
+			});
+			// An undetected child degrades to the root rule, which is a state the session was already in.
+			expect(detectsChild(childCtx("child"))).toBe(false);
+		} finally {
+			__clearChildDetectorForTests();
 		}
 	});
 });
@@ -211,7 +288,7 @@ describe("degradation is loud and inert (ticket 02)", () => {
 		clearRegistry();
 		const { pi, handlers, tools } = childSurface();
 		applyFactories(pi);
-		expect(handlers.size).toBe(0); // the factory no-ops rather than registering handlers
+		expect(handlers.size).toBe(3); // the bridge's own three, and the owner's none
 		expect(tools.size).toBe(0);
 		expect(childStatus()).toContain("no registry");
 		expect(() => bindChild({ childSessionFile: "/child.jsonl" })).not.toThrow();
@@ -243,6 +320,20 @@ describe("the owner list (ticket 02)", () => {
 		expect(names).toContain("todowrite");
 		expect(new Set(names).size).toBe(names.length);
 		expect(magicContext.nativeOnly).toEqual(["todowrite"]);
+	});
+
+	it("declares child eligibility as its own list, equal to native-only today", () => {
+		// Two lists answering two questions (`nativeOnly`: a *root* must keep it a pi tool;
+		// `childEligible`: a *child* may hold it). Equal today, and pinned so a divergence is a decision
+		// someone made rather than a drift nobody noticed.
+		expect(magicContext.childEligible).toEqual(magicContext.nativeOnly);
+		expect(childEligibleTools()).toContain("todowrite");
+	});
+
+	it("keeps the acceptance probe out of the list unless something is measuring", () => {
+		// The instrument reads pi's own api, so it is the bar's independent half — and it must cost
+		// nothing to a session that is not being measured.
+		expect(OWNERS.map((owner) => owner.name)).not.toContain("probe");
 	});
 
 	it("names no owner in the owner-agnostic files", () => {

@@ -236,23 +236,29 @@ let turnBehavior: () => Promise<void> = () =>
 		releaseTurn = resolve;
 	});
 
+/** Every option bag the manager handed pi, so a test can read what a child was actually built with. */
+const capturedSessionOptions: any[] = [];
+
 mock.module("@earendil-works/pi-coding-agent", () => ({
 	SettingsManager: { create: () => ({}) },
 	DefaultResourceLoader: class {
 		async reload() {}
 	},
 	SessionManager: { create: () => ({ appendCustomEntry() {} }) },
-	createAgentSession: async () => ({
-		session: {
-			sessionFile: "/tmp/child.jsonl",
-			model: null,
-			bindExtensions: async () => {},
-			prompt: () => turnBehavior(),
-			followUp: async () => {},
-			abort: async () => {},
-			dispose: () => {},
-		},
-	}),
+	createAgentSession: async (options: any) => {
+		capturedSessionOptions.push(options);
+		return {
+			session: {
+				sessionFile: "/tmp/child.jsonl",
+				model: null,
+				bindExtensions: async () => {},
+				prompt: () => turnBehavior(),
+				followUp: async () => {},
+				abort: async () => {},
+				dispose: () => {},
+			},
+		};
+	},
 }));
 
 function managerHarness() {
@@ -361,5 +367,111 @@ describe("the manager's notices (ticket 06)", () => {
 		expect(h.notices).toHaveLength(2);
 		expect(h.notices[1]!.content).not.toContain("boom");
 		expect(h.notices[1]!.content).toContain("finished: done");
+	});
+});
+
+/* ------------------------------------------------------------------ *
+ * The ceiling (child-surface tickets 01, 03)
+ * ------------------------------------------------------------------ */
+
+describe("the ceiling a child is built with", () => {
+	beforeEach(() => {
+		capturedSessionOptions.length = 0;
+		releaseTurn = null;
+		turnBehavior = async () => {};
+	});
+
+	function harnessWith(overrides: Record<string, unknown> = {}) {
+		const requests: any[] = [];
+		const manager = createChildManager({
+			cwd: () => "/tmp/work",
+			ownSessionFile: () => "/tmp/parent.jsonl",
+			kernelFactoryFor: () => () => {},
+			childFactories: (request) => {
+				requests.push(request);
+				return [];
+			},
+			childCeiling: (parentSurface) => ({
+				ceiling: (parentSurface ?? []).filter(
+					(name) => name === "python" || name === "todowrite",
+				),
+				source: "spawner",
+				dropped: (parentSurface ?? []).filter(
+					(name) => name !== "python" && name !== "todowrite",
+				),
+			}),
+			ownSurface: () => ["python", "ask_user_question", "todowrite"],
+			runtime: async () => ({}),
+			maxDepth: 2,
+			maxLive: 8,
+			...overrides,
+		});
+		return { manager, requests };
+	}
+
+	it("hands pi the ceiling, and carries it into the child's factories", async () => {
+		const { manager, requests } = harnessWith();
+		await manager.spawn({
+			prompt: "go",
+			name: "ceiling",
+			depth: 1,
+			spawnCell: "",
+			parentSessionFile: "/tmp/parent.jsonl",
+			ownerDispatch: () => {},
+		});
+
+		// The hard half: pi turns this into `allowedToolNames` and filters the tool *registry* by it, so
+		// nothing outside the ceiling is merely inactive in the child — it is unregistered.
+		expect(capturedSessionOptions.at(-1)?.tools).toEqual(["python", "todowrite"]);
+		// The soft half: the child's own factory reconciles against the same value and records it.
+		expect(requests.at(-1)?.ceiling).toEqual({
+			ceiling: ["python", "todowrite"],
+			source: "spawner",
+			dropped: ["ask_user_question"],
+		});
+	});
+
+	it("reads the surface the request carries, not this manager's own", async () => {
+		// A grandchild is spawned through the *root's* manager, so the ceiling has to come from the
+		// spawning session's own instance or it would be computed from the wrong session (ticket 01 §3).
+		const { manager } = harnessWith();
+		await manager.spawn({
+			prompt: "go",
+			name: "grandchild",
+			depth: 2,
+			spawnCell: "",
+			parentSessionFile: "/tmp/child.jsonl",
+			ownerDispatch: () => {},
+			surface: ["python"],
+		});
+		expect(capturedSessionOptions.at(-1)?.tools).toEqual(["python"]);
+	});
+
+	it("falls back to this manager's own surface when a request carries none", async () => {
+		const { manager } = harnessWith();
+		await manager.spawn({
+			prompt: "go",
+			name: "legacy",
+			depth: 1,
+			spawnCell: "",
+			parentSessionFile: "/tmp/parent.jsonl",
+			ownerDispatch: () => {},
+		});
+		expect(capturedSessionOptions.at(-1)?.tools).toEqual(["python", "todowrite"]);
+	});
+
+	it("builds a child with no tools at all when no ceiling policy is installed", async () => {
+		// Degradation, not failure: with no seam there is nothing that may be held, and the child's own
+		// entry records an empty surface rather than the child quietly keeping whatever it registered.
+		const { manager } = harnessWith({ childCeiling: undefined });
+		await manager.spawn({
+			prompt: "go",
+			name: "no-seam",
+			depth: 1,
+			spawnCell: "",
+			parentSessionFile: "/tmp/parent.jsonl",
+			ownerDispatch: () => {},
+		});
+		expect(capturedSessionOptions.at(-1)?.tools).toEqual([]);
 	});
 });

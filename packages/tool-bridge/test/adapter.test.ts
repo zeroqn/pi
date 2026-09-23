@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import {
 	gatherToolBridge,
 	installToolBridge,
+	reconcileChildSurface,
 	reconcileToolSurface,
 	renderCatalogue,
 	textOfResult,
@@ -19,6 +20,7 @@ import {
 	API_VERSION,
 	__resetToolBridgeForTests,
 	bridgedSession,
+	recordBridged,
 	sessionKey,
 	type BridgePublication,
 	type SlotOwner,
@@ -360,3 +362,75 @@ describe("installing the bridge, and the surface rule", () => {
 		expect(calls).toEqual([["python"]]);
 	});
 });
+
+describe("the child's surface (child-surface ticket 03 §6)", () => {
+	beforeEach(() => __resetToolBridgeForTests());
+
+	/** A child's pi: an ambient-shaped registry of `registered`, currently offering `active`. */
+	function childPi(registered: string[], active: string[]) {
+		const state = [...active];
+		const writes: string[][] = [];
+		return {
+			state,
+			writes,
+			pi: {
+				getActiveTools: () => [...state],
+				getAllTools: () => registered.map((name) => ({ name })),
+				setActiveTools(names: string[]) {
+					writes.push([...names]);
+					state.splice(0, state.length, ...names);
+				},
+			},
+		};
+	}
+
+	it("keeps only what the ceiling and the registry both allow", () => {
+		const ctx = fakeCtx("child-keep");
+		const { pi, state } = childPi(
+			["read", "bash", "python", "todowrite"],
+			["read", "bash", "python", "ctx_memory"],
+		);
+		const report = reconcileChildSurface({ pi, ctx, ceiling: ["python", "todowrite"] });
+		// The resumed-child direction: a spawned child's registry was already filtered by pi.
+		expect(state).toEqual(["python", "todowrite"]);
+		expect(report.surface).toEqual(["python", "todowrite"]);
+		expect(report.deactivated).toEqual(["read", "bash", "ctx_memory"]);
+		expect(report.restored).toEqual(["todowrite"]);
+	});
+
+	it("strips what the child's own cell can reach, even inside the ceiling", () => {
+		const ctx = fakeCtx("child-strip");
+		recordBridged(sessionKey(ctx), { toolNames: ["todowrite"], owners: ["magic-context"] });
+		const { pi, state } = childPi(["python", "todowrite"], ["python", "todowrite"]);
+		const report = reconcileChildSurface({ pi, ctx, ceiling: ["python", "todowrite"] });
+		// A name a cell can call is not a pi tool in that session — the root's direction, and it outranks
+		// the ceiling: a route exists, so the tool goes.
+		expect(state).toEqual(["python"]);
+		expect(report.deactivated).toEqual(["todowrite"]);
+		expect(report.restored).toEqual([]);
+	});
+
+	it("does not activate a ceiling name nothing registered", () => {
+		const ctx = fakeCtx("child-unregistered");
+		const { pi, state } = childPi(["python"], ["python"]);
+		const report = reconcileChildSurface({ pi, ctx, ceiling: ["python", "todowrite"] });
+		expect(state).toEqual(["python"]);
+		expect(report.restored).toEqual([]);
+	});
+
+	it("writes nothing when the surface is already right", () => {
+		const ctx = fakeCtx("child-noop");
+		const { pi, writes } = childPi(["python", "todowrite"], ["python", "todowrite"]);
+		reconcileChildSurface({ pi, ctx, ceiling: ["python", "todowrite"] });
+		expect(writes).toEqual([]);
+	});
+
+	it("narrows to nothing when the ceiling is empty, and says what it removed", () => {
+		const ctx = fakeCtx("child-empty-ceiling");
+		const { pi, state } = childPi(["python", "todowrite"], ["python", "todowrite"]);
+		const report = reconcileChildSurface({ pi, ctx, ceiling: [] });
+		expect(state).toEqual([]);
+		expect(report.deactivated).toEqual(["python", "todowrite"]);
+	});
+});
+

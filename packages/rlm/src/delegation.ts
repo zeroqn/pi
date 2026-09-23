@@ -25,6 +25,14 @@ export type DelegationDeps = {
 	ownerDispatch?: (notice: { key: string; content: string; customType?: string; cancelled?: () => boolean }) => void;
 	/** Which cell is running, for `spawnCell` provenance at depth >= 2. */
 	currentCell: () => string;
+	/**
+	 * **This** session's live surface, read when a child is spawned (`.scratch/child-surface/` ticket
+	 * 01 §3). It travels with the request because the manager that actually creates the child may not be
+	 * this session's: a grandchild is spawned through the *root's* manager, so without this the ceiling
+	 * would be computed from the root's surface and a grandchild could hold a tool its own parent does
+	 * not — breaking the transitivity the rule promises.
+	 */
+	ownSurface: () => string[];
 };
 
 export function delegationHostFns(deps: DelegationDeps): Record<string, (...args: unknown[]) => Promise<unknown>> {
@@ -40,7 +48,12 @@ export function delegationHostFns(deps: DelegationDeps): Record<string, (...args
 		};
 		if (deps.childContext) {
 			// The child's own session file is *its* child's parent — provenance, not the root's.
-			return deps.childContext.spawn({ ...inner, parentSessionFile: deps.sessionFile(), spawnCell: deps.currentCell() });
+			return deps.childContext.spawn({
+				...inner,
+				parentSessionFile: deps.sessionFile(),
+				spawnCell: deps.currentCell(),
+				surface: deps.ownSurface(),
+			});
 		}
 		return deps.manager!.spawn({
 			...inner,
@@ -48,6 +61,7 @@ export function delegationHostFns(deps: DelegationDeps): Record<string, (...args
 			spawnCell: deps.currentCell(),
 			parentSessionFile: deps.sessionFile(),
 			ownerDispatch: deps.ownerDispatch,
+			surface: deps.ownSurface(),
 		});
 	};
 

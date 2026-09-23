@@ -95,8 +95,41 @@ where the ledger refused it, which leaves pi's active set untouched.
 A child loads no ambient extensions, so an owner that wants to serve one injects an extension factory
 into it instead. That is this package's other half, and it is deliberately generic: `src/child-seam.ts`
 exports `childFactories(request)`, `bindChild(input)` and `childStatus()`, and knows only that an owner
-may declare them. The owners themselves live in `src/owners/` — the one place in the package that names
-an extension.
+may declare four hooks. The owners themselves live in `src/owners/` — the one place in the package that
+names an extension.
+
+## A child's surface (`.scratch/child-surface/`)
+
+A child is offered **a subset of what its spawner is offered**, and reaches the rest from its own cell.
+Three pieces, all in this package:
+
+- **The ceiling.** `childCeiling(parentSurface)` narrows the spawning session's live `getActiveTools()`
+  to `["python", ...childEligibleTools()]` — code mode's own tool, named once in the seam, plus whatever
+  each owner declares in `OwnerModule.childEligible`. A name no owner declares (`ask_user_question`, for
+  instance, which needs a UI a child does not have) can never reach a child. With no spawner to read — a
+  resumed child — the declared list itself stands in, and the child's own record says `source:
+  "fallback"`.
+- **The hard half.** rlm passes that ceiling to `createAgentSession({ tools })`, which pi turns into
+  `allowedToolNames` and applies to the **registry**: nothing outside the ceiling is merely inactive in
+  a spawned child, it is unregistered, pi's own builtins included. `setActiveToolsByName` can then only
+  ever produce a subset.
+- **The soft half.** `childSurfaceFactory` — appended **last** by `childFactories`, because handlers run
+  in registration order — reconciles a child's active set in three directions: keep only what the
+  ceiling and the registry allow, strip what the child's own cell can reach, and put back a ceiling name
+  the mount dropped. It runs at `session_start` and again at `before_agent_start`, and writes what it
+  did to the child's own transcript as `rlm-child-surface` (`surface`, `ceiling`, `source`, `dropped`,
+  `deactivated`, `restored`) — which is what tells a *narrowed* child from a *broken* one.
+
+A **resumed** child takes the ambient-manifest path instead, so `createAgentSession`'s filter never runs
+for it. It is reconciled by this package's **entry**, which rlm teaches to recognise a child by
+installing its own reader (`setChildDetector`) rather than making this package learn rlm's marker
+vocabulary. The entry is declared last in the manifest, which is what makes it late enough to correct
+the set before the first turn's prompt is built.
+
+`PI_TOOL_BRIDGE_PROBE=1` adds one more entry to the owner list: a probe whose child factory appends
+`getActiveTools()` and `getAllTools()` to the child's transcript. It is the acceptance bar's *independent*
+half — a child's own entry is written by the code under test — and it is inert unless the variable is
+set.
 
 ## What the model sees
 
@@ -130,11 +163,13 @@ Every drop is reported with a reason (`problems` from `installToolBridge`) rathe
 - `src/convention.ts` — the symbols, the types, the slot, the session record and `sessionKey`.
 - `src/adapter.ts` — gathering, the `tool` host function, `installToolBridge`, and the surface rule.
 - `src/adopter.ts` — `adoptToolBridge` and `bridgeStatusLine`: what an extension with a kernel calls.
-- `src/child-seam.ts` — the generic child seam: the three hooks an adopter calls, over `ChildRequest`
-  and `ChildBindInput`.
-- `src/owners/` — **the only place that names an owner**. `index.ts` holds the `OwnerModule` list and
-  `nativeOnlyTools()`; `magic-context.ts` is the first owner's child shim.
-- `src/index.ts` — the entry: `before_agent_start` reconciliation and the `session_shutdown` cleanup.
+- `src/child-seam.ts` — the generic child seam: the hooks an adopter calls, over `ChildRequest` and
+  `ChildBindInput`, plus the child's *policy*: `childCeiling` and the `setChildDetector` reader.
+- `src/owners/` — **the only place that names an owner**. `index.ts` holds the `OwnerModule` list,
+  `nativeOnlyTools()` and `childEligibleTools()`; `magic-context.ts` is the first owner's child shim;
+  `probe.ts` is the env-gated acceptance instrument.
+- `src/index.ts` — the entry: the surface rule at `session_start` and `before_agent_start` — the child's
+  when a detector recognises one — and the `session_shutdown` cleanup.
 - `test/` — the rules, testable with no pi, no kernel and no monty (the surface is typed
   structurally, so nothing here imports pi). `child-seam.test.ts` also pins that every file in `src/`
   outside `owners/` names no owner.

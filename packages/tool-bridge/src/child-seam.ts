@@ -5,18 +5,96 @@
  * A child loads no ambient extensions, so an owner that serves one injects an extension factory into it
  * (`childFactories`) and is told which session it now serves (`bindChild`). Neither the shapes above nor
  * this file name an owner: the owner list lives in `./owners`, and all this module knows is that a
- * descriptor may declare the three hooks.
+ * descriptor may declare the four hooks.
  *
- * Deliberately **not** here: the root bridge (`./adopter`) and the surface rule (`./adapter`). They answer
- * different questions — what a *cell* can call, and what pi's active set holds — and the child path shares
- * no state with either.
+ * Since `.scratch/child-surface/` this file also owns the child's **policy** — the ceiling (`childCeiling`)
+ * and the child detector (`setChildDetector`) — and appends **the bridge's own child factory** last, which
+ * is what corrects a child's surface (`./adapter`). The root bridge (`./adopter`) is deliberately still not
+ * here: it answers what a *cell* can call, a different question with its own state.
  */
-import { OWNERS } from "./owners";
+import { type ChildCeiling, childSurfaceFactory } from "./adapter";
+
+export type { ChildCeiling };
+import { forgetSession, sessionKey } from "./convention";
+import { OWNERS, childEligibleTools } from "./owners";
+
+/**
+ * The one tool code mode owns, named once and here.
+ *
+ * No owner can declare it: `python` is not an owner's tool, and the ceiling's whole job is to keep it —
+ * a child without it has no way to work at all. Its other half is that a name can only be in the ceiling
+ * if the *parent's* surface held it, so a parent that is not a code-mode session still offers a child
+ * nothing.
+ */
+const CHILD_ALWAYS = ["python"] as const;
+
+/**
+ * The ceiling: what a child session may be offered at all (`zeroqn/pi`'s
+ * `.scratch/child-surface/` ticket 03).
+ *
+ * `parentSurface` is the *spawning* session's live `getActiveTools()`, read at spawn time — never a
+ * record, and never a walk up a chain (ticket 01). With no spawner to read (a session opened on its own,
+ * resumed, or a child whose spawner is in another process) the declared list stands in: `python` plus
+ * every owner's `childEligible`, intersected — later — with what the child actually registers, so an
+ * absent owner removes its own name.
+ *
+ * `dropped` is what a reader needs to tell a *narrowed* child from a *broken* one: it names the parent's
+ * tools the child was never going to hold (`ask_user_question`, for instance, which no owner declares).
+ */
+export function childCeiling(parentSurface?: readonly string[]): ChildCeiling {
+	const eligible = [...CHILD_ALWAYS, ...childEligibleTools()];
+	if (parentSurface === undefined) {
+		return { ceiling: eligible, source: "fallback" };
+	}
+	const ceiling = parentSurface.filter((name) => eligible.includes(name));
+	return {
+		ceiling,
+		source: "spawner",
+		dropped: parentSurface.filter((name) => !eligible.includes(name)),
+	};
+}
+
+/**
+ * The child detector: how the bridge's *entry* learns that the session it is reconciling is a child.
+ *
+ * A resumed child loads the ambient manifest, so it is reconciled by the entry rather than by a factory
+ * injected at spawn time — and only rlm knows what a child session looks like (`readChildProvenance`,
+ * its own `rlm-child` entry). Rather than teach this package rlm's marker, rlm **installs** its reader
+ * once it loads: one function, no per-session table, and no rlm loaded means no child is detected and the
+ * root rule applies exactly as before (map ticket 03 §5).
+ */
+let childDetector: ((ctx: unknown) => boolean) | undefined;
+
+export function setChildDetector(detector: (ctx: unknown) => boolean): void {
+	childDetector = detector;
+}
+
+export function detectsChild(ctx: unknown): boolean {
+	if (!childDetector) return false;
+	try {
+		return childDetector(ctx) === true;
+	} catch {
+		// A detector that throws must not take a session's start with it; an undetected child degrades to
+		// the root rule, which is a state the session was already in.
+		return false;
+	}
+}
+
+/** Test seam: forget the installed detector. */
+export function __clearChildDetectorForTests(): void {
+	childDetector = undefined;
+}
 
 /** What an owner may need to build a child's factories. Grows a field when an owner needs one. */
 export type ChildRequest = {
 	/** The spawning session's file. Provenance: owners log it, none routes by it. */
 	parentSessionFile?: string;
+	/**
+	 * The ceiling the spawner computed for this child (ticket 01 §2). Absent when nothing computed one —
+	 * a child built by a caller that does not know about ceilings — in which case the factory's own
+	 * `childCeiling()` (the declared fallback) stands in.
+	 */
+	ceiling?: ChildCeiling;
 };
 
 /**
@@ -44,6 +122,11 @@ export function childFactories(request: ChildRequest): Array<(pi: any) => void> 
 		if (!owner.childFactories) continue;
 		factories.push(...owner.childFactories(request));
 	}
+	// **Last, and that is the mechanism** (ticket 02 §3): handlers run in registration order, so the
+	// bridge's own session-start reconcile has to be registered after every owner's — otherwise an owner
+	// that registers a tool in its own `session_start` would have it activated by pi *behind* the
+	// reconcile's back, and the surface would be wrong until the next turn.
+	factories.push(childSurfaceFactory(request));
 	return factories;
 }
 

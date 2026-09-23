@@ -66,6 +66,19 @@ export interface SpawnRequest {
 	spawnCell: string;
 	parentSessionFile?: string;
 	ownerDispatch: (notice: Notice) => void;
+	/**
+	 * The **spawning** session's live surface, supplied by that session's own rlm instance
+	 * (`.scratch/child-surface/` ticket 01 §3). It travels with the request because the manager that
+	 * creates the child need not be the spawner's: a grandchild goes through the root's manager, so
+	 * reading this session's `pi` here would compute the ceiling from the root's surface instead.
+	 */
+	surface?: string[];
+	/** Computed by `spawn` from `surface`, and carried into the child's factories. */
+	ceiling?: {
+		ceiling: string[];
+		source: "spawner" | "fallback";
+		dropped?: string[];
+	};
 }
 
 interface ChildRecord extends ChildHandle {
@@ -89,6 +102,17 @@ export interface ChildManagerDeps {
 	 * extensions.
 	 */
 	childFactories?: (request: SpawnRequest) => Array<(pi: any) => void>;
+	/**
+	 * This manager's own session's live surface — the fallback when a request carries none (a caller
+	 * that predates the ceiling, or a test). The real operand rides the request (ticket 01 §3).
+	 */
+	ownSurface?: () => string[];
+	/** The child-eligible policy: `parentSurface` in, a ceiling out. Absent means no ceiling is computed. */
+	childCeiling?: (parentSurface?: readonly string[]) => {
+		ceiling: string[];
+		source: "spawner" | "fallback";
+		dropped?: string[];
+	};
 	runtime: () => Promise<any>;
 	maxDepth: number;
 	maxLive: number;
@@ -500,6 +524,14 @@ export function createChildManager(deps: ChildManagerDeps) {
 		const modelRuntime = await deps.runtime();
 		const directory = agentDir();
 		const cwd = deps.cwd();
+		// The ceiling for this child, computed **here, at spawn time** (ticket 01 §2): the spawning
+		// session's live surface, narrowed by the seam to what a child may hold. Two operands, both from
+		// the seam's policy — never a record, and never a walk up a chain.
+		const parentSurface = request.surface ?? deps.ownSurface?.();
+		const ceiling = deps.childCeiling?.(parentSurface) ?? {
+			ceiling: [],
+			source: "fallback" as const,
+		};
 		const settingsManager = piModule.SettingsManager.create(cwd, directory);
 		const id = `child-${++counter}`;
 
@@ -542,7 +574,12 @@ export function createChildManager(deps: ChildManagerDeps) {
 			noExtensions: true,
 			noPromptTemplates: true,
 			noThemes: true,
-			extensionFactories: [deps.kernelFactoryFor(context), ...(deps.childFactories?.(request) ?? [])],
+			// The ceiling rides the request so the child's own reconcile can record what it was given
+			// and where the answer came from (ticket 01 §5).
+			extensionFactories: [
+				deps.kernelFactoryFor(context),
+				...(deps.childFactories?.({ ...request, ceiling }) ?? []),
+			],
 			appendSystemPrompt: childPromptFor(request, deps.maxDepth),
 		});
 		await loader.reload();
@@ -579,6 +616,12 @@ export function createChildManager(deps: ChildManagerDeps) {
 			...(resolved?.thinkingLevel ? { thinkingLevel: resolved.thinkingLevel } : {}),
 			resourceLoader: loader,
 			sessionManager,
+			// The **hard** half of the ceiling (ticket 03 §3). pi turns this into `allowedToolNames` and
+			// filters the tool *registry* by it, so nothing outside the ceiling is merely inactive in a
+			// child — it is unregistered: pi's own builtins included, and any owner's later registration.
+			// The child's post-mount reconcile still runs, but as a guard and an artefact, not as the
+			// mechanism.
+			tools: ceiling.ceiling,
 			sessionStartEvent: { type: "session_start", reason: "startup" },
 		});
 		await session.bindExtensions({ mode: "print" });
