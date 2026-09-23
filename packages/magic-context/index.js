@@ -475,9 +475,10 @@ import {
   setTodoSnapshot,
   registerTodoOverlay,
   registerTodoStateLifecycle,
+  createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-yeynvzfc.js";
+} from "./index-j0yscwgv.js";
 import {
   pushNotification2
 } from "./index-b3eqj1g6.js";
@@ -24512,87 +24513,6 @@ function isSentinelPart(part) {
   return p.type === "text" && typeof p.text === "string" && (p.text === "" || p.text === WHOLE_MESSAGE_PLACEHOLDER_TEXT);
 }
 
-// src/pi-child-mode.ts
-var CHILD_TOOL_ALLOWLIST = new Set([
-  "ctx_search",
-  "ctx_reduce",
-  "ctx_expand"
-]);
-var CHILD_TAG_SENTENCE = "Messages and tool outputs are tagged with §N§ identifiers (e.g. §1§, §42§). " + "Use ctx_reduce to drop tool outputs you have already processed. " + "ctx_search queries this project's memory; ctx_expand opens a tagged item.";
-var CHILD_TAG_MARKER = "tagged with §N§ identifiers";
-var reducedSessions = new Set;
-function markReducedSession(sessionId) {
-  if (typeof sessionId === "string" && sessionId.length > 0)
-    reducedSessions.add(sessionId);
-}
-function unmarkReducedSession(sessionId) {
-  if (typeof sessionId === "string" && sessionId.length > 0)
-    reducedSessions.delete(sessionId);
-}
-function isReducedSession(sessionId) {
-  return typeof sessionId === "string" && reducedSessions.has(sessionId);
-}
-var tagSentenceLogged = new Set;
-function shouldLogTagSentence(sessionId) {
-  if (typeof sessionId !== "string" || sessionId.length === 0)
-    return false;
-  if (tagSentenceLogged.has(sessionId))
-    return false;
-  tagSentenceLogged.add(sessionId);
-  return true;
-}
-function textOf(value) {
-  if (typeof value === "string")
-    return value;
-  if (Array.isArray(value)) {
-    let out = "";
-    for (const part of value) {
-      if (typeof part === "string")
-        out += part;
-      else if (part && typeof part === "object" && typeof part.text === "string") {
-        out += part.text;
-      }
-    }
-    return out;
-  }
-  return "";
-}
-function alreadyTold(messages) {
-  for (const message of messages) {
-    if (textOf(message?.content).includes(CHILD_TAG_MARKER))
-      return true;
-  }
-  return false;
-}
-function withAppendedText(message, text) {
-  const content = message.content;
-  if (typeof content === "string")
-    return { ...message, content: `${content}
-
-${text}` };
-  if (Array.isArray(content)) {
-    return { ...message, content: [...content, { type: "text", text }] };
-  }
-  return message;
-}
-function ensureChildTagSentence(result, sessionId) {
-  if (!result || !Array.isArray(result.messages))
-    return result;
-  if (!isReducedSession(sessionId))
-    return result;
-  if (alreadyTold(result.messages))
-    return result;
-  for (let index = result.messages.length - 1;index >= 0; index -= 1) {
-    const message = result.messages[index];
-    if (message?.role !== "user")
-      continue;
-    const messages = result.messages.slice();
-    messages[index] = withAppendedText(message, CHILD_TAG_SENTENCE);
-    return { messages };
-  }
-  return result;
-}
-
 // src/pi-context-limit.ts
 var MIN_SANE_LIMIT = 16000;
 var MAX_SANE_LIMIT = 1e7;
@@ -25944,6 +25864,264 @@ function assertPiRawFallbackFits(messages, contextLimit, log, cause) {
     log(`raw_fallback_over_context_limit proxy_bytes=${bytes} proxy_tokens=${proxyTokens} limit=${contextLimit} early_abort=true serialization_failed=${serializationFailed}`);
     throw new PiStorageBusyError({ cause });
   }
+}
+
+// src/pi-child-mode.ts
+var CHILD_TOOL_ALLOWLIST = new Set([
+  "ctx_search",
+  "ctx_reduce",
+  "ctx_expand"
+]);
+var CHILD_TAG_SENTENCE = "Messages and tool outputs are tagged with §N§ identifiers (e.g. §1§, §42§).";
+var CHILD_TAG_MARKER = "tagged with §N§ identifiers";
+function narrowCatalogueForChild(parentNames, isChild) {
+  return isChild ? parentNames.filter((name) => CHILD_TOOL_ALLOWLIST.has(name)) : [...parentNames];
+}
+var tagSentenceLogged = new Set;
+function shouldLogTagSentence(sessionId) {
+  if (typeof sessionId !== "string" || sessionId.length === 0)
+    return false;
+  if (tagSentenceLogged.has(sessionId))
+    return false;
+  tagSentenceLogged.add(sessionId);
+  return true;
+}
+function textOf(value) {
+  if (typeof value === "string")
+    return value;
+  if (Array.isArray(value)) {
+    let out = "";
+    for (const part of value) {
+      if (typeof part === "string")
+        out += part;
+      else if (part && typeof part === "object" && typeof part.text === "string") {
+        out += part.text;
+      }
+    }
+    return out;
+  }
+  return "";
+}
+function alreadyTold(messages) {
+  for (const message of messages) {
+    if (textOf(message?.content).includes(CHILD_TAG_MARKER))
+      return true;
+  }
+  return false;
+}
+function withAppendedText(message, text) {
+  const content = message.content;
+  if (typeof content === "string")
+    return { ...message, content: `${content}
+
+${text}` };
+  if (Array.isArray(content)) {
+    return { ...message, content: [...content, { type: "text", text }] };
+  }
+  return message;
+}
+function ensureChildTagSentence(result, reduced) {
+  if (!result || !Array.isArray(result.messages))
+    return result;
+  if (!reduced)
+    return result;
+  if (alreadyTold(result.messages))
+    return result;
+  for (let index = result.messages.length - 1;index >= 0; index -= 1) {
+    const message = result.messages[index];
+    if (message?.role !== "user")
+      continue;
+    const messages = result.messages.slice();
+    messages[index] = withAppendedText(message, CHILD_TAG_SENTENCE);
+    return { messages };
+  }
+  return result;
+}
+
+// src/pi-tool-publication.ts
+var BRIDGE_OWNERS_SYMBOL = Symbol.for("pi-tool-bridge:owners");
+var BRIDGE_API_VERSION = 1;
+var BRIDGE_OWNER = "magic-context";
+var BRIDGE_PUBLISHABLE_TOOL_NAMES = new Set([
+  "ctx_search",
+  "ctx_memory",
+  "ctx_note",
+  "ctx_expand",
+  "ctx_reduce"
+]);
+function isBridgePublishable(name) {
+  return BRIDGE_PUBLISHABLE_TOOL_NAMES.has(name);
+}
+function bridgeSlot() {
+  const holder = globalThis;
+  const existing = holder[BRIDGE_OWNERS_SYMBOL];
+  if (existing instanceof Map)
+    return existing;
+  const created = new Map;
+  holder[BRIDGE_OWNERS_SYMBOL] = created;
+  return created;
+}
+function publishBridgeTools(key, publication) {
+  const slot = bridgeSlot();
+  slot.set(key, publication);
+  return () => {
+    if (slot.get(key) === publication)
+      slot.delete(key);
+  };
+}
+function bridgeToolEntries(definitions, names) {
+  const entries = [];
+  for (const name of names) {
+    if (!isBridgePublishable(name))
+      continue;
+    const definition = definitions.get(name);
+    if (!definition)
+      continue;
+    entries.push({
+      name,
+      description: definition.description,
+      snippet: definition.promptSnippet ?? definition.description,
+      parameters: definition.parameters
+    });
+  }
+  return entries;
+}
+
+// src/pi-registry.ts
+var REGISTRY_KEY = Symbol.for("@cortexkit/magic-context:pi-registry");
+var registrations = new Set;
+function sessionKeys(ctx) {
+  const sessionManager = ctx?.sessionManager;
+  const keys = [];
+  try {
+    const id = sessionManager?.getSessionId?.();
+    if (typeof id === "string" && id.length > 0)
+      keys.push(id);
+  } catch {}
+  try {
+    const file = sessionManager?.getSessionFile?.();
+    if (typeof file === "string" && file.length > 0)
+      keys.push(file);
+  } catch {}
+  return keys;
+}
+function isBoundChild(ctx) {
+  const keys = sessionKeys(ctx);
+  if (keys.length === 0)
+    return false;
+  for (const entry of registrations) {
+    for (const key of keys)
+      if (entry.bound.has(key))
+        return true;
+  }
+  return false;
+}
+function resolve3(ctx) {
+  const keys = sessionKeys(ctx);
+  for (const registration of registrations) {
+    if (keys.some((key) => registration.bound.has(key)))
+      return registration;
+  }
+  return registrations.size === 1 ? [...registrations][0] : undefined;
+}
+function bridgeRefusal(toolName, reason) {
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Error: '${toolName}' is not available — ${reason}.`
+      }
+    ],
+    details: undefined
+  };
+}
+function registerPiRegistry(options) {
+  const registration = {
+    dbPath: options.dbPath,
+    projectDir: options.projectDir,
+    registry: options.registry,
+    bound: new Set,
+    tools: options.tools ?? new Map
+  };
+  registrations.add(registration);
+  const facade = {
+    childTodo: () => options.childTodo?.(),
+    transformContext: async (event, ctx) => resolve3(ctx)?.registry.transformContext(event, ctx),
+    compact: async (ctx) => resolve3(ctx)?.registry.compact(ctx),
+    scrubMessage: (message) => {
+      for (const entry of registrations)
+        entry.registry.scrubMessage(message);
+    },
+    bindChild: (input) => {
+      const keys = [input.childSessionFile].filter((value) => typeof value === "string" && value.length > 0);
+      if (keys.length === 0)
+        return;
+      const matches = [...registrations].filter((entry) => input.cwd === undefined || entry.projectDir === input.cwd);
+      const targets = matches.length > 0 ? matches : registrations.size === 1 ? [...registrations] : [];
+      for (const entry of targets)
+        for (const key of keys)
+          entry.bound.add(key);
+      log(`[magic-context][pi] bound child session ${keys[0]} to parent ${input.parentSessionFile ?? "(unknown)"} on ${targets.length} instance(s) — a bound session is served in reduced mode`);
+      log(input.childSessionId ? `[magic-context][pi] child ${input.childSessionId} is served in reduced mode` : "[magic-context][pi] child bound WITHOUT a session id; reduced mode derives from the binding, so it is still served as a child");
+    },
+    runTool: async (toolName, params, ctx) => {
+      if (!CHILD_TOOL_ALLOWLIST.has(toolName)) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: '${toolName}' is not available in this session.`
+            }
+          ],
+          details: undefined
+        };
+      }
+      const definition = resolve3(ctx)?.tools.get(toolName);
+      if (!definition) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: '${toolName}' is not available — Magic Context has no instance serving this session.`
+            }
+          ],
+          details: undefined
+        };
+      }
+      return definition.execute(`child-${toolName}-${Date.now()}`, params, undefined, undefined, ctx);
+    },
+    clearSession: (sessionId, sessionFile) => {
+      for (const entry of registrations) {
+        entry.bound.delete(sessionId);
+        if (sessionFile !== undefined)
+          entry.bound.delete(sessionFile);
+        entry.registry.clearSession(sessionId);
+      }
+    }
+  };
+  globalThis[REGISTRY_KEY] = facade;
+  const bridge = options.bridge;
+  const grantedNames = (ctx) => (bridge?.publishableNames(ctx) ?? []).filter(isBridgePublishable);
+  const unpublishBridge = bridge ? publishBridgeTools(`${BRIDGE_OWNER}\x00${options.dbPath}\x00${options.projectDir}`, {
+    owner: BRIDGE_OWNER,
+    apiVersion: BRIDGE_API_VERSION,
+    catalogue: (ctx) => resolve3(ctx) === registration ? bridgeToolEntries(registration.tools, grantedNames(ctx)) : [],
+    execute: async (name, params, ctx) => {
+      if (resolve3(ctx) !== registration) {
+        return bridgeRefusal(name, "Magic Context has no instance serving this session");
+      }
+      if (!grantedNames(ctx).includes(name)) {
+        return bridgeRefusal(name, "not available in this session");
+      }
+      return bridge.execute(name, params, ctx);
+    }
+  }) : () => {};
+  return () => {
+    unpublishBridge();
+    registrations.delete(registration);
+    if (registrations.size === 0)
+      delete globalThis[REGISTRY_KEY];
+  };
 }
 
 // src/pi-todo-inject.ts
@@ -29139,9 +29317,10 @@ function registerPiContextHandler(pi, baseOptions) {
           return;
         }
       })();
+      const reduced = isBoundChild(ctx);
       const tNoteNudges = performance.now();
       try {
-        if (!options.compactionOff && !isReducedSession(sessionId)) {
+        if (!options.compactionOff && !reduced) {
           outputMessages = applyNoteNudges({
             sessionId,
             db: options.db,
@@ -29159,7 +29338,7 @@ function registerPiContextHandler(pi, baseOptions) {
       }
       logTransformTiming(sessionId, "noteNudges", tNoteNudges);
       const tAutoSearch = performance.now();
-      if (options.autoSearch?.enabled && !options.compactionOff && !isReducedSession(sessionId)) {
+      if (options.autoSearch?.enabled && !options.compactionOff && !reduced) {
         try {
           outputMessages = await runAutoSearchHintForPi({
             sessionId,
@@ -34457,180 +34636,6 @@ function ensurePiNativeConfigLink() {
   ensureLink();
 }
 
-// src/pi-tool-publication.ts
-var BRIDGE_OWNERS_SYMBOL = Symbol.for("pi-tool-bridge:owners");
-var BRIDGE_API_VERSION = 1;
-var BRIDGE_OWNER = "magic-context";
-var BRIDGE_PUBLISHABLE_TOOL_NAMES = new Set([
-  "ctx_search",
-  "ctx_memory",
-  "ctx_note",
-  "ctx_expand",
-  "ctx_reduce"
-]);
-function isBridgePublishable(name) {
-  return BRIDGE_PUBLISHABLE_TOOL_NAMES.has(name);
-}
-function bridgeSlot() {
-  const holder = globalThis;
-  const existing = holder[BRIDGE_OWNERS_SYMBOL];
-  if (existing instanceof Map)
-    return existing;
-  const created = new Map;
-  holder[BRIDGE_OWNERS_SYMBOL] = created;
-  return created;
-}
-function publishBridgeTools(key, publication) {
-  const slot = bridgeSlot();
-  slot.set(key, publication);
-  return () => {
-    if (slot.get(key) === publication)
-      slot.delete(key);
-  };
-}
-function bridgeToolEntries(definitions, names) {
-  const entries = [];
-  for (const name of names) {
-    if (!isBridgePublishable(name))
-      continue;
-    const definition = definitions.get(name);
-    if (!definition)
-      continue;
-    entries.push({
-      name,
-      description: definition.description,
-      snippet: definition.promptSnippet ?? definition.description,
-      parameters: definition.parameters
-    });
-  }
-  return entries;
-}
-
-// src/pi-registry.ts
-var REGISTRY_KEY = Symbol.for("@cortexkit/magic-context:pi-registry");
-var registrations = new Set;
-function sessionKeys(ctx) {
-  const sessionManager = ctx?.sessionManager;
-  const keys = [];
-  try {
-    const id = sessionManager?.getSessionId?.();
-    if (typeof id === "string" && id.length > 0)
-      keys.push(id);
-  } catch {}
-  try {
-    const file = sessionManager?.getSessionFile?.();
-    if (typeof file === "string" && file.length > 0)
-      keys.push(file);
-  } catch {}
-  return keys;
-}
-function resolve3(ctx) {
-  const keys = sessionKeys(ctx);
-  for (const registration of registrations) {
-    if (keys.some((key) => registration.bound.has(key)))
-      return registration;
-  }
-  return registrations.size === 1 ? [...registrations][0] : undefined;
-}
-function bridgeRefusal(toolName, reason) {
-  return {
-    content: [
-      {
-        type: "text",
-        text: `Error: '${toolName}' is not available — ${reason}.`
-      }
-    ],
-    details: undefined
-  };
-}
-function registerPiRegistry(options) {
-  const registration = {
-    dbPath: options.dbPath,
-    projectDir: options.projectDir,
-    registry: options.registry,
-    bound: new Set,
-    tools: options.tools ?? new Map
-  };
-  registrations.add(registration);
-  const facade = {
-    transformContext: async (event, ctx) => resolve3(ctx)?.registry.transformContext(event, ctx),
-    compact: async (ctx) => resolve3(ctx)?.registry.compact(ctx),
-    scrubMessage: (message) => {
-      for (const entry of registrations)
-        entry.registry.scrubMessage(message);
-    },
-    bindChild: (input) => {
-      const keys = [input.childSessionFile].filter((value) => typeof value === "string" && value.length > 0);
-      if (keys.length === 0)
-        return;
-      const matches = [...registrations].filter((entry) => input.cwd === undefined || entry.projectDir === input.cwd);
-      const targets = matches.length > 0 ? matches : registrations.size === 1 ? [...registrations] : [];
-      for (const entry of targets)
-        for (const key of keys)
-          entry.bound.add(key);
-      markReducedSession(input.childSessionId);
-      log(`[magic-context][pi] bound child session ${keys[0]} to parent ${input.parentSessionFile ?? "(unknown)"} on ${targets.length} instance(s)`);
-      log(input.childSessionId ? `[magic-context][pi] child ${input.childSessionId} is served in reduced mode` : "[magic-context][pi] child bound WITHOUT a session id — reduced mode not marked, the pass will treat it as a parent session");
-    },
-    runTool: async (toolName, params, ctx) => {
-      if (!CHILD_TOOL_ALLOWLIST.has(toolName)) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Error: '${toolName}' is not available in this session.`
-            }
-          ],
-          details: undefined
-        };
-      }
-      const definition = resolve3(ctx)?.tools.get(toolName);
-      if (!definition) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Error: '${toolName}' is not available — Magic Context has no instance serving this session.`
-            }
-          ],
-          details: undefined
-        };
-      }
-      return definition.execute(`child-${toolName}-${Date.now()}`, params, undefined, undefined, ctx);
-    },
-    clearSession: (sessionId) => {
-      for (const entry of registrations) {
-        entry.bound.delete(sessionId);
-        entry.registry.clearSession(sessionId);
-      }
-      unmarkReducedSession(sessionId);
-    }
-  };
-  globalThis[REGISTRY_KEY] = facade;
-  const bridge = options.bridge;
-  const grantedNames = (ctx) => (bridge?.publishableNames(ctx) ?? []).filter(isBridgePublishable);
-  const unpublishBridge = bridge ? publishBridgeTools(`${BRIDGE_OWNER}\x00${options.dbPath}\x00${options.projectDir}`, {
-    owner: BRIDGE_OWNER,
-    apiVersion: BRIDGE_API_VERSION,
-    catalogue: (ctx) => resolve3(ctx) === registration ? bridgeToolEntries(registration.tools, grantedNames(ctx)) : [],
-    execute: async (name, params, ctx) => {
-      if (resolve3(ctx) !== registration) {
-        return bridgeRefusal(name, "Magic Context has no instance serving this session");
-      }
-      if (!grantedNames(ctx).includes(name)) {
-        return bridgeRefusal(name, "not available in this session");
-      }
-      return bridge.execute(name, params, ctx);
-    }
-  }) : () => {};
-  return () => {
-    unpublishBridge();
-    registrations.delete(registration);
-    if (registrations.size === 0)
-      delete globalThis[REGISTRY_KEY];
-  };
-}
-
 // src/strip-tag-prefix.ts
 function stripTagPrefixFromAssistantMessage(message) {
   if (message.role !== "assistant")
@@ -35356,6 +35361,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
   registerPiDroppedInputGuard(pi);
   const todowriteEnabled = bootProjectDeps.config.todowrite.enabled !== false;
   const todowriteOverlayEnabled = todowriteEnabled && bootProjectDeps.config.todowrite.overlay !== false;
+  const todowriteDefinition = todowriteEnabled ? createTodowriteTool() : undefined;
   const registeredTools = registerMagicContextTools(pi, {
     db,
     ensureProjectRegistered: ensureProjectRegisteredFromPiDirectory,
@@ -35367,6 +35373,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
     dreamerEnabled: isDreamerRunnable(config),
     resolveDreamerEnabled: (ctx) => resolveCurrentProjectDeps(ctx).dreamerEnabled,
     todowriteEnabled,
+    todowriteDefinition,
     compactionOff,
     promptSurface: registrationPromptSurface,
     promptSurfaceRuntime
@@ -35416,7 +35423,8 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
       publishableNames: (ctx) => {
         const memoryEnabled = resolveCurrentProjectDeps(ctx).config.memory.enabled;
         const registered = new Set(pi.getAllTools().map((tool) => tool.name));
-        return [...registeredTools.keys()].filter((name) => registered.has(name) && (name !== "ctx_memory" || memoryEnabled));
+        const parentNames = [...registeredTools.keys()].filter((name) => registered.has(name) && (name !== "ctx_memory" || memoryEnabled));
+        return narrowCatalogueForChild(parentNames, isBoundChild(ctx));
       },
       execute: async (name, params, ctx) => {
         const definition = registeredTools.get(name);
@@ -35434,14 +35442,34 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
         return definition.execute(`bridge-${name}-${Date.now()}`, params, undefined, undefined, ctx);
       }
     },
+    childTodo: () => todowriteDefinition ? {
+      definition: todowriteDefinition,
+      capture: (message, ctx) => {
+        const sessionId = ctx?.sessionManager?.getSessionId?.();
+        if (!sessionId)
+          return;
+        try {
+          capturePiTodowriteMessageIfCompatible({
+            db,
+            sessionId,
+            message,
+            todowriteEnabled: true,
+            todoOverlay: undefined,
+            persist: true
+          });
+        } catch (err) {
+          warn("childTodo: capture failed:", err);
+        }
+      }
+    } : undefined,
     registry: {
       transformContext: async (event, ctx) => {
         const sessionId = ctx?.sessionManager?.getSessionId?.();
         const result = await runContextPass(event, ctx);
-        if (!isReducedSession(sessionId))
+        if (!isBoundChild(ctx))
           return result;
         const base = result ?? { messages: event.messages };
-        const withTagSentence = ensureChildTagSentence(base, sessionId);
+        const withTagSentence = ensureChildTagSentence(base, true);
         if (shouldLogTagSentence(sessionId)) {
           log(withTagSentence === base ? `[magic-context][pi] child ${sessionId}: tag sentence already present or nothing to attach it to (roles: ${base.messages.map((m) => m?.role).join(",")})` : `[magic-context][pi] child ${sessionId}: tag sentence injected`);
         }

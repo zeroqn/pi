@@ -73,6 +73,7 @@
       },
       "peerDependencies": {
         "pi-code-mode": "*",
+        "pi-tool-bridge": "*",
       },
     },
     "packages/rpiv-advisor-pi-native": {

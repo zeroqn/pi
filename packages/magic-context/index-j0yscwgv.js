@@ -33881,286 +33881,6 @@ function registerTodoStateLifecycle(pi, deps) {
   });
 }
 
-// ../plugin/src/tools/ctx-expand/constants.ts
-var CTX_EXPAND_DESCRIPTION = `Recover the original conversation from your compacted history.
-
-Older parts of this session are summarized under \`## start-end · date · title\` headings inside <session-history> — e.g. \`## 120-245 · … · Fixed tagger collision\`. Each heading replaces the raw messages in that ordinal range with a summary. When the summary isn't enough — you need exact wording, a specific value, an error message, or the reasoning behind a decision — expand the range:
-
-ctx_expand(start=120, end=245)  ← the heading's start/end range
-
-Returns the raw transcript as [N] U:/A: lines, capped at ~15K tokens; an oversized range returns the head and tells you where to continue. Also works with ordinals from ctx_search message results — expand a window around a hit (e.g. start=N-10, end=N+5). Ranges after the last compartment are your live tail — already visible in context, not expandable.
-
-Two recovery modes for finer detail:
-- ctx_expand(start=120, end=245, verbose=true) — lists each message SEPARATELY with its ordinal [N] and a per-part preview (each tool call shown with its output size). Use this to find the exact message or tool call you want, then recover it in full by ordinal.
-- ctx_expand(message=138) — returns the FULL untruncated content of the message at that ordinal: every text part, and every tool call's complete input + output, read from stored history. This is the cheap way to get back a tool output you dropped with ctx_reduce — the original is still in storage even though the wire shows [dropped §N§]. If the message was deleted from history (session prune/revert), it says so.`;
-var CTX_EXPAND_TOKEN_BUDGET = 15000;
-
-// ../plugin/src/tools/ctx-expand/mode.ts
-function isInt(value) {
-  return typeof value === "number" && Number.isInteger(value);
-}
-function minOrdinal(domain) {
-  return domain === "non-negative" ? 0 : 1;
-}
-function messageError(domain) {
-  return domain === "non-negative" ? "Error: message must be a non-negative integer." : "Error: message must be a positive integer.";
-}
-function rangeError(domain) {
-  return domain === "non-negative" ? "Error: provide either message=<ordinal>, or start and end (non-negative integers, start <= end)." : "Error: provide either message=<ordinal>, or start and end (positive integers, start <= end).";
-}
-function resolveCtxExpandMode(args, domain) {
-  const min = minOrdinal(domain);
-  const messagePresent = args.message !== undefined && args.message !== null;
-  const message = isInt(args.message) ? args.message : undefined;
-  const start = isInt(args.start) ? args.start : undefined;
-  const end = isInt(args.end) ? args.end : undefined;
-  const messageValid = message !== undefined && message >= min;
-  const rangeValid = start !== undefined && end !== undefined && start >= min && end >= start;
-  const fillerPair = start === 0 && end === 0;
-  const rangeNamed = rangeValid && !fillerPair;
-  if (messageValid && !rangeNamed) {
-    return { kind: "message", message };
-  }
-  if (messagePresent && !messageValid && !rangeNamed) {
-    return { kind: "error", message: messageError(domain) };
-  }
-  if (rangeValid) {
-    return {
-      kind: "range",
-      start,
-      end,
-      verbose: args.verbose === true
-    };
-  }
-  return { kind: "error", message: rangeError(domain) };
-}
-
-// ../plugin/src/tools/ctx-expand/render.ts
-function isRecord4(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-function roleLabel(role) {
-  if (role === "assistant")
-    return "A (assistant)";
-  if (role === "user")
-    return "U (user)";
-  return role;
-}
-function truncate(value, max) {
-  const t = value.trim();
-  return t.length <= max ? t : `${t.slice(0, max)}…`;
-}
-function keyArg(input) {
-  if (!input)
-    return "";
-  for (const k of ["filePath", "path", "pattern", "query", "symbol", "module", "action"]) {
-    const v = input[k];
-    if (typeof v === "string" && v.length > 0)
-      return truncate(v, 60);
-  }
-  if (typeof input.description === "string")
-    return truncate(input.description, 60);
-  return "";
-}
-function asToolPart(part) {
-  const type = typeof part.type === "string" ? part.type : "";
-  if (type === "tool") {
-    const state = isRecord4(part.state) ? part.state : null;
-    const output = state && typeof state.output === "string" ? state.output : state && state.output != null ? JSON.stringify(state.output) : null;
-    const metadata = state && isRecord4(state.metadata) ? state.metadata : null;
-    const title = state && typeof state.title === "string" && state.title || metadata && typeof metadata.title === "string" && metadata.title || null;
-    return {
-      name: typeof part.tool === "string" ? part.tool : "tool",
-      callId: typeof part.callID === "string" ? part.callID : "",
-      title,
-      input: state && isRecord4(state.input) ? state.input : null,
-      output
-    };
-  }
-  if (type === "tool_use") {
-    return {
-      name: typeof part.name === "string" ? part.name : "tool",
-      callId: typeof part.id === "string" ? part.id : "",
-      title: null,
-      input: isRecord4(part.input) ? part.input : null,
-      output: null
-    };
-  }
-  if (type === "tool_result") {
-    const content = part.content;
-    const output = typeof content === "string" ? content : content != null ? JSON.stringify(content) : null;
-    return {
-      name: "tool_result",
-      callId: typeof part.tool_use_id === "string" ? part.tool_use_id : "",
-      title: null,
-      input: null,
-      output
-    };
-  }
-  return null;
-}
-function textOf(part) {
-  if (part.type === "text" && typeof part.text === "string")
-    return part.text;
-  return null;
-}
-function reasoningOf(part) {
-  if ((part.type === "reasoning" || part.type === "thinking") && typeof part.text === "string") {
-    return part.text;
-  }
-  return null;
-}
-function renderPartPreview(part) {
-  if (!isRecord4(part))
-    return null;
-  const text = textOf(part);
-  if (text !== null) {
-    const t = truncate(text, 200);
-    return t.length > 0 ? `    • ${t}` : null;
-  }
-  const tool = asToolPart(part);
-  if (tool) {
-    const arg = keyArg(tool.input);
-    const head = arg ? `${tool.name}(${arg})` : tool.name;
-    return tool.output !== null ? `    • tool ${head} → output ~${estimateTokens(tool.output)} tok` : `    • tool ${head}`;
-  }
-  const reasoning = reasoningOf(part);
-  if (reasoning !== null)
-    return `    • [reasoning] ${truncate(reasoning, 120)}`;
-  const type = typeof part.type === "string" ? part.type : "part";
-  if (type === "file")
-    return "    • [file]";
-  if (type === "step-start" || type === "step-finish")
-    return null;
-  return `    • [${type}]`;
-}
-function renderPartFull(part) {
-  if (!isRecord4(part))
-    return null;
-  const text = textOf(part);
-  if (text !== null) {
-    return text.trim().length > 0 ? `  [text]
-${text}` : null;
-  }
-  const tool = asToolPart(part);
-  if (tool) {
-    const lines = [];
-    const idSuffix = tool.callId ? ` #${tool.callId}` : "";
-    lines.push(`  [tool: ${tool.name}${idSuffix}]`);
-    if (tool.title && tool.title.trim().length > 0) {
-      lines.push(`  description: ${tool.title.trim()}`);
-    }
-    if (tool.input)
-      lines.push(`  input: ${JSON.stringify(tool.input)}`);
-    if (tool.output !== null)
-      lines.push(`  output:
-${tool.output}`);
-    return lines.join(`
-`);
-  }
-  const type = typeof part.type === "string" ? part.type : "part";
-  if (type === "file") {
-    const name = typeof part.filename === "string" && part.filename || typeof part.url === "string" && part.url || "";
-    return `  [file]${name ? ` ${name}` : ""}`;
-  }
-  return null;
-}
-function renderMessageByOrdinal(sessionId, ordinal) {
-  const msg = readRawSessionMessages(sessionId).find((m) => m.ordinal === ordinal);
-  if (!msg) {
-    return `No message at ordinal ${ordinal} in this session's stored history — it was deleted ` + `(session prune/revert) or the ordinal is wrong, so it can't be recovered. ` + `Re-run the tool if you still need the data.`;
-  }
-  const rendered = msg.parts.map(renderPartFull).filter((l) => l !== null);
-  const lines = [`[${msg.ordinal}] ${roleLabel(msg.role)} — full recovery:`, ""];
-  if (rendered.length === 0) {
-    lines.push("  (no recoverable content — message had only structural/reasoning parts)");
-  } else {
-    lines.push(...rendered);
-  }
-  return lines.join(`
-`);
-}
-function renderVerboseRange(sessionId, start, end, tokenBudget) {
-  const messages = readRawSessionMessages(sessionId).filter((m) => m.ordinal >= start && m.ordinal <= end);
-  const out = [];
-  let usedTokens = 0;
-  let lastOrdinal = start - 1;
-  let truncated = false;
-  for (const msg of messages) {
-    const header = `[${msg.ordinal}] ${roleLabel(msg.role)}`;
-    const partLines = msg.parts.map(renderPartPreview).filter((l) => l !== null);
-    const block = partLines.length > 0 ? `${header}
-${partLines.join(`
-`)}` : header;
-    const blockTokens = estimateTokens(block);
-    if (usedTokens + blockTokens > tokenBudget && out.length > 0) {
-      truncated = true;
-      break;
-    }
-    out.push(block);
-    usedTokens += blockTokens;
-    lastOrdinal = msg.ordinal;
-  }
-  return { text: out.join(`
-
-`), lastOrdinal, truncated };
-}
-
-// ../plugin/src/tools/unwrap-imitated-reduced-args.ts
-var MAX_DECODED_STRING_LENGTH = 1024 * 1024;
-var MAX_DECODED_ARRAY_ITEMS = 100;
-function validField(value, rule) {
-  if (rule === "string") {
-    return typeof value === "string" && value.length <= MAX_DECODED_STRING_LENGTH;
-  }
-  if (rule === "number")
-    return typeof value === "number" && Number.isFinite(value);
-  if (rule === "boolean")
-    return typeof value === "boolean";
-  if (rule.type === "enum")
-    return typeof value === "string" && rule.values.includes(value);
-  if (!Array.isArray(value) || value.length > (rule.maxItems ?? MAX_DECODED_ARRAY_ITEMS)) {
-    return false;
-  }
-  return value.every((item) => {
-    if (rule.items === "number")
-      return typeof item === "number" && Number.isFinite(item);
-    return typeof item === "string" && item.length <= MAX_DECODED_STRING_LENGTH && (rule.values === undefined || rule.values.includes(item));
-  });
-}
-function validDecodedArgs(value, schema) {
-  for (const [field, fieldValue] of Object.entries(value)) {
-    if (field === "reduced") {
-      if (typeof fieldValue !== "boolean")
-        return false;
-      continue;
-    }
-    if (field === "summary") {
-      if (typeof fieldValue !== "string" || fieldValue.length > MAX_DECODED_STRING_LENGTH) {
-        return false;
-      }
-      continue;
-    }
-    const rule = schema[field];
-    if (!rule || !validField(fieldValue, rule))
-      return false;
-  }
-  return true;
-}
-function unwrapImitatedReducedArgs(args, primaryFields, schema) {
-  const record = args;
-  if (primaryFields.some((field) => record[field] !== undefined) || record.reduced !== true || typeof record.summary !== "string") {
-    return args;
-  }
-  try {
-    const parsed = JSON.parse(record.summary);
-    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) && validDecodedArgs(parsed, schema)) {
-      return parsed;
-    }
-  } catch {}
-  return args;
-}
-
 // ../../node_modules/.bun/typebox@1.3.7/node_modules/typebox/build/system/memory/metrics.mjs
 var Metrics = {
   assign: 0,
@@ -34485,6 +34205,339 @@ var integerKeyPattern = new RegExp("^(?:0|[1-9][0-9]*)$");
 
 // ../../node_modules/.bun/typebox@1.3.7/node_modules/typebox/build/type/engine/indexed/from_object.mjs
 var NumericKeyPattern = new RegExp(IntegerKey);
+// src/tools/todowrite.ts
+var TodoItem = _Object_({
+  content: String2({ description: "Brief description of the task" }),
+  status: Union(TODO_STATUSES.map((v) => Literal(v))),
+  priority: Optional(Union(TODO_PRIORITIES.map((v) => Literal(v)))),
+  id: Optional(String2({ description: "Optional stable id for the todo" }))
+});
+var TodowriteParams = _Object_({
+  todos: _Array_(TodoItem, {
+    description: "Replace the current task list with this complete set of todos. Include every task you intend to track this turn — pending, in_progress, completed, or cancelled — because the list overwrites previous state."
+  })
+});
+var PROMPT_SNIPPET = "Manage a task list to track multi-step progress";
+var PROMPT_GUIDELINES = [
+  "Use `todowrite` for non-trivial work spanning 3+ steps, when the user gives you multiple tasks, or when you need to track progress across a verify/fix loop. Skip it for single-shot answers or trivial one-step work.",
+  "Pass the COMPLETE updated todo list every time. This tool replaces the prior list rather than appending to it, so include pending, in_progress, completed, and cancelled tasks that should remain visible.",
+  "When starting a task, mark exactly one todo `in_progress` before doing the work. Mark items `completed` immediately when done; use `cancelled` only for work that is no longer needed.",
+  "Never mark a todo completed if verification is failing, implementation is partial, or an unresolved blocker remains. Keep it `in_progress` and add or update a todo for the blocker instead."
+];
+function createTodowriteTool() {
+  return {
+    name: TODO_TOOL_NAME,
+    label: "Todos",
+    description: "Manage the session task list.",
+    promptSnippet: PROMPT_SNIPPET,
+    promptGuidelines: PROMPT_GUIDELINES,
+    parameters: TodowriteParams,
+    async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+      const todos = params.todos ?? [];
+      const active = todos.filter((todo) => !TITLE_DONE_STATUSES.has(todo.status)).length;
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(todos, null, 2)
+          }
+        ],
+        details: {
+          todos,
+          title: `${active} todos`,
+          truncated: false
+        }
+      };
+    },
+    renderCall(args, theme, context) {
+      return renderTodowriteCall(args, theme, context);
+    },
+    renderResult(result, _opts, theme, context) {
+      return renderTodowriteResult(result, theme, context);
+    }
+  };
+}
+
+// ../plugin/src/tools/ctx-expand/constants.ts
+var CTX_EXPAND_DESCRIPTION = `Recover the original conversation from your compacted history.
+
+Older parts of this session are summarized under \`## start-end · date · title\` headings inside <session-history> — e.g. \`## 120-245 · … · Fixed tagger collision\`. Each heading replaces the raw messages in that ordinal range with a summary. When the summary isn't enough — you need exact wording, a specific value, an error message, or the reasoning behind a decision — expand the range:
+
+ctx_expand(start=120, end=245)  ← the heading's start/end range
+
+Returns the raw transcript as [N] U:/A: lines, capped at ~15K tokens; an oversized range returns the head and tells you where to continue. Also works with ordinals from ctx_search message results — expand a window around a hit (e.g. start=N-10, end=N+5). Ranges after the last compartment are your live tail — already visible in context, not expandable.
+
+Two recovery modes for finer detail:
+- ctx_expand(start=120, end=245, verbose=true) — lists each message SEPARATELY with its ordinal [N] and a per-part preview (each tool call shown with its output size). Use this to find the exact message or tool call you want, then recover it in full by ordinal.
+- ctx_expand(message=138) — returns the FULL untruncated content of the message at that ordinal: every text part, and every tool call's complete input + output, read from stored history. This is the cheap way to get back a tool output you dropped with ctx_reduce — the original is still in storage even though the wire shows [dropped §N§]. If the message was deleted from history (session prune/revert), it says so.`;
+var CTX_EXPAND_TOKEN_BUDGET = 15000;
+
+// ../plugin/src/tools/ctx-expand/mode.ts
+function isInt(value) {
+  return typeof value === "number" && Number.isInteger(value);
+}
+function minOrdinal(domain) {
+  return domain === "non-negative" ? 0 : 1;
+}
+function messageError(domain) {
+  return domain === "non-negative" ? "Error: message must be a non-negative integer." : "Error: message must be a positive integer.";
+}
+function rangeError(domain) {
+  return domain === "non-negative" ? "Error: provide either message=<ordinal>, or start and end (non-negative integers, start <= end)." : "Error: provide either message=<ordinal>, or start and end (positive integers, start <= end).";
+}
+function resolveCtxExpandMode(args, domain) {
+  const min = minOrdinal(domain);
+  const messagePresent = args.message !== undefined && args.message !== null;
+  const message = isInt(args.message) ? args.message : undefined;
+  const start = isInt(args.start) ? args.start : undefined;
+  const end = isInt(args.end) ? args.end : undefined;
+  const messageValid = message !== undefined && message >= min;
+  const rangeValid = start !== undefined && end !== undefined && start >= min && end >= start;
+  const fillerPair = start === 0 && end === 0;
+  const rangeNamed = rangeValid && !fillerPair;
+  if (messageValid && !rangeNamed) {
+    return { kind: "message", message };
+  }
+  if (messagePresent && !messageValid && !rangeNamed) {
+    return { kind: "error", message: messageError(domain) };
+  }
+  if (rangeValid) {
+    return {
+      kind: "range",
+      start,
+      end,
+      verbose: args.verbose === true
+    };
+  }
+  return { kind: "error", message: rangeError(domain) };
+}
+
+// ../plugin/src/tools/ctx-expand/render.ts
+function isRecord4(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function roleLabel(role) {
+  if (role === "assistant")
+    return "A (assistant)";
+  if (role === "user")
+    return "U (user)";
+  return role;
+}
+function truncate(value, max) {
+  const t = value.trim();
+  return t.length <= max ? t : `${t.slice(0, max)}…`;
+}
+function keyArg(input) {
+  if (!input)
+    return "";
+  for (const k of ["filePath", "path", "pattern", "query", "symbol", "module", "action"]) {
+    const v = input[k];
+    if (typeof v === "string" && v.length > 0)
+      return truncate(v, 60);
+  }
+  if (typeof input.description === "string")
+    return truncate(input.description, 60);
+  return "";
+}
+function asToolPart(part) {
+  const type = typeof part.type === "string" ? part.type : "";
+  if (type === "tool") {
+    const state = isRecord4(part.state) ? part.state : null;
+    const output = state && typeof state.output === "string" ? state.output : state && state.output != null ? JSON.stringify(state.output) : null;
+    const metadata = state && isRecord4(state.metadata) ? state.metadata : null;
+    const title = state && typeof state.title === "string" && state.title || metadata && typeof metadata.title === "string" && metadata.title || null;
+    return {
+      name: typeof part.tool === "string" ? part.tool : "tool",
+      callId: typeof part.callID === "string" ? part.callID : "",
+      title,
+      input: state && isRecord4(state.input) ? state.input : null,
+      output
+    };
+  }
+  if (type === "tool_use") {
+    return {
+      name: typeof part.name === "string" ? part.name : "tool",
+      callId: typeof part.id === "string" ? part.id : "",
+      title: null,
+      input: isRecord4(part.input) ? part.input : null,
+      output: null
+    };
+  }
+  if (type === "tool_result") {
+    const content = part.content;
+    const output = typeof content === "string" ? content : content != null ? JSON.stringify(content) : null;
+    return {
+      name: "tool_result",
+      callId: typeof part.tool_use_id === "string" ? part.tool_use_id : "",
+      title: null,
+      input: null,
+      output
+    };
+  }
+  return null;
+}
+function textOf(part) {
+  if (part.type === "text" && typeof part.text === "string")
+    return part.text;
+  return null;
+}
+function reasoningOf(part) {
+  if ((part.type === "reasoning" || part.type === "thinking") && typeof part.text === "string") {
+    return part.text;
+  }
+  return null;
+}
+function renderPartPreview(part) {
+  if (!isRecord4(part))
+    return null;
+  const text = textOf(part);
+  if (text !== null) {
+    const t = truncate(text, 200);
+    return t.length > 0 ? `    • ${t}` : null;
+  }
+  const tool = asToolPart(part);
+  if (tool) {
+    const arg = keyArg(tool.input);
+    const head = arg ? `${tool.name}(${arg})` : tool.name;
+    return tool.output !== null ? `    • tool ${head} → output ~${estimateTokens(tool.output)} tok` : `    • tool ${head}`;
+  }
+  const reasoning = reasoningOf(part);
+  if (reasoning !== null)
+    return `    • [reasoning] ${truncate(reasoning, 120)}`;
+  const type = typeof part.type === "string" ? part.type : "part";
+  if (type === "file")
+    return "    • [file]";
+  if (type === "step-start" || type === "step-finish")
+    return null;
+  return `    • [${type}]`;
+}
+function renderPartFull(part) {
+  if (!isRecord4(part))
+    return null;
+  const text = textOf(part);
+  if (text !== null) {
+    return text.trim().length > 0 ? `  [text]
+${text}` : null;
+  }
+  const tool = asToolPart(part);
+  if (tool) {
+    const lines = [];
+    const idSuffix = tool.callId ? ` #${tool.callId}` : "";
+    lines.push(`  [tool: ${tool.name}${idSuffix}]`);
+    if (tool.title && tool.title.trim().length > 0) {
+      lines.push(`  description: ${tool.title.trim()}`);
+    }
+    if (tool.input)
+      lines.push(`  input: ${JSON.stringify(tool.input)}`);
+    if (tool.output !== null)
+      lines.push(`  output:
+${tool.output}`);
+    return lines.join(`
+`);
+  }
+  const type = typeof part.type === "string" ? part.type : "part";
+  if (type === "file") {
+    const name = typeof part.filename === "string" && part.filename || typeof part.url === "string" && part.url || "";
+    return `  [file]${name ? ` ${name}` : ""}`;
+  }
+  return null;
+}
+function renderMessageByOrdinal(sessionId, ordinal) {
+  const msg = readRawSessionMessages(sessionId).find((m) => m.ordinal === ordinal);
+  if (!msg) {
+    return `No message at ordinal ${ordinal} in this session's stored history — it was deleted ` + `(session prune/revert) or the ordinal is wrong, so it can't be recovered. ` + `Re-run the tool if you still need the data.`;
+  }
+  const rendered = msg.parts.map(renderPartFull).filter((l) => l !== null);
+  const lines = [`[${msg.ordinal}] ${roleLabel(msg.role)} — full recovery:`, ""];
+  if (rendered.length === 0) {
+    lines.push("  (no recoverable content — message had only structural/reasoning parts)");
+  } else {
+    lines.push(...rendered);
+  }
+  return lines.join(`
+`);
+}
+function renderVerboseRange(sessionId, start, end, tokenBudget) {
+  const messages = readRawSessionMessages(sessionId).filter((m) => m.ordinal >= start && m.ordinal <= end);
+  const out = [];
+  let usedTokens = 0;
+  let lastOrdinal = start - 1;
+  let truncated = false;
+  for (const msg of messages) {
+    const header = `[${msg.ordinal}] ${roleLabel(msg.role)}`;
+    const partLines = msg.parts.map(renderPartPreview).filter((l) => l !== null);
+    const block = partLines.length > 0 ? `${header}
+${partLines.join(`
+`)}` : header;
+    const blockTokens = estimateTokens(block);
+    if (usedTokens + blockTokens > tokenBudget && out.length > 0) {
+      truncated = true;
+      break;
+    }
+    out.push(block);
+    usedTokens += blockTokens;
+    lastOrdinal = msg.ordinal;
+  }
+  return { text: out.join(`
+
+`), lastOrdinal, truncated };
+}
+
+// ../plugin/src/tools/unwrap-imitated-reduced-args.ts
+var MAX_DECODED_STRING_LENGTH = 1024 * 1024;
+var MAX_DECODED_ARRAY_ITEMS = 100;
+function validField(value, rule) {
+  if (rule === "string") {
+    return typeof value === "string" && value.length <= MAX_DECODED_STRING_LENGTH;
+  }
+  if (rule === "number")
+    return typeof value === "number" && Number.isFinite(value);
+  if (rule === "boolean")
+    return typeof value === "boolean";
+  if (rule.type === "enum")
+    return typeof value === "string" && rule.values.includes(value);
+  if (!Array.isArray(value) || value.length > (rule.maxItems ?? MAX_DECODED_ARRAY_ITEMS)) {
+    return false;
+  }
+  return value.every((item) => {
+    if (rule.items === "number")
+      return typeof item === "number" && Number.isFinite(item);
+    return typeof item === "string" && item.length <= MAX_DECODED_STRING_LENGTH && (rule.values === undefined || rule.values.includes(item));
+  });
+}
+function validDecodedArgs(value, schema) {
+  for (const [field, fieldValue] of Object.entries(value)) {
+    if (field === "reduced") {
+      if (typeof fieldValue !== "boolean")
+        return false;
+      continue;
+    }
+    if (field === "summary") {
+      if (typeof fieldValue !== "string" || fieldValue.length > MAX_DECODED_STRING_LENGTH) {
+        return false;
+      }
+      continue;
+    }
+    const rule = schema[field];
+    if (!rule || !validField(fieldValue, rule))
+      return false;
+  }
+  return true;
+}
+function unwrapImitatedReducedArgs(args, primaryFields, schema) {
+  const record = args;
+  if (primaryFields.some((field) => record[field] !== undefined) || record.reduced !== true || typeof record.summary !== "string") {
+    return args;
+  }
+  try {
+    const parsed = JSON.parse(record.summary);
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) && validDecodedArgs(parsed, schema)) {
+      return parsed;
+    }
+  } catch {}
+  return args;
+}
+
 // src/tools/ctx-expand.ts
 var ParamsSchema = _Object_({
   start: Optional(Number2({
@@ -41355,59 +41408,6 @@ function createCtxSearchTool(deps) {
   };
 }
 
-// src/tools/todowrite.ts
-var TodoItem = _Object_({
-  content: String2({ description: "Brief description of the task" }),
-  status: Union(TODO_STATUSES.map((v) => Literal(v))),
-  priority: Optional(Union(TODO_PRIORITIES.map((v) => Literal(v)))),
-  id: Optional(String2({ description: "Optional stable id for the todo" }))
-});
-var TodowriteParams = _Object_({
-  todos: _Array_(TodoItem, {
-    description: "Replace the current task list with this complete set of todos. Include every task you intend to track this turn — pending, in_progress, completed, or cancelled — because the list overwrites previous state."
-  })
-});
-var PROMPT_SNIPPET = "Manage a task list to track multi-step progress";
-var PROMPT_GUIDELINES = [
-  "Use `todowrite` for non-trivial work spanning 3+ steps, when the user gives you multiple tasks, or when you need to track progress across a verify/fix loop. Skip it for single-shot answers or trivial one-step work.",
-  "Pass the COMPLETE updated todo list every time. This tool replaces the prior list rather than appending to it, so include pending, in_progress, completed, and cancelled tasks that should remain visible.",
-  "When starting a task, mark exactly one todo `in_progress` before doing the work. Mark items `completed` immediately when done; use `cancelled` only for work that is no longer needed.",
-  "Never mark a todo completed if verification is failing, implementation is partial, or an unresolved blocker remains. Keep it `in_progress` and add or update a todo for the blocker instead."
-];
-function createTodowriteTool() {
-  return {
-    name: TODO_TOOL_NAME,
-    label: "Todos",
-    description: "Manage the session task list.",
-    promptSnippet: PROMPT_SNIPPET,
-    promptGuidelines: PROMPT_GUIDELINES,
-    parameters: TodowriteParams,
-    async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      const todos = params.todos ?? [];
-      const active = todos.filter((todo) => !TITLE_DONE_STATUSES.has(todo.status)).length;
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(todos, null, 2)
-          }
-        ],
-        details: {
-          todos,
-          title: `${active} todos`,
-          truncated: false
-        }
-      };
-    },
-    renderCall(args, theme, context) {
-      return renderTodowriteCall(args, theme, context);
-    },
-    renderResult(result, _opts, theme, context) {
-      return renderTodowriteResult(result, theme, context);
-    }
-  };
-}
-
 // src/tools/index.ts
 var CTX_MEMORY_TOOL_NAME = "ctx_memory";
 function syncCtxMemoryToolEnabled(pi, memoryEnabled) {
@@ -41460,7 +41460,7 @@ function registerMagicContextTools(pi, opts) {
     pi.registerTool(ctxExpand);
   }
   if (opts.todowriteEnabled !== false) {
-    pi.registerTool(createTodowriteTool());
+    pi.registerTool(opts.todowriteDefinition ?? createTodowriteTool());
     if (opts.todowriteCommandEnabled !== false) {
       registerTodosCommand(pi);
     }
@@ -41482,4 +41482,4 @@ function registerMagicContextTools(pi, opts) {
   ]);
 }
 
-export { COMPACTION_ENABLED_PATH, isDreamerRunnable, isCompactionEnabled, migrateMagicContextConfigLocations, withContentLanguageDirective, withMigrationLanguageDirective, buildPrimaryLanguageDirective, parseCron, nextOccurrence, nextDueAtMs, canonicalModelIdentity, piModelRefToCanonical, resolveModelRefForPi, modelRefLookupOrder, ompModelRefToCanonical, resolveModelRefForOmp, resolveModelConfigValue, resolveModelConfigOrDefault, DEFAULT_HISTORIAN_TIMEOUT_MS, getProtectedTokensTierOverrides, sanitizeDiagnosticText, hasShareabilitySensitiveText, FAIL_CLOSED_DOCTOR_COMMAND, formatFailClosedBlockingMessage, createFailClosedBlockingError, isFailClosedBlockingError, shouldBypassFailClosedBlock, createFailClosedController, setHarness, getHarness, ensureCortexKitArtifactGitignore, getProjectMagicContextHistorianDir, getMagicContextStorageResolution, getMagicContextStorageDir, log, sessionLog, flushLogger, ProjectIdentityError, resolveProjectIdentityStrict, resolveProjectIdentity, resolveProjectIdentityForSession, beginBootQuietPeriod, scheduleAfterBootQuiet, CTX_REDUCE_KEEP, newestCtxReduceTagNumbers, textMentionsRecentCommit, hasMeaningfulUserText, extractTexts, extractToolCallSummaries, preloadTokenizer, estimateTokens, normalizeText, stripWellFormedLeadingTagPrefix, stripPersistedAssistantText, byteSize, stripTagPrefix, peelLeadingMcTagNotation, prependTag, isRecord, estimateImageTokensFromDataUrl, normalizeTodoStateJson, buildSyntheticTodoPart, stripChannel1ReminderSpans, effectiveTailHygiene, CHANNEL1_SENTINEL, CHANNEL1_FLOOR_TOKENS, decideChannel1, evaluateChannel2, reclaimableToolOutputCount, buildChannel2Reminder, buildChannel1Reminder, planEmergencyDrop, updateTagByteSize, getRecentTagOwnerMessageIds, AGE_RECLAIM_MIN_TOKENS, getOldestActiveUnprotectedToolTags, getActiveToolTagsForAgeReclaim, getTriggerTagTokenUpperBound, updateTagInputByteSize, updateTagTokenCount, getPersistedToolTagAccounting, getAllStatusTagTokenTotalsFlat, updateTagInputTokenCount, tagTokenCountIsNull, backfillTagTokenCounts, insertTag, updateTagStatus, updateTagDropMode, updateCavemanDepth, hasPiFallbackMessageTags, findAdoptableFallbackTags, hasPiFallbackToolOwnerTags, findPiFallbackToolOwnerTags, adoptPiFallbackToolOwnerTag, adoptPiFallbackMessageTag, getMaxTagNumberBySession, getAssignableTagNumberByMessageId, deriveTagLoadFloor, getTagsBySession, getActiveTagsBySession, getTagsForPendingOperations, getTagsByNumbers, getDroppedTagsByNumbers, getMaxDroppedTagNumber, getToolTagNumberByOwner, getNullOwnerToolTag, adoptNullOwnerToolTag, resolveOpenCodeDbPath, assertOpenCodeStoreGeneration, openCodeDbPathExists, recordOpenCodeDbReadFailure, clearOpenCodeDbReadFailure, claimOpenCodeDbDiagnosticOnce, Database, closeQuietly, completedToolArcCrossesBoundary, estimateTrueRawMessageTokens, buildToolArcs, fenceBoundaryForCompletedToolArcs, fenceBoundaryForToolArcs, buildTrueRawTokenIndex, computeRawRangeFingerprint, invalidateTrueRawTokenCache, DROPPED_INPUT_MESSAGE, droppedInputMarker, containsDroppedInputPlaceholder, isEditTool, applyEditMarkerToInput, setRawMessageProvider, withRawMessageProvider, cleanUserText, withRawSessionMessageCache, readRawSessionMessages, primeTailRawMessageCache, getCachedAbsoluteMessageCount, primeInMemoryTailRawMessageCache, getRawSessionMessageCount, getRawSessionTagKeysThrough, getLegacyProtectedTailStartOrdinal, readSessionChunk, logSlowWriteTransaction, clearCompressionDepth, clearCompressionDepthRange, getMessageIndexSourceIdentity, isMessageIndexSourceCurrent, getLastIndexedOrdinal, getMessageIndexReconciliationStartOrdinal, isMessageIndexReconciledThrough, indexSingleMessage, indexMessagesAfterOrdinal, sweepOrphanedOpenCodeMessageIndexes, recordSessionProjectIdentity, COMPARTMENT_LEASE_RENEWAL_MS, acquireCompartmentLease, renewCompartmentLease, releaseCompartmentLease, releaseCompartmentLeaseBestEffort, isCompartmentLeaseHeld, isNoContentCompartment, HAS_COMPARTMENT_CONTENT_SQL, persistCachedM0, clearCachedM0M1, getCompartments, getLastCompartmentEndMessage, getLastCompartmentEndMessageId, getCompartmentsByEndMessageId, appendCompartments, saveRecompStagingPass, getRecompStaging, clearRecompStaging, getRecompPartialRange, setRecompPartialRange, escapeXmlAttr, escapeXmlContent, getModuleNoteEvaluationBridge, getContextStoreUuid, drainMirrorPages, parseCompartmentOutput, resolveWorkspaceShareCategories, resolveWorkspaceIdentitySet, expandWorkspaceIdentitySetWithAliases, sourceNameForMemory, computeWorkspaceEpochFingerprint, bumpEpochsForWorkspaceMembers, readProjectDocsCanonical, encodePiContentDecision, getPiContentDecisions, freezePiContentDecision, getNativeReplayState, saveNativeToolInputs, addNativeReasoningIds, copySessionStateForClone, getErrorMessage, describeError, piHarnessKindFromExecutable, setStoragePrivatePermissionEnforcement, getSchemaFenceRejection, getMigrationOnOpenRefusal, LATEST_SUPPORTED_VERSION, getDatabasePath, getPersistedSchemaVersion, setSqlitePragmaConfig, applySqliteTuningPragmas, runSqliteOptimize, openDatabase, openDatabaseAsync, queueM0Mutation, getMaxM0MutationId, queueMemoryMutation, getMemoryMutationsForRender, getMemoryMutationsForRenderByProjects, getMaxMemoryMutationId, getMaxMemoryMutationIdForProjects, MAX_EXECUTE_THRESHOLD, escalationBands, computeProtectionWindow, readEpochFloorSnapshot, getProtectionWindowForSession, isProviderOverflowFailClosedProven, describeProtectedTailDrainBudgetSkip, loadProtectedTailMeta, markProtectedTailPolicyV3Seeded, recordProtectedTailPublicationFloor, recordProtectedTailNoEligibleHead, getWrapupInProgressState, isWrapupInProgress, acquireWrapupInProgress, updateWrapupInProgress, releaseWrapupInProgress, resolveCompactionModeRecord, getCompactionModeRecord, setCompactionModeRecord, reserveProtectedTailDrainTokens, clearEmergencyDrainLatch, recordHistorianDrainFailure, clearHistorianDrainFailure, rollbackProtectedTailDrainReservation, clearPersistedReasoningWatermark, getEmergencyInputSample, setEmergencyDropSample, clearEmergencyDropSample, getLastNudgeUndropped, setLastNudgeUndropped, getChannel1NudgeState, setChannel1NudgeState, markChannel1PostReduceGracePending, captureChannel1PostReduceGraceBaseline, getChannel2NudgeState, getChannel2NudgeClaim, setChannel2NudgeState, casChannel2NudgeState, claimChannel2NudgeState, casChannel2NudgeClaim, getPersistedNoteNudge, setPersistedNoteNudgeTrigger, setPersistedNoteNudgeTriggerMessageId, getNoteNudgeAnchors, getAutoSearchHintDecisions, deliverNoteNudgeAtomic, appendAutoSearchHintDecision, pruneNoteNudgeAnchors, pruneAutoSearchHintDecisions, getPersistedTodoSyntheticAnchor, setPersistedTodoSyntheticAnchor, clearPersistedTodoSyntheticAnchor, getNoteLastReadAt, incrementHistorianFailure, clearHistorianFailureState, getOverflowState, recordOverflowDetected, clearEmergencyRecovery, clearDetectedContextLimit, getStrippedPlaceholderIds, applyStrippedPlaceholderDelta, NEWEST_REASONING_BEARING_ASSISTANT, THINKING_BINDING_RECOVERY_FROZEN_PREFIX, thinkingBindingRecoveryFrozenId, getThinkingBindingRecoveryTarget, armThinkingBindingRecovery, clearThinkingBindingRecoveryIf, getMergedReasoningStrippedIds, addMergedReasoningStrippedIds, getProcessedImageStrippedIds, addProcessedImageStrippedIds, getPendingCompactionMarkerState, clearPendingCompactionMarkerStateIf, getPendingPiCompactionMarkerState, setPendingPiCompactionMarkerState, clearPendingPiCompactionMarkerStateIf, getSessionsWithPendingPiMarker, setSessionWorkMetrics, getSessionWorkMetrics, resolveEpochFloorForPass, getOrCreateSessionMeta, updateSessionMeta, advanceToolReclaimWatermark, retryPendingSessionCleanups, retryPendingRustSessionCleanupsForProject, getNotes, getSessionNotes, getPendingSmartNotes, getReadySmartNotes, markNoteReady, markNoteChecked, queuePendingOp, getPendingOps, getPendingOpsCount, clearPendingOps, removePendingOp, PRIMER_CANDIDATE_TTL_MS, PRIMER_CANDIDATE_MAX_AGE_MS, primerOccurrenceKey, primerOccurrenceUtcDay, insertPrimerCandidates, updatePrimerCandidateEmbedding, getPrimerCandidatesByIds, getPrimerCandidatesForPromotion, countPrimerCandidatesForProject, getActivePrimers, createPrimer, updatePrimerSupport, updatePrimerAnswer, GLOBAL_USER_PROFILE_PROJECT_PATH, getProjectState, bumpProjectUserProfileVersion, saveSourceContent, getSourceContents, recordSubagentInvocation, getLatestHistorianInvocationId, BoundedSessionMap, MIN_PLAUSIBLE_CONTEXT_LIMIT, reloadWindowOverlay, getWindowOverlay, resolveWindowOverlayFacts, deriveWindowGeometry, hasTrustedAbsoluteWall, applyProvenInputFloor, formatWindowDerivationLine, isSaneLimit, resolveOutputReserve, getSdkContextLimit, formatConfigParseStatusLine, formatConfigParseNotice, claimConfigParseFailuresOnce, promptSurfaceHashMaterial, createPromptSurfaceRuntime, createPromptSurfaceGuidanceEpochCache, SYNTH_USER_ID_PREFIX, resolvePiStableId, readPiSessionSnapshot, readPiSessionMessages, readPiSessionMessagePage, findLastModelKeyFromBranch, convertEntriesToRawMessages, convertEntriesToRawMessagePage, computeCueContentHash, hasMuralCueColumns, getMuralCueState, memoryNeedsCue, setMuralCue, recordMuralCueRejection, invalidateMemory, computeNormalizedHash, hasMemoryShareableColumn, hasMemoryClassifiedAtColumn, getUnclassifiedMemoryIds, insertMemory, getMemoryByHash, getMemoriesByProject, getMemoriesByProjects, getMaxMemoryIdForProjects, getAllActiveMemoriesForMigration, getMemoryById, setMemoryClassification, archiveMemory, deleteMemory, getMemoryCount, getMemoryCountsByStatus, USER_MEMORY_CANDIDATE_TTL_MS, insertUserMemoryCandidates, getUserMemoryCandidates, deleteUserMemoryCandidates, pruneExpiredUserMemoryCandidates, insertUserMemory, getActiveUserMemories, updateUserMemoryContent, dismissUserMemory, getTaskScheduleState, getMostRecentTaskRunAt, pruneNonCanonicalTaskRows, deleteTaskScheduleRowsForProject, seedTaskScheduleState, writeTaskScheduleState, isRetrospectiveWindowProcessed, recordRetrospectiveWindowProcessed, curateCategoryForMemoryCategory, peekCurateCategoryScope, beginCurateCategoryRun, curateTaskStateAfterSuccess, formatSynapseLaneDescriptor, buildCanonicalChunkTextFromFts, buildCompartmentSummaryFallbackText, canonicalizeInMemoryChunkTextForEmbedding, chunkCanonicalText, chunkEmbeddingWindowsAreCurrent, replaceCompartmentChunkEmbeddings, cosineSimilarity, GIT_SWEEP_LEASE_RENEWAL_MS, acquireGitSweepLease, renewGitSweepLease, markGitSweepSuccessAndRelease, parkGitSweepNonIndexable, releaseGitSweepLease, describeShadowBackfillWriteRefusal, contentSha256, sweepStaleEmbeddingIdentitiesForProject, enqueueShadowEmbeddingItems, getProjectEmbeddingSnapshot, getProjectChunkEmbeddingModelId, getProjectEmbeddingMaxInputTokens, embedTextForProject, embedBatchForProject, embedItemsForProject, embedUnembeddedMemoriesForProject, drainCommitBacklogForProject, embedSessionCompartmentChunks, getEmbeddingCoverageStatus, promoteSessionFactsDurable, embedPromotedFacts, recordMemoryMapping, recordMemoryVerifications, getUnmappedMemoryIds, clearMemoryVerifications, getMemoryVerifications, resolveGitTopLevel, readGitHead, readGitChangedFilesSince, readGitFileChangeTimesSince, verificationFileExists, normalizeVerificationFiles, isDirectiveShapedProjectRule, takeCurateSafetyRefusalCount, wakePlaneStatus, indexCommitsForProject, embedUnembeddedCommits, loadPiConfig, ensureProjectRegisteredFromPiDirectory, resolvePiHarnessDetection, resolvePiHarnessKind, resolveMuralWire, updateCompactionMarkerAfterPublication, COMPARTMENT_RENDER_EPOCH, encodeCachedM0UpgradeIdentity, decodeCachedM0UpgradeIdentity, DEFAULT_HISTORY_BUDGET_TOKENS, renderCompartmentAtTier, renderDecayedCompartments, extractM0Block, TEMPORAL_MARKER_PATTERN, temporalMarkerPrefix, clearInjectionCache, getVisibleMemoryIds, renderMemoryBlock, DEFAULT_MEMORY_BUDGET_TOKENS, DEFAULT_USER_PROFILE_BUDGET_TOKENS, trimMemoriesToBudgetV2, trimWorkspaceMemoriesToBudgetV2, trimUserMemoriesToBudget, renderMemoryBlockV2, stripMemoryMuralBlock, unifiedSearch, rememberTodowriteToolCallTodos, parseTodos, setTodoSnapshot, registerTodoOverlay, registerTodoStateLifecycle, syncCtxMemoryToolEnabled, registerMagicContextTools };
+export { COMPACTION_ENABLED_PATH, isDreamerRunnable, isCompactionEnabled, migrateMagicContextConfigLocations, withContentLanguageDirective, withMigrationLanguageDirective, buildPrimaryLanguageDirective, parseCron, nextOccurrence, nextDueAtMs, canonicalModelIdentity, piModelRefToCanonical, resolveModelRefForPi, modelRefLookupOrder, ompModelRefToCanonical, resolveModelRefForOmp, resolveModelConfigValue, resolveModelConfigOrDefault, DEFAULT_HISTORIAN_TIMEOUT_MS, getProtectedTokensTierOverrides, sanitizeDiagnosticText, hasShareabilitySensitiveText, FAIL_CLOSED_DOCTOR_COMMAND, formatFailClosedBlockingMessage, createFailClosedBlockingError, isFailClosedBlockingError, shouldBypassFailClosedBlock, createFailClosedController, setHarness, getHarness, ensureCortexKitArtifactGitignore, getProjectMagicContextHistorianDir, getMagicContextStorageResolution, getMagicContextStorageDir, log, sessionLog, flushLogger, ProjectIdentityError, resolveProjectIdentityStrict, resolveProjectIdentity, resolveProjectIdentityForSession, beginBootQuietPeriod, scheduleAfterBootQuiet, CTX_REDUCE_KEEP, newestCtxReduceTagNumbers, textMentionsRecentCommit, hasMeaningfulUserText, extractTexts, extractToolCallSummaries, preloadTokenizer, estimateTokens, normalizeText, stripWellFormedLeadingTagPrefix, stripPersistedAssistantText, byteSize, stripTagPrefix, peelLeadingMcTagNotation, prependTag, isRecord, estimateImageTokensFromDataUrl, normalizeTodoStateJson, buildSyntheticTodoPart, stripChannel1ReminderSpans, effectiveTailHygiene, CHANNEL1_SENTINEL, CHANNEL1_FLOOR_TOKENS, decideChannel1, evaluateChannel2, reclaimableToolOutputCount, buildChannel2Reminder, buildChannel1Reminder, planEmergencyDrop, updateTagByteSize, getRecentTagOwnerMessageIds, AGE_RECLAIM_MIN_TOKENS, getOldestActiveUnprotectedToolTags, getActiveToolTagsForAgeReclaim, getTriggerTagTokenUpperBound, updateTagInputByteSize, updateTagTokenCount, getPersistedToolTagAccounting, getAllStatusTagTokenTotalsFlat, updateTagInputTokenCount, tagTokenCountIsNull, backfillTagTokenCounts, insertTag, updateTagStatus, updateTagDropMode, updateCavemanDepth, hasPiFallbackMessageTags, findAdoptableFallbackTags, hasPiFallbackToolOwnerTags, findPiFallbackToolOwnerTags, adoptPiFallbackToolOwnerTag, adoptPiFallbackMessageTag, getMaxTagNumberBySession, getAssignableTagNumberByMessageId, deriveTagLoadFloor, getTagsBySession, getActiveTagsBySession, getTagsForPendingOperations, getTagsByNumbers, getDroppedTagsByNumbers, getMaxDroppedTagNumber, getToolTagNumberByOwner, getNullOwnerToolTag, adoptNullOwnerToolTag, resolveOpenCodeDbPath, assertOpenCodeStoreGeneration, openCodeDbPathExists, recordOpenCodeDbReadFailure, clearOpenCodeDbReadFailure, claimOpenCodeDbDiagnosticOnce, Database, closeQuietly, completedToolArcCrossesBoundary, estimateTrueRawMessageTokens, buildToolArcs, fenceBoundaryForCompletedToolArcs, fenceBoundaryForToolArcs, buildTrueRawTokenIndex, computeRawRangeFingerprint, invalidateTrueRawTokenCache, DROPPED_INPUT_MESSAGE, droppedInputMarker, containsDroppedInputPlaceholder, isEditTool, applyEditMarkerToInput, setRawMessageProvider, withRawMessageProvider, cleanUserText, withRawSessionMessageCache, readRawSessionMessages, primeTailRawMessageCache, getCachedAbsoluteMessageCount, primeInMemoryTailRawMessageCache, getRawSessionMessageCount, getRawSessionTagKeysThrough, getLegacyProtectedTailStartOrdinal, readSessionChunk, logSlowWriteTransaction, clearCompressionDepth, clearCompressionDepthRange, getMessageIndexSourceIdentity, isMessageIndexSourceCurrent, getLastIndexedOrdinal, getMessageIndexReconciliationStartOrdinal, isMessageIndexReconciledThrough, indexSingleMessage, indexMessagesAfterOrdinal, sweepOrphanedOpenCodeMessageIndexes, recordSessionProjectIdentity, COMPARTMENT_LEASE_RENEWAL_MS, acquireCompartmentLease, renewCompartmentLease, releaseCompartmentLease, releaseCompartmentLeaseBestEffort, isCompartmentLeaseHeld, isNoContentCompartment, HAS_COMPARTMENT_CONTENT_SQL, persistCachedM0, clearCachedM0M1, getCompartments, getLastCompartmentEndMessage, getLastCompartmentEndMessageId, getCompartmentsByEndMessageId, appendCompartments, saveRecompStagingPass, getRecompStaging, clearRecompStaging, getRecompPartialRange, setRecompPartialRange, escapeXmlAttr, escapeXmlContent, getModuleNoteEvaluationBridge, getContextStoreUuid, drainMirrorPages, parseCompartmentOutput, resolveWorkspaceShareCategories, resolveWorkspaceIdentitySet, expandWorkspaceIdentitySetWithAliases, sourceNameForMemory, computeWorkspaceEpochFingerprint, bumpEpochsForWorkspaceMembers, readProjectDocsCanonical, encodePiContentDecision, getPiContentDecisions, freezePiContentDecision, getNativeReplayState, saveNativeToolInputs, addNativeReasoningIds, copySessionStateForClone, getErrorMessage, describeError, piHarnessKindFromExecutable, setStoragePrivatePermissionEnforcement, getSchemaFenceRejection, getMigrationOnOpenRefusal, LATEST_SUPPORTED_VERSION, getDatabasePath, getPersistedSchemaVersion, setSqlitePragmaConfig, applySqliteTuningPragmas, runSqliteOptimize, openDatabase, openDatabaseAsync, queueM0Mutation, getMaxM0MutationId, queueMemoryMutation, getMemoryMutationsForRender, getMemoryMutationsForRenderByProjects, getMaxMemoryMutationId, getMaxMemoryMutationIdForProjects, MAX_EXECUTE_THRESHOLD, escalationBands, computeProtectionWindow, readEpochFloorSnapshot, getProtectionWindowForSession, isProviderOverflowFailClosedProven, describeProtectedTailDrainBudgetSkip, loadProtectedTailMeta, markProtectedTailPolicyV3Seeded, recordProtectedTailPublicationFloor, recordProtectedTailNoEligibleHead, getWrapupInProgressState, isWrapupInProgress, acquireWrapupInProgress, updateWrapupInProgress, releaseWrapupInProgress, resolveCompactionModeRecord, getCompactionModeRecord, setCompactionModeRecord, reserveProtectedTailDrainTokens, clearEmergencyDrainLatch, recordHistorianDrainFailure, clearHistorianDrainFailure, rollbackProtectedTailDrainReservation, clearPersistedReasoningWatermark, getEmergencyInputSample, setEmergencyDropSample, clearEmergencyDropSample, getLastNudgeUndropped, setLastNudgeUndropped, getChannel1NudgeState, setChannel1NudgeState, markChannel1PostReduceGracePending, captureChannel1PostReduceGraceBaseline, getChannel2NudgeState, getChannel2NudgeClaim, setChannel2NudgeState, casChannel2NudgeState, claimChannel2NudgeState, casChannel2NudgeClaim, getPersistedNoteNudge, setPersistedNoteNudgeTrigger, setPersistedNoteNudgeTriggerMessageId, getNoteNudgeAnchors, getAutoSearchHintDecisions, deliverNoteNudgeAtomic, appendAutoSearchHintDecision, pruneNoteNudgeAnchors, pruneAutoSearchHintDecisions, getPersistedTodoSyntheticAnchor, setPersistedTodoSyntheticAnchor, clearPersistedTodoSyntheticAnchor, getNoteLastReadAt, incrementHistorianFailure, clearHistorianFailureState, getOverflowState, recordOverflowDetected, clearEmergencyRecovery, clearDetectedContextLimit, getStrippedPlaceholderIds, applyStrippedPlaceholderDelta, NEWEST_REASONING_BEARING_ASSISTANT, THINKING_BINDING_RECOVERY_FROZEN_PREFIX, thinkingBindingRecoveryFrozenId, getThinkingBindingRecoveryTarget, armThinkingBindingRecovery, clearThinkingBindingRecoveryIf, getMergedReasoningStrippedIds, addMergedReasoningStrippedIds, getProcessedImageStrippedIds, addProcessedImageStrippedIds, getPendingCompactionMarkerState, clearPendingCompactionMarkerStateIf, getPendingPiCompactionMarkerState, setPendingPiCompactionMarkerState, clearPendingPiCompactionMarkerStateIf, getSessionsWithPendingPiMarker, setSessionWorkMetrics, getSessionWorkMetrics, resolveEpochFloorForPass, getOrCreateSessionMeta, updateSessionMeta, advanceToolReclaimWatermark, retryPendingSessionCleanups, retryPendingRustSessionCleanupsForProject, getNotes, getSessionNotes, getPendingSmartNotes, getReadySmartNotes, markNoteReady, markNoteChecked, queuePendingOp, getPendingOps, getPendingOpsCount, clearPendingOps, removePendingOp, PRIMER_CANDIDATE_TTL_MS, PRIMER_CANDIDATE_MAX_AGE_MS, primerOccurrenceKey, primerOccurrenceUtcDay, insertPrimerCandidates, updatePrimerCandidateEmbedding, getPrimerCandidatesByIds, getPrimerCandidatesForPromotion, countPrimerCandidatesForProject, getActivePrimers, createPrimer, updatePrimerSupport, updatePrimerAnswer, GLOBAL_USER_PROFILE_PROJECT_PATH, getProjectState, bumpProjectUserProfileVersion, saveSourceContent, getSourceContents, recordSubagentInvocation, getLatestHistorianInvocationId, BoundedSessionMap, MIN_PLAUSIBLE_CONTEXT_LIMIT, reloadWindowOverlay, getWindowOverlay, resolveWindowOverlayFacts, deriveWindowGeometry, hasTrustedAbsoluteWall, applyProvenInputFloor, formatWindowDerivationLine, isSaneLimit, resolveOutputReserve, getSdkContextLimit, formatConfigParseStatusLine, formatConfigParseNotice, claimConfigParseFailuresOnce, promptSurfaceHashMaterial, createPromptSurfaceRuntime, createPromptSurfaceGuidanceEpochCache, SYNTH_USER_ID_PREFIX, resolvePiStableId, readPiSessionSnapshot, readPiSessionMessages, readPiSessionMessagePage, findLastModelKeyFromBranch, convertEntriesToRawMessages, convertEntriesToRawMessagePage, computeCueContentHash, hasMuralCueColumns, getMuralCueState, memoryNeedsCue, setMuralCue, recordMuralCueRejection, invalidateMemory, computeNormalizedHash, hasMemoryShareableColumn, hasMemoryClassifiedAtColumn, getUnclassifiedMemoryIds, insertMemory, getMemoryByHash, getMemoriesByProject, getMemoriesByProjects, getMaxMemoryIdForProjects, getAllActiveMemoriesForMigration, getMemoryById, setMemoryClassification, archiveMemory, deleteMemory, getMemoryCount, getMemoryCountsByStatus, USER_MEMORY_CANDIDATE_TTL_MS, insertUserMemoryCandidates, getUserMemoryCandidates, deleteUserMemoryCandidates, pruneExpiredUserMemoryCandidates, insertUserMemory, getActiveUserMemories, updateUserMemoryContent, dismissUserMemory, getTaskScheduleState, getMostRecentTaskRunAt, pruneNonCanonicalTaskRows, deleteTaskScheduleRowsForProject, seedTaskScheduleState, writeTaskScheduleState, isRetrospectiveWindowProcessed, recordRetrospectiveWindowProcessed, curateCategoryForMemoryCategory, peekCurateCategoryScope, beginCurateCategoryRun, curateTaskStateAfterSuccess, formatSynapseLaneDescriptor, buildCanonicalChunkTextFromFts, buildCompartmentSummaryFallbackText, canonicalizeInMemoryChunkTextForEmbedding, chunkCanonicalText, chunkEmbeddingWindowsAreCurrent, replaceCompartmentChunkEmbeddings, cosineSimilarity, GIT_SWEEP_LEASE_RENEWAL_MS, acquireGitSweepLease, renewGitSweepLease, markGitSweepSuccessAndRelease, parkGitSweepNonIndexable, releaseGitSweepLease, describeShadowBackfillWriteRefusal, contentSha256, sweepStaleEmbeddingIdentitiesForProject, enqueueShadowEmbeddingItems, getProjectEmbeddingSnapshot, getProjectChunkEmbeddingModelId, getProjectEmbeddingMaxInputTokens, embedTextForProject, embedBatchForProject, embedItemsForProject, embedUnembeddedMemoriesForProject, drainCommitBacklogForProject, embedSessionCompartmentChunks, getEmbeddingCoverageStatus, promoteSessionFactsDurable, embedPromotedFacts, recordMemoryMapping, recordMemoryVerifications, getUnmappedMemoryIds, clearMemoryVerifications, getMemoryVerifications, resolveGitTopLevel, readGitHead, readGitChangedFilesSince, readGitFileChangeTimesSince, verificationFileExists, normalizeVerificationFiles, isDirectiveShapedProjectRule, takeCurateSafetyRefusalCount, wakePlaneStatus, indexCommitsForProject, embedUnembeddedCommits, loadPiConfig, ensureProjectRegisteredFromPiDirectory, resolvePiHarnessDetection, resolvePiHarnessKind, resolveMuralWire, updateCompactionMarkerAfterPublication, COMPARTMENT_RENDER_EPOCH, encodeCachedM0UpgradeIdentity, decodeCachedM0UpgradeIdentity, DEFAULT_HISTORY_BUDGET_TOKENS, renderCompartmentAtTier, renderDecayedCompartments, extractM0Block, TEMPORAL_MARKER_PATTERN, temporalMarkerPrefix, clearInjectionCache, getVisibleMemoryIds, renderMemoryBlock, DEFAULT_MEMORY_BUDGET_TOKENS, DEFAULT_USER_PROFILE_BUDGET_TOKENS, trimMemoriesToBudgetV2, trimWorkspaceMemoriesToBudgetV2, trimUserMemoriesToBudget, renderMemoryBlockV2, stripMemoryMuralBlock, unifiedSearch, rememberTodowriteToolCallTodos, parseTodos, setTodoSnapshot, registerTodoOverlay, registerTodoStateLifecycle, createTodowriteTool, syncCtxMemoryToolEnabled, registerMagicContextTools };
