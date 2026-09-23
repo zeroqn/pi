@@ -116,6 +116,8 @@ export interface SkillContent {
 }
 
 export const MAX_SKILL_NAME_LENGTH = 64;
+/** pi warns and no longer surfaces a skill whose description exceeds this. */
+export const MAX_SKILL_DESCRIPTION_LENGTH = 1024;
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PAYLOAD_DIRS = new Set(["scripts", "references", "assets"]);
 const SKILL_FILE_NAME = "SKILL.md";
@@ -123,6 +125,20 @@ const SKILL_FILE_NAME = "SKILL.md";
 /** True when `name` satisfies the Agent Skills name rules. */
 export function isValidSkillName(name: string): boolean {
 	return name.length >= 1 && name.length <= MAX_SKILL_NAME_LENGTH && SKILL_NAME.test(name);
+}
+
+/**
+ * pi caps a skill description at 1024 characters and warns
+ * "description exceeds 1024 characters" when a file goes over. A learned skill
+ * that trips that is surfaced as a conflict rather than as a usable skill, so
+ * the store refuses the write instead of publishing one.
+ */
+export function validateSkillDescription(description: unknown): string | undefined {
+	if (typeof description !== "string" || description.trim().length === 0) return "description must not be empty";
+	if (description.length > MAX_SKILL_DESCRIPTION_LENGTH) {
+		return `description exceeds ${MAX_SKILL_DESCRIPTION_LENGTH} characters (${description.length})`;
+	}
+	return undefined;
 }
 
 /**
@@ -284,7 +300,8 @@ export class SkillStore {
 	stage(input: NewSkillInput): StageResult {
 		const nameError = this.validateName(input.name);
 		if (nameError) return { ok: false, reason: nameError };
-		if (input.description.trim().length === 0) return { ok: false, reason: "description must not be empty" };
+		const descriptionError = validateSkillDescription(input.description);
+		if (descriptionError) return { ok: false, reason: descriptionError };
 		if (input.body.trim().length === 0) return { ok: false, reason: "body must not be empty" };
 
 		let dest: string;
@@ -388,9 +405,8 @@ export class SkillStore {
 
 		const hasContent = typeof input.body === "string" && input.body.trim().length > 0;
 		if (hasContent) {
-			if (typeof input.description !== "string" || input.description.trim().length === 0) {
-				return { ok: false, reason: "a proposed skill needs a description" };
-			}
+			const descriptionError = validateSkillDescription(input.description);
+			if (descriptionError) return { ok: false, reason: descriptionError };
 			for (const file of input.files ?? []) {
 				const fileError = validateProposalPath(file.path);
 				if (fileError) return { ok: false, reason: fileError };
@@ -461,7 +477,8 @@ export class SkillStore {
 		const metadata = isPlainObject(parsed.frontmatter.metadata) ? parsed.frontmatter.metadata : existing.metadata;
 		const files = changes.files ?? this.readPayloadFiles(existing.dir);
 
-		if (description.trim().length === 0) return { ok: false, reason: "description must not be empty" };
+		const descriptionError = validateSkillDescription(description);
+		if (descriptionError) return { ok: false, reason: descriptionError };
 		if (body.trim().length === 0) return { ok: false, reason: "body must not be empty" };
 		for (const file of files) {
 			const fileError = validatePayloadPath(file.path);

@@ -76,7 +76,7 @@ Most sessions contain nothing worth a skill. Producing nothing is a good outcome
 
 - Use the \`skill_store\` tool. Start with \`{ "action": "list" }\`, then \`{ "action": "read", "name": ... }\` on any skill that looks close, so you extend the library instead of duplicating it.
 - Names must be unique across the whole store; creation is refused if the name is taken, so pick a distinct, descriptive name.
-- \`{ "action": "create", "name": ..., "description": ..., "body": ..., "files": [...] }\`. The description decides when the skill is loaded — make it specific (what it does and when to use it).
+- \`{ "action": "create", "name": ..., "description": ..., "body": ..., "files": [...] }\`. The description decides when the skill is loaded — make it specific (what it does and when to use it). Keep it under 1024 characters: pi warns above that, and the store refuses the write.
 - If the lesson belongs in an existing human-authored skill rather than a new learned one, use \`{ "action": "propose", ... }\` and explain why; the human tier is never edited directly.
 - Create at most three skills. Fewer is better.
 

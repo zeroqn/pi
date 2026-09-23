@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { isValidSkillName, provenanceOf, SkillStore, treeWrittenSkills, validatePayloadPath } from "../store.ts";
+import { isValidSkillName, MAX_SKILL_DESCRIPTION_LENGTH, provenanceOf, SkillStore, treeWrittenSkills, validatePayloadPath } from "../store.ts";
 import { isInside } from "../paths.ts";
 
 function tempStore(t, options = {}) {
@@ -31,6 +31,24 @@ test("isValidSkillName follows the Agent Skills name rules", () => {
 	assert.equal(isValidSkillName("under_score"), false);
 	assert.equal(isValidSkillName(""), false);
 	assert.equal(isValidSkillName("x".repeat(65)), false);
+});
+
+// pi warns "description exceeds 1024 characters" on a longer one, so the store
+// refuses the write rather than publishing a skill pi surfaces as a conflict.
+test("a description past pi's limit is refused on create and on patch", (t) => {
+	const store = tempStore(t);
+	const atLimit = "x".repeat(MAX_SKILL_DESCRIPTION_LENGTH);
+	const over = "x".repeat(MAX_SKILL_DESCRIPTION_LENGTH + 1);
+
+	assert.equal(store.create({ ...basic("at-limit"), description: atLimit }).ok, true);
+
+	const refused = store.create({ ...basic("over-limit"), description: over });
+	assert.equal(refused.ok, false);
+	assert.match(refused.reason, /description exceeds 1024 characters/);
+	assert.equal(store.findByName("over-limit"), undefined);
+
+	assert.match(store.patch("at-limit", { description: over }).reason, /description exceeds 1024 characters/);
+	assert.equal(store.findByName("at-limit").description, atLimit, "the live skill is untouched");
 });
 
 test("create writes a general skill with learned provenance", (t) => {
