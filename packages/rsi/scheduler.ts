@@ -18,6 +18,16 @@
  *
  * Everything time-related goes through an injectable {@link Clock}, so the whole
  * chain is testable with a fake clock and fake passes.
+ *
+ * Two invariants this file owes the process rather than the store:
+ *
+ *   - **A timer never outlives its session.** pi invalidates a disposed session's ctx, and a timer
+ *     armed a minute earlier keeps firing afterwards, so every entry point asks
+ *     {@link PassSchedulerOptions.sessionAlive} first and a session that is gone is skipped without
+ *     touching the ctx it no longer has.
+ *   - **A failure report cannot fail.** `notify` runs inside the catches below; a throw from there
+ *     escapes the catch, then the timer callback, and a rejection nobody awaits ends a headless run
+ *     (measured 2026-09-24 — the pass-failure path read `ctx.ui` on a disposed session's ctx).
  */
 
 import type { RsiConfig } from "./config.ts";
@@ -139,6 +149,13 @@ export interface PassSchedulerOptions {
 	 * its shorter `childQuietMinutes`, because a child lives for one delegated task (ticket 13).
 	 */
 	quietMinutes?: () => number;
+	/**
+	 * Whether this session still exists. Required, because a scheduler whose timer can fire into a
+	 * disposed session is the bug this gate exists to prevent: pi invalidates the ctx, and nothing
+	 * else cancels the timer (a spawner-disposed child never receives `session_shutdown` unless its
+	 * spawner emits it).
+	 */
+	sessionAlive: () => boolean;
 	clock?: Clock;
 	/** Why an attempt was declined; for tests and diagnostics, not the user. */
 	onSkip?: (reason: string) => void;
@@ -165,6 +182,9 @@ export class PassScheduler {
 	/** The session went quiet: (re)arm the quiet timer. */
 	settled(): void {
 		if (!this.options.config.enabled) return;
+		// A session that is already gone must not arm a timer at all: nothing would ever cancel it,
+		// and the pass it triggers could only report that it has no session to work from.
+		if (!this.options.sessionAlive()) return;
 		// Deliberately does *not* reset the retry budget: the re-arm path calls `settled()`
 		// again, so resetting here would let a contended store loop forever. A real turn
 		// (`activity`) or a pass that actually runs is what earns a fresh budget.
@@ -172,7 +192,9 @@ export class PassScheduler {
 		const quietMs = (this.options.quietMinutes?.() ?? this.options.config.quietMinutes) * 60_000;
 		this.timer = this.clock.setTimeout(() => {
 			this.timer = undefined;
-			void this.onQuiet();
+			// `onQuiet` contains its own failures; this is the last line of defence, because a
+			// rejection here has no awaiter and takes the process with it.
+			void this.onQuiet().catch((error) => this.report(error));
 		}, quietMs);
 	}
 
@@ -217,14 +239,31 @@ export class PassScheduler {
 		try {
 			return await this.run(reason);
 		} catch (error) {
-			this.options.notify?.(`rsi: pass failed (${error instanceof Error ? error.message : String(error)})`, "error");
+			this.report(error);
 			return { ran: true, outcome: { ok: false, toolActions: 0 } };
+		}
+	}
+
+	/**
+	 * Report a failed pass, and never throw. This runs inside a catch, so a throw from the reporter
+	 * escapes the catch, then the timer callback, and the unhandled rejection ends the process —
+	 * which is exactly how a disposed session's pass took a headless run down. A diagnostic that
+	 * cannot speak is still better than a dead session.
+	 */
+	private report(error: unknown): void {
+		try {
+			this.options.notify?.(`rsi: pass failed (${error instanceof Error ? error.message : String(error)})`, "error");
+		} catch {
+			/* nothing left to report with */
 		}
 	}
 
 	private async run(reason: PassReason): Promise<AttemptResult> {
 		const { config, root } = this.options;
 		if (!config.enabled) return this.skip("disabled");
+		// First, before any ctx or `pi` read below: a session that is gone is not a session with
+		// nothing to learn, and every accessor behind this line belongs to it.
+		if (!this.options.sessionAlive()) return this.skip("the session is gone");
 
 		if (suppressedAsQueryOnly({ activeTools: this.options.getActiveTools(), kernelCanWrite: this.options.kernelCanWrite?.() })) {
 			return this.skip("query-only session");
@@ -315,7 +354,7 @@ export class PassScheduler {
 		try {
 			return await run();
 		} catch (error) {
-			this.options.notify?.(`rsi: pass failed (${error instanceof Error ? error.message : String(error)})`, "error");
+			this.report(error);
 			return { ok: false, toolActions: 0 };
 		}
 	}

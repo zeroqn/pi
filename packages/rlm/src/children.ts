@@ -729,14 +729,51 @@ export function createChildManager(deps: ChildManagerDeps) {
 				} catch {
 					/* best effort */
 				}
-				try {
-					record.session?.dispose();
-				} catch {
-					/* best effort */
-				}
+				// Tells the child's own extensions the session is gone before the runner is invalidated
+				// (see `disposeChildSession`: disposing alone leaves their timers armed and their
+				// resources open).
+				await disposeChildSession(record.session);
 			}
 		},
 	};
+}
+
+/**
+ * Dispose a child session, telling its extensions first.
+ *
+ * `AgentSession.dispose()` invalidates the child's extension runner **silently**. pi's own
+ * `AgentSessionRuntime.dispose()` emits `session_shutdown` immediately before it, but a child built
+ * through `createAgentSession` never passes through that wrapper, so without this line a child's
+ * extensions are never told: RSI keeps its seam registered, its provider record and an armed quiet
+ * timer; skill-bridge keeps the session's providers; and a background timer fires into the dead ctx
+ * minutes later. That is how a headless run which had spawned a child came to die with
+ * `This extension ctx is stale after session replacement or reload` — measured 2026-09-24: the
+ * child's RSI quiet timer fired 60s after this dispose, its failure was reported through the same
+ * dead ctx, and the unhandled rejection ended the process.
+ *
+ * `emitSessionShutdownEvent` is not a public export of pi; it is exactly `hasHandlers` + `emit` on
+ * the runner the session exposes, which is what this reimplements. A handler that throws must not
+ * keep the session alive, so both steps are best effort.
+ */
+export async function disposeChildSession(
+	session: unknown,
+	/** pi's own union, spelled out locally: this module takes no static dependency on pi. */
+	reason: "quit" | "reload" | "new" | "resume" | "fork" = "quit",
+): Promise<void> {
+	const runner = (session as { extensionRunner?: { hasHandlers?: (event: string) => boolean; emit?: (event: unknown) => Promise<unknown> } } | undefined)
+		?.extensionRunner;
+	try {
+		if (runner?.hasHandlers?.("session_shutdown")) {
+			await runner.emit?.({ type: "session_shutdown", reason });
+		}
+	} catch {
+		/* a throwing handler is that extension's problem, not the child's reason to stay open */
+	}
+	try {
+		(session as { dispose?: () => void } | undefined)?.dispose?.();
+	} catch {
+		/* the process is going away either way */
+	}
 }
 
 /** `find_models` (ticket 06): the kernel needs somewhere to learn valid selectors. */

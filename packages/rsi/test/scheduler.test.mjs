@@ -79,6 +79,7 @@ function makeScheduler(t, options = {}) {
 		getSessionFile: options.getSessionFile,
 		onLockContention: options.onLockContention,
 		quietMinutes: options.quietMinutes,
+		sessionAlive: options.sessionAlive ?? (() => true),
 		lastTurnWasAborted: options.lastTurnWasAborted,
 		runPass,
 		curate: options.curate,
@@ -106,6 +107,7 @@ function makeSchedulerAt(t, root, clock, options = {}) {
 		getSessionFile: options.getSessionFile,
 		onLockContention: options.onLockContention,
 		quietMinutes: options.quietMinutes,
+		sessionAlive: options.sessionAlive ?? (() => true),
 		lastTurnWasAborted: options.lastTurnWasAborted,
 		runPass: options.runPass ?? (async (reason) => {
 			calls.push(reason);
@@ -616,4 +618,87 @@ test("a pass that throws reports through notify instead of failing silently", as
 	assert.match(notices[0].line, /rsi: pass failed/);
 	assert.match(notices[0].line, /before initialization/);
 	assert.equal(notices[0].type, "error");
+});
+
+// ---------------------------------------------------------------------------
+// A session that is gone, and a report that cannot be delivered.
+//
+// Measured 2026-09-24: a child's quiet timer was armed a minute before its spawner disposed the
+// session. `AgentSession.dispose()` invalidates the ctx, and the timer fired anyway — the pass
+// failed on the first ctx read, `notify` read `ctx.ui` on the dead ctx, and the throw escaped
+// `attempt`, then the timer callback, and the unhandled rejection ended the whole run. The two
+// tests below pin each half: the timer must not act on a dead session at all, and a reporter that
+// throws must not become the thing that kills the process.
+// ---------------------------------------------------------------------------
+
+test("a session that is gone is skipped, and its timer is never armed", async (t) => {
+	const { scheduler, clock, calls, skips } = makeScheduler(t, { sessionAlive: () => false });
+	scheduler.settled();
+	assert.equal(clock.pending, 0, "a gone session must not arm a quiet timer");
+
+	clock.advance(60 * 60_000);
+	assert.deepEqual(calls, [], "no pass may run for a session that no longer exists");
+
+	const result = await scheduler.learnNow();
+	assert.equal(result.ran, false);
+	assert.equal(result.skipped, "the session is gone");
+	assert.ok(skips.includes("the session is gone"));
+});
+
+test("a session that goes away after the timer was armed is skipped when it fires", async (t) => {
+	// The real shape: the timer is armed while the session is alive, and the session is disposed
+	// before it fires.
+	let alive = true;
+	const notices = [];
+	const { scheduler, clock, calls, skips } = makeScheduler(t, {
+		sessionAlive: () => alive,
+		notify: (line, type) => notices.push({ line, type }),
+	});
+	scheduler.settled();
+	assert.equal(clock.pending, 1);
+
+	alive = false;
+	clock.advance(6 * 60_000);
+	assert.deepEqual(calls, []);
+	assert.ok(skips.includes("the session is gone"));
+	assert.deepEqual(notices, [], "a skipped pass is not a failure");
+});
+
+test("a pass whose failure cannot be reported is still contained", async (t) => {
+	// The reporter runs inside the scheduler's catch, so a throw from it used to escape the catch
+	// it exists to serve. `learnNow` is awaited here on purpose: before the fix this test could
+	// only fail by taking the process with it.
+	const { scheduler, calls } = makeScheduler(t, {
+		runPass: async () => {
+			calls.push("threw");
+			throw new Error("ctx is stale");
+		},
+		notify: () => {
+			throw new Error("This extension ctx is stale after session replacement or reload.");
+		},
+	});
+	const result = await scheduler.learnNow();
+	assert.equal(result.ran, true);
+	assert.equal(result.outcome.ok, false);
+});
+
+test("a failure reported from the timer cannot escape as an unhandled rejection", async (t) => {
+	const rejections = [];
+	const onRejection = (error) => rejections.push(error);
+	process.on("unhandledRejection", onRejection);
+	t.after(() => process.off("unhandledRejection", onRejection));
+
+	const { scheduler, clock } = makeScheduler(t, {
+		runPass: async () => {
+			throw new Error("ctx is stale");
+		},
+		notify: () => {
+			throw new Error("and the reporter is gone too");
+		},
+	});
+	scheduler.settled();
+	clock.advance(6 * 60_000);
+	await flush();
+
+	assert.deepEqual(rejections, []);
 });

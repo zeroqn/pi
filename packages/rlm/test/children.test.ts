@@ -18,6 +18,7 @@ import { join } from "node:path";
 import {
 	CHILD_ENTRY_TYPE,
 	type CostTotals,
+	disposeChildSession,
 	type Notice,
 	createChildManager,
 	deriveDepth,
@@ -473,5 +474,68 @@ describe("the ceiling a child is built with", () => {
 			ownerDispatch: () => {},
 		});
 		expect(capturedSessionOptions.at(-1)?.tools).toEqual([]);
+	});
+});
+
+describe("disposing a child session", () => {
+	/** A stand-in for `AgentSession`: records what happened, in order. */
+	function fakeSession(input: { handlers?: boolean; emitThrows?: boolean; disposeThrows?: boolean } = {}) {
+		const order: string[] = [];
+		const events: unknown[] = [];
+		const session = {
+			extensionRunner: {
+				hasHandlers: (event: string) => {
+					order.push(`hasHandlers:${event}`);
+					return input.handlers ?? true;
+				},
+				emit: async (event: unknown) => {
+					order.push("emit");
+					if (input.emitThrows) throw new Error("a handler threw");
+					events.push(event);
+					return true;
+				},
+			},
+			dispose: () => {
+				order.push("dispose");
+				if (input.disposeThrows) throw new Error("dispose threw");
+			},
+		};
+		return { session, order, events };
+	}
+
+	it("tells the child's extensions before the runner is invalidated", async () => {
+		// `AgentSession.dispose()` invalidates the child's extension runner silently, and a child
+		// built through `createAgentSession` never goes through pi's runtime wrapper, which is the
+		// only thing that emits `session_shutdown`. Without this the child's extensions keep their
+		// timers armed and their resources open: measured 2026-09-24, a child's RSI quiet timer
+		// fired 60s into the disposed session and killed the run.
+		const { session, order, events } = fakeSession();
+		await disposeChildSession(session);
+		expect(order).toEqual(["hasHandlers:session_shutdown", "emit", "dispose"]);
+		expect(events).toEqual([{ type: "session_shutdown", reason: "quit" }]);
+	});
+
+	it("disposes even when nothing handles the event, and asks first", async () => {
+		const { session, order, events } = fakeSession({ handlers: false });
+		await disposeChildSession(session);
+		expect(order).toEqual(["hasHandlers:session_shutdown", "dispose"]);
+		expect(events).toEqual([]);
+	});
+
+	it("is best effort: a throwing handler or a throwing dispose still ends in dispose", async () => {
+		const throwing = fakeSession({ emitThrows: true });
+		await disposeChildSession(throwing.session);
+		expect(throwing.order).toEqual(["hasHandlers:session_shutdown", "emit", "dispose"]);
+
+		const disposeThrows = fakeSession({ disposeThrows: true });
+		await disposeChildSession(disposeThrows.session);
+		expect(disposeThrows.order.at(-1)).toBe("dispose");
+	});
+
+	it("tolerates a session with no extension runner at all", async () => {
+		const disposed: string[] = [];
+		await disposeChildSession({ dispose: () => disposed.push("disposed") });
+		expect(disposed).toEqual(["disposed"]);
+		await disposeChildSession(undefined);
 	});
 });

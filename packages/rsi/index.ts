@@ -84,18 +84,32 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		/**
 		 * A pass that fails must say so. This was never wired, so a throwing pass advanced the
 		 * tree-wide floor and left no trace anywhere — the worst kind of silent absence.
+		 *
+		 * It is also the one place RSI speaks from outside a handler, where the only ctx it has may
+		 * already be gone — a disposed session's ctx throws from **every** property, `ui` included,
+		 * and a throw from *here* escapes the scheduler's own catch, then the timer callback, and the
+		 * unhandled rejection ends a headless run. So: a root session with a live ctx is notified, a
+		 * child or a gone ctx gets a transcript entry instead, and if even that is gone the line is
+		 * dropped rather than fatal.
 		 */
 		notify: (line, type) => {
-			if (isChildSession(sessionFileOf(currentCtx))) {
-				try {
-					pi.appendEntry("rsi-pass", { line, level: type ?? "info", failed: true });
-				} catch {
-					/* the record is best effort */
+			try {
+				if (sessionIsAlive(currentCtx) && !isChildSession(sessionFileOf(currentCtx))) {
+					currentCtx?.ui?.notify?.(line, type);
+					return;
 				}
-				return;
+			} catch {
+				/* fall through to the transcript */
 			}
-			currentCtx?.ui?.notify?.(line, type);
+			try {
+				pi.appendEntry("rsi-pass", { line, level: type ?? "info", failed: true });
+			} catch {
+				/* a diagnostic must not be able to fail */
+			}
 		},
+		// The scheduler asks this before every entry point and before arming a timer: a session
+		// that is gone must be skipped, not probed.
+		sessionAlive: () => sessionIsAlive(currentCtx),
 		getActiveTools: () => pi.getActiveTools(),
 		// A code-mode session's surface is `["python"]`, which the tool-name heuristic reads as
 		// query-only — but its kernel can write, and RSI holds the handle that proves it. Nothing
@@ -882,6 +896,24 @@ function headerParentSession(sessionManager: unknown): string | undefined {
 		return typeof parent === "string" && parent.length > 0 ? path.resolve(parent) : undefined;
 	} catch {
 		return undefined;
+	}
+}
+
+/**
+ * Whether the ctx this instance last saw is still usable.
+ *
+ * pi invalidates a disposed session's runner, after which **every** property of that ctx throws —
+ * `sessionManager` included, which is why `sessionFileOf` cannot tell "a session with no file" from
+ * "a session that is gone". Touching one is the only probe pi offers, and it is what keeps a timer
+ * armed in one session from acting on a session that no longer exists.
+ */
+function sessionIsAlive(ctx: ExtensionContext | undefined): boolean {
+	if (!ctx) return false;
+	try {
+		void ctx.sessionManager;
+		return true;
+	} catch {
+		return false;
 	}
 }
 
