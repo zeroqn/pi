@@ -3,12 +3,15 @@
  * `find_models`).
  *
  * Contributed to code mode's kernel at `session_start`, verbatim, in owner order — the kernel's
- * base prelude is a function of `ROOT`/`SCRATCH` and this is appended to it. RSI contributes the
- * `skills()` / `skill(name)` half, which concatenates **after** this one: rlm's contribution is
- * accepted first, from the manifest's load order and the child loader's factory order, so the
- * composed tail is byte-identical to the pre-split `PRELUDE_TAIL` captured at
- * `.scratch/rsi-oneway/tools/pre-split-prelude-tail.txt` (990 chars, sha256 `4943da42…`; this half
- * is the first 697).
+ * base prelude is a function of `ROOT`/`SCRATCH` and this is appended to it. `pi-skill-bridge`
+ * contributes the `skills()` / `skill(name)` half, which concatenates **after** this one: rlm's
+ * contribution is accepted first, from the manifest's load order and the child loader's factory
+ * order, so this half keeps its position in the composed tail.
+ *
+ * That tail is **no longer byte-identical** to the capture at
+ * `.scratch/rsi-oneway/tools/pre-split-prelude-tail.txt` (990 chars, sha256 `4943da42…`; this half is
+ * the first 697): `skill()`'s docstring changed when the call form moved to the bridge, and
+ * `.scratch/skill-bridge` ticket 09 records the amendment. The ordering above is what still holds.
  *
  * The host functions it names are contributed in the same call, so a cell can never see a name whose
  * host function was rejected.

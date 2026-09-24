@@ -39,8 +39,9 @@ describe("the delegation prelude", () => {
 		for (const name of ["ROOT =", "def read_text", "async def bash", "class BgHandle"]) {
 			expect(PRELUDE_TAIL).not.toContain(name);
 		}
-		// And the learned-skill wrappers are RSI's half, not rlm's. Their absence here is the whole
-		// point of the split: rlm contributes no skills surface at all.
+		// And the learned-skill wrappers are the skill bridge's half now, not rlm's (they were RSI's
+		// before `.scratch/skill-bridge` ticket 06). Their absence here is the whole point of the split:
+		// rlm contributes no skills surface at all.
 		for (const name of ["async def skills", "async def skill", "skills_host", "skill_host"]) {
 			expect(PRELUDE_TAIL).not.toContain(name);
 		}

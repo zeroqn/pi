@@ -30,9 +30,11 @@ export type KernelHandle = {
 };
 
 /**
- * What RSI contributes: the learned-skill host functions and the prelude lines that name them.
- * **No text** — no description, no snippet, no guidelines — which is what keeps the
- * model-visible surface byte-identical across the move (map ticket 04 §1).
+ * What a contributor writes into a kernel.
+ *
+ * RSI no longer has one of these: the learned-skill host functions and the prelude that named them
+ * moved to `pi-skill-bridge` (`.scratch/skill-bridge` ticket 06), and RSI now mounts only. The shape
+ * stays because `bindKernel` is the client's entry point, and a mount-only caller is the common case.
  */
 export type KernelContribution = {
 	owner: string;
@@ -104,7 +106,7 @@ export function versionProblem(entry: { apiVersion: number }): string | null {
 }
 
 /**
- * Mount this session's kernel, contribute RSI's surface, and hand back both.
+ * Mount this session's kernel, contribute if asked, and hand back both.
  *
  * The mount is idempotent by session key, so it does not matter whether code mode's own
  * `session_start` handler ran first, or whether rlm mounted already: every caller gets the same
@@ -114,7 +116,11 @@ export function versionProblem(entry: { apiVersion: number }): string | null {
 export function bindKernel(options: {
 	pi: unknown;
 	ctx: unknown;
-	contribution: (handle: KernelHandle) => KernelContribution;
+	/**
+	 * Omitted by a caller that only wants the kernel — RSI's own case, since it contributes nothing now.
+	 * A callback rather than a value because a contributor needs the handle to build what it contributes.
+	 */
+	contribution?: (handle: KernelHandle) => KernelContribution;
 	glob?: Record<symbol, unknown>;
 }): KernelBind {
 	const lookup = findKernelEntry(options.glob);
@@ -133,6 +139,7 @@ export function bindKernel(options: {
 	}
 
 	try {
+		if (!options.contribution) return { handle, receipt: null };
 		return { handle, receipt: handle.contribute(options.contribution(handle)) };
 	} catch (error) {
 		// The handle is still real: the session has a kernel, RSI simply could not write to it.

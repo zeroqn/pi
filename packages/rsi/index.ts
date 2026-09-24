@@ -24,7 +24,7 @@ import { buildCandidates, buildCurationReport, buildCuratorPrompt, curationDueFo
 import { buildDigest } from "./digest.ts";
 import { buildJournalDigest, consultationsSince, journalPathFor, kernelActivity, readJournal } from "./journal.ts";
 import { runLearningFork, type ForkSession } from "./fork.ts";
-import { discoverSkillNames } from "./frontmatter.ts";
+import { discoverSkillNames, parseFrontmatter } from "./frontmatter.ts";
 import { readLedger, recordCountedUsage, recordUsage, sessionCountedAt, setSkillState, takeStatusSnapshot } from "./ledger.ts";
 import { buildReport, emptyTally, formatPassNotification, tallyChanged } from "./pass.ts";
 import { projectKeyFor } from "./project-key.ts";
@@ -35,8 +35,7 @@ import { PassScheduler } from "./scheduler.ts";
 import { applyProposal, discardProposal, formatProposal } from "./review.ts";
 import type { SkillActionDeps } from "./skill-actions.ts";
 import { isChildSession, registerRsiSeam, type RsiSeamWork } from "./seam.ts";
-import { RSI_PRELUDE } from "./prelude-rsi.ts";
-import { beforeAgentStartResult, type PromptSkill } from "./skills-block.ts";
+import { forgetSession, registerProvider, sessionKey } from "../skill-bridge/src/convention.ts";
 import { SkillStore, treeWrittenSkills, type Scope, type SkillProvenance } from "./store.ts";
 import { bashReadCandidates, formatStatus, scopeKey, summarizeStatus, UsageTracker } from "./telemetry.ts";
 
@@ -77,7 +76,6 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	 * per-instance, and one `rsiExtension()` call per session means the instance is the session.
 	 */
 	let codeMode: KernelHandle | null = null;
-	let contributed = false;
 	let warnedRefusal = false;
 
 	const scheduler = new PassScheduler({
@@ -190,18 +188,6 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		}
 	}
 
-	/** The same list in pi's own skill shape, for the block. */
-	function learnedForBlock(): PromptSkill[] {
-		return seamSkills().map((skill) => ({
-			name: skill.name,
-			description: skill.description,
-			filePath: skill.location,
-			baseDir: skill.location.replace(/\/SKILL\.md$/, ""),
-			sourceInfo: { source: "rsi", scope: skill.scope },
-			disableModelInvocation: false,
-		}));
-	}
-
 	/** One skill's content, resolved in this session's scope union - never another project's. */
 	function skillContent(name: string): { content: string; files: string[] } | undefined {
 		try {
@@ -252,65 +238,68 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	}
 
 	/**
-	 * What RSI writes into the kernel (map ticket 04). The host functions and the prelude that names
-	 * them arrive in **one** `contribute()` call, so a cell can never see a name whose host function
-	 * was rejected. No text: RSI contributes no description, snippet or guidelines, which is what
-	 * keeps the model-visible surface byte-identical across the move.
+	 * Register this session's store as a **provider** (`.scratch/skill-bridge` tickets 01 and 06).
+	 *
+	 * RSI no longer writes anything into the kernel: the block and the `skill()`/`skills()` call form
+	 * belong to `pi-skill-bridge`, which reads pi's own loaded skills itself and asks providers for the
+	 * rest. What RSI keeps is the one thing it alone knows — the store — behind two calls: `list()` for
+	 * the scope union this session can see, `read(name)` for one skill's body and its declared payload
+	 * files.
+	 *
+	 * The read returns the **body**, frontmatter stripped, because that is what the other tier hands
+	 * over: one tier with frontmatter and one without is the asymmetry the single call form exists to
+	 * remove. A model that wants the raw file can still `cat` the location the block shows.
+	 *
+	 * Registering is idempotent by owner, so a second `session_start` (a reload) replaces rather than
+	 * duplicates. Nothing here may throw: a session that cannot register loses the surface, never the
+	 * store — the passes, the ledger and `resources_discover` do not depend on it.
 	 */
-	function kernelContribution() {
-		return {
-			owner: "rsi",
-			hostFns: {
-				async skills_host() {
-					return seamSkills();
+	function registerAsProvider(ctx: ExtensionContext): void {
+		try {
+			const receipt = registerProvider({
+				sessionKey: sessionKey(ctx),
+				provider: {
+					owner: "rsi",
+					apiVersion: 1,
+					list: () => seamSkills(),
+					read: (name: string) => {
+						const found = skillContent(name);
+						if (!found) return undefined;
+						return { content: parseFrontmatter(found.content).body, files: found.files };
+					},
 				},
-				async skill_host(...args: unknown[]) {
-					const wanted = String(args[0] ?? "").trim();
-					if (!wanted) throw new Error("skill(name) requires a name");
-					const found = skillContent(wanted);
-					if (!found) throw new Error(`no learned skill named "${wanted}" — call skills() for the ones this session can see`);
-					// The count is not made here: it is pulled from the journal at the turn boundary,
-					// where this same call is visible with its neighbours (ticket 11).
-					return found;
-				},
-			},
-			prelude: RSI_PRELUDE,
-		};
+			});
+			if (!receipt.accepted) warn(`skills provider refused: ${receipt.problem}`);
+		} catch (error) {
+			warn(`could not register the skills provider (${message(error)})`);
+		}
+	}
+
+	/** One warning per session, and never a failure: the human is told, the model is not. */
+	function warn(line: string): void {
+		if (warnedRefusal) return;
+		warnedRefusal = true;
+		try {
+			currentCtx?.ui?.notify?.(`rsi: ${line}`, "warning");
+		} catch {
+			/* a notice must never fail a session start */
+		}
 	}
 
 	/**
-	 * Mount this session's kernel and contribute RSI's surface (tickets 04, 07, 10).
+	 * Mount this session's kernel — and contribute nothing (`.scratch/skill-bridge` ticket 06).
 	 *
-	 * Called from `session_start` and nowhere else: the contribution window is `[mount, the first
-	 * cell of that handle]`, and a cell cannot run before pi finishes awaiting the `session_start`
-	 * emission, so this is provably in time. A later retry could only ever be refused.
+	 * The mount is kept for two facts that have nothing to do with the bridge: `kernelCanWrite` (the
+	 * learner gate's proof that a code-mode session can write) and the kernel handle's session key,
+	 * which the journal path is derived from. It is idempotent by session key, so it does not matter
+	 * whether code mode's own `session_start` ran first.
 	 */
 	function bindToKernel(ctx: ExtensionContext): void {
-		const bind = bindKernel({ pi, ctx, contribution: () => kernelContribution() });
+		const bind = bindKernel({ pi, ctx });
 		codeMode = bind.handle;
-		if (bind.receipt && bind.receipt.rejected.length === 0) contributed = true;
-
-		// A first refusal is loud — recorded durably and told to the human, the same pair RSI uses
-		// for an unavailable store. A repeat for a session RSI has already served is silent, because
-		// nothing is lost: the host functions and the prelude are already in that kernel. That is
-		// exactly the RPC-replacement path, the only case that reaches here.
-		let problem = bind.problem ?? null;
-		const refusal = bind.receipt?.rejected?.[0];
-		if (!contributed && refusal) problem = `contribution refused whole: ${refusal.name} (${refusal.reason})`;
-		if (problem && !warnedRefusal) {
-			warnedRefusal = true;
-			try {
-				ctx.ui?.notify?.(`rsi: ${problem}`, "warning");
-			} catch {
-				/* a notice must never fail a session start */
-			}
-		}
-
-		// RSI's own durable record of whether it reached this session's kernel: rlm's `rlm-rsi`
-		// entry goes with the rest of its RSI knowledge, and without this the success case would
-		// leave no trace at all — the silent-absence shape RSI already fixed once for failed passes.
+		if (bind.problem) warn(bind.problem);
 		try {
-			pi.appendEntry("rsi-kernel", { mounted: codeMode !== null, contributed, problem });
+			pi.appendEntry("rsi-kernel", { mounted: codeMode !== null, problem: bind.problem ?? null });
 		} catch {
 			/* the record is best effort */
 		}
@@ -338,6 +327,9 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		if (!config.enabled) return;
 		// The kernel first, so the block's gate has an answer before the first turn (tickets 07, 08).
 		bindToKernel(ctx);
+		// Then the provider. Ordering is not load-bearing — the surface reads providers at cell time —
+		// but a session that never registers is a session whose learned skills are invisible.
+		registerAsProvider(ctx);
 		for (const warning of warnings) {
 			ctx.ui.notify(warning, "warning");
 		}
@@ -359,11 +351,9 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 			const usage = tracker.noteExpansion(expanded.name, expanded.location);
 			if (usage) await recordUsage(store.root, usage);
 		}
-		// The code-mode block (ticket 08), rendered here because RSI is what knows the store: one
-		// section, both tiers, the same sentence rlm used to append. `contributed` is required
-		// rather than implied — the sentence tells the model to call `skill(name)`, which exists
-		// only when RSI's contribution was accepted.
-		return beforeAgentStartResult(event, { contributed, learned: learnedForBlock() });
+		// The block is not RSI's any more (`.scratch/skill-bridge` ticket 06): `pi-skill-bridge` renders
+		// both tiers, from the event's own loaded skills and from this session's provider. This handler
+		// is telemetry only, and returns `undefined` so another renderer's prompt is left alone.
 	});
 
 	pi.on("turn_start", async () => {
@@ -385,11 +375,18 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 		return undefined;
 	});
 
-	pi.on("session_shutdown", async () => {
+	pi.on("session_shutdown", async (_event, ctx) => {
 		// Withdraw before anything else: a withdrawn instance must not serve a session that is
 		// going away. A child never reaches this handler (ticket 09), which is why the
 		// registration is also pruned by session-file mtime rather than only released here.
 		withdrawSeam();
+		// The provider record is keyed by session and `globalThis` outlives the session, so it goes with
+		// it. `pi-skill-bridge` also prunes by session-file mtime, because a child never reaches here.
+		try {
+			forgetSession(sessionKey(ctx ?? currentCtx));
+		} catch {
+			/* the session is going away either way */
+		}
 		scheduler.shutdown();
 		const fork = activeFork;
 		activeFork = undefined;

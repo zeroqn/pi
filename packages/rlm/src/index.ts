@@ -35,6 +35,7 @@ import {
 	setChildDetector,
 } from "../../tool-bridge/src/child-seam";
 import { rsiBindChild, rsiChildExtensions, rsiStatus } from "./rsi-seam";
+import skillBridge from "../../skill-bridge/src/index";
 import { errorText, str } from "./util";
 import { resolveWebHook } from "./web-hook";
 
@@ -89,10 +90,22 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				// module instance: pi calls an inline factory directly, so the child's code mode
 				// is the parent's, in the parent's process (ticket 02 §3).
 				kernelFactoryFor: (child) => (childPi: any) => createRlm(childPi, child),
-				// The owners' factories come from the bridge's child seam, and RSI offers its own
-				// through the same kind of seam; rlm names neither, and a seam that is absent or
-				// too old contributes nothing.
-				childFactories: (request) => [...ownerChildFactories(request), ...rsiChildExtensions()],
+				// The owners' factories come from the tool bridge's child seam, and RSI offers its own
+				// through the same kind of seam; rlm names neither, and a seam that is absent or too
+				// old contributes nothing.
+				//
+				// The skills bridge is named directly, and deliberately: a spawned child loads no
+				// ambient extensions, so a skills surface that existed only in the manifest would
+				// vanish for exactly the sessions that delegate the most work. It is named here rather
+				// than carried by RSI because a child must keep its skills surface when RSI is absent
+				// — which is the whole point of the bridge (`.scratch/skill-bridge` tickets 01 #18 and
+				// 07). The import is a library call, not a second kernel: the entry's state is all
+				// per-session closures.
+				childFactories: (request) => [
+					...ownerChildFactories(request),
+					...rsiChildExtensions(),
+					skillBridge,
+				],
 			// The ceiling's first operand: this session's *live* surface, read at spawn time and never
 			// read back from a record (ticket 01 §1-2). A grandchild reads its own `pi` here, which is
 			// what makes "a child is a subset of its parent" transitive by construction.
