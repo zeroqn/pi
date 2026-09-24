@@ -1,0 +1,27 @@
+{
+	"name": "pi-skill-bridge",
+	"version": "0.1.0",
+	"description": "Show pi's own skills, and a store's, on a code-mode surface — one block, one call form, no disk knowledge of anyone else's store.",
+	"type": "module",
+	"scripts": {
+		"test": "bun test",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"code-mode",
+		"skill-bridge"
+	],
+	"license": "MIT",
+	"pi": {
+		"extensions": [
+			"./src/index.ts"
+		]
+	},
+	"devDependencies": {
+		"@types/node": "^22.20.0",
+		"typescript": "^5.8.0"
+	}
+}
