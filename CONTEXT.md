@@ -95,3 +95,32 @@ _Avoid_: limit, cap
 A tool a child session may hold, declared by whoever owns it: a tool whose effect is pi's dispatch, or
 code mode's own tool. Every other tool is reached from a cell instead of being offered to the model.
 _Avoid_: allowed tool, child tool
+
+## The skill bridge
+
+**Skills block**:
+The `<available_skills>` text appended to a code-mode prompt, because pi renders its own only for a
+surface that can read files.
+_Avoid_: skills prompt, skill list
+
+**Human tier**:
+Everything pi loaded — the user directory, the project's, packages, `--skill` paths.
+_Avoid_: user skills, pi skills
+
+**Learned tier**:
+A store a provider supplies, learned rather than authored.
+_Avoid_: rsi skills, generated skills
+
+**Skills provider**:
+The per-session rendezvous by which a store offers its skills to the bridge: `list()`, and `read(name)`
+for one skill's body and its declared files.
+_Avoid_: catalogue (that is the tool bridge's), publication, plugin
+
+**Call form**:
+`skill(name)` and `skills()` — the two names the model calls from a cell. One form, both tiers.
+_Avoid_: skill tool, skill API
+
+**Route**:
+How a name is *read* — through the provider that claims it, or from the file it names. Distinct from
+the order the block lists entries in, which puts pi's own first.
+_Avoid_: resolution, lookup
