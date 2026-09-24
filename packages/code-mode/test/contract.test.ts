@@ -19,6 +19,7 @@ import {
 	findEntry,
 	registrySessions,
 	publish,
+	sessionIsAlive,
 	versionProblem,
 	type KernelHandleCore,
 	type RegistryEntry,
@@ -165,6 +166,42 @@ describe("the mounter (ticket 01: one kernel per session)", () => {
 		expect(first.publisher).toBe(PUBLISHER);
 	});
 
+	it("carries the kernel and the ctx it was mounted for, so another instance can reach them", () => {
+		// The child case, at the level of the rule: the kernel is created by the instance that
+		// published the registry, and the session's own ctx arrives at an instance that never saw
+		// `create`. The handle is the only object both have.
+		const keys = createSessionKeys();
+		let core_: ReturnType<typeof core> | undefined;
+		const mounter = createMounter({
+			keys,
+			create: () => {
+				core_ = core();
+				return core_;
+			},
+		});
+		const ctx = ctxFor("/tmp/sessions/a.jsonl");
+		const handle = mounter.mount({}, ctx);
+		expect(handle.kernel).toBe(core_);
+		expect(handle.ctx).toBe(ctx);
+		expect(handle.kernel.root()).toBe("/root");
+	});
+
+	it("retires by key, which is the only way to retire a session that is already gone", () => {
+		// `retire` reads the ctx, and reading a disposed ctx throws — so the reap of a dead session
+		// cannot go through it.
+		const keys = createSessionKeys();
+		const mounter = createMounter({ keys, create: () => core() });
+		const ctx = ctxFor("/tmp/sessions/a.jsonl");
+		mounter.mount({}, ctx);
+		const stale = {
+			get sessionManager(): never {
+				throw new Error("This extension ctx is stale after session replacement or reload.");
+			},
+		};
+		expect(() => mounter.retire(stale)).toThrow();
+		expect(mounter.retireKey("/tmp/sessions/a.jsonl")).toBe(true);
+		expect(mounter.retireKey("/tmp/sessions/a.jsonl")).toBe(false);
+	});
 	it("gives a different session its own kernel, and retires on request", () => {
 		const keys = createSessionKeys();
 		let created = 0;
@@ -182,6 +219,23 @@ describe("the mounter (ticket 01: one kernel per session)", () => {
 		expect(mounter.retire(ctxFor("/tmp/sessions/a.jsonl"))).toBe(true);
 		expect(mounter.retire(ctxFor("/tmp/sessions/a.jsonl"))).toBe(false);
 		expect(mounter.mount({}, ctxFor("/tmp/sessions/a.jsonl")).mounts).toBe(1);
+	});
+});
+
+describe("sessionIsAlive (a gone session versus an idle one)", () => {
+	it("is false for a ctx whose properties throw, and for no ctx at all", () => {
+		const stale = {
+			get sessionManager(): never {
+				throw new Error("This extension ctx is stale after session replacement or reload.");
+			},
+		};
+		expect(sessionIsAlive(stale)).toBe(false);
+		expect(sessionIsAlive(undefined)).toBe(false);
+		expect(sessionIsAlive(null)).toBe(false);
+	});
+
+	it("is true for a live ctx — a finished child is resumable, not gone", () => {
+		expect(sessionIsAlive(ctxFor("/tmp/sessions/a.jsonl"))).toBe(true);
 	});
 });
 

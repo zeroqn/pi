@@ -33,3 +33,13 @@ session has one kernel whichever extension asks first.
 - rlm degrades loudly and inertly to no `python` tool. Because it never imports code mode, the
   dependency is a runtime requirement rather than a build-time one — declared as a peer so an
   install cannot be silently broken, never resolved as code.
+- **A kernel belongs to the session, not to the instance that mounted it.** The published handle
+  carries the kernel itself and the ctx it was mounted for, so *any* code-mode instance in the process
+  can dump and close a session's kernel. That is not bookkeeping: a child's kernel is mounted by the
+  instance that published the registry while the child loads no code-mode entry of its own, and a
+  `/new` or `/reload` re-imports the entry — so the instance that creates a kernel is regularly *not*
+  the instance that later handles that session's ctx. A per-instance kernel map hid the difference: a
+  child's kernel was never dumped and never closed, and after a `/new` it was unreachable even in
+  principle. `session_start` now reaps the kernels of sessions that are provably gone (their ctx has
+  been invalidated — liveness, not the absence of a key, because a finished child is still resumable),
+  which is the one moment both shapes are certain.

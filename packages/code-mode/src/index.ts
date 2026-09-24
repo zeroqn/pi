@@ -16,6 +16,7 @@ import {
 	createSessionKeys,
 	publish,
 	registrySessions,
+	sessionIsAlive,
 	type Ledger,
 } from "./contract";
 import { createKernel, type Kernel } from "./kernel";
@@ -33,7 +34,18 @@ export default function codeMode(pi: any) {
 	// Read the sessions map off the registry *before* publishing: a `/reload` re-imports this
 	// entry, and the reloaded instance has to join the map the live consumers already hold.
 	const sessions = registrySessions();
-	const kernels = new Map<string, Kernel>();
+
+	/**
+	 * The kernel for a session, from the **shared** map rather than a per-instance one.
+	 *
+	 * A session's kernel is not always created by the instance that later handles its ctx. An RLM
+	 * child mounts through the registry, which reaches the instance that published it — the child
+	 * loads no code-mode entry at all — and a `/reload` or `/new` re-imports this entry, so the
+	 * instance that created a kernel is not the one that ends up serving it. A per-instance map
+	 * therefore could not see a child's kernel: it was never dumped, never closed, and the map was
+	 * orphaned with the kernels still inside it.
+	 */
+	const kernelFor = (ctx: unknown): Kernel | undefined => sessions.get(keys.of(ctx))?.kernel as Kernel | undefined;
 
 	// The api is a parameter, not the closure's `pi`: a child mounts through the registry from
 	// *this* instance, so its `sessionPi` is the child's own registry while `pi` is the spawner's.
@@ -57,9 +69,9 @@ export default function codeMode(pi: any) {
 				required: ["code"],
 			},
 			async execute(_toolCallId: unknown, params: { code: string }, _signal: unknown, onUpdate: any, ctx: any) {
-				const kernel = kernels.get(keys.of(ctx));
+				const kernel = kernelFor(ctx);
 				if (!kernel) {
-					const problems = await mounter.sessions.get(keys.of(ctx))?.problems().catch(() => []);
+					const problems = await sessions.get(keys.of(ctx))?.problems().catch(() => []);
 					return { content: [{ type: "text", text: noKernelText(problems ?? []) }], details: { failed: true } };
 				}
 				return kernel.execute(params, onUpdate, ctx);
@@ -84,7 +96,6 @@ export default function codeMode(pi: any) {
 					}),
 			});
 			const kernel = createKernel({ pi: sessionPi, sessionKey, ledger });
-			kernels.set(sessionKey, kernel);
 			registerPythonTool(sessionPi, {
 				description: ledger.description(),
 				snippet: ledger.snippet(),
@@ -111,11 +122,47 @@ export default function codeMode(pi: any) {
 
 	publish({ publisher: PUBLISHER, apiVersion: API_VERSION, sessions, mount: mounter.mount });
 
+	/**
+	 * Dump and close every kernel whose session no longer exists.
+	 *
+	 * A session does not always end where its kernel was mounted. RLM disposes a child through the
+	 * *child's* runner, and a child loads no code-mode entry, so nothing on that runner can reach the
+	 * kernel the publishing instance holds — and a `/new`, `/resume` or `/fork` re-imports this entry,
+	 * so the instance that mounted the outgoing session's kernels is gone and its local map with it.
+	 * Either way the kernel (and its monty worker) is only visible through the shared map, and
+	 * `session_start` is the first moment it is provably dead: pi tears the outgoing session down
+	 * *before* it builds the incoming one, and RLM kills every descendant of the parent it is leaving.
+	 *
+	 * Liveness, not the key's absence, is the test, because a session that is merely idle is not a
+	 * session that is gone: a finished child is still resumable, and `send` runs its next turn on the
+	 * kernel it already has.
+	 */
+	async function reapDeadKernels(own: string): Promise<void> {
+		for (const [key, handle] of [...sessions]) {
+			if (key === own) continue;
+			if (sessionIsAlive(handle.ctx)) continue;
+			try {
+				await (handle.kernel as Kernel).shutdown();
+			} catch {
+				/* a kernel that cannot close must still not hold the session open */
+			}
+			mounter.retireKey(key);
+			try {
+				pi.appendEntry("code-mode-reaped", { sessionKey: key });
+			} catch {
+				/* diagnostics only */
+			}
+		}
+	}
+
 	pi.on("session_start", async (_event: any, ctx: any) => {
+		await reapDeadKernels(keys.of(ctx));
 		try {
 			const handle = mounter.mount(pi, ctx);
-			const kernel = kernels.get(handle.sessionKey);
-			const problems = kernel ? await kernel.startSession(ctx) : [];
+			// `startSession` is re-run for a kernel this instance joined rather than created (a
+			// reload, or a second consumer's mount): restoring the background records is keyed by id,
+			// and the preflight is memoised, so the second call costs nothing and cannot double up.
+			const problems = await (handle.kernel as Kernel).startSession(ctx);
 			reportProblems(ctx, problems);
 		} catch (error) {
 			// A mount that threw leaves this session without a kernel. Say so, and record it:
@@ -126,21 +173,23 @@ export default function codeMode(pi: any) {
 	});
 
 	pi.on("agent_end", async (_event: any, ctx: any) => {
-		await kernels.get(keys.of(ctx))?.endTurn();
+		await kernelFor(ctx)?.endTurn();
 	});
 
 	pi.on("session_shutdown", async (_event: any, ctx: any) => {
 		const key = keys.of(ctx);
-		const kernel = kernels.get(key);
+		// The shared map, not a local one: a session replaced by `/new` or `/reload` is shut down by
+		// an instance that did not mount its kernel, and a kernel nobody shuts down is a kernel nobody
+		// dumps — its monty worker and its checkout outlive the session for the rest of the process.
+		const kernel = kernelFor(ctx);
 		if (kernel) {
-			kernels.delete(key);
 			try {
 				await kernel.shutdown();
 			} catch {
 				/* the kernel may already be gone */
 			}
 		}
-		mounter.retire(ctx);
+		mounter.retireKey(key);
 	});
 
 	/**

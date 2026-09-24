@@ -100,6 +100,23 @@ export type KernelHandle = KernelHandleCore & {
 	readonly sessionKey: string;
 	/** 1 = the one kernel for this session; >1 = the idempotency rule doing its job. */
 	readonly mounts: number;
+	/**
+	 * The object `create` returned — the kernel itself.
+	 *
+	 * It rides on the handle so that **any** code-mode instance in this process can reach a
+	 * session's kernel, not only the one that created it. A child's kernel is mounted through the
+	 * registry by whichever instance published it (the child loads no code-mode entry of its own),
+	 * and a `/reload` or `/new` re-imports this entry, so the instance holding a kernel in a local
+	 * map is not the instance that later handles that session's ctx.
+	 */
+	readonly kernel: KernelHandleCore;
+	/**
+	 * The ctx the kernel was mounted for, kept for one purpose: {@link sessionIsAlive} asks whether
+	 * that session still exists. A session whose ctx has been invalidated is gone — its kernel has to
+	 * be dumped and closed — while a session that is merely idle (a finished child, which `send` can
+	 * still resume) must be left exactly as it is.
+	 */
+	readonly ctx: unknown;
 };
 
 export type RegistryEntry = {
@@ -152,6 +169,9 @@ export type EntryLookup =
 export type Mounter = {
 	mount: (pi: unknown, ctx: unknown) => KernelHandle;
 	retire: (ctx: unknown) => boolean;
+	/** Retire by key. `retire` cannot be used on a session that is already gone: `keys.of` reads
+	 * the ctx, and reading a disposed ctx throws. */
+	retireKey: (key: string) => boolean;
 	sessions: Map<string, KernelHandle>;
 };
 
@@ -180,6 +200,22 @@ export function createSessionKeys(): SessionKeys {
 			return key;
 		},
 	};
+}
+
+/**
+ * Whether a ctx is still usable. pi invalidates a disposed session's runner, after which **every**
+ * property of that ctx throws — `sessionManager` included — so touching one is the only probe there
+ * is. It is what tells a kernel whose session is gone (reap it) from one that is merely idle (leave
+ * it: a finished child is still resumable).
+ */
+export function sessionIsAlive(ctx: unknown): boolean {
+	if (ctx === undefined || ctx === null) return false;
+	try {
+		void (ctx as { sessionManager?: unknown }).sessionManager;
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /** Publish, first wins. A second publisher joins the first entry rather than replacing it,
@@ -256,8 +292,13 @@ export function createMounter(options: {
 }): Mounter {
 	const sessions = options.sessions ?? new Map<string, KernelHandle>();
 	const counts = new Map<string, number>();
-	const wrap = (core: KernelHandleCore, key: string): KernelHandle => ({
+	const wrap = (core: KernelHandleCore, key: string, ctx: unknown): KernelHandle => ({
 		...core,
+		// Both of these are the handle's reason to exist rather than bookkeeping: `kernel` is how an
+		// instance reaches a session it did not mount, and `ctx` is how it tells a gone session from
+		// an idle one (see the type).
+		kernel: core,
+		ctx,
 		publisher: PUBLISHER,
 		apiVersion: API_VERSION,
 		sessionKey: key,
@@ -265,6 +306,10 @@ export function createMounter(options: {
 			return counts.get(key) ?? 1;
 		},
 	});
+	const retireKey = (key: string): boolean => {
+		counts.delete(key);
+		return sessions.delete(key);
+	};
 	return {
 		sessions,
 		mount(pi: unknown, ctx: unknown) {
@@ -277,15 +322,12 @@ export function createMounter(options: {
 				return existing;
 			}
 			counts.set(key, 1);
-			const handle = wrap(options.create(pi, ctx, key), key);
+			const handle = wrap(options.create(pi, ctx, key), key, ctx);
 			sessions.set(key, handle);
 			return handle;
 		},
-		retire(ctx: unknown) {
-			const key = options.keys.of(ctx);
-			counts.delete(key);
-			return sessions.delete(key);
-		},
+		retire: (ctx: unknown) => retireKey(options.keys.of(ctx)),
+		retireKey,
 	};
 }
 
