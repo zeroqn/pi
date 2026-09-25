@@ -32,6 +32,7 @@
  * bash-allowlist.ts for what that means for shell commands, and EXEMPT_HOST_CALLS for the cell lane.
  */
 
+import { resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { KernelGuard, KernelGuardVerdict } from "../host-bridge/src/client.ts";
 import {
@@ -39,6 +40,7 @@ import {
 	registerContributor,
 	sessionKey,
 	sessionRecord,
+	type ChildBindInput,
 	type SessionInput,
 } from "../host-bridge/src/convention.ts";
 import { checkReadOnlyCommand } from "./bash-allowlist.ts";
@@ -49,6 +51,26 @@ const STATUS_KEY = "readonly-mode";
 const OWNER = "readonly-mode";
 /** The contract version a code mode must speak for a cell to be governed: 2 added the `guard` slot. */
 const GUARD_API_VERSION = 2;
+
+/**
+ * The floors: session keys a *parent* session holds read-only, and that parent's **live** answer.
+ *
+ * A process-global, because a child's own load of this entry is a different module instance from its
+ * spawner's (`moduleCache: false`) while both may be asked about the same kernel. A floor is a getter
+ * rather than a boolean so a child *follows* its spawner instead of freezing at the moment of the
+ * spawn — that is what makes it an inheritance rather than a copy, and it is what stops a child ever
+ * being wider than the session that spawned it.
+ */
+export const FLOORS_KEY = Symbol.for("pi-readonly-mode:floors");
+
+function floors(): Map<string, () => boolean> {
+	const holder = globalThis as Record<symbol, unknown>;
+	const existing = holder[FLOORS_KEY];
+	if (existing instanceof Map) return existing as Map<string, () => boolean>;
+	const created = new Map<string, () => boolean>();
+	holder[FLOORS_KEY] = created;
+	return created;
+}
 
 /** Tools known to modify the workspace. Kept exact for the active-set filter. */
 const WRITER_TOOLS = new Set(["edit", "write", "apply_patch", "ast_grep_replace", "ast_grep_rewrite"]);
@@ -200,18 +222,30 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	 * (a session with no code mode at all). Only the first earns the cell half of the prompt.
 	 */
 	let cellLane: "mounted" | "unenforceable" | null = null;
+	const floor = floors();
+	/** Child sessions this registration serves, keyed as the seam keys them. */
+	const children = new Set<string>();
+
+	/**
+	 * Whether the kernel for `forKey` is read-only: this session's own flag, or a floor a parent holds
+	 * over it. Both halves are read live, so the spawner's toggle reaches its children.
+	 */
+	function isOn(forKey: string): boolean {
+		if (enabled) return true;
+		return floor.get(forKey)?.() === true;
+	}
 	/** Sessions the seam told us are roots: the inventory check's stale half is only sound there. */
 	const roots = new Set<string>();
 	/** Sessions the inventory has already been checked for, so the notice is said once. */
 	const checked = new Set<string>();
 
-	/** This session's policy, as the kernel's guard. Both answers read the live flag, so the toggle
-	 *  lands on the next cell with no rebuild. */
-	function guardFor(): KernelGuard {
+	/** The policy for one session's kernel. Both answers are read live — this session's flag, or the
+	 *  floor a parent holds over it — so a toggle lands on the next cell with no rebuild. */
+	function guardFor(forKey: string): KernelGuard {
 		return {
-			mountMode: () => (enabled ? "read-only" : "read-write"),
+			mountMode: () => (isOn(forKey) ? "read-only" : "read-write"),
 			before: (call) => {
-				if (!enabled) return undefined;
+				if (!isOn(forKey)) return undefined;
 				const route = ROUTES[call.name];
 				if (route !== undefined) {
 					// A route call with no name is introspection (`await tool()` lists what is published),
@@ -290,21 +324,46 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 			owner: OWNER,
 			apiVersion: HOST_API_VERSION,
 			session: (input: SessionInput) => {
-				if (input.sessionKey !== key) return {};
-				if (input.isChild) roots.delete(key);
-				else roots.add(key);
+				const own = input.sessionKey === key;
+				// A **spawned child** loads no ambient extension, so its kernel would be mounted with
+				// nobody's answer to inherit if this registration did not give it one.
+				if (!own && !children.has(input.sessionKey)) return {};
+				if (own) {
+					if (input.isChild) roots.delete(key);
+					else roots.add(key);
+				}
 				if (input.handle.apiVersion < GUARD_API_VERSION) {
-					cellLane = "unenforceable";
 					// A contribution is validated all-or-nothing, so an older code mode refuses the guard
 					// *whole* and the session never learns: it would show the read-only prompt, the status
 					// line, and a writable workspace. That is the one failure this check exists to prevent.
-					unenforceable =
+					const problem =
 						`Read-only mode cannot be enforced inside a cell: this code mode speaks contract version ` +
 						`${input.handle.apiVersion}, and a guard needs ${GUARD_API_VERSION}. The python tool is refused while the mode is on.`;
-					return { problems: [unenforceable] };
+					// Only a session's own instance can refuse its own tool, so the flag is only set for
+					// this session: an ungovernable child is reported, and its own instance refuses its tool.
+					if (own) {
+						cellLane = "unenforceable";
+						unenforceable = problem;
+					}
+					return { problems: [problem] };
 				}
-				cellLane = "mounted";
-				return { contribution: { owner: OWNER, guard: guardFor() } };
+				if (own) cellLane = "mounted";
+				return { contribution: { owner: OWNER, guard: guardFor(input.sessionKey) } };
+			},
+			/**
+			 * Told about a child of this session by the spawner: rlm binds every contributor from its own
+			 * `session_start`, which runs before the composition root asks them (`.scratch/host-bridge`
+			 * ticket 05), so the binding is in place by the time the child's kernel is mounted.
+			 *
+			 * The floor is this session's **effective** answer rather than its raw flag, so a grandchild
+			 * inherits through a child — whose own flag is false while what holds it is its spawner's floor.
+			 */
+			bindChild: (input: ChildBindInput) => {
+				if (!input.childSessionFile) return;
+				if (!input.parentSessionFile || resolve(input.parentSessionFile) !== key) return;
+				const childKey = resolve(input.childSessionFile);
+				children.add(childKey);
+				floor.set(childKey, () => isOn(key));
 			},
 		});
 		if (registered.registered) return;

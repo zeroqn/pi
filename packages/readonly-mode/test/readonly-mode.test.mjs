@@ -169,7 +169,9 @@ test("allows the reads a query session needs", () => {
 // exercised without a model call.
 // ---------------------------------------------------------------------------
 
-function load({ flag = false, active = ["read", "bash", "edit", "write", "todowrite", "read_symbol"], entries = [] } = {}) {
+let sessionCounter = 0;
+
+function load({ flag = false, active = ["read", "bash", "edit", "write", "todowrite", "read_symbol"], entries = [], sessionFile } = {}) {
 	const handlers = {};
 	const commands = {};
 	const shortcuts = {};
@@ -204,13 +206,15 @@ function load({ flag = false, active = ["read", "bash", "edit", "write", "todowr
 
 	factory(pi);
 
+	// A real session file, so the seam keys this session the way it keys a live one.
+	const file = sessionFile ?? `/sessions/readonly-mode-${(sessionCounter += 1)}.jsonl`;
 	const ctx = {
 		ui: {
 			notify: (message) => notifications.push(message),
 			setStatus: (key, value) => statuses.set(key, value),
 			theme: { fg: (_color, text) => text },
 		},
-		sessionManager: { getEntries: () => entries },
+		sessionManager: { getEntries: () => entries, getSessionFile: () => file },
 	};
 
 	return {
@@ -221,6 +225,7 @@ function load({ flag = false, active = ["read", "bash", "edit", "write", "todowr
 		notifications,
 		statuses,
 		ctx,
+		file,
 		tools: () => activeTools,
 	};
 }
@@ -540,4 +545,86 @@ test("nothing is said when there is no kernel to be wrong about", async () => {
 	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
 	assert.equal(h.notifications.filter((n) => /exemption list|remove the line/.test(n)).length, 0);
 	assert.deepEqual(h.appended.filter((entry) => entry.type === "readonly-mode-inventory"), []);
+});
+
+// ---------------------------------------------------------------------------
+// The child lane (ticket 05): a child's mode comes from its spawner, as a live floor.
+// ---------------------------------------------------------------------------
+
+/**
+ * What a spawn does to the contributors: the seam's own dispatch, done here by hand.
+ *
+ * `pi-host-bridge`'s `bindChild` is exactly this loop (every registration that declares one, contained
+ * so one cannot stop another), and it is its own tested behaviour; importing `compose.ts` would drag
+ * its runtime import of `client` into a suite that runs on node, which will not resolve an
+ * extensionless relative import.
+ */
+const spawn = (childFile, parentFile) => {
+	for (const registration of contributors()) {
+		if (typeof registration.bindChild === "function") {
+			registration.bindChild({ childSessionFile: childFile, parentSessionFile: parentFile, cwd: "/workspace" });
+		}
+	}
+};
+
+const ask = (registration, sessionKey_, isChild) =>
+	registration.session({ ctx: {}, sessionKey: sessionKey_, handle: { apiVersion: 2 }, isChild, cwd: "/workspace" });
+
+const registrationFor = (key) => contributors().find((r) => r.key === `readonly-mode@${key}`);
+
+test("a child inherits its spawner's floor, and follows it", async () => {
+	const parent = await cellLane();
+	const childFile = "/sessions/child-of-floor.jsonl";
+	spawn(childFile, parent.key);
+
+	// Nothing holds it yet: the spawner is not read-only.
+	assert.equal(ask(parent.registration, childFile, true).contribution.guard.mountMode(), "read-write");
+
+	await toggleOn(parent.h);
+	const childGuard = ask(parent.registration, childFile, true).contribution.guard;
+	assert.equal(childGuard.mountMode(), "read-only");
+	assert.equal(childGuard.before({ name: "some_new_capability", args: [] }).allow, false);
+	assert.ok(childGuard.before({ name: "rlm_spawn", args: [] }) === undefined, "a child may still delegate");
+
+	// The floor is the spawner's *live* answer, not the state at the moment of the spawn.
+	await toggleOn(parent.h);
+	assert.equal(childGuard.mountMode(), "read-write");
+});
+
+test("a child's own instance cannot widen what its spawner holds", async () => {
+	const parent = await cellLane();
+	await toggleOn(parent.h);
+	const childFile = "/sessions/child-own.jsonl";
+	spawn(childFile, parent.key);
+
+	// The child's own load of this entry: its own flag is off, which is all it knows about itself.
+	const child = load({ sessionFile: childFile });
+	await child.handlers.session_start[0]({}, child.ctx);
+	const childKey = sessionKey(child.ctx);
+	const guard = ask(registrationFor(childKey), childKey, true).contribution.guard;
+	assert.equal(guard.mountMode(), "read-only", "the floor is the spawner's, not the child's own flag");
+	assert.equal(guard.before({ name: "some_new_capability", args: [] }).allow, false);
+});
+
+test("a grandchild inherits through a child", async () => {
+	const parent = await cellLane();
+	await toggleOn(parent.h);
+	const childFile = "/sessions/child-mid.jsonl";
+	const grandFile = "/sessions/child-grand.jsonl";
+	spawn(childFile, parent.key);
+
+	const child = load({ sessionFile: childFile });
+	await child.handlers.session_start[0]({}, child.ctx);
+	const childKey = sessionKey(child.ctx);
+	spawn(grandFile, childKey);
+
+	// The middle session's own flag is false, and what holds it is its own spawner's floor: the
+	// grandchild has to inherit the *effective* answer, not the raw one.
+	const guard = ask(registrationFor(childKey), grandFile, true).contribution.guard;
+	assert.equal(guard.mountMode(), "read-only");
+});
+
+test("a registration answers for its own session and its children, and for nobody else", async () => {
+	const parent = await cellLane();
+	assert.deepEqual(ask(parent.registration, "/sessions/stranger.jsonl", false), {});
 });
