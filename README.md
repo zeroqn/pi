@@ -7,6 +7,8 @@ one is a fork.
 | --- | --- |
 | [`code-mode`](packages/code-mode) | The Python kernel; one tool replaces pi's tool surface. |
 | [`rlm`](packages/rlm) | Delegation (children) and the agent-side seams, inside that kernel. |
+| [`host-bridge`](packages/host-bridge) | The composition root: the one client of code mode's registry, and what asks each contributor for a session. |
+| [`skill-bridge`](packages/skill-bridge) | pi's own skills, and a provider store's, on a code-mode surface — one block, one call form. |
 | [`rsi`](packages/rsi) | Background loop learns reusable skills from sessions and maintains them. |
 | [`web-access`](packages/web-access) | `web_search`/`fetch_content` host functions for the kernel, plus the untrusted-web-content guard. |
 | [`zvec-grep`](packages/zvec-grep) | zvec-grep search and managed ripgrep as native pi tools. |
@@ -15,13 +17,15 @@ one is a fork.
 | [`rpiv-advisor-pi-native`](packages/rpiv-advisor-pi-native) | Keeps rpiv-advisor's config in pi's own config tree. |
 | [`magic-context`](packages/magic-context) | Forked. Cross-session memory and context management for pi. **Prebuilt** — see below. |
 
-The first four compose into one code-mode runtime. `code-mode` owns the kernel and the `python`
-tool; `rlm`, `web-access` and `rsi` reach it through a process-global registry — a contract, not an
-import — and each *contributes* the host functions and sentences it is responsible for. `tool-bridge`
-is a leaf of the same kind: it contributes one host function, `tool`, through which an owner's
-published tools are callable by name, plus the reconciler that keeps pi's active set to the tools a
-cell cannot stand in for. Uninstall any of the three and the kernel still runs, with fewer names in
-it; uninstall `code-mode` and the others say so instead of half-working. The rest are independent.
+Seven of them compose into one code-mode runtime. `code-mode` owns the kernel and the `python` tool,
+and `host-bridge` is the composition root — the one client of code-mode's registry, and what asks
+each contributor for a session. `rlm`, `skill-bridge`, `tool-bridge` and `web-access` register with
+it, a contract rather than an import, and each *contributes* the host functions, prelude lines and
+sentences it is responsible for; `rsi` reaches the same client only to hold a kernel handle, and
+contributes nothing. `tool-bridge` also carries the reconciler that keeps pi's active set to the
+tools a cell cannot stand in for. Uninstall any contributor and the kernel still runs, with fewer
+names in it; uninstall `code-mode` and the others say so instead of half-working. The other four are
+independent.
 
 ## Setup
 
@@ -42,15 +46,15 @@ export RLM_WEB_MODULE="$PWD/packages/web-access/host.ts"   # web-access -> kerne
 - `RLM_WEB_MODULE` — how web-access is joined to the kernel. Nothing is imported; rlm reads the
   module name, resolves it once so the tool description only promises what exists, and contributes
   the `createHost(ctx)` it exports per kernel.
-- `zvec-grep` needs the `zg` CLI on `PATH` (or `ZVEC_GREP_BIN` pointing at it). The two
-  `-pi-native` extensions only relocate another package's config file, so they do nothing
-  unless that package is installed.
+- `zvec-grep` needs the `zg` CLI on `PATH` (or `ZVEC_GREP_BIN` pointing at it). The
+  `-pi-native` extension only relocates another package's config file, so it does nothing unless that
+  package is installed.
 
 Install one at a time, or the whole set from the root manifest:
 
 ```bash
 pi install ./packages/rlm      # one package
-pi install .                   # or this repo's root, whose manifest declares all ten
+pi install .                   # or this repo's root, whose manifest declares all eleven
 ```
 
 ## The fork
