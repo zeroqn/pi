@@ -12,8 +12,9 @@
  *    `await tool(name, …)` calls one, and the answer is the tool's own text,
  *    refusals included. An unpublished name throws a `NameError` that lists what was published,
  *    which is the one failure a model can repair by itself.
- * 3. **The surface rule** (ticket 03, extended by ticket 12). Once a name is reachable from a
- *    cell, its pi tool is stripped from the active set for that session — and only then, because a
+ * 3. **The surface rule** (ticket 03, extended by ticket 12, kept here by `.scratch/host-bridge`
+ *    ticket 04). Once a name is reachable from a cell, its pi tool is stripped from the active set
+ *    for that session — and only then, because a
  *    session with no cell route must keep the pi tool it had. The rule has a second direction: a
  *    *native-only* tool, whose effect is pi's dispatch rather than its own `execute`, must be
  *    **active**, because the convention forbids publishing it. This is the half an entry runs per
@@ -28,29 +29,10 @@ import {
 	API_VERSION,
 	type BridgePublication,
 	type BridgeToolEntry,
-	READER,
 	type SlotOwner,
-	sessionKey,
-	bridgedSession,
-	forgetSession,
 	publications,
-	recordBridged,
 } from "./convention";
-
-/** The part of a contribution ledger this package uses, structurally (code-mode's handle). */
-export type BridgeContribution = {
-	owner: string;
-	hostFns?: Record<string, (...args: unknown[]) => Promise<unknown>>;
-	guidelines?: string[];
-};
-
-export type BridgeReceipt = {
-	accepted?: string[];
-	rejected?: { name: string; reason: string }[];
-};
-
-/** `KernelHandle.contribute`, structurally. */
-export type KernelContribute = (contribution: BridgeContribution) => BridgeReceipt;
+import { type ChildCeiling, sessionKey, sessionRecord } from "../../host-bridge/src/convention";
 
 /** What a pi extension api has to offer for the surface rule — nothing else is used. */
 export type ActiveToolSurface = {
@@ -335,90 +317,6 @@ export function toolHostFn(
 	};
 }
 
-export type BridgeInstallInput = {
-	/** The session's kernel handle: `handle.contribute`. */
-	contribute: KernelContribute;
-	/** The calling session's ctx, handed to every executor (the tools resolve their own session). */
-	ctx: unknown;
-	/** Defaults to `sessionKey(ctx)`; the surface rule looks up the same value. */
-	sessionKey?: string;
-	/** Test seam: publications to read instead of the live slot. */
-	owners?: SlotOwner[];
-};
-
-export type BridgeInstallResult = {
-	/** The pi tool names this session's kernel can now call. Empty when nothing was installed. */
-	installed: string[];
-	/** Everything dropped on the way, each with a reason (loud once, in the caller's record). */
-	problems: BridgeProblem[];
-	/** Why nothing was installed, when nothing was. */
-	reason?: string;
-};
-
-/**
- * Builds the contribution, hands it to the kernel, and records what became reachable — in that
- * order, because the record must not claim a route that the ledger refused.
- */
-export function installToolBridge(input: BridgeInstallInput): BridgeInstallResult {
-	const gathered = gatherToolBridge(input.ctx, input.owners ?? publications());
-	if (gathered.tools.length === 0) {
-		return {
-			installed: [],
-			problems: gathered.problems,
-			reason:
-				gathered.problems.length > 0
-					? "no owner offered a usable tool"
-					: "nothing is published",
-		};
-	}
-
-	let receipt: BridgeReceipt;
-	try {
-		receipt = input.contribute({
-			owner: READER,
-			hostFns: { tool: toolHostFn(gathered, input.ctx) },
-			guidelines: bridgeGuidelines(gathered),
-		});
-	} catch (error) {
-		// The ledger is another package's code, and this runs inside a `session_start` handler:
-		// a throw here would take the session's start with it. Loud, inert, recorded.
-		return {
-			installed: [],
-			problems: gathered.problems,
-			reason: `the kernel refused the contribution with an exception — ${errorText(error)}`,
-		};
-	}
-
-	const accepted = new Set(receipt?.accepted ?? []);
-	if (!accepted.has("tool")) {
-		const rejected = (receipt?.rejected ?? [])
-			.map((entry) => `${entry.name}: ${entry.reason}`)
-			.join("; ");
-		return {
-			installed: [],
-			problems: gathered.problems,
-			reason: `the 'tool' host function was not accepted (${rejected || "no receipt"}) — the pi tools stay active, so nothing is lost`,
-		};
-	}
-
-	const installed = gathered.tools.map((tool) => tool.entry.name);
-	recordBridged(input.sessionKey ?? sessionKey(input.ctx), {
-		toolNames: installed,
-		owners: ownersOf(gathered),
-	});
-	return { installed, problems: gathered.problems };
-}
-
-/** What a child may hold, and where the answer came from (`.scratch/child-surface/` ticket 01). */
-export type ChildCeiling = {
-	/** The names a child may have active: the parent's surface, narrowed to what a child may hold. */
-	ceiling: string[];
-	/** `spawner` — read from the spawning session; `fallback` — the declared list, no spawner to read. */
-	source: "spawner" | "fallback";
-	/** Names the parent's surface held that the ceiling excluded. Absent for a `fallback` ceiling. */
-	dropped?: string[];
-};
-
 /** What the child's reconcile did, in the words a reader of the session later needs. */
 export type ChildSurfaceReport = {
 	/** What the child was actually offered, after the reconcile. */
@@ -449,7 +347,7 @@ export function reconcileChildSurface(input: {
 }): ChildSurfaceReport {
 	const before = input.pi.getActiveTools();
 	const ceiling = new Set(input.ceiling);
-	const cellReachable = new Set(bridgedSession(sessionKey(input.ctx))?.toolNames ?? []);
+	const cellReachable = new Set(sessionRecord(sessionKey(input.ctx))?.reaches ?? []);
 	const registered = input.pi.getAllTools?.();
 
 	const surface = before.filter(
@@ -498,11 +396,12 @@ export function recordChildSurface(
 /**
  * The bridge's own child factory: the half of the child path that runs *inside* the child.
  *
- * `childFactories` appends it last, so its `session_start` handler runs after every owner's. It
- * reconciles at `session_start` (writing the child's own record) and again at `before_agent_start`,
- * because pi builds the turn's prompt from the active set *before* those handlers run — the same reason
- * the root's entry does both. On shutdown it forgets the child's record: the entry is not loaded in a
- * spawned child, so this is the only thing that releases it.
+ * The registration hands it to `pi-host-bridge` as this package's `childSurface` declaration, which
+ * is appended after every contributor's factories, so its `session_start` handler runs after every
+ * contributor's. It reconciles at `session_start` (writing the child's own record) and again at
+ * `before_agent_start`, because pi builds the turn's prompt from the active set *before* those
+ * handlers run — the same reason the root's entry does both. The session *record* is no longer this
+ * package's to release: the composition root's own child factory forgets it (ticket 05).
  */
 export function childSurfaceFactory(input: { ceiling?: ChildCeiling }): (pi: any) => void {
 	return (childPi: any) => {
@@ -518,10 +417,6 @@ export function childSurfaceFactory(input: { ceiling?: ChildCeiling }): (pi: any
 		childPi.on("before_agent_start", (_event: unknown, ctx: unknown) => {
 			const ceiling = ceilingOf();
 			reconcileChildSurface({ pi: childPi, ctx, ceiling: ceiling.ceiling });
-			return undefined;
-		});
-		childPi.on("session_shutdown", (_event: unknown, ctx: unknown) => {
-			forgetSession(sessionKey(ctx));
 			return undefined;
 		});
 	};
@@ -543,9 +438,12 @@ export function reconcileToolSurface(
 	ctx: unknown,
 	nativeOnly: readonly string[],
 ): string[] {
-	const record = bridgedSession(sessionKey(ctx));
-	if (!record || record.toolNames.length === 0) return [];
-	const bridged = new Set(record.toolNames);
+	// The record is `pi-host-bridge`'s (ticket 05): it writes it only after the ledger accepted the
+	// contribution, so a name here is a name a cell can actually call — and a session the composition
+	// never touched has no record at all, which is what keeps this rule from stripping anything there.
+	const record = sessionRecord(sessionKey(ctx));
+	if (!record || record.reaches.length === 0) return [];
+	const bridged = new Set(record.reaches);
 	const active = pi.getActiveTools();
 	const next = active.filter((name) => !bridged.has(name));
 	const stripped = active.filter((name) => bridged.has(name));

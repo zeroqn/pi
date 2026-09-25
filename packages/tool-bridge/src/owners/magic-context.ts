@@ -26,7 +26,7 @@
  * is a **degradation, not a failure**: the bridge must run correctly with this owner absent, old, or
  * missing the registry entirely, and `childStatus()` reports which state applies.
  */
-import type { ChildBindInput, ChildRequest } from "../child-seam";
+import type { ChildBindInput, ChildRequest } from "../../../host-bridge/src/convention";
 import type { OwnerModule } from "./index";
 
 const REGISTRY_KEY = Symbol.for("@cortexkit/magic-context:pi-registry");

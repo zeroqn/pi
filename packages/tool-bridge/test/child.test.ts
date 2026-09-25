@@ -1,44 +1,21 @@
 /**
- * The child seam and its first owner (wayfinder ticket 05, `.scratch/tool-ownership/`; reworked by
- * `.scratch/child-surface/` tickets 03-06).
+ * The child path, end to end through the seam: the first owner's child shim, the ceiling's policy, and
+ * the containment the seam owes every contributor (`.scratch/tool-ownership` ticket 05,
+ * `.scratch/child-surface` tickets 03-06; re-homed by `.scratch/host-bridge` ticket 05).
  *
- * What changed, and why this file no longer pins three tool definitions: a child no longer holds
- * `ctx_search`/`ctx_reduce`/`ctx_expand` as proxies — it reaches them from its own cell through the tool
- * bridge, whose generated line states how — and the *only* tool the shim registers is the one value the
- * registry hands over, `childTodo()`. The pin that replaced check 3b asserts *that*: which names the shim
- * registers, that the definition is the instance's own object rather than a copy, that the capture rides
- * the `message_end` hook the bridge already has, and that a registry offering no capability registers
- * nothing at all.
- *
- * The last two describe blocks are ticket 02's decisions: the owner list is unique, and the
- * owner-agnostic files name no owner.
+ * What this file is *not*: a test of the composition. The seam's own order, its detector, its factory
+ * list and its bind dispatch are `pi-host-bridge`'s, tested there. What is left here is what is
+ * genuinely this package's — the owner's child behaviour, the child-eligibility policy that feeds the
+ * ceiling, and the fact that both are actually wired into the registration a live process reads.
  */
-import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import {
-	__clearChildDetectorForTests,
-	bindChild,
-	childCeiling,
-	childFactories,
-	childStatus,
-	detectsChild,
-	setChildDetector,
-} from "../src/child-seam";
-import { OWNERS, childEligibleTools, nativeOnlyTools } from "../src/owners";
-import { magicContext } from "../src/owners/magic-context";
-import { probe } from "../src/owners/probe";
+import { beforeEach, describe, expect, it } from "bun:test";
+import { bindChild, childCeiling, childFactories, childStatus } from "../../host-bridge/src/compose";
+import { __resetHostBridgeForTests, registerContributor } from "../../host-bridge/src/convention";
+import { __resetToolBridgeForTests } from "../src/convention";
+import { toolBridgeRegistration } from "../src/registration";
+import { childEligibleTools } from "../src/owners";
 
 const REGISTRY_KEY = Symbol.for("@cortexkit/magic-context:pi-registry");
-
-/**
- * The files that must stay owner-agnostic, and the strings that would betray an owner.
- *
- * Every file in `src/` outside `owners/` belongs here: the seam, the reader, the convention, the
- * entry and the adopter describe a mechanism, not an owner. `owners/index.ts` is excluded because
- * naming its owners is its whole job.
- */
-const GENERIC_FILES = ["child-seam.ts", "adapter.ts", "adopter.ts", "convention.ts", "index.ts"];
-const OWNER_PATTERNS = [/\bmagic/i, /cortexkit/i, /\bctx_/];
 
 /** A registry that answers the shape the owner looks for, with per-test overrides. */
 function installRegistry(overrides: Record<string, unknown> = {}): void {
@@ -79,7 +56,7 @@ function childSurface(): {
 			active.push(...names);
 		},
 	};
-	/** Handlers run in registration order, which is the whole mechanism (ticket 02 §3). */
+	/** Handlers run in registration order, which is the whole mechanism. */
 	const run = async (event: string, ...args: unknown[]) => {
 		for (const handler of handlers.get(event) ?? []) await handler(...args);
 	};
@@ -108,7 +85,15 @@ const TODO = {
 	execute: () => undefined,
 };
 
-describe("the child's tools (child-surface ticket 06 — what replaced acceptance check 3b)", () => {
+beforeEach(() => {
+	__resetToolBridgeForTests();
+	__resetHostBridgeForTests();
+	// The seam serves contributors, and this package is one: without this, none of the child
+	// declarations below is read at all.
+	registerContributor(toolBridgeRegistration);
+});
+
+describe("the child's tools (child-surface ticket 06)", () => {
 	it("registers the capability's definition and no proxy of its own", async () => {
 		installRegistry({ childTodo: () => ({ definition: TODO, capture: () => {} }) });
 		try {
@@ -186,7 +171,7 @@ describe("the child's tools (child-surface ticket 06 — what replaced acceptanc
 			const { pi, run } = childSurface();
 			applyFactories(pi);
 			await run("session_shutdown", {}, childCtx());
-			// The file is the binding's key: clearing only the id was a silent no-op (ticket 04).
+			// The file is the binding's key: clearing only the id was a silent no-op.
 			expect(cleared).toEqual([["child", "/child.jsonl"]]);
 		} finally {
 			clearRegistry();
@@ -218,13 +203,9 @@ describe("the child's tools (child-surface ticket 06 — what replaced acceptanc
 	});
 });
 
-describe("the ceiling (child-surface ticket 03)", () => {
+describe("the ceiling's policy half (child-surface ticket 03)", () => {
 	it("narrows the spawning session's surface to what a child may hold", () => {
-		const { ceiling, source, dropped } = childCeiling([
-			"python",
-			"ask_user_question",
-			"todowrite",
-		]);
+		const { ceiling, source, dropped } = childCeiling(["python", "ask_user_question", "todowrite"]);
 		expect(ceiling).toEqual(["python", "todowrite"]);
 		expect(source).toBe("spawner");
 		// Neither of these is declared child-eligible by any owner — `ask_user_question` needs a UI a
@@ -234,9 +215,9 @@ describe("the ceiling (child-surface ticket 03)", () => {
 	});
 
 	it("names code mode's own tool once, and no owner has to declare it", () => {
-		// `python` is in the seam's own `CHILD_ALWAYS`, not in any owner's declaration — and it still has
-		// to be in the *parent's* surface to survive the intersection, so a parent that is not a
-		// code-mode session offers a child nothing.
+		// `python` is the seam's own constant, not an owner's declaration — and it still has to be in
+		// the *parent's* surface to survive the intersection, so a parent that is not a code-mode
+		// session offers a child nothing.
 		expect(childCeiling(["python", "read"]).ceiling).toEqual(["python"]);
 		expect(childCeiling(["read", "bash"]).ceiling).toEqual([]);
 		expect(childEligibleTools()).not.toContain("python");
@@ -262,47 +243,13 @@ describe("the ceiling (child-surface ticket 03)", () => {
 	});
 });
 
-describe("the child detector (child-surface ticket 03 §5)", () => {
-	it("detects nothing until rlm installs its reader", () => {
-		__clearChildDetectorForTests();
-		expect(detectsChild(childCtx())).toBe(false);
-	});
-
-	it("keeps the reader where another module instance can see it", () => {
-		// pi loads each extension entry through its own jiti instance, so rlm's copy of this module and
-		// the bridge entry's copy are two module scopes. A module-level variable would be set by one and
-		// read as undefined by the other — which is what the first live run of the resumed-child path
-		// showed. The rendezvous is a process-global, like this package's session record.
-		setChildDetector(() => true);
-		const slot = (globalThis as Record<symbol, unknown>)[
-			Symbol.for("pi-tool-bridge:child-detector")
-		] as { current?: unknown } | undefined;
-		expect(typeof slot?.current).toBe("function");
-		__clearChildDetectorForTests();
-	});
-
-	it("answers from the installed reader, and contains a throwing one", () => {
-		setChildDetector((ctx: any) => ctx?.sessionManager?.getSessionId?.() === "child");
-		try {
-			expect(detectsChild(childCtx("child"))).toBe(true);
-			expect(detectsChild(childCtx("root"))).toBe(false);
-			setChildDetector(() => {
-				throw new Error("boom");
-			});
-			// An undetected child degrades to the root rule, which is a state the session was already in.
-			expect(detectsChild(childCtx("child"))).toBe(false);
-		} finally {
-			__clearChildDetectorForTests();
-		}
-	});
-});
-
-describe("degradation is loud and inert (ticket 02)", () => {
-	it("keeps a no-op factory and reports the absence when there is no registry", () => {
+describe("degradation is loud and inert", () => {
+	it("registers nothing and reports the absence when there is no registry", async () => {
 		clearRegistry();
-		const { pi, handlers, tools } = childSurface();
+		const { pi, tools, run } = childSurface();
 		applyFactories(pi);
-		expect(handlers.size).toBe(3); // the bridge's own three, and the owner's none
+		expect(tools.size).toBe(0);
+		await run("session_start", {}, childCtx());
 		expect(tools.size).toBe(0);
 		expect(childStatus()).toContain("no registry");
 		expect(() => bindChild({ childSessionFile: "/child.jsonl" })).not.toThrow();
@@ -319,76 +266,5 @@ describe("degradation is loud and inert (ticket 02)", () => {
 		} finally {
 			clearRegistry();
 		}
-	});
-});
-
-describe("the owner list (ticket 02)", () => {
-	it("has one entry per owner, with unique names", () => {
-		const names = OWNERS.map((owner) => owner.name);
-		expect(new Set(names).size).toBe(names.length);
-		expect(names).toContain("magic-context");
-	});
-
-	it("unions native-only names without duplicates", () => {
-		const names = nativeOnlyTools();
-		expect(names).toContain("todowrite");
-		expect(new Set(names).size).toBe(names.length);
-		expect(magicContext.nativeOnly).toEqual(["todowrite"]);
-	});
-
-	it("declares child eligibility as its own list, equal to native-only today", () => {
-		// Two lists answering two questions (`nativeOnly`: a *root* must keep it a pi tool;
-		// `childEligible`: a *child* may hold it). Equal today, and pinned so a divergence is a decision
-		// someone made rather than a drift nobody noticed.
-		expect(magicContext.childEligible).toEqual(magicContext.nativeOnly);
-		expect(childEligibleTools()).toContain("todowrite");
-	});
-
-	it("keeps the acceptance probe out of the list unless something is measuring", () => {
-		// The instrument reads pi's own api, so it is the bar's independent half — and it must cost
-		// nothing to a session that is not being measured.
-		expect(OWNERS.map((owner) => owner.name)).not.toContain("probe");
-	});
-
-	it("reports a child's surface from pi's own api when it is switched on", () => {
-		// The instrument's own shape: it must read pi's api and write one entry, and it must not be in
-		// the owner list unless something is measuring (asserted just above).
-		const entries: Array<{ customType: string; data: unknown }> = [];
-		const handlers: Function[] = [];
-		const pi = {
-			on: (_event: string, handler: Function) => handlers.push(handler),
-			getActiveTools: () => ["python", "todowrite"],
-			getAllTools: () => [
-				{ name: "python", description: "Run Python", promptGuidelines: ["one", "two"] },
-				{ name: "todowrite" },
-			],
-			appendEntry: (customType: string, data: unknown) => entries.push({ customType, data }),
-		};
-		probe.childFactories?.({})[0]?.(pi);
-		for (const handler of handlers) handler({}, { sessionManager: { getSessionId: () => "child" } });
-		expect(entries).toEqual([
-			{
-				customType: "rlm-child-probe",
-				data: {
-					active: ["python", "todowrite"],
-					registered: ["python", "todowrite"],
-					session: "child",
-					python: { description: "Run Python", guidelines: ["one", "two"] },
-				},
-			},
-		]);
-	});
-
-	it("names no owner in the owner-agnostic files", () => {
-		const offenders: string[] = [];
-		for (const file of GENERIC_FILES) {
-			const lines = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8").split("\n");
-			lines.forEach((line, index) => {
-				if (OWNER_PATTERNS.some((pattern) => pattern.test(line))) {
-					offenders.push(`${file}:${index + 1}: ${line.trim()}`);
-				}
-			});
-		}
-		expect(offenders).toEqual([]);
 	});
 });

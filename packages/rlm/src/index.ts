@@ -17,23 +17,13 @@
  *    recorded reason, one line to the model, and everything else still working (ticket 01's
  *    failure table; a throwing factory would kill the whole process — ticket 02 §1).
  */
-import { bindCodeMode, codeModeChildExtensions, type CodeModeHandle } from "./bind";
-import {
-	type BridgeReport,
-	adoptToolBridge,
-	bridgeStatusLine,
-} from "../../tool-bridge/src/adopter";
-import { type ChildCeiling, childCeiling } from "../../tool-bridge/src/child-seam";
+import { bindCodeMode, type CodeModeHandle } from "./bind";
+import { bindChild, childCeiling, childFactories, childStatus } from "../../host-bridge/src/compose";
+import { type ChildCeiling, setChildDetector } from "../../host-bridge/src/convention";
 import { createChildManager, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
 import type { ChildKernelContext, Notice } from "./children";
 import { rlmContribution, webAccessContribution } from "./contribution";
 import { delegationHostFns } from "./delegation";
-import {
-	bindChild,
-	childFactories as ownerChildFactories,
-	childStatus,
-	setChildDetector,
-} from "../../tool-bridge/src/child-seam";
 import { rsiBindChild, rsiChildExtensions, rsiStatus } from "./rsi-seam";
 import skillBridge from "../../skill-bridge/src/index";
 import { errorText, str } from "./util";
@@ -94,9 +84,9 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				// module instance: pi calls an inline factory directly, so the child's code mode
 				// is the parent's, in the parent's process (ticket 02 §3).
 				kernelFactoryFor: (child) => (childPi: any) => createRlm(childPi, child),
-				// The owners' factories come from the tool bridge's child seam, and RSI offers its own
-				// through the same kind of seam; rlm names neither, and a seam that is absent or too
-				// old contributes nothing.
+				// The seam composes every contributor's child factories (and its own child instance),
+				// and RSI offers its own through rlm's own seam; rlm names neither contributor, and a
+				// seam that is absent or too old contributes nothing.
 				//
 				// The skills bridge is named directly, and deliberately: a spawned child loads no
 				// ambient extensions, so a skills surface that existed only in the manifest would
@@ -106,16 +96,16 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				// 07). The import is a library call, not a second kernel: the entry's state is all
 				// per-session closures.
 				childFactories: (request) => [
-					...ownerChildFactories(request),
+					// RSI's own child signal, and the skills bridge while it still mounts itself: both are
+					// named by this module only because a child loads no ambient extensions. Everything
+					// else — the seam's own composition, every contributor's factories and code mode's own
+					// child instance — comes from `pi-host-bridge`, which appends code mode **inside** its
+					// list so the child's instance joins the kernel this factory already mounted and
+					// brings the lifecycle the child otherwise has none of (`agent_end` and
+					// `session_shutdown`). Code mode is still never imported (ADR 0001).
 					...rsiChildExtensions(),
 					skillBridge,
-					// Loaded **last**, so RLM's own factory has already mounted: the child's code-mode
-					// instance joins that kernel rather than creating a second one, and brings the
-					// lifecycle the child otherwise has none of — `agent_end` (so the kernel is dumped
-					// at the end of every one of the child's turns) and `session_shutdown`. The factory
-					// is handed over by the registry entry at spawn time; code mode is still never
-					// imported (ADR 0001), and an entry without the member contributes nothing.
-					...codeModeChildExtensions(),
+					...childFactories(request),
 				],
 			// The ceiling's first operand: this session's *live* surface, read at spawn time and never
 			// read back from a record (ticket 01 §1-2). A grandchild reads its own `pi` here, which is
@@ -249,8 +239,7 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 		}
 
 		const problems: string[] = [];
-		let bridge: BridgeReport | undefined;
-		const bound = await bindCodeMode({
+			const bound = await bindCodeMode({
 			pi,
 			ctx,
 			contributions: (handle) => {
@@ -301,19 +290,11 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 
 		if (bound.status === "bound") {
 			codeMode = bound.handle;
-			// The tool bridge (ticket 06), after the bind and before the first cell: an owner's
-			// published pi tools become host functions a cell can call, and the names that became
-			// reachable are recorded for the surface entry to strip. Contributed here rather than
-			// through `bindCodeMode` because the bridge has to see its own receipt, and a session
-			// whose contribution was refused records nothing and keeps the pi tools it had.
-			//
-			// **In a child too**, since `.scratch/child-surface/` ticket 02. The guard that used to be
-			// here existed for one reason — a bound child's publication resolved, through the owner's
-			// own lookup, to its *parent's* instance, so the child would inherit the parent's policy
-			// and its bound would widen — and ticket 04 removed that reason: the owner now narrows its
-			// own catalogue for a bound child. The child path therefore mirrors
-			// the root path exactly: rlm installs, the bridge corrects the surface.
-			bridge = adoptToolBridge({ contribute: bound.handle.contribute, ctx });
+			// The tool bridge is **not** adopted here any more (`.scratch/host-bridge` ticket 05): the
+			// composition root asks every contributor for this session in its own `session_start`,
+			// which runs after this one, and writes the record the surface entry reads. What rlm still
+			// does is bind the session's *owners* to a child before that happens, and report the
+			// kernel's own preflight.
 			problems.push(...bound.problems);
 			for (const rejection of bound.rejections) {
 				const names = rejection.rejected.map((r) => r.name).join(", ");
@@ -328,7 +309,7 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			// Recorded unconditionally — including on failure — because this entry is the only
 			// durable evidence of whether the kernel and the session's owners were available.
 			try {
-				pi.appendEntry("rlm-tools", { tools: childStatus(), bridge: bridgeStatusLine(bridge), problems, startReason });
+				pi.appendEntry("rlm-tools", { tools: childStatus(), problems, startReason });
 			} catch {
 				/* diagnostics must never fail a session */
 			}

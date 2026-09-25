@@ -7,24 +7,25 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import {
 	gatherToolBridge,
-	installToolBridge,
 	reconcileChildSurface,
 	reconcileToolSurface,
 	renderCatalogue,
 	textOfResult,
 	toolHostFn,
-	type BridgeReceipt,
 	type Gathered,
 } from "../src/adapter";
 import {
 	API_VERSION,
 	__resetToolBridgeForTests,
-	bridgedSession,
-	recordBridged,
-	sessionKey,
 	type BridgePublication,
 	type SlotOwner,
 } from "../src/convention";
+import {
+	__resetHostBridgeForTests,
+	recordSession,
+	sessionKey,
+} from "../../host-bridge/src/convention";
+import { toolBridgeAnswer } from "../src/registration";
 
 /**
  * The native-only set the entry hands the surface rule. A literal here, not the owner's declaration:
@@ -78,6 +79,14 @@ function searchTool(ownerName = "magic-context", calls: Record<string, unknown>[
 			return { content: [{ type: "text", text: `${name} says ${JSON.stringify(params)}` }] };
 		},
 	});
+}
+
+/** Write owners into the live slot, the way an owner's own bundle would. */
+function publish(owners: SlotOwner[]): void {
+	const slot = ((globalThis as Record<symbol, unknown>)[
+		Symbol.for("pi-tool-bridge:owners")
+	] ??= new Map()) as Map<string, BridgePublication>;
+	for (const entry of owners) slot.set(entry.key, entry.publication);
 }
 
 const ctx = fakeCtx("bridge-test-session");
@@ -226,31 +235,34 @@ describe("what a cell sees", () => {
 	});
 });
 
-describe("installing the bridge, and the surface rule", () => {
-	beforeEach(() => __resetToolBridgeForTests());
+describe("the contribution, and the surface rule", () => {
+	beforeEach(() => {
+		__resetToolBridgeForTests();
+		__resetHostBridgeForTests();
+	});
 
-	const accepting = (receipt?: BridgeReceipt) => {
-		const contributions: unknown[] = [];
-		return {
-			contributions,
-			contribute: (contribution: unknown) => {
-				contributions.push(contribution);
-				return receipt ?? { accepted: ["tool"], rejected: [] };
-			},
-		};
+	/** The answer, driven the way the composition root drives it — through the live slot. */
+	const answer = (owners: SlotOwner[]) => {
+		publish(owners);
+		return toolBridgeAnswer({ ctx } as never);
 	};
 
-	it("contributes one host function and one instruction line per owner, and records the names", () => {
-		const sink = accepting();
-		const result = installToolBridge({
-			contribute: sink.contribute,
-			ctx,
-			owners: [searchTool()],
+	/** The session record is `pi-host-bridge`'s: the composition root writes it after the ledger, and
+	 *  this rule only reads it. */
+	const record = (reaches: string[]) =>
+		recordSession(sessionKey(ctx), {
+			mounted: true,
+			owners: ["magic-context"],
+			installed: ["tool"],
+			reaches,
+			promptTexts: [],
+			problems: [],
 		});
-		expect(result.installed).toEqual(["ctx_search", "ctx_reduce"]);
-		expect(result.reason).toBeUndefined();
 
-		const contribution = sink.contributions[0] as {
+	it("answers one host function and one instruction line per owner, and names what a cell can reach", () => {
+		const a = answer([searchTool()]);
+		expect(a?.reaches).toEqual(["ctx_search", "ctx_reduce"]);
+		const contribution = a?.contribution as {
 			owner: string;
 			hostFns: Record<string, unknown>;
 			guidelines: string[];
@@ -260,42 +272,36 @@ describe("installing the bridge, and the surface rule", () => {
 		expect(contribution.guidelines).toEqual([
 			'magic-context publishes ctx_search, ctx_reduce. None of them is a pi tool or a bare name in a cell — call one as await tool("ctx_search", query=…); await tool() lists them all.',
 		]);
-		expect(bridgedSession(sessionKey(ctx))).toEqual({
-			toolNames: ["ctx_search", "ctx_reduce"],
-			owners: ["magic-context"],
-		});
 	});
 
 	it("names every published tool, and keeps the example runnable when a tool has no parameters", () => {
-		const sink = accepting();
-		installToolBridge({
-			contribute: sink.contribute,
-			ctx,
-			owners: [owner("mc", { owner: "magic-context", catalogue: () => [{ name: "ctx_memory" }] })],
-		});
-		const contribution = sink.contributions[0] as { guidelines: string[] };
+		const a = answer([owner("mc", { owner: "magic-context", catalogue: () => [{ name: "ctx_memory" }] })]);
+		const contribution = a?.contribution as { guidelines: string[] };
 		expect(contribution.guidelines).toEqual([
 			'magic-context publishes ctx_memory. None of them is a pi tool or a bare name in a cell — call one as await tool("ctx_memory"); await tool() lists them all.',
 		]);
 	});
 
-	it("contributes nothing and records nothing when the ledger refuses the kernel name", () => {
-		const sink = accepting({
-			accepted: [],
-			rejected: [{ name: "tool", reason: "already contributed by pi-rlm" }],
-		});
-		const result = installToolBridge({ contribute: sink.contribute, ctx, owners: [searchTool()] });
-		expect(result.installed).toEqual([]);
-		expect(result.reason).toContain("already contributed by pi-rlm");
-		expect(bridgedSession(sessionKey(ctx))).toBeUndefined();
+	it("answers nothing at all when nothing is published", () => {
+		expect(answer([])).toBeNull();
 	});
 
-	it("does nothing at all when nothing is published", () => {
-		const sink = accepting();
-		const result = installToolBridge({ contribute: sink.contribute, ctx, owners: [] });
-		expect(result.installed).toEqual([]);
-		expect(result.reason).toBe("nothing is published");
-		expect(sink.contributions).toEqual([]);
+	it("casts what it dropped into the session's problems, and still offers the rest", () => {
+		const a = answer([
+			owner("mc", {
+				owner: "magic-context",
+				catalogue: () => [
+					{ name: "ctx_search" },
+					{ name: "" },
+					{ name: "ctx_reduce", parameters: "not a schema" as never },
+				],
+			}),
+		]);
+		expect(a?.reaches).toEqual(["ctx_search"]);
+		expect(a?.problems).toEqual([
+			"magic-context: a catalogue entry without a name was dropped",
+			"magic-context: entry 'ctx_reduce' has a parameters value that is not a schema object — entry dropped",
+		]);
 	});
 
 	it("strips a bridged pi tool, puts back a native-only one, and does nothing without a record", () => {
@@ -315,19 +321,14 @@ describe("installing the bridge, and the surface rule", () => {
 			},
 		};
 
-		// No bridge installed for this session: not one call to setActiveTools, because a session
-		// with no cell route must keep the pi tool it had.
+		// No record for this session: not one call to setActiveTools, because a session with no cell
+		// route must keep the pi tool it had.
 		expect(reconcileToolSurface(pi, ctx, NATIVE_ONLY)).toEqual([]);
 		expect(calls).toEqual([]);
 
-		const sink = accepting();
-		// The fixture publishes `ctx_memory` because that is the name the surface rule exists for:
-		// Magic Context re-appends it on `session_start`, so code mode's reset does not remove it.
-		installToolBridge({
-			contribute: sink.contribute,
-			ctx,
-			owners: [owner("mc", { owner: "magic-context", catalogue: () => [{ name: "ctx_memory" }] })],
-		});
+		// The fixture records `ctx_memory` because that is the name the surface rule exists for: Magic
+		// Context re-appends it on `session_start`, so code mode's reset does not remove it.
+		record(["ctx_memory"]);
 		// `todowrite` was never active — code mode's reset removed it and nothing re-appends it — so
 		// the rule is what makes it reachable, and it lands after every name it did not touch.
 		expect(reconcileToolSurface(pi, ctx, NATIVE_ONLY)).toEqual(["ctx_memory"]);
@@ -352,12 +353,7 @@ describe("installing the bridge, and the surface rule", () => {
 			},
 		};
 
-		const sink = accepting();
-		installToolBridge({
-			contribute: sink.contribute,
-			ctx,
-			owners: [owner("mc", { owner: "magic-context", catalogue: () => [{ name: "ctx_memory" }] })],
-		});
+		record(["ctx_memory"]);
 		expect(reconcileToolSurface(pi, ctx, NATIVE_ONLY)).toEqual(["ctx_memory"]);
 		expect(calls).toEqual([["python"]]);
 	});
@@ -400,7 +396,14 @@ describe("the child's surface (child-surface ticket 03 §6)", () => {
 
 	it("strips what the child's own cell can reach, even inside the ceiling", () => {
 		const ctx = fakeCtx("child-strip");
-		recordBridged(sessionKey(ctx), { toolNames: ["todowrite"], owners: ["magic-context"] });
+		recordSession(sessionKey(ctx), {
+			mounted: true,
+			owners: ["magic-context"],
+			installed: ["tool"],
+			reaches: ["todowrite"],
+			promptTexts: [],
+			problems: [],
+		});
 		const { pi, state } = childPi(["python", "todowrite"], ["python", "todowrite"]);
 		const report = reconcileChildSurface({ pi, ctx, ceiling: ["python", "todowrite"] });
 		// A name a cell can call is not a pi tool in that session — the root's direction, and it outranks

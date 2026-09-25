@@ -12,7 +12,7 @@
  * kind as `__resetToolBridgeForTests`, so it ships inert and nothing that is not measuring pays for it.
  * It publishes nothing, binds nothing, and contributes no child factory when the variable is unset.
  */
-import type { ChildRequest } from "../child-seam";
+import type { ChildRequest } from "../../../host-bridge/src/convention";
 import type { OwnerModule } from "./index";
 
 /** What the probe writes into the child's own transcript. */

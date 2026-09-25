@@ -2,11 +2,11 @@
  * The owner list — the one place in the bridge that knows an extension by name (wayfinder ticket 02,
  * `.scratch/tool-ownership/`).
  *
- * Every other module in `src/` is owner-agnostic and consumes this list rather than an owner: the child
- * seam aggregates the hooks below, and the entry passes `nativeOnlyTools()` to the surface rule. Adding an
- * owner is a module plus one line here.
+ * Every other module in `src/` is owner-agnostic and consumes this list rather than an owner: the
+ * registration aggregates the hooks below, and the entry passes `nativeOnlyTools()` to the surface
+ * rule. Adding an owner is a module plus one line here.
  */
-import type { ChildBindInput, ChildRequest } from "../child-seam";
+import type { ChildBindInput, ChildRequest } from "../../../host-bridge/src/convention";
 import { magicContext } from "./magic-context";
 import { probe } from "./probe";
 

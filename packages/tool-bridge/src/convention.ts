@@ -1,22 +1,12 @@
 /**
- * The tool bridge — the contract by which an extension offers its pi tools to a code-mode
- * kernel, and the session-scoped record of what that kernel can actually call.
- *
- * ## The problem
- *
- * A code-mode session drives the model through one tool: code mode resets pi's active set to
- * `["python"]`, and pi resolves a tool call against the active list. Every other extension's
- * tools stay registered but unreachable, so an owner's tool answers "Tool not found" in exactly the
- * sessions where the model is doing the most work. Host
- * functions are the way in — a contributed host function is callable from a cell by bare
- * name, which is how rlm's delegation vocabulary already reaches the kernel.
+ * The tool bridge's publication convention — how an owner offers its pi tools, and where the reader
+ * finds them (wayfinder map `.scratch/tool-bridge/`).
  *
  * ## What a publisher does (no dependency on this package)
  *
- * Publishing is a **duplicated literal**, not an import: an owner writes its offer into the
- * slot below. A vendor bundle built in another checkout cannot resolve a private workspace
- * package, and the reader must not know owners by name — so the two sides agree on a symbol
- * and a shape instead:
+ * Publishing is a **duplicated literal**, not an import: an owner writes its offer into the slot
+ * below. A vendor bundle built in another checkout cannot resolve a private workspace package, and the
+ * reader must not know owners by name — so the two sides agree on a symbol and a shape instead:
  *
  * ```js
  * const slot = (globalThis[Symbol.for("pi-tool-bridge:owners")] ??= new Map())
@@ -28,31 +18,20 @@
  * })
  * ```
  *
- * - **`catalogue(ctx)` answers for one session**: the tools *this* session may call, or `[]`
- *   when the owner serves no such session. It must be the same set `execute` accepts — the
- *   reader advertises what the catalogue returned and nothing else, so a listed name is a
- *   name that works.
- * - **`execute(name, params, ctx)`** runs the owner's own call path and returns a result
- *   shaped like pi's (`{ content: [{ type: "text", text }], isError? }`).
- * - **Publish only tools whose effect lives in `execute`.** A tool whose effect pi's dispatch
- *   produces — the transcript, an overlay, a renderer — must not be published: called from a
- *   cell it would appear to succeed and do nothing. A tool whose state pi captures from its own
- *   dispatch is the live example, and it stays a pi tool.
+ * - **`catalogue(ctx)` answers for one session**: the tools *this* session may call, or `[]` when the
+ *   owner serves no such session. It must be the same set `execute` accepts.
+ * - **`execute(name, params, ctx)`** runs the owner's own call path and returns pi's result shape.
+ * - **Publish only tools whose effect lives in `execute`.** A tool whose state pi captures from its
+ *   own dispatch must not be published: called from a cell it would appear to succeed and do nothing.
  *
- * Publishing is **keyed by instance and replaces**: pi's jiti loader re-imports an extension
- * entry per session while `globalThis` survives, so an appending publish would leave one live
- * publication per import. Two owners, or two instances of one owner, coexist under different
- * keys, and each answers only for the sessions it serves.
+ * Publishing is **keyed by instance and replaces**: pi's jiti loader re-imports an extension entry per
+ * session while `globalThis` survives, so an appending publish would leave one publication per import.
  *
- * ## What the reader guarantees
+ * ## What moved out of this package (`.scratch/host-bridge` ticket 05)
  *
- * - A publication whose `apiVersion` is not this major is refused whole, with a reason.
- * - A malformed *entry* is dropped; the owner's other entries still work.
- * - The first owner to publish a tool name holds it. A second owner claiming that name is
- *   refused whole, so names are never qualified and a cell always writes
- *   `tool("<name>", arg="…")`.
- * - Nothing here touches pi's active set. That is the surface rule in `adapter.ts`, and it
- *   strips a name only when a cell route for it was actually installed.
+ * The session **record** — which pi tool names a cell can reach — is `pi-host-bridge`'s now, because
+ * that package owns the composition and is what sees the ledger's receipt before it records anything.
+ * This package reads it (`sessionRecord(sessionKey(ctx))?.reaches`) and writes nothing.
  */
 import { resolve } from "node:path";
 
@@ -61,13 +40,10 @@ import { resolve } from "node:path";
  */
 export const OWNERS_SYMBOL = Symbol.for("pi-tool-bridge:owners");
 
-/** The session records this package keeps: which pi tool names a cell can call, per session. */
-export const SESSIONS_SYMBOL = Symbol.for("pi-tool-bridge:sessions");
-
 /** The publication shape's version. A reader refuses any other major. */
 export const API_VERSION = 1;
 
-/** This package's name in the contribution ledger and in the model's instructions. */
+/** This package's name in the ledger, in the model's instructions and in the session's record. */
 export const READER = "pi-tool-bridge";
 
 /** One tool as a reader needs to describe it. Every field but `name` is optional. */
@@ -94,9 +70,6 @@ export type BridgePublication = {
 
 export type SlotOwner = { key: string; publication: BridgePublication };
 
-/** What a session's kernel can call, and who published it. Written only on a real install. */
-export type BridgedSession = { toolNames: string[]; owners: string[] };
-
 function ownersSlot(): Map<string, BridgePublication> {
 	const holder = globalThis as Record<symbol, unknown>;
 	const existing = holder[OWNERS_SYMBOL];
@@ -105,15 +78,6 @@ function ownersSlot(): Map<string, BridgePublication> {
 	}
 	const created = new Map<string, BridgePublication>();
 	holder[OWNERS_SYMBOL] = created;
-	return created;
-}
-
-function sessionsSlot(): Map<string, BridgedSession> {
-	const holder = globalThis as Record<symbol, unknown>;
-	const existing = holder[SESSIONS_SYMBOL];
-	if (existing instanceof Map) return existing as Map<string, BridgedSession>;
-	const created = new Map<string, BridgedSession>();
-	holder[SESSIONS_SYMBOL] = created;
 	return created;
 }
 
@@ -129,72 +93,23 @@ export function publications(): SlotOwner[] {
 }
 
 /**
- * The session key, taken from `ctx.sessionManager` and never from the `ctx` object: pi hands
- * out a fresh context per call, so ctx identity is not stable across two handlers in one bind.
- * An unpersisted session keys on the session manager's identity instead.
+ * The session key — **one derivation for the workspace**, owned by `pi-host-bridge`
+ * (`.scratch/host-bridge/` ticket 02).
  *
- * The adopter and the surface rule must both use *this* function. They are the two halves of
- * one fact — "this session has a cell route to these names" — and a second derivation would
- * silently stop matching.
+ * The rule this function was written under still holds: the adopter and the surface rule are two
+ * halves of one fact — "this session has a cell route to these names" — so they must key their records
+ * identically. The derivation now has to be shared with the composition root and code mode's client as
+ * well, so it moved to the package that owns both and this re-export keeps every existing reader on
+ * the same function.
  */
-export function sessionKey(ctx: unknown): string {
-	const anyCtx = ctx as
-		| { sessionManager?: { getSessionFile?: () => string | undefined } }
-		| null
-		| undefined;
-	let file: string | undefined;
-	try {
-		file = anyCtx?.sessionManager?.getSessionFile?.();
-	} catch {
-		file = undefined;
-	}
-	if (typeof file === "string" && file.length > 0) return resolve(file);
-	const anchor: object =
-		(anyCtx?.sessionManager as object | undefined) ?? (ctx as object | undefined) ?? {};
-	const keys = unpersistedKeys();
-	let key = keys.get(anchor);
-	if (key === undefined) {
-		nextUnpersisted += 1;
-		key = `unpersisted#${nextUnpersisted}`;
-		keys.set(anchor, key);
-	}
-	return key;
-}
-
-let nextUnpersisted = 0;
-let unpersistedStore: WeakMap<object, string> | undefined;
-
-function unpersistedKeys(): WeakMap<object, string> {
-	if (!unpersistedStore) unpersistedStore = new WeakMap();
-	return unpersistedStore;
-}
+export { sessionKey } from "../../host-bridge/src/convention";
 
 /**
- * Records that this session's kernel can call these names. Called by the adopter **after** the
- * contribution was accepted — the surface rule strips a pi tool only when a cell route exists,
- * and a record written before acceptance would strip a tool whose route never appeared.
+ * Test seam: drop every publication this process holds.
+ *
+ * The session records are `pi-host-bridge`'s now (`__resetHostBridgeForTests`), which is why a test
+ * that needs both calls both.
  */
-export function recordBridged(key: string, record: BridgedSession): void {
-	sessionsSlot().set(key, {
-		toolNames: [...new Set(record.toolNames)],
-		owners: [...new Set(record.owners)],
-	});
-}
-
-export function bridgedSession(key: string): BridgedSession | undefined {
-	return sessionsSlot().get(key);
-}
-
-/** Clears one session's record. `globalThis` outlives `/new`, resume and fork, so a session
- * that ends must take its record with it. */
-export function forgetSession(key: string): void {
-	sessionsSlot().delete(key);
-}
-
-/** Test seam: forget every record and drop every publication this process holds. */
 export function __resetToolBridgeForTests(): void {
 	ownersSlot().clear();
-	sessionsSlot().clear();
-	nextUnpersisted = 0;
-	unpersistedStore = undefined;
 }

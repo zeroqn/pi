@@ -1,0 +1,23 @@
+{
+	"name": "pi-host-bridge",
+	"version": "0.1.0",
+	"private": true,
+	"description": "The one client of code mode's registry and the composition root for a session's contributors — host functions, prose and child factories — so a contributor registers instead of being named.",
+	"type": "module",
+	"scripts": {
+		"test": "bun test",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"code-mode",
+		"host-bridge"
+	],
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^22.20.0",
+		"typescript": "^5.8.0"
+	}
+}

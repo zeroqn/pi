@@ -79,7 +79,7 @@ describe("the owners slot", () => {
 	});
 });
 
-describe("the session record", () => {
+describe("the session key (the derivation itself is pi-host-bridge's)", () => {
 	beforeEach(() => __resetToolBridgeForTests());
 
 	it("keys a session by its file, absolutely, and keeps two unpersisted sessions apart", () => {
@@ -95,16 +95,4 @@ describe("the session record", () => {
 		);
 	});
 
-	it("records what a cell can call, deduplicated, and forgets it on request", () => {
-		const key = sessionKey(fakeCtx("s"));
-		expect(bridgedSession(key)).toBeUndefined();
-		recordBridged(key, { toolNames: ["ctx_search", "ctx_reduce", "ctx_search"], owners: ["mc", "mc"] });
-		expect(bridgedSession(key)).toEqual({
-			toolNames: ["ctx_search", "ctx_reduce"],
-			owners: ["mc"],
-		});
-		forgetSession(key);
-		expect(bridgedSession(key)).toBeUndefined();
-		expect((globalThis as Record<symbol, unknown>)[SESSIONS_SYMBOL]).toBeInstanceOf(Map);
-	});
 });

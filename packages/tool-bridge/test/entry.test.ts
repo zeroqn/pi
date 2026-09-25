@@ -9,8 +9,10 @@
  * of it, while the request itself carried the corrected set.
  */
 import { beforeEach, describe, expect, it } from "bun:test";
-import { __clearChildDetectorForTests, setChildDetector } from "../src/child-seam";
-import { __resetToolBridgeForTests, recordBridged, sessionKey } from "../src/convention";
+import { __clearChildDetectorForTests, setChildDetector } from "../../host-bridge/src/convention";
+import { __resetHostBridgeForTests, recordSession, registerContributor, sessionKey } from "../../host-bridge/src/convention";
+import { __resetToolBridgeForTests } from "../src/convention";
+import { toolBridgeRegistration } from "../src/registration";
 import toolBridge from "../src/index";
 
 function ctxFor(id: string) {
@@ -40,12 +42,24 @@ function surface(active: string[], ctx: unknown) {
 		},
 	};
 	toolBridge(pi);
-	recordBridged(sessionKey(ctx), { toolNames: ["ctx_memory"], owners: ["magic-context"] });
+	recordSession(sessionKey(ctx), {
+		mounted: true,
+		owners: ["magic-context"],
+		installed: ["tool"],
+		reaches: ["ctx_memory"],
+		promptTexts: [],
+		problems: [],
+	});
 	return { active, handlers };
 }
 
 describe("the entry's two moments", () => {
-	beforeEach(() => __resetToolBridgeForTests());
+	beforeEach(() => {
+		__resetToolBridgeForTests();
+		__resetHostBridgeForTests();
+		// The seam's own reset drops registrations too, and this package's is made at module load.
+		registerContributor(toolBridgeRegistration);
+	});
 
 	it("strips at session_start, before the first turn's prompt is built", () => {
 		const ctx = ctxFor("session-start");
@@ -83,6 +97,8 @@ describe("the entry's two moments", () => {
 describe("a resumed child (child-surface ticket 03 §5)", () => {
 	beforeEach(() => {
 		__resetToolBridgeForTests();
+		__resetHostBridgeForTests();
+		registerContributor(toolBridgeRegistration);
 		__clearChildDetectorForTests();
 	});
 
@@ -154,7 +170,14 @@ describe("a resumed child (child-surface ticket 03 §5)", () => {
 		const ctx = ctxFor("root");
 		setChildDetector(() => false);
 		const { active, handlers, entries } = resumed(["python", "ctx_memory"]);
-		recordBridged(sessionKey(ctx), { toolNames: ["ctx_memory"], owners: ["magic-context"] });
+		recordSession(sessionKey(ctx), {
+		mounted: true,
+		owners: ["magic-context"],
+		installed: ["tool"],
+		reaches: ["ctx_memory"],
+		promptTexts: [],
+		problems: [],
+	});
 		handlers.get("session_start")?.({}, ctx);
 		expect(active).toEqual(["python", "todowrite"]);
 		expect(entries).toEqual([]);
