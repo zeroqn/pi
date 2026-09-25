@@ -37,11 +37,35 @@ export type KernelNotice = {
 /** Which journals a session replays, and which scratch to seed from. rlm owns the rule. */
 export type KernelProvenance = { journals: string[]; seedScratchFrom?: string };
 
+/** One host call, as the kernel is about to make it. Code mode's own shape, mirrored. */
+export type KernelHostCall = { name: string; args: unknown[] };
+
+/** What a guard answers for one call. Anything but an explicit refusal means "run it". */
+export type KernelGuardVerdict = { allow: false; reason: string } | { allow: true } | undefined;
+
+/**
+ * The session's policy, mirrored from code mode's `Guard` (contract version 2, `readonly-guard`
+ * ticket 02): asked before every host call, and for the mode the session's workspace mount gets.
+ *
+ * Mirrored rather than imported for the same reason the contribution shape is: this package is the
+ * one place that reads code mode's registry, and pi's loader would give an import a second module
+ * instance. `before` may be sync or async and is on the hot path of every call, so a guard must be
+ * cheap.
+ */
+export type KernelGuard = {
+	before?: (call: KernelHostCall) => KernelGuardVerdict | Promise<KernelGuardVerdict>;
+	mountMode?: () => "read-only" | "read-write" | undefined;
+};
+
 /**
  * What a contributor writes into a kernel. This mirrors code-mode's own `Contribution` — the fields
  * are the publisher's, and this module must not widen them (standing preference 2: no change to code
- * mode's contract). `owner`, `onNotice` and `provenance` are single-owner there: a second declarer of
- * a slot is refused whole by the ledger, not silently ignored.
+ * mode's contract). `owner`, `onNotice`, `provenance` and `guard` are single-owner there: a second
+ * declarer of a slot is refused whole by the ledger, not silently ignored.
+ *
+ * The mirror tracks the publisher's *version*: `guard` arrived with contract version 2, and a
+ * consumer that reads the registry compares `handle.apiVersion` before sending one (a contributor
+ * cannot: the ledger refuses it whole, and the session would never learn).
  */
 export type KernelContribution = {
 	owner: string;
@@ -55,6 +79,7 @@ export type KernelContribution = {
 		ctx: unknown,
 		own: { sessionFile?: string; firstIndex?: number },
 	) => KernelProvenance;
+	guard?: KernelGuard;
 };
 
 export type KernelRejection = { name: string; reason: string };

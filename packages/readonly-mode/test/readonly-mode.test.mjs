@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import factory from "../index.ts";
 import { checkReadOnlyCommand } from "../bash-allowlist.ts";
+import { contributors, sessionKey } from "../../host-bridge/src/convention.ts";
 
 // ---------------------------------------------------------------------------
 // bash-allowlist: the load-bearing part. Every blocked case below is a hole in
@@ -308,4 +310,143 @@ test("--readonly starts gated, and a resumed session restores the mode", async (
 	const disabled = load({ entries: [{ type: "custom", customType: "readonly-mode", data: { enabled: false } }] });
 	await disabled.handlers.session_start[0]({}, disabled.ctx);
 	assert.deepEqual(disabled.tools(), ["read", "bash", "edit", "write", "todowrite", "read_symbol"]);
+});
+
+// ---------------------------------------------------------------------------
+// The cell lane (`.scratch/readonly-guard` ticket 04): the guard this extension
+// contributes to a code-mode kernel. The two audiences are told apart by *how* a
+// decision is reached — the guard is a function of the call, so it is tested as
+// one, with no kernel and no monty.
+// ---------------------------------------------------------------------------
+
+/**
+ * Load the extension, start its session, and read back the guard it registered.
+ *
+ * `handleApiVersion` is the contract version the mounted code mode reports: 2 knows the `guard`
+ * slot, anything lower does not.
+ */
+async function cellLane({ flag = false, entries = [], handleApiVersion = 2 } = {}) {
+	const h = load({ flag, entries });
+	await h.handlers.session_start[0]({}, h.ctx);
+	const key = sessionKey(h.ctx);
+	const registration = contributors().find((r) => r.owner === "readonly-mode" && r.key.endsWith(key));
+	const answer = registration?.session({
+		ctx: h.ctx,
+		sessionKey: key,
+		handle: { apiVersion: handleApiVersion },
+		isChild: false,
+		cwd: "/workspace",
+		sessionFile: undefined,
+	});
+	return { h, key, registration, answer, guard: answer?.contribution?.guard };
+}
+
+const allowed = (verdict) => verdict === undefined;
+
+test("registers for its own session, under a key that cannot be taken by a second load", async () => {
+	const { key, registration, guard } = await cellLane();
+	assert.ok(registration, "expected a registration in the seam");
+	assert.match(registration.key, new RegExp(`${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`));
+	assert.ok(guard, "expected a guard contribution");
+
+	// A guard answers for one session only: the key is the session's own.
+	assert.deepEqual(registration.session({ sessionKey: "another-session", handle: { apiVersion: 2 } }), {});
+});
+
+test("the mount is read-only exactly while the mode is on", async () => {
+	const { h, guard } = await cellLane();
+	assert.equal(guard.mountMode(), "read-write");
+	await toggleOn(h);
+	assert.equal(guard.mountMode(), "read-only");
+	await toggleOn(h);
+	assert.equal(guard.mountMode(), "read-write");
+});
+
+test("the shell lane is checkReadOnlyCommand's, verbatim — and only while the mode is on", async () => {
+	const { h, guard } = await cellLane();
+	const bash = (command) => guard.before({ name: "bash_host", args: [command] });
+
+	assert.ok(allowed(bash("rm -rf /")), "the guard does nothing while the mode is off");
+
+	await toggleOn(h);
+	assert.equal(bash("rm -rf /").allow, false);
+	assert.match(bash("rm -rf /").reason, /not on the read-only allowlist/);
+	assert.match(bash("git push").reason, /modify the repository/);
+	assert.ok(allowed(bash("git log --oneline")));
+	// Code mode's calling shape: a trailing kwargs object is where a named call lands.
+	assert.match(guard.before({ name: "bash_host", args: [{ command: "rm -rf /" }] }).reason, /allowlist/);
+});
+
+test("code mode's own reads are not the policy's business", async () => {
+	const { h, guard } = await cellLane();
+	await toggleOn(h);
+	for (const name of ["find", "grep", "read_image", "bg_poll", "bg_read", "bg_kill", "bg_list"]) {
+		assert.ok(allowed(guard.before({ name, args: [] })), `expected ${name} to be untouched`);
+	}
+});
+
+test("an exempt extension call passes, and an unlisted one is refused with the fix named", async () => {
+	const { h, guard } = await cellLane();
+	await toggleOn(h);
+
+	assert.ok(allowed(guard.before({ name: "rlm_spawn", args: ["look at it"] })));
+	assert.ok(allowed(guard.before({ name: "web_search", args: ["anything"] })));
+
+	const verdict = guard.before({ name: "some_new_capability", args: [] });
+	assert.equal(verdict.allow, false);
+	assert.match(verdict.reason, /'some_new_capability' is not on the read-only exemption list/);
+	assert.match(verdict.reason, /EXEMPT_HOST_CALLS/);
+});
+
+test("the tool bridge's route is judged on the name it carries", async () => {
+	const { h, guard } = await cellLane();
+	await toggleOn(h);
+	const route = (...args) => guard.before({ name: "tool", args });
+
+	assert.ok(allowed(route("ctx_search", { query: "x" })), "a listed capability");
+	assert.ok(allowed(route("ctx_memory", { content: "x" })), "Magic Context's store is deliberately exempt");
+	assert.ok(allowed(route()), "introspection (`await tool()` lists) asks for nothing");
+	assert.ok(allowed(route({ name: "ctx_expand" })), "a named call lands in the kwargs object");
+
+	const refused = route("ctx_something_new");
+	assert.equal(refused.allow, false);
+	assert.match(refused.reason, /'ctx_something_new' is not on the read-only exemption list/);
+});
+
+test("every exemption carries a reason, and no name is listed twice", async () => {
+	// The list is hand-edited, so the two ways a hand edit goes wrong are pinned: a name nobody can
+	// justify, and a name added twice so a later deletion looks like it worked.
+	const source = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
+	const entries = [...source.matchAll(/\{ name: "([a-z_]+)", reason: "(.+?)" \}/g)];
+	assert.ok(entries.length > 10, "expected the exemption list to be read");
+	const names = entries.map((entry) => entry[1]);
+	assert.equal(new Set(names).size, names.length, `duplicate exemption: ${names.join(", ")}`);
+	for (const [, name, reason] of entries) {
+		assert.ok(reason.length > 10, `${name} needs a reason a reader can weigh`);
+	}
+});
+
+test("a code mode too old to know the guard is refused, and its cell with it", async () => {
+	const { h, answer, guard } = await cellLane({ handleApiVersion: 1 });
+	assert.equal(guard, undefined, "nothing is contributed to a code mode that would refuse it whole");
+	assert.equal(answer.contribution, undefined);
+	assert.match(answer.problems.join(" "), /contract version 1, and a guard needs 2/);
+
+	// The floor: no guard, no `python`. Fail-closed costs the cell, never the workspace.
+	await toggleOn(h);
+	const veto = await h.handlers.tool_call[0]({ toolName: "python", input: { code: "1" } });
+	assert.match(veto.reason, /cannot be enforced inside a cell/);
+
+	// And a cell is only refused while the mode is on.
+	await h.commands.readonly.handler("", h.ctx);
+	assert.equal(await h.handlers.tool_call[0]({ toolName: "python", input: {} }), undefined);
+});
+
+test("a guard is contributed for a fresh session even when the mode is restored from a resume", async () => {
+	const entries = [
+		{ type: "custom", customType: "readonly-mode", data: { enabled: true, toolsBefore: ["read", "bash"] } },
+	];
+	const { guard } = await cellLane({ entries });
+	assert.equal(guard.mountMode(), "read-only", "a resumed session keeps the guard it was saved with");
+	assert.equal(guard.before({ name: "some_new_capability", args: [] }).allow, false);
 });
