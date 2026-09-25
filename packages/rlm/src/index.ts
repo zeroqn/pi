@@ -29,7 +29,6 @@ import type { ChildKernelContext, Notice } from "./children";
 // Imported for its side effect on the seam, and for the session deps this file files with it.
 import { forgetRlmSessionDeps, setRlmSessionDeps } from "./registration";
 import { rsiBindChild, rsiChildExtensions, rsiStatus } from "./rsi-seam";
-import skillBridge from "../../skill-bridge/src/index";
 import { errorText, str } from "./util";
 const MAX_DEPTH = 2;
 const MAX_LIVE_CHILDREN = 8;
@@ -85,15 +84,14 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				// 07). The import is a library call, not a second kernel: the entry's state is all
 				// per-session closures.
 				childFactories: (request) => [
-					// RSI's own child signal, and the skills bridge while it still mounts itself: both are
-					// named by this module only because a child loads no ambient extensions. Everything
-					// else — the seam's own composition, every contributor's factories and code mode's own
-					// child instance — comes from `pi-host-bridge`, which appends code mode **inside** its
-					// list so the child's instance joins the kernel this factory already mounted and
-					// brings the lifecycle the child otherwise has none of (`agent_end` and
-					// `session_shutdown`). Code mode is still never imported (ADR 0001).
+					// RSI's own child signal, named here because it is rlm's own seam. Everything else —
+					// the seam's own composition, every contributor's factories (the skills bridge's
+					// block installer among them) and code mode's own child instance — comes from
+					// `pi-host-bridge`, which appends code mode **inside** its list so the child's
+					// instance joins the kernel this factory already mounted and brings the lifecycle
+					// the child otherwise has none of (`agent_end` and `session_shutdown`). Code mode is
+					// still never imported (ADR 0001).
 					...rsiChildExtensions(),
-					skillBridge,
 					...childFactories(request),
 				],
 			// The ceiling's first operand: this session's *live* surface, read at spawn time and never
