@@ -337,3 +337,98 @@ describe("a guarded kernel", () => {
 		expect(text).toContain("hi");
 	});
 });
+
+// ---------------------------------------------------------------------------
+// The mount's mode, per feed: the other half of what a guard answers.
+// ---------------------------------------------------------------------------
+
+describe("a session's cwd mount", () => {
+	let dir: string;
+	let sentinel: string;
+
+	beforeEach(() => {
+		delete glob[REGISTRY_KEY];
+		dir = mkdtempSync(join(tmpdir(), "code-mode-mount-"));
+		sentinel = join(dir, "sentinel");
+	});
+
+	function session() {
+		const pi = fakePi();
+		codeMode(pi as never);
+		const entry = glob[REGISTRY_KEY] as RegistryEntry;
+		const made = sessionCtx(dir, sessionFileIn(dir, "mount"));
+		const handle = entry.mount(pi as never, made.ctx);
+		return { handle, made };
+	}
+
+	/** One cell's answer, with `guard` contributed before the kernel starts. */
+	async function cell(handle: { contribute: (c: unknown) => unknown; kernel: unknown }, made: { ctx: unknown }, code: string) {
+		return textOf(await (handle.kernel as Kernel).execute({ code }, undefined, made.ctx));
+	}
+
+	maybe("is read-only when the guard says so: the write is refused and the host file never appears", async () => {
+		const { handle, made } = session();
+		writeFileSync(join(dir, "readable.txt"), "on disk");
+		handle.contribute({ owner: "readonly-mode", guard: { mountMode: () => "read-only" } });
+
+		const refused = await cell(handle, made, `write_text(${JSON.stringify(sentinel)}, "x")`);
+		expect(refused).toContain("[Errno 30]");
+		expect(refused).toContain("Read-only file system");
+		expect(existsSync(sentinel)).toBe(false);
+
+		// The same mount still reads: a read-only workspace is a workspace, not a broken one.
+		expect(await cell(handle, made, `print(read_text("readable.txt").strip())`)).toContain("on disk");
+	});
+
+	maybe("is read-write with no guard at all, which is what every session had before", async () => {
+		const { handle, made } = session();
+		handle.contribute({ owner: "readonly-mode" });
+		expect(await cell(handle, made, `write_text("written.txt", "x")`)).toContain("# => 1");
+		expect(readFileSync(join(dir, "written.txt"), "utf8")).toBe("x");
+	});
+
+	maybe("follows a mode that changes between cells, and costs the kernel nothing", async () => {
+		let mode: string = "read-write";
+		const { handle, made } = session();
+		handle.contribute({ owner: "readonly-mode", guard: { mountMode: () => mode as never } });
+
+		// The kernel is created by this first cell, so the mode below is a *change*, not the start.
+		expect(await cell(handle, made, "value = 41\nwrite_text(\"first.txt\", \"x\")")).toContain("# => 1");
+		expect(existsSync(join(dir, "first.txt"))).toBe(true);
+
+		mode = "read-only";
+		const refused = await cell(handle, made, `write_text(${JSON.stringify(sentinel)}, "x")`);
+		expect(refused).toContain("Read-only file system");
+		expect(existsSync(sentinel)).toBe(false);
+		// No rebuild, no replay: the same kernel, with everything the first cell defined.
+		expect(await cell(handle, made, "print(value + 1)")).toContain("42");
+
+		// And back again — the mode is an answer, not a state the kernel freezes on.
+		mode = "read-write";
+		expect(await cell(handle, made, `write_text(${JSON.stringify(sentinel)}, "x")`)).toContain("# => 1");
+		expect(readFileSync(sentinel, "utf8")).toBe("x");
+	});
+
+	maybe("refuses the cell rather than downgrading when the workspace cannot be mounted that way", async () => {
+		let mode: string = "read-write";
+		const { handle, made } = session();
+		handle.contribute({ owner: "readonly-mode", guard: { mountMode: () => mode as never } });
+		expect(await cell(handle, made, "print('first')")).toContain("first");
+
+		// An unknown mode is monty's own constructor refusing, which is the only way to reach this
+		// path deterministically: it stands in for "the read-only mount could not be made".
+		mode = "nonsense";
+		const refused = await cell(handle, made, "print('second')");
+		expect(refused).toContain("refused this cell");
+		expect(refused).toContain("invalid mount mode");
+		expect(refused).not.toContain("second");
+	});
+
+	maybe("fails the *start* when the first cell is the one that cannot get its mount", async () => {
+		const { handle, made } = session();
+		handle.contribute({ owner: "readonly-mode", guard: { mountMode: () => "nonsense" as never } });
+		// A kernel that never started is the pinned "does not cache a failed start" contract, so this
+		// rejects rather than answering — and the next cell is what retries.
+		expect((handle.kernel as Kernel).execute({ code: "1+1" }, undefined, made.ctx)).rejects.toThrow("invalid mount mode");
+	});
+});

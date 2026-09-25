@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type * as MontyModule from "@pydantic/monty/node";
 import { createBackgroundManager } from "./background";
-import type { Ledger, KernelHandleCore, Notice, Provenance } from "./contract";
+import type { Ledger, KernelHandleCore, MountMode, Notice, Provenance } from "./contract";
 import { makeHost, bind, type Attachment } from "./host";
 import { appendJournal, readJournal, readJournals, recordingHost, replayHost, restoredLine } from "./journal";
 import type { CellRecord, HostCallRecord, HostFns, RestoreReport } from "./journal";
@@ -188,7 +188,12 @@ export function createKernel(options: {
 	const rotateBackoff = Math.max(1, Math.floor((maxSuspensions - rotateAt) / 8));
 	let pool: MontyPool | null = null;
 	let session: Awaited<ReturnType<MontyPool["checkout"]>> | null = null;
-	let mount: InstanceType<typeof MontyModule.MountDir> | null = null;
+	/**
+	 * The workspace mount, by mode. `MountDir`'s constructor opens its host directory, so a mount is
+	 * a resource rather than a value — at most two of these exist per kernel, and each is reused by
+	 * every feed that wants that mode.
+	 */
+	const cwdMounts = new Map<MountMode, InstanceType<typeof MontyModule.MountDir>>();
 	let scratchMount: InstanceType<typeof MontyModule.MountDir> | null = null;
 	let root = "";
 	let scratch = "";
@@ -269,9 +274,46 @@ export function createKernel(options: {
 	}
 
 	/**
+	 * The mode this session's workspace mount should have **right now**.
+	 *
+	 * Asked per feed rather than once, which is what makes a guard's changing answer — `/readonly` —
+	 * take effect at the next cell with the kernel, its variables and its journal intact. A guard
+	 * that throws is read as `read-only`: a policy that cannot say is a policy that cannot vouch for
+	 * the workspace, and guessing "writable" is the one reading that loses data.
+	 */
+	function cwdMode(): MountMode {
+		try {
+			return ledger.guard()?.mountMode?.() ?? "read-write";
+		} catch {
+			return "read-only";
+		}
+	}
+
+	/**
+	 * The mode — and the mount — for this feed. A failure is a **refusal, never a downgrade**: a
+	 * session whose policy says read-only must not fall back to a writable workspace, so the caller
+	 * is handed a problem to report instead of a mount to use.
+	 */
+	function mountFor(monty: typeof MontyModule): { mount: InstanceType<typeof MontyModule.MountDir> } | { problem: string } {
+		const mode = cwdMode();
+		const existing = cwdMounts.get(mode);
+		if (existing) return { mount: existing };
+		try {
+			const made = new monty.MountDir({ hostPath: root, virtualPath: root, mode });
+			cwdMounts.set(mode, made);
+			return { mount: made };
+		} catch (error) {
+			return {
+				problem: `this session's workspace is ${mode}, and it could not be mounted that way (${errorText(error)}). The cell was refused rather than run against a workspace it was told not to change.`,
+			};
+		}
+	}
+
+	/**
 	 * Scratch lives beside the session file so it survives a resume, and is mounted
-	 * read-write at its real host path so `bash` agrees on the path. It is never deleted
-	 * during the session: journal replay re-reads it.
+	 * read-write at its real host path so `bash` agrees on the path — in **every** mode: it sits
+	 * outside the workspace, and journal replay and output spill both read it back. It is never
+	 * deleted during the session.
 	 */
 	function scratchDirFor(ctx: any): string {
 		const sessionFile = sessionFilePath(ctx);
@@ -307,9 +349,13 @@ export function createKernel(options: {
 		const started = await monty.Monty.create();
 		pool = started;
 		session = await started.checkout({ limits: checkoutLimits });
-		mount = new monty.MountDir({ hostPath: cwd, virtualPath: cwd, mode: "read-write" });
-		scratchMount = new monty.MountDir({ hostPath: scratch, virtualPath: scratch, mode: "read-write" });
 		root = cwd;
+		scratchMount = new monty.MountDir({ hostPath: scratch, virtualPath: scratch, mode: "read-write" });
+		// The workspace's mode is the guard's answer, and a mount that cannot be made is a **start**
+		// failure rather than a cell refusal — the kernel is not running, and the next cell rebuilds
+		// it (the pinned "does not cache a failed start" contract).
+		const first = mountFor(monty);
+		if ("problem" in first) throw new Error(first.problem);
 		const sessionFile = sessionFilePath(ctx);
 		journalPath = sessionFile ? `${sessionFile}.rlm-journal.jsonl` : "";
 		dumpPath = sessionFile ? `${sessionFile}.rlm-dump.bin` : "";
@@ -320,7 +366,7 @@ export function createKernel(options: {
 		// The dump fast path must come first: `loadSession` refuses a session that has already
 		// been fed, and a matching dump already contains the prelude's state.
 		if (await restoreFromDump(ctx)) return;
-		await session.feedRun(prelude(cwd, scratch) + ledger.preludeTail(), { mount: [mount, scratchMount] });
+		await session.feedRun(prelude(cwd, scratch) + ledger.preludeTail(), { mount: [first.mount, scratchMount] });
 		await restoreFromJournal(ctx, cwd);
 	}
 
@@ -770,6 +816,15 @@ export function createKernel(options: {
 				}
 				await ensureKernel(ctx);
 				const monty = await loadMonty();
+				// Per feed, and before anything else is prepared for the cell: a session that must be
+				// read-only is refused here rather than run against a mount it was told not to have.
+				const resolved = mountFor(monty);
+				if ("problem" in resolved) {
+					return {
+						content: [{ type: "text", text: `# the python kernel refused this cell: ${resolved.problem}` }],
+						details: { failed: true },
+					};
+				}
 				const streams = new monty.CollectStreams();
 				const progress = (text: string) => onUpdate?.({ content: [{ type: "text", text }] });
 				currentProgress = progress;
@@ -792,7 +847,7 @@ export function createKernel(options: {
 					guard: ledger.guard(),
 				});
 				const feedOptions = {
-					mount: [mount, scratchMount],
+					mount: [resolved.mount, scratchMount],
 					printCallback: streams,
 					// The counting wrapper goes outside the recording one: it has to hand monty the
 					// very promise its driver registers, so the settle it sees is the one that matters.
@@ -953,7 +1008,7 @@ export function createKernel(options: {
 		}
 		session = null;
 		pool = null;
-		mount = null;
+		cwdMounts.clear();
 		scratchMount = null;
 		starting = null;
 		journal = [];
