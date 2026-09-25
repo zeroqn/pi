@@ -450,3 +450,34 @@ test("a guard is contributed for a fresh session even when the mode is restored 
 	assert.equal(guard.mountMode(), "read-only", "a resumed session keeps the guard it was saved with");
 	assert.equal(guard.before({ name: "some_new_capability", args: [] }).allow, false);
 });
+
+test("the prompt describes the cell only where there is a governed kernel to describe", async () => {
+	// No kernel: the prompt is the tool-and-shell one, which is all that is true there.
+	const bare = load();
+	await toggleOn(bare);
+	const plain = (await bare.handlers.before_agent_start[0]({ systemPrompt: "BASE" })).systemPrompt;
+	assert.match(plain, /## Read-only mode \(active\)/);
+	assert.doesNotMatch(plain, /mounted read-only/);
+
+	// A governed kernel: the cell half appears, and says what actually happens inside one.
+	const { h, guard } = await cellLane();
+	assert.ok(guard, "expected the guard to have been contributed");
+	await toggleOn(h);
+	const withCell = (await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" })).systemPrompt;
+	assert.match(withCell, /your Python runs in one kernel whose workspace is mounted read-only/);
+	assert.match(withCell, /raise `PermissionError` there/);
+	assert.match(withCell, /declared exception, not a licence/);
+
+	// Off is off: neither half is injected.
+	await h.commands.readonly.handler("", h.ctx);
+	assert.equal(await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }), undefined);
+});
+
+test("a session whose kernel cannot be governed is not told it is", async () => {
+	const { h } = await cellLane({ handleApiVersion: 1 });
+	await toggleOn(h);
+	const prompt = (await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" })).systemPrompt;
+	assert.doesNotMatch(prompt, /mounted read-only/, "the mount half would be a lie here");
+	// The floor is what tells the truth instead: the tool is refused, and the refusal says why.
+	assert.match((await h.handlers.tool_call[0]({ toolName: "python", input: {} })).reason, /cannot be enforced inside a cell/);
+});

@@ -167,6 +167,17 @@ Answer the question. Nothing on disk may change while this mode is on.
 - Say you could not verify something instead of asserting it. If the answer needs execution, say what you would run.
 - Answer what was asked: no unrequested implementation plan, no "want me to go ahead and fix it?".`;
 
+/**
+ * The half of the prompt a **code-mode** session needs, appended only when this session has a kernel.
+ *
+ * Without it the model reads "the write tools are disabled" and then finds `write_text` in the
+ * prelude, tries it, and reports a contradiction: the block above is about pi's tools and shell
+ * commands, and a cell is neither. Say what actually happens in there, and say why a refusal is
+ * worth reporting rather than working around.
+ */
+const READ_ONLY_CELL_PROMPT = `- In a code-mode session your Python runs in one kernel whose workspace is mounted read-only: \`write_text\`, \`edit_text\`, \`mkdirp\` and \`open(..., "w")\` raise \`PermissionError\` there, and a mutating shell command run with \`await bash(...)\` is refused by the same allowlist as above.
+- A few extension capabilities stay available inside a cell — delegation, web reads, the context store — because they do not write the workspace. That is a declared exception, not a licence: anything else is refused by name, and if you need a capability that is refused, say which one and stop rather than looking for another route.`;
+
 interface ReadOnlyState {
 	enabled: boolean;
 	toolsBefore?: string[];
@@ -182,6 +193,12 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	 * floor is fail-closed, and it costs the cell rather than the workspace).
 	 */
 	let unenforceable: string | null = null;
+	/**
+	 * Whether this session actually has a governed kernel: `"mounted"` once the guard has been
+	 * contributed, `"unenforceable"` when the kernel cannot be governed, `null` while nothing has asked
+	 * (a session with no code mode at all). Only the first earns the cell half of the prompt.
+	 */
+	let cellLane: "mounted" | "unenforceable" | null = null;
 
 	/** This session's policy, as the kernel's guard. Both answers read the live flag, so the toggle
 	 *  lands on the next cell with no rebuild. */
@@ -224,6 +241,7 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 			session: (input: SessionInput) => {
 				if (input.sessionKey !== key) return {};
 				if (input.handle.apiVersion < GUARD_API_VERSION) {
+					cellLane = "unenforceable";
 					// A contribution is validated all-or-nothing, so an older code mode refuses the guard
 					// *whole* and the session never learns: it would show the read-only prompt, the status
 					// line, and a writable workspace. That is the one failure this check exists to prevent.
@@ -232,6 +250,7 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 						`${input.handle.apiVersion}, and a guard needs ${GUARD_API_VERSION}. The python tool is refused while the mode is on.`;
 					return { problems: [unenforceable] };
 				}
+				cellLane = "mounted";
 				return { contribution: { owner: OWNER, guard: guardFor() } };
 			},
 		});
@@ -333,7 +352,10 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	// leave the transcript clean when the mode goes off.
 	pi.on("before_agent_start", async (event) => {
 		if (!enabled) return undefined;
-		return { systemPrompt: `${event.systemPrompt}\n\n${READ_ONLY_PROMPT}` };
+		// The cell half only where there is a governed kernel to describe. A plain pi session has no
+		// cell, and telling it about a mount it does not have is how a prompt starts lying.
+		const cell = cellLane === "mounted" ? `\n${READ_ONLY_CELL_PROMPT}` : "";
+		return { systemPrompt: `${event.systemPrompt}\n\n${READ_ONLY_PROMPT}${cell}` };
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
