@@ -4,7 +4,7 @@
  *
  * It is deliberately thin — {@link installHandlers} is the whole of it, and it lives in `./compose` so
  * that the same three handlers serve the root session and a child. What this file adds is the *name*:
- * `packages/host-bridge/src/index.ts` is the manifest entry, declared **immediately before
+ * `packages/host-bridge/index.ts` is the manifest entry, declared **immediately before
  * `magic-context`** so that a contributor's system-prompt text lands where web-access's own entry puts
  * it today (Magic Context *composes from* the incoming prompt, `vendor/.../pi-plugin/src/index.ts:2217`,
  * so an earlier append survives it), while `pi-tool-bridge` keeps the **last** slot its surface rule
@@ -14,7 +14,7 @@
  * business and `pi-tool-bridge`'s rule respectively; this package only decides who writes into a
  * session's host surface, and which session gets which.
  */
-import { type BridgeSurface, installHandlers } from "./compose";
+import { type BridgeSurface, installHandlers } from "./src/compose";
 
 export default function hostBridge(pi: BridgeSurface): void {
 	installHandlers(pi, {});
@@ -29,6 +29,6 @@ export {
 	childFactories,
 	composeSession,
 	installHandlers,
-} from "./compose";
-export * from "./client";
-export * from "./convention";
+} from "./src/compose";
+export * from "./src/client";
+export * from "./src/convention";

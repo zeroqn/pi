@@ -69,7 +69,7 @@ export type SearchEnvelope = {
  * monty hands a JS host function its arguments as the sandbox wrote them: positionals in
  * order, and **Python keyword arguments as one trailing plain object**
  * (`web_search("q", num_results=3)` arrives as `("q", { num_results: 3 })`). rlm's own host
- * functions unwrap the same convention with `bind()` in `extensions/rlm/src/index.ts`; a
+ * functions unwrap the same convention with `bind()` in `extensions/rlm/index.ts`; a
  * hook module has to do it for itself. The first live integration run is what proved it:
  * the unit tests called these functions directly and never saw the convention.
  */

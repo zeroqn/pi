@@ -17,7 +17,7 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { REGISTRY_KEY, type RegistryEntry } from "../src/contract";
-import codeMode from "../src/index";
+import codeMode from "../index";
 
 type Handler = (event: unknown, ctx: unknown) => unknown;
 

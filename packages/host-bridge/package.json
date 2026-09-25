@@ -16,6 +16,11 @@
 		"host-bridge"
 	],
 	"license": "MIT",
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	},
 	"devDependencies": {
 		"@types/node": "^22.20.0",
 		"typescript": "^5.8.0"

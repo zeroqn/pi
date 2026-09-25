@@ -17,19 +17,19 @@
  *    recorded reason, one line to the model, and everything else still working (ticket 01's
  *    failure table; a throwing factory would kill the whole process — ticket 02 §1).
  */
-import { bindChild, childCeiling, childFactories, childStatus } from "../../host-bridge/src/compose";
+import { bindChild, childCeiling, childFactories, childStatus } from "../host-bridge/src/compose";
 import {
 	type ChildCeiling,
 	sessionKey,
 	sessionRecord,
 	setChildDetector,
-} from "../../host-bridge/src/convention";
-import { createChildManager, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
-import type { ChildKernelContext, Notice } from "./children";
+} from "../host-bridge/src/convention";
+import { createChildManager, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./src/children";
+import type { ChildKernelContext, Notice } from "./src/children";
 // Imported for its side effect on the seam, and for the session deps this file files with it.
-import { forgetRlmSessionDeps, setRlmSessionDeps } from "./registration";
-import { rsiBindChild, rsiChildExtensions, rsiStatus } from "./rsi-seam";
-import { errorText, str } from "./util";
+import { forgetRlmSessionDeps, setRlmSessionDeps } from "./src/registration";
+import { rsiBindChild, rsiChildExtensions, rsiStatus } from "./src/rsi-seam";
+import { errorText, str } from "./src/util";
 const MAX_DEPTH = 2;
 const MAX_LIVE_CHILDREN = 8;
 

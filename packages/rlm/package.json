@@ -6,7 +6,7 @@
   "keywords": ["pi-package"],
   "description": "Delegation and the agent-side seams for pi, inside the code-mode Python kernel",
   "pi": {
-    "extensions": ["./src/index.ts"]
+    "extensions": ["./index.ts"]
   },
   "peerDependencies": {
     "pi-code-mode": "*",

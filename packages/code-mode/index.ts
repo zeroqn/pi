@@ -22,10 +22,10 @@ import {
 	registrySessions,
 	sessionIsAlive,
 	type Ledger,
-} from "./contract";
-import { createKernel, type Kernel } from "./kernel";
-import { BASE_DESCRIPTION, BASE_GUIDELINES, BASE_SNIPPET } from "./surface";
-import { errorText, str } from "./util";
+} from "./src/contract";
+import { createKernel, type Kernel } from "./src/kernel";
+import { BASE_DESCRIPTION, BASE_GUIDELINES, BASE_SNIPPET } from "./src/surface";
+import { errorText, str } from "./src/util";
 
 /** What a cell gets when the session has no kernel at all — said plainly, never a stub. */
 function noKernelText(problems: string[]): string {

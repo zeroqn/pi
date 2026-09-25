@@ -28,17 +28,17 @@ import {
 	pruneProviders,
 	providersFor,
 	sessionKey,
-} from "./convention";
+} from "./src/convention";
 import {
 	API_VERSION as HOST_API_VERSION,
 	type ContributorRegistration,
 	type SessionInput,
 	registerContributor,
 	sessionRecord,
-} from "../../host-bridge/src/convention";
-import { skillHostFns } from "./call";
-import { SKILL_PRELUDE } from "./prelude";
-import { beforeAgentStartResult, eventSkills } from "./render";
+} from "../host-bridge/src/convention";
+import { skillHostFns } from "./src/call";
+import { SKILL_PRELUDE } from "./src/prelude";
+import { beforeAgentStartResult, eventSkills } from "./src/render";
 
 /**
  * A week. Pruning is hygiene, not correctness: a record is keyed by session file, so a stale one

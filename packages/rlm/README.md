@@ -98,8 +98,8 @@ and `web-hook.test.ts` (both deleted with the hook).
 ```bash
 cd /workspace/pi
 MONTY_BIN=$(nix build --no-link --print-out-paths /workspace/pi/monty#monty-bin)/bin/monty \
-pi -ne -e /workspace/pi/extensions/packages/code-mode/src/index.ts \
-      -e /workspace/pi/extensions/packages/rlm/src/index.ts -nbt \
+pi -ne -e /workspace/pi/extensions/packages/code-mode/index.ts \
+      -e /workspace/pi/extensions/packages/rlm/index.ts -nbt \
    --session-dir /tmp/rlm-sessions -p "your task"
 ```
 
@@ -110,8 +110,8 @@ cd /workspace/pi
 D=/tmp/rlm-surface
 rm -rf $D && mkdir -p $D/sessions
 
-pi -ne -e /workspace/pi/extensions/packages/code-mode/src/index.ts \
-      -e /workspace/pi/extensions/packages/rlm/src/index.ts -nbt --session-dir $D/sessions -p \
+pi -ne -e /workspace/pi/extensions/packages/code-mode/index.ts \
+      -e /workspace/pi/extensions/packages/rlm/index.ts -nbt --session-dir $D/sessions -p \
   "Use the python tool exactly once, with ONE CELL: h = await rlm.spawn('Reply with exactly CHILD-OK.', name='probe'); print('spawned', h['child_id'], h['status']); b = await bash('printf hello', background=True); await bash('sleep 6'); print('bg', (await b.poll())['status'], (await b.output())['text'])"
 
 ls $D/sessions/                        # the child's session file sits beside the parent's

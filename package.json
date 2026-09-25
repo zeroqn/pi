@@ -16,17 +16,17 @@
 	"license": "MIT",
 	"pi": {
 		"extensions": [
-			"packages/code-mode/src/index.ts",
-			"packages/rlm/src/index.ts",
-			"packages/skill-bridge/src/index.ts",
+			"packages/code-mode/index.ts",
+			"packages/rlm/index.ts",
+			"packages/skill-bridge/index.ts",
 			"packages/rsi/index.ts",
 			"packages/web-access/host.ts",
 			"packages/readonly-mode/index.ts",
 			"packages/zvec-grep/index.ts",
 			"packages/rpiv-advisor-pi-native/index.ts",
-			"packages/host-bridge/src/index.ts",
+			"packages/host-bridge/index.ts",
 			"packages/magic-context/index.js",
-			"packages/tool-bridge/src/index.ts"
+			"packages/tool-bridge/index.ts"
 		]
 	}
 }

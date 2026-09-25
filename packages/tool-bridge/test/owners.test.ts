@@ -11,12 +11,13 @@ import { probe } from "../src/owners/probe";
 /**
  * The files that must stay owner-agnostic, and the strings that would betray an owner.
  *
- * Every file in `src/` outside `owners/` belongs here: the reader, the convention, the registration
- * and the entry describe a mechanism, not an owner. `owners/index.ts` is excluded because naming its
- * owners is its whole job. (`child-seam.ts` and `adopter.ts` were on this list until
- * `.scratch/host-bridge` ticket 05 moved the generic half to `pi-host-bridge`.)
+ * Every file in `src/` outside `owners/`, plus the entry at the package root, belongs here: the
+ * reader, the convention, the registration and the entry describe a mechanism, not an owner.
+ * `owners/index.ts` is excluded because naming its owners is its whole job. (`child-seam.ts` and
+ * `adopter.ts` were on this list until `.scratch/host-bridge` ticket 05 moved the generic half to
+ * `pi-host-bridge`.)
  */
-const GENERIC_FILES = ["adapter.ts", "convention.ts", "index.ts", "registration.ts"];
+const GENERIC_FILES = ["src/adapter.ts", "src/convention.ts", "index.ts", "src/registration.ts"];
 const OWNER_PATTERNS = [/\bmagic/i, /cortexkit/i, /\bctx_/];
 
 describe("the owner list", () => {
@@ -79,7 +80,7 @@ describe("the owner list", () => {
 	it("names no owner in the owner-agnostic files", () => {
 		const offenders: string[] = [];
 		for (const file of GENERIC_FILES) {
-			const lines = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8").split("\n");
+			const lines = readFileSync(new URL(`../${file}`, import.meta.url), "utf8").split("\n");
 			lines.forEach((line, index) => {
 				if (OWNER_PATTERNS.some((pattern) => pattern.test(line))) {
 					offenders.push(`${file}:${index + 1}: ${line.trim()}`);

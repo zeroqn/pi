@@ -25,7 +25,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { REGISTRY_KEY, type RegistryEntry } from "../src/contract";
-import codeMode from "../src/index";
+import codeMode from "../index";
 import type { Kernel } from "../src/kernel";
 
 const workerPath = process.env.MONTY_BIN ?? null;

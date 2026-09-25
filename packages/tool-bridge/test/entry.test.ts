@@ -13,7 +13,7 @@ import { __clearChildDetectorForTests, setChildDetector } from "../../host-bridg
 import { __resetHostBridgeForTests, recordSession, registerContributor, sessionKey } from "../../host-bridge/src/convention";
 import { __resetToolBridgeForTests } from "../src/convention";
 import { toolBridgeRegistration } from "../src/registration";
-import toolBridge from "../src/index";
+import toolBridge from "../index";
 
 function ctxFor(id: string) {
 	return {

@@ -17,7 +17,7 @@
 	"license": "MIT",
 	"pi": {
 		"extensions": [
-			"./src/index.ts"
+			"./index.ts"
 		]
 	},
 	"devDependencies": {

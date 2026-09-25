@@ -30,7 +30,7 @@ import {
 } from "../../host-bridge/src/convention";
 import { SKILL_PRELUDE } from "../src/prelude";
 import { stubFormatter } from "./formatter-stub";
-import skillBridge, { __resetBridgeStateForTests, skillBridgeRegistration } from "../src/index";
+import skillBridge, { __resetBridgeStateForTests, skillBridgeRegistration } from "../index";
 
 const REGISTRY_KEY = Symbol.for("pi-code-mode:registry");
 /** Recreated per test: a shared directory would be gone after the first one's cleanup. */

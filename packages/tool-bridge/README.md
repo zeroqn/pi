@@ -71,7 +71,7 @@ and — only if the ledger accepted it — records which names became reachable 
 `sessionKey(ctx)`. That record is the whole input to the surface rule, so a session whose bridge was
 refused or absent keeps the pi tools it had.
 
-The entry (`src/index.ts`) is what applies the rule, and **its position in the manifest is part of
+The entry (`index.ts`) is what applies the rule, and **its position in the manifest is part of
 the mechanism**: it must be declared *after* every owner whose tools it strips. Handlers run in load
 order, and Magic Context — which re-appends `ctx_memory` on `session_start` — is last in this
 workspace's list. Move the entry up and the rule silently stops working.
@@ -168,7 +168,7 @@ Every drop is reported with a reason (`problems` from `installToolBridge`) rathe
 - `src/owners/` — **the only place that names an owner**. `index.ts` holds the `OwnerModule` list,
   `nativeOnlyTools()` and `childEligibleTools()`; `magic-context.ts` is the first owner's child shim;
   `probe.ts` is the env-gated acceptance instrument.
-- `src/index.ts` — the entry: the surface rule at `session_start` and `before_agent_start` — the child's
+- `index.ts` — the entry: the surface rule at `session_start` and `before_agent_start` — the child's
   when a detector recognises one — and the `session_shutdown` cleanup.
 - `test/` — the rules, testable with no pi, no kernel and no monty (the surface is typed
   structurally, so nothing here imports pi). `child-seam.test.ts` also pins that every file in `src/`

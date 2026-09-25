@@ -104,11 +104,11 @@ publisher contract, and `.scratch/tool-bridge/` for the decisions.
 ```bash
 cd /workspace/pi
 MONTY_BIN=$(nix build --no-link --print-out-paths /workspace/pi/monty#monty-bin)/bin/monty \
-pi -ne -e /workspace/pi/extensions/packages/code-mode/src/index.ts -nbt \
+pi -ne -e /workspace/pi/extensions/packages/code-mode/index.ts -nbt \
    --session-dir /tmp/cm-sessions -p "your task"
 ```
 
-Add `-e /workspace/pi/extensions/packages/rlm/src/index.ts` for delegation, and
+Add `-e /workspace/pi/extensions/packages/rlm/index.ts` for delegation, and
 `RLM_WEB_MODULE=/workspace/pi/extensions/packages/web-access/host.ts` for web host functions.
 
 Environment overrides: `RLM_FD` (find backend), `RLM_ZG` (grep backend), `RLM_SHELL`. `MONTY_BIN`

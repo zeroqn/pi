@@ -34,12 +34,12 @@ import {
 	reconcileChildSurface,
 	reconcileToolSurface,
 	recordChildSurface,
-} from "./adapter";
-import { type ChildSurfaceReport } from "./adapter";
-import { childCeiling } from "../../host-bridge/src/compose";
-import { type ChildCeiling, detectsChild, registerContributor } from "../../host-bridge/src/convention";
-import { nativeOnlyTools } from "./owners";
-import { toolBridgeRegistration } from "./registration";
+} from "./src/adapter";
+import { type ChildSurfaceReport } from "./src/adapter";
+import { childCeiling } from "../host-bridge/src/compose";
+import { type ChildCeiling, detectsChild, registerContributor } from "../host-bridge/src/convention";
+import { nativeOnlyTools } from "./src/owners";
+import { toolBridgeRegistration } from "./src/registration";
 
 type PiEntrySurface = ActiveToolSurface & {
 	on(event: string, handler: (event: unknown, ctx: unknown) => unknown): void;
@@ -90,7 +90,7 @@ export default function toolBridge(pi: PiEntrySurface): void {
 	});
 }
 
-export { toolBridgeRegistration, toolBridgeAnswer } from "./registration";
+export { toolBridgeRegistration, toolBridgeAnswer } from "./src/registration";
 export {
 	type ActiveToolSurface,
 	type ChildSurfaceReport,
@@ -98,5 +98,5 @@ export {
 	reconcileChildSurface,
 	recordChildSurface,
 	gatherToolBridge,
-} from "./adapter";
-export * from "./convention";
+} from "./src/adapter";
+export * from "./src/convention";

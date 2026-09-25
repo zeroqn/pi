@@ -6,7 +6,7 @@
 	"keywords": ["pi-package"],
 	"description": "Code-mode Python kernel for pi, backed by monty",
 	"pi": {
-		"extensions": ["./src/index.ts"]
+		"extensions": ["./index.ts"]
 	},
 	"dependencies": {
 		"@pydantic/monty": "0.0.23"
