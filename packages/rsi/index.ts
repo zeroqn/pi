@@ -18,7 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { buildSessionContext, convertToLlm, getAgentDir, parseSkillBlock, serializeConversation } from "@earendil-works/pi-coding-agent";
-import { bindKernel, type KernelHandle } from "./code-mode.ts";
+import { type KernelHandle, mountKernel } from "../host-bridge/src/client.ts";
 import { loadConfig, saveConfig } from "./config.ts";
 import { buildCandidates, buildCurationReport, buildCuratorPrompt, curationDueForSession, isCurationDue, retirementCandidates } from "./curation.ts";
 import { buildDigest } from "./digest.ts";
@@ -307,13 +307,19 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 	 * learner gate's proof that a code-mode session can write) and the kernel handle's session key,
 	 * which the journal path is derived from. It is idempotent by session key, so it does not matter
 	 * whether code mode's own `session_start` ran first.
+	 *
+	 * It is `pi-host-bridge`'s **client** half that mounts it (`.scratch/host-bridge` ticket 09): RSI
+	 * is a client, not a contributor — it registers nothing, because a seam that demanded a
+	 * contribution in order to hand over a handle would be a seam with a lie in it. The one behaviour
+	 * that moved with the client is the wording of the absence reasons, which are now the seam's.
 	 */
 	function bindToKernel(ctx: ExtensionContext): void {
-		const bind = bindKernel({ pi, ctx });
-		codeMode = bind.handle;
-		if (bind.problem) warn(bind.problem);
+		const mounted = mountKernel({ pi, ctx });
+		const problem = mounted.status === "mounted" ? null : mounted.reason;
+		if (mounted.status === "mounted") codeMode = mounted.handle;
+		if (problem) warn(problem);
 		try {
-			pi.appendEntry("rsi-kernel", { mounted: codeMode !== null, problem: bind.problem ?? null });
+			pi.appendEntry("rsi-kernel", { mounted: codeMode !== null, problem });
 		} catch {
 			/* the record is best effort */
 		}
