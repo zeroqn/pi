@@ -273,7 +273,7 @@ export async function fetchGuarded(url: string, options: GuardedFetchOptions): P
 			response = await (options.fetchImpl ?? fetch)(current, {
 				redirect: "manual",
 				signal,
-				headers: { "user-agent": "pi-web-code/0.1 (+rlm kernel host function)", accept: "*/*", ...options.headers },
+				headers: { "user-agent": "pi-web-access/0.1 (+rlm kernel host function)", accept: "*/*", ...options.headers },
 			});
 		} catch (error) {
 			if (deadline.aborted) throw webError("TimeoutError", `fetch timed out after ${options.timeoutMs} ms: ${current.href}`);

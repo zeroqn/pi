@@ -51,7 +51,7 @@ _Avoid_: service locator, bus
 
 **rlm**:
 The extension that adds delegation inside code mode — children, notices, and the seams to RSI,
-Magic Context and web-code. It owns no kernel.
+Magic Context and web-access. It owns no kernel.
 _Avoid_: the code-mode extension
 
 **Child**:

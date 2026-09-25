@@ -26,7 +26,7 @@ import {
 import { type ChildCeiling, childCeiling } from "../../tool-bridge/src/child-seam";
 import { createChildManager, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
 import type { ChildKernelContext, Notice } from "./children";
-import { rlmContribution, webCodeContribution } from "./contribution";
+import { rlmContribution, webAccessContribution } from "./contribution";
 import { delegationHostFns } from "./delegation";
 import {
 	bindChild,
@@ -259,7 +259,7 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 						},
 					}),
 				];
-				const web = webCodeContribution({
+				const web = webAccessContribution({
 					hook: webHook,
 					cwd: ctx?.cwd ?? root,
 					sessionFile: ctx?.sessionManager?.getSessionFile?.(),

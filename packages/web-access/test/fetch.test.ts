@@ -8,7 +8,7 @@ const PUBLIC = "93.184.216.34";
 const guard = { allowRanges: [] as string[], domainPolicy: { allow: [] as string[], deny: [] as string[] }, lookup: async () => [PUBLIC] };
 
 function scratch(): string {
-	return mkdtempSync(join(tmpdir(), "pi-web-code-fetch-"));
+	return mkdtempSync(join(tmpdir(), "pi-web-access-fetch-"));
 }
 
 function respond(body: string | Uint8Array, contentType: string, status = 200) {

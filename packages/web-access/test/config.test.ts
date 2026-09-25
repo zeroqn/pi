@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DEFAULT_PROVIDERS, loadConfig, providerOrder } from "../config";
 
 function configFile(body: string): string {
-	const dir = mkdtempSync(join(tmpdir(), "pi-web-code-config-"));
+	const dir = mkdtempSync(join(tmpdir(), "pi-web-access-config-"));
 	const file = join(dir, "web-search.json");
 	writeFileSync(file, body);
 	return file;
@@ -27,7 +27,7 @@ describe("the shared web-search.json (ticket 03)", () => {
 	});
 
 	it("treats a missing file as no configuration rather than an empty one", () => {
-		const config = loadConfig(join(mkdtempSync(join(tmpdir(), "pi-web-code-none-")), "web-search.json"));
+		const config = loadConfig(join(mkdtempSync(join(tmpdir(), "pi-web-access-none-")), "web-search.json"));
 		expect(config.raw).toBeNull();
 		expect(config.providers).toEqual([]);
 		expect(config.anysearchApiKey).toBeNull();

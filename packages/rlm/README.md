@@ -1,7 +1,7 @@
 # rlm — delegation and the agent-side seams for pi
 
 The agent-shaped half of the code-mode runtime: **children** (delegation), the notices that tell the
-model when one finishes, and the seams to RSI (the learned-skill store in this repo) and `web-code`.
+model when one finishes, and the seams to RSI (the learned-skill store in this repo) and `web-access`.
 
 It owns **no kernel**. The kernel, the `python` tool, the prelude's base half, the host functions,
 the journal, the dump and the rotation all belong to
@@ -71,8 +71,8 @@ One `contribute()` call, at `session_start`, before the first cell:
   seam.
 - **The web hook's wiring**: `RLM_WEB_MODULE` is resolved once at load, so nothing is promised that
   cannot be called, and instantiated per kernel — a child's fetches spill into the child's own
-  scratch — then contributed as `web-code`'s host functions and sentences. rlm does not import
-  web-code and never learns what the functions do.
+  scratch — then contributed as `web-access`'s host functions and sentences. rlm does not import
+  web-access and never learns what the functions do.
 
 ## Tests
 

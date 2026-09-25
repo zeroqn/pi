@@ -9,7 +9,7 @@ survives monty's suspension budget, and the tool itself. Nothing here knows abou
 notices or learned skills — those arrive from other packages through the contract below.
 
 It stands alone. `packages/rlm` adds delegation and the agent-side seams on top, and is the usual
-way to run it; `packages/web-code` adds web host functions the same way.
+way to run it; `packages/web-access` adds web host functions the same way.
 
 ## The surface it owns
 
@@ -109,7 +109,7 @@ pi -ne -e /workspace/pi/extensions/packages/code-mode/src/index.ts -nbt \
 ```
 
 Add `-e /workspace/pi/extensions/packages/rlm/src/index.ts` for delegation, and
-`RLM_WEB_MODULE=/workspace/pi/extensions/packages/web-code/host.ts` for web host functions.
+`RLM_WEB_MODULE=/workspace/pi/extensions/packages/web-access/host.ts` for web host functions.
 
 Environment overrides: `RLM_FD` (find backend), `RLM_ZG` (grep backend), `RLM_SHELL`. `MONTY_BIN`
 is only needed on a host without `/lib64/ld-linux-x86-64.so.2` — NixOS, musl; the flake's

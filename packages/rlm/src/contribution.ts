@@ -69,12 +69,12 @@ export function rlmContribution(options: {
 }
 
 /**
- * web-code, as a contribution of its own. rlm resolves the module once at load (so the
+ * web-access, as a contribution of its own. rlm resolves the module once at load (so the
  * description can promise exactly what exists) and instantiates it per kernel — a child's
  * fetches spill into the child's own scratch — then hands the functions over, which is the
  * whole of the coupling: nothing is imported between the two extensions.
  */
-export function webCodeContribution(options: {
+export function webAccessContribution(options: {
 	hook: WebPlan;
 	cwd: string;
 	sessionFile?: string;
@@ -90,7 +90,7 @@ export function webCodeContribution(options: {
 	if (instantiated.status === "error") return { contribution: null, reason: instantiated.reason };
 	return {
 		contribution: {
-			owner: "web-code",
+			owner: "web-access",
 			hostFns: instantiated.fns as Record<string, (...args: unknown[]) => Promise<unknown>>,
 			description: webDescriptionSuffix(options.hook),
 			guidelines: webPromptGuidelines(options.hook),

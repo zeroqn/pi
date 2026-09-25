@@ -1,10 +1,17 @@
 {
-  "name": "pi-web-code",
+  "name": "pi-web-access",
   "version": "0.1.0",
   "private": true,
-  "description": "Web host functions (web_search, fetch_content) for the rlm Python kernel, over DuckDuckGo and AnySearch.",
+  "description": "Web access for the kernel: web_search/fetch_content host functions over DuckDuckGo and AnySearch, plus the untrusted-web-content guard.",
   "type": "module",
-  "keywords": ["pi-package", "pi", "rlm", "web-search"],
+  "keywords": [
+    "pi-package",
+    "pi",
+    "rlm",
+    "web-search",
+    "prompt-injection",
+    "security"
+  ],
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "linkedom": "^0.18.13",
@@ -23,6 +30,8 @@
     "smoke": "bun scripts/live-smoke.ts"
   },
   "pi": {
-    "extensions": ["./host.ts"]
+    "extensions": [
+      "./host.ts"
+    ]
   }
 }

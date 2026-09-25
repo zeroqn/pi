@@ -18,7 +18,7 @@ if (process.env.RLM_WEB_SMOKE !== "1") {
 	process.exit(0);
 }
 
-const scratchDir = mkdtempSync(join(tmpdir(), "pi-web-code-smoke-"));
+const scratchDir = mkdtempSync(join(tmpdir(), "pi-web-access-smoke-"));
 const host = createHost({ cwd: process.cwd(), sessionFile: join(scratchDir, "smoke.jsonl"), progress: (text) => console.log("  ·", text) });
 
 function line(label: string, value: unknown): void {

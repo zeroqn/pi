@@ -298,9 +298,9 @@ describe("contributing (tickets 01 and 03)", () => {
 	it("is idempotent per owner, keeping the owner's position in the order", () => {
 		const l = ledger();
 		l.accept({ owner: "rlm", description: " FIRST", hostFns: { rlm_spawn: async () => ({}) } });
-		l.accept({ owner: "web-code", description: " WEB" });
+		l.accept({ owner: "web-access", description: " WEB" });
 		l.accept({ owner: "rlm", description: " SECOND", hostFns: { rlm_poll: async () => ({}) } });
-		expect(l.owners()).toEqual(["rlm", "web-code"]);
+		expect(l.owners()).toEqual(["rlm", "web-access"]);
 		expect(l.description()).toBe("BASE_DESC SECOND WEB");
 		// Replaced wholesale: the name it no longer declares is free again.
 		expect(Object.keys(l.hostFns())).toEqual(["rlm_poll"]);
@@ -322,7 +322,7 @@ describe("contributing (tickets 01 and 03)", () => {
 		l.accept({ owner: "rsi", hostFns: { bash_host: async () => ({}) } });
 		expect(changes).toBe(1);
 		l.close();
-		l.accept({ owner: "web-code", description: " WEB" });
+		l.accept({ owner: "web-access", description: " WEB" });
 		expect(changes).toBe(1);
 	});
 

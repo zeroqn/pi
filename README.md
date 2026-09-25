@@ -8,16 +8,15 @@ one is a fork.
 | [`code-mode`](packages/code-mode) | The Python kernel; one tool replaces pi's tool surface. |
 | [`rlm`](packages/rlm) | Delegation (children) and the agent-side seams, inside that kernel. |
 | [`rsi`](packages/rsi) | Background loop learns reusable skills from sessions and maintains them. |
-| [`web-code`](packages/web-code) | `web_search` and `fetch_content` host functions for the kernel. |
+| [`web-access`](packages/web-access) | `web_search`/`fetch_content` host functions for the kernel, plus the untrusted-web-content guard. |
 | [`zvec-grep`](packages/zvec-grep) | zvec-grep search and managed ripgrep as native pi tools. |
-| [`pi-web-guard`](packages/pi-web-guard) | Fences pi-web-access tool output as untrusted, plus a prompt rule. |
 | [`tool-bridge`](packages/tool-bridge) | Another extension's published pi tools, callable from inside a cell as `await tool(...)`. |
 | [`readonly-mode`](packages/readonly-mode) | Query-only mode: removes writer tools, gates bash, injects a prompt. |
 | [`rpiv-advisor-pi-native`](packages/rpiv-advisor-pi-native) | Keeps rpiv-advisor's config in pi's own config tree. |
 | [`magic-context`](packages/magic-context) | Forked. Cross-session memory and context management for pi. **Prebuilt** — see below. |
 
 The first four compose into one code-mode runtime. `code-mode` owns the kernel and the `python`
-tool; `rlm`, `web-code` and `rsi` reach it through a process-global registry — a contract, not an
+tool; `rlm`, `web-access` and `rsi` reach it through a process-global registry — a contract, not an
 import — and each *contributes* the host functions and sentences it is responsible for. `tool-bridge`
 is a leaf of the same kind: it contributes one host function, `tool`, through which an owner's
 published tools are callable by name, plus the reconciler that keeps pi's active set to the tools a
@@ -35,12 +34,12 @@ Two things no package manager can supply:
 
 ```bash
 export MONTY_BIN=/path/to/monty/bin/monty           # code-mode's worker
-export RLM_WEB_MODULE="$PWD/packages/web-code/host.ts"   # web-code -> kernel
+export RLM_WEB_MODULE="$PWD/packages/web-access/host.ts"   # web-access -> kernel
 ```
 
 - `MONTY_BIN` — code-mode's [monty](https://github.com/pydantic/monty) worker is a native binary,
   not the npm dependency of the same name. Without it the kernel cannot start.
-- `RLM_WEB_MODULE` — how web-code is joined to the kernel. Nothing is imported; rlm reads the
+- `RLM_WEB_MODULE` — how web-access is joined to the kernel. Nothing is imported; rlm reads the
   module name, resolves it once so the tool description only promises what exists, and contributes
   the `createHost(ctx)` it exports per kernel.
 - `zvec-grep` needs the `zg` CLI on `PATH` (or `ZVEC_GREP_BIN` pointing at it). The two

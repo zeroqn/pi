@@ -57,7 +57,7 @@ export async function searchDuckDuckGo(
 		response = await (options.fetchImpl ?? fetch)(url, {
 			headers: {
 				accept: "text/html",
-				"user-agent": "Mozilla/5.0 (compatible; pi-web-code/0.1; +https://github.com/pydantic/monty)",
+				"user-agent": "Mozilla/5.0 (compatible; pi-web-access/0.1; +https://github.com/pydantic/monty)",
 			},
 			signal,
 		});

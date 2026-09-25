@@ -1,14 +1,15 @@
 /**
- * `pi-web-code` — the web host functions the rlm kernel can call (map `.scratch/rlm-web/`).
+ * `pi-web-access` — the web host functions the rlm kernel can call (map `.scratch/rlm-web/`),
+ * plus the untrusted-content guard for what both routes return (`guard.ts`).
  *
  * This file is two things at once, deliberately:
  *
- *   - the **kernel hook**: `RLM_WEB_MODULE=/workspace/pi/extensions/pi-web-code/host.ts`
+ *   - the **kernel hook**: `RLM_WEB_MODULE=/workspace/pi/extensions/packages/web-access/host.ts`
  *     makes rlm import it at load and call `createHost(ctx)` once per kernel, where the
  *     returned `{ web_search, fetch_content }` join the same host surface as `bash`,
  *     `find`, `grep` and `read_image` (map ticket 03);
- *   - a **pi package entry** with a no-op default export, so `pi install` on this directory
- *     loads something harmless. The extension registers **no** pi-level tools — that was
+ *   - a **pi package entry** whose default export registers the guard, so `pi install` on this
+ *     directory loads it. The extension still registers **no** pi-level tools — that was
  *     round 2's decision, and it is what keeps it from colliding with the installed
  *     `pi-web-access`, which already owns `web_search` for non-rlm sessions.
  *
@@ -26,6 +27,7 @@ import { fetchContent, type FetchEnvelope, type FetchMode } from "./fetch";
 import { searchAnySearch } from "./providers/anysearch";
 import { searchDuckDuckGo } from "./providers/duckduckgo";
 import type { SearchResult } from "./providers/types";
+import { fenceText, installGuard, type GuardPi } from "./guard";
 
 export const SEARCH_TIMEOUT_MS = 30_000;
 export const FETCH_TIMEOUT_MS = 60_000;
@@ -129,9 +131,35 @@ function matchesFilter(url: string, filter: DomainFilter): boolean {
 	return !filter.deny.some(matches);
 }
 
+/**
+ * Fence every free-text field of a search envelope — result titles, snippets and extracts, and the
+ * per-provider error strings (an upstream error body is attacker-influenced text too). `url`
+ * (routing), `query` (the caller's own text) and `provider` are left intact.
+ */
+function fenceSearchEnvelope(envelope: SearchEnvelope): SearchEnvelope {
+	return {
+		...envelope,
+		results: envelope.results.map((result) => ({
+			...result,
+			title: fenceText(result.title),
+			snippet: fenceText(result.snippet),
+			content: fenceText(result.content),
+		})),
+		errors: Object.fromEntries(Object.entries(envelope.errors).map(([name, why]) => [name, fenceText(why)])),
+	};
+}
+
+/** Fence the free-text fields of a fetch envelope: the raw envelope has none (the bytes are on
+ *  disk), the markdown one has `title` and `head`. The spilled file itself is left unfenced — a
+ *  cell that reads it gets raw text and must treat it as untrusted on the same rule. */
+function fenceFetchEnvelope(envelope: FetchEnvelope): FetchEnvelope {
+	if (!("head" in envelope)) return envelope;
+	return { ...envelope, title: fenceText(envelope.title), head: fenceText(envelope.head) };
+}
+
 export function createHost(ctx: HostContext, deps: HostDeps = {}) {
 	const config: WebConfig = deps.config ?? loadConfig();
-	const scratchDir = ctx.sessionFile ? `${ctx.sessionFile}.scratch` : `${tmpdir()}/pi-web-code`;
+	const scratchDir = ctx.sessionFile ? `${ctx.sessionFile}.scratch` : `${tmpdir()}/pi-web-access`;
 	mkdirSync(scratchDir, { recursive: true });
 
 	async function runProvider(name: string, query: string, limit: number, signal?: AbortSignal): Promise<SearchResult[]> {
@@ -167,7 +195,7 @@ export function createHost(ctx: HostContext, deps: HostDeps = {}) {
 					const kept = found.filter((result) => matchesFilter(result.url, filter)).slice(0, limit);
 					if (kept.length > 0) {
 						ctx.progress?.(`web_search: ${name} answered with ${kept.length}`);
-						return { query, provider: name, results: kept, errors };
+						return fenceSearchEnvelope({ query, provider: name, results: kept, errors });
 					}
 					errors[name] = found.length === 0 ? "no results" : `${found.length} results, none survived domain_filter`;
 					empty ??= { provider: name, results: kept };
@@ -177,7 +205,7 @@ export function createHost(ctx: HostContext, deps: HostDeps = {}) {
 				}
 			}
 			// Nothing anywhere: an empty success is a result, not an error (ticket 04).
-			if (empty) return { query, provider: empty.provider, results: empty.results, errors };
+			if (empty) return fenceSearchEnvelope({ query, provider: empty.provider, results: empty.results, errors });
 			throw webError(
 				"RuntimeError",
 				`every provider failed for "${query}": ${Object.entries(errors).map(([name, why]) => `${name}: ${why}`).join("; ")}`,
@@ -200,14 +228,16 @@ export function createHost(ctx: HostContext, deps: HostDeps = {}) {
 			if (rawMode !== "markdown" && rawMode !== "raw") {
 				throw webError("ValueError", `fetch_content: mode must be "markdown" or "raw", got ${JSON.stringify(rawMode)}`);
 			}
-			return await fetchContent(url, {
-				mode: rawMode as FetchMode,
-				scratchDir,
-				timeoutMs: FETCH_TIMEOUT_MS,
-				guard: { allowRanges: config.allowRanges, domainPolicy: config.domainPolicy },
-				progress: ctx.progress,
-				fetchImpl: deps.fetchImpl,
-			});
+			return fenceFetchEnvelope(
+				await fetchContent(url, {
+					mode: rawMode as FetchMode,
+					scratchDir,
+					timeoutMs: FETCH_TIMEOUT_MS,
+					guard: { allowRanges: config.allowRanges, domainPolicy: config.domainPolicy },
+					progress: ctx.progress,
+					fetchImpl: deps.fetchImpl,
+				}),
+			);
 		} catch (error) {
 			throw asWebError(error, "RuntimeError", "fetch_content failed");
 		}
@@ -222,7 +252,8 @@ export function createHost(ctx: HostContext, deps: HostDeps = {}) {
  */
 export type HostDeps = { fetchImpl?: typeof fetch; config?: WebConfig };
 
-/** `pi install` loads this file as an extension; it registers nothing, on purpose. */
-export default function piWebCode(): void {
-	/* no pi-level tools: the capability is the kernel's (round 2) */
+/** `pi install` loads this file as an extension: the default export registers the guard and
+ *  nothing else. No pi-level tools — the capability is the kernel's (round 2). */
+export default function piWebAccess(pi: GuardPi): void {
+	installGuard(pi);
 }
