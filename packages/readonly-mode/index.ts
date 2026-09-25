@@ -38,6 +38,7 @@ import {
 	API_VERSION as HOST_API_VERSION,
 	registerContributor,
 	sessionKey,
+	sessionRecord,
 	type SessionInput,
 } from "../host-bridge/src/convention.ts";
 import { checkReadOnlyCommand } from "./bash-allowlist.ts";
@@ -199,6 +200,10 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	 * (a session with no code mode at all). Only the first earns the cell half of the prompt.
 	 */
 	let cellLane: "mounted" | "unenforceable" | null = null;
+	/** Sessions the seam told us are roots: the inventory check's stale half is only sound there. */
+	const roots = new Set<string>();
+	/** Sessions the inventory has already been checked for, so the notice is said once. */
+	const checked = new Set<string>();
 
 	/** This session's policy, as the kernel's guard. Both answers read the live flag, so the toggle
 	 *  lands on the next cell with no rebuild. */
@@ -232,6 +237,52 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	 * governed by a flag that is not its own (the trap `.scratch/child-surface` ticket 03 measured on
 	 * the child detector).
 	 */
+	/**
+	 * The inventory check: the exemption list is hand-edited, and both ways a hand edit goes wrong are
+	 * otherwise silent.
+	 *
+	 * A **live name that is not listed** is refused in a read-only cell — the model reports a missing
+	 * capability and nobody knows why. A **listed name nothing contributes any more** is the more
+	 * dangerous one: it keeps a name permitted, and the next contributor to take that name inherits a
+	 * permission nobody decided was safe.
+	 *
+	 * Neither refuses the session: refusing to run because a contributor was added would be a worse
+	 * failure than the hole. Both are said once, to the human and in the transcript.
+	 *
+	 * The stale half is only asked of a **root** session. A child's surface is narrowed by design, so a
+	 * name's absence there is not evidence that it is gone.
+	 */
+	function checkInventory(key: string, ctx: ExtensionContext): void {
+		const record = sessionRecord(key);
+		if (!record?.mounted) return;
+		const live = new Set([...(record.installed ?? []), ...(record.reaches ?? [])]);
+		const unlisted = [...live].filter((name) => !EXEMPT.has(name)).sort();
+		const stale = roots.has(key) ? [...EXEMPT].filter((name) => !live.has(name)).sort() : [];
+		if (unlisted.length === 0 && stale.length === 0) return;
+		const lines = [
+			...unlisted.map(
+				(name) =>
+					`${name} is contributed in this session and is not on the read-only exemption list, so a read-only cell will refuse it — add it to EXEMPT_HOST_CALLS in pi-readonly-mode if that is safe`,
+			),
+			...stale.map(
+				(name) =>
+					`${name} is on the read-only exemption list and nothing contributes it in this session — remove the line`,
+			),
+		];
+		for (const line of lines) {
+			try {
+				ctx.ui.notify(`readonly-mode: ${line}`, "warning");
+			} catch {
+				/* a notice must never fail a turn */
+			}
+		}
+		try {
+			pi.appendEntry("readonly-mode-inventory", { unlisted, stale });
+		} catch {
+			/* diagnostics only */
+		}
+	}
+
 	function registerForSession(ctx: ExtensionContext): void {
 		const key = sessionKey(ctx);
 		const registered = registerContributor({
@@ -240,6 +291,8 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 			apiVersion: HOST_API_VERSION,
 			session: (input: SessionInput) => {
 				if (input.sessionKey !== key) return {};
+				if (input.isChild) roots.delete(key);
+				else roots.add(key);
 				if (input.handle.apiVersion < GUARD_API_VERSION) {
 					cellLane = "unenforceable";
 					// A contribution is validated all-or-nothing, so an older code mode refuses the guard
@@ -350,11 +403,18 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 
 	// Layer 1's instruction half: ambient, per turn, so it costs nothing to
 	// leave the transcript clean when the mode goes off.
-	pi.on("before_agent_start", async (event) => {
+	pi.on("before_agent_start", async (event, ctx) => {
 		if (!enabled) return undefined;
 		// The cell half only where there is a governed kernel to describe. A plain pi session has no
 		// cell, and telling it about a mount it does not have is how a prompt starts lying.
 		const cell = cellLane === "mounted" ? `\n${READ_ONLY_CELL_PROMPT}` : "";
+		// Once per session, and only while the mode is on: the list matters exactly when it is being
+		// used, and a session that never turns the mode on is not the one paying for a notice.
+		const key = sessionKey(ctx);
+		if (!checked.has(key)) {
+			checked.add(key);
+			checkInventory(key, ctx);
+		}
 		return { systemPrompt: `${event.systemPrompt}\n\n${READ_ONLY_PROMPT}${cell}` };
 	});
 

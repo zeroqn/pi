@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import factory from "../index.ts";
 import { checkReadOnlyCommand } from "../bash-allowlist.ts";
-import { contributors, sessionKey } from "../../host-bridge/src/convention.ts";
+import { contributors, recordSession, sessionKey } from "../../host-bridge/src/convention.ts";
 
 // ---------------------------------------------------------------------------
 // bash-allowlist: the load-bearing part. Every blocked case below is a hole in
@@ -287,7 +287,7 @@ test("injects the read-only prompt only while enabled", async () => {
 	const before = h.handlers.before_agent_start[0];
 	assert.equal(await before({ systemPrompt: "BASE" }), undefined);
 	await toggleOn(h);
-	const result = await before({ systemPrompt: "BASE" });
+	const result = await before({ systemPrompt: "BASE" }, h.ctx);
 	assert.match(result.systemPrompt, /^BASE/);
 	assert.match(result.systemPrompt, /## Read-only mode \(active\)/);
 	assert.match(result.systemPrompt, /cite file paths with line numbers/);
@@ -325,7 +325,7 @@ test("--readonly starts gated, and a resumed session restores the mode", async (
  * `handleApiVersion` is the contract version the mounted code mode reports: 2 knows the `guard`
  * slot, anything lower does not.
  */
-async function cellLane({ flag = false, entries = [], handleApiVersion = 2 } = {}) {
+async function cellLane({ flag = false, entries = [], handleApiVersion = 2, isChild = false } = {}) {
 	const h = load({ flag, entries });
 	await h.handlers.session_start[0]({}, h.ctx);
 	const key = sessionKey(h.ctx);
@@ -334,7 +334,7 @@ async function cellLane({ flag = false, entries = [], handleApiVersion = 2 } = {
 		ctx: h.ctx,
 		sessionKey: key,
 		handle: { apiVersion: handleApiVersion },
-		isChild: false,
+		isChild,
 		cwd: "/workspace",
 		sessionFile: undefined,
 	});
@@ -455,7 +455,7 @@ test("the prompt describes the cell only where there is a governed kernel to des
 	// No kernel: the prompt is the tool-and-shell one, which is all that is true there.
 	const bare = load();
 	await toggleOn(bare);
-	const plain = (await bare.handlers.before_agent_start[0]({ systemPrompt: "BASE" })).systemPrompt;
+	const plain = (await bare.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, bare.ctx)).systemPrompt;
 	assert.match(plain, /## Read-only mode \(active\)/);
 	assert.doesNotMatch(plain, /mounted read-only/);
 
@@ -463,21 +463,81 @@ test("the prompt describes the cell only where there is a governed kernel to des
 	const { h, guard } = await cellLane();
 	assert.ok(guard, "expected the guard to have been contributed");
 	await toggleOn(h);
-	const withCell = (await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" })).systemPrompt;
+	const withCell = (await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx)).systemPrompt;
 	assert.match(withCell, /your Python runs in one kernel whose workspace is mounted read-only/);
 	assert.match(withCell, /raise `PermissionError` there/);
 	assert.match(withCell, /declared exception, not a licence/);
 
 	// Off is off: neither half is injected.
 	await h.commands.readonly.handler("", h.ctx);
-	assert.equal(await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }), undefined);
+	assert.equal(await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx), undefined);
 });
 
 test("a session whose kernel cannot be governed is not told it is", async () => {
 	const { h } = await cellLane({ handleApiVersion: 1 });
 	await toggleOn(h);
-	const prompt = (await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" })).systemPrompt;
+	const prompt = (await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx)).systemPrompt;
 	assert.doesNotMatch(prompt, /mounted read-only/, "the mount half would be a lie here");
 	// The floor is what tells the truth instead: the tool is refused, and the refusal says why.
 	assert.match((await h.handlers.tool_call[0]({ toolName: "python", input: {} })).reason, /cannot be enforced inside a cell/);
+});
+
+test("the inventory check reports both ways the hand-edited list goes wrong", async () => {
+	const { h, key } = await cellLane();
+	// What the seam recorded for this session: rlm's name is listed, one name is new, and the tool
+	// bridge reached a single capability — so four listed capabilities are gone from this surface.
+	recordSession(key, {
+		mounted: true,
+		owners: ["rlm", "pi-tool-bridge"],
+		installed: ["rlm_spawn", "brand_new_thing"],
+		reaches: ["ctx_search"],
+		promptTexts: [],
+		problems: [],
+	});
+	await toggleOn(h);
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+
+	assert.ok(
+		h.notifications.some((n) => /brand_new_thing is contributed/.test(n)),
+		"a live name that is not listed has to be reported",
+	);
+	assert.ok(
+		h.notifications.some((n) => /ctx_expand is on the read-only exemption list/.test(n)),
+		"a listed name nothing contributes has to be reported",
+	);
+	assert.ok(
+		!h.notifications.some((n) => /rlm_spawn is contributed/.test(n)),
+		"a listed live name is not",
+	);
+	assert.equal(h.appended.filter((entry) => entry.type === "readonly-mode-inventory").length, 1);
+
+	// Said once per session: a second turn does not repeat it.
+	const before = h.notifications.length;
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.equal(h.notifications.length, before);
+});
+
+test("a child's narrowed surface is not mistaken for a name that is gone", async () => {
+	const { h, key } = await cellLane({ isChild: true });
+	recordSession(key, {
+		mounted: true,
+		owners: ["rlm"],
+		installed: ["rlm_spawn"],
+		reaches: [],
+		promptTexts: [],
+		problems: [],
+	});
+	await toggleOn(h);
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.equal(h.notifications.filter((n) => /remove the line/.test(n)).length, 0);
+	// The other direction still holds: a child that reaches something unlisted is told.
+	assert.ok(h.notifications.length > 0, "the unlisted half is asked of every session");
+});
+
+test("nothing is said when there is no kernel to be wrong about", async () => {
+	const h = load();
+	await toggleOn(h);
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.equal(h.notifications.filter((n) => /exemption list|remove the line/.test(n)).length, 0);
+	assert.deepEqual(h.appended.filter((entry) => entry.type === "readonly-mode-inventory"), []);
 });
