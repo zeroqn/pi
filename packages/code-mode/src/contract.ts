@@ -124,6 +124,18 @@ export type RegistryEntry = {
 	apiVersion: number;
 	sessions: Map<string, KernelHandle>;
 	mount: (pi: unknown, ctx: unknown) => KernelHandle;
+	/**
+	 * The factory a **spawned child** loads, when its loader can name one.
+	 *
+	 * A spawned child loads no ambient extensions, so without this its runner carries no code-mode
+	 * instance at all: nothing running on the child can reach the kernel its spawner mounted, so no
+	 * `agent_end` and no `session_shutdown` ever fires for it — the kernel is dumped neither at the
+	 * end of a turn nor at its own disposal. The factory is the publisher's **own function object**,
+	 * so the child's instance runs in this module instance and joins the sessions map this entry
+	 * already published. Optional on purpose: an older code mode has none, and a child is then served
+	 * exactly as it was before — mounted through the registry, dumped late.
+	 */
+	childExtension?: () => ((pi: unknown) => void) | undefined;
 };
 
 /** The names code mode's own kernel answers. No contribution may take one. */

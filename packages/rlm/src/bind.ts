@@ -56,6 +56,9 @@ export type CodeModeEntry = {
 	apiVersion: number;
 	sessions: Map<string, CodeModeHandle>;
 	mount: (pi: unknown, ctx: unknown) => CodeModeHandle;
+	/** The factory a spawned child's loader loads, when this entry offers one. Optional, and its
+	 * absence costs the child nothing but its lifecycle (see {@link codeModeChildExtensions}). */
+	childExtension?: () => ((pi: unknown) => void) | undefined;
 };
 
 export type BindResult =
@@ -95,6 +98,31 @@ export function versionProblem(entry: { apiVersion: number }): string | null {
 	if (typeof entry.apiVersion !== "number") return "the entry has no numeric apiVersion";
 	if (entry.apiVersion >= REQUIRED_API_VERSION) return null;
 	return `code mode's contract is version ${entry.apiVersion}, and this build of rlm needs ${REQUIRED_API_VERSION}`;
+}
+
+/**
+ * The extension factories a spawned child's loader is given, or `[]` when code mode is absent, lacks
+ * the member, or throws.
+ *
+ * This is what gives a spawned child a code-mode instance of its own, and with it a **lifecycle**: the
+ * child's runner is the one that emits `agent_end` and `session_shutdown`, so its kernel is dumped at
+ * the end of each of its turns and closed when the child is disposed. Without the instance, nothing
+ * running on the child can reach the kernel its spawner mounted, so it is dumped at neither moment
+ * and only reaped at a later `session_start` in the parent's process.
+ *
+ * The factory is code mode's own function object, handed over at runtime: rlm still does not import
+ * code mode (ADR 0001), it asks the entry it already binds. Best effort, like every other path in
+ * this module — a seam that throws must cost the child its lifecycle, never its session.
+ */
+export function codeModeChildExtensions(): Array<(pi: unknown) => void> {
+	const lookup = findCodeMode();
+	if (lookup.status !== "found" || typeof lookup.entry.childExtension !== "function") return [];
+	try {
+		const factory = lookup.entry.childExtension();
+		return typeof factory === "function" ? [factory] : [];
+	} catch {
+		return [];
+	}
 }
 
 /**

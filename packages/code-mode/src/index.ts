@@ -6,6 +6,10 @@
  * rlm: if rlm is loaded it mounts first (or second — the mounter does not care), contributes,
  * and gets the same handle back. If it is not loaded, this still works and the kernel simply
  * has fewer names in it.
+ *
+ * The entry has a **second shape** — `codeModeChild`, published as `childExtension` — which a spawned
+ * child's loader takes instead of importing this module: the same instance, without the publish, so
+ * the child's own runner carries code mode's per-session handlers.
  */
 import {
 	API_VERSION,
@@ -29,7 +33,31 @@ function noKernelText(problems: string[]): string {
 	return `# the python kernel is not running: ${why}`;
 }
 
-export default function codeMode(pi: any) {
+export default function codeMode(pi: any): void {
+	createInstance(pi, true);
+}
+
+/**
+ * The instance a **spawned child** loads — the other half of `childExtension` on the registry entry.
+ *
+ * A child's loader takes the factory from the published entry rather than importing this module, so
+ * the function object is the publisher's own and the instance it builds runs in the publisher's
+ * module graph (`.scratch/code-mode` ticket 02 §3). It is the same instance code mode always had,
+ * with one difference: it does **not** publish. The entry on the registry is what live consumers
+ * hold, and a child is a joiner — republishing would hand them the child's mounter for no gain.
+ *
+ * What the instance buys is the child's *lifecycle*. Its runner is the one that emits `agent_end`
+ * and `session_shutdown`, so a child's kernel is now dumped at the end of each of its own turns and
+ * closed when the child is disposed, instead of outliving both until a later `session_start` reaps
+ * it; and `startSession` runs for the child, which is what restores a resumed child's background
+ * records. It reaches the kernel through the shared map, because the child's kernel was created by
+ * the *spawner's* instance (`mount` joins rather than creating a second one).
+ */
+export function codeModeChild(pi: any): void {
+	createInstance(pi, false);
+}
+
+function createInstance(pi: any, publishEntry: boolean) {
 	const keys = createSessionKeys();
 	// Read the sessions map off the registry *before* publishing: a `/reload` re-imports this
 	// entry, and the reloaded instance has to join the map the live consumers already hold.
@@ -120,7 +148,18 @@ export default function codeMode(pi: any) {
 		},
 	});
 
-	publish({ publisher: PUBLISHER, apiVersion: API_VERSION, sessions, mount: mounter.mount });
+	// A child instance joins the entry instead of replacing it (see `codeModeChild`): the entry live
+	// consumers hold has to keep pointing at the instance whose handlers serve *their* sessions. A
+	// publisher always publishes — the `/reload` case depends on the fresh mount taking over.
+	if (publishEntry) {
+		publish({
+			publisher: PUBLISHER,
+			apiVersion: API_VERSION,
+			sessions,
+			mount: mounter.mount,
+			childExtension: () => codeModeChild,
+		});
+	}
 
 	/**
 	 * Dump and close every kernel whose session no longer exists.

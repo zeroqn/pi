@@ -43,3 +43,15 @@ session has one kernel whichever extension asks first.
   principle. `session_start` now reaps the kernels of sessions that are provably gone (their ctx has
   been invalidated — liveness, not the absence of a key, because a finished child is still resumable),
   which is the one moment both shapes are certain.
+- **A spawned child gets a code-mode instance of its own, taken from the entry it already reads.** The
+  published entry carries `childExtension` — the publisher's own entry function, bound for child use —
+  and rlm hands it to a spawned child's loader. rlm still does not import code mode: the factory
+  travels at runtime through the same seam it already binds, exactly as RSI's does. The instance is a
+  **joiner** — it publishes nothing, so the entry live consumers hold keeps pointing at the instance
+  whose handlers serve *their* sessions — and the kernel it reaches is the spawner's, through the
+  shared map. What it buys is the child's *lifecycle*: the child's runner is the one that emits
+  `agent_end` and `session_shutdown`, so a child's kernel is dumped at the end of each of its own
+  turns and closed when the child is disposed, and `startSession` reaches a child for the first time
+  (which is what restores a resumed child's background records). Before it, no handler running on a
+  child could reach that kernel at all, so it was dumped at neither moment — the reap above was the
+  only thing that ever closed it.

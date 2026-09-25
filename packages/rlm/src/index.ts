@@ -17,7 +17,7 @@
  *    recorded reason, one line to the model, and everything else still working (ticket 01's
  *    failure table; a throwing factory would kill the whole process — ticket 02 §1).
  */
-import { bindCodeMode, type CodeModeHandle } from "./bind";
+import { bindCodeMode, codeModeChildExtensions, type CodeModeHandle } from "./bind";
 import {
 	type BridgeReport,
 	adoptToolBridge,
@@ -105,6 +105,13 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 					...ownerChildFactories(request),
 					...rsiChildExtensions(),
 					skillBridge,
+					// Loaded **last**, so RLM's own factory has already mounted: the child's code-mode
+					// instance joins that kernel rather than creating a second one, and brings the
+					// lifecycle the child otherwise has none of — `agent_end` (so the kernel is dumped
+					// at the end of every one of the child's turns) and `session_shutdown`. The factory
+					// is handed over by the registry entry at spawn time; code mode is still never
+					// imported (ADR 0001), and an entry without the member contributes nothing.
+					...codeModeChildExtensions(),
 				],
 			// The ceiling's first operand: this session's *live* surface, read at spawn time and never
 			// read back from a record (ticket 01 §1-2). A grandchild reads its own `pi` here, which is

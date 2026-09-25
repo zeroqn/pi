@@ -156,6 +156,60 @@ describe("mounting a second session through the published entry", () => {
 		expect(entry.sessions.has("/sessions/root.jsonl")).toBe(false);
 	});
 
+	it("publishes the child instance, and the child instance does not take the entry over", () => {
+		// A spawned child loads no ambient extensions, so its loader is handed the factory from the
+		// published entry instead of importing this module. What it builds is a code-mode instance on
+		// the child's own runner — the one that emits `agent_end` and `session_shutdown` — and it must
+		// be a *joiner*: the entry live consumers hold has to keep pointing at the instance whose
+		// handlers serve their sessions.
+		const spawner = fakePi();
+		codeMode(spawner as never);
+		const entry = glob[REGISTRY_KEY] as RegistryEntry;
+		const mount = entry.mount;
+		expect(typeof entry.childExtension).toBe("function");
+
+		const child = fakePi();
+		const childInstance = entry.childExtension?.();
+		if (!childInstance) throw new Error("the entry published no child extension");
+		childInstance(child as never);
+
+		expect(glob[REGISTRY_KEY]).toBe(entry);
+		expect((glob[REGISTRY_KEY] as RegistryEntry).mount).toBe(mount);
+		// The lifecycle, and nothing else: these are the events the child's runner emits, and without
+		// an instance on it no `agent_end` and no `session_shutdown` ever reached the child's kernel.
+		expect([...child.handlers.keys()].sort()).toEqual(["agent_end", "session_shutdown", "session_start"]);
+	});
+
+	it("joins the spawner's kernel — one kernel per session, whoever asks first", async () => {
+		const spawner = fakePi();
+		codeMode(spawner as never);
+		const entry = glob[REGISTRY_KEY] as RegistryEntry;
+		const childCtx = ctxFor("/sessions/child.jsonl");
+		// The spawner mounted this child's kernel through the registry (rlm's bind), so the child's own
+		// instance has to find it in the shared map rather than create a second one.
+		const mounted = entry.mount(spawner as never, childCtx);
+		let started = 0;
+		(mounted.kernel as { startSession: () => Promise<string[]> }).startSession = async () => {
+			started += 1;
+			return [];
+		};
+
+		const child = fakePi();
+		const childInstance = entry.childExtension?.();
+		if (!childInstance) throw new Error("the entry published no child extension");
+		childInstance(child as never);
+		await child.emit("session_start", childCtx);
+
+		expect(entry.sessions.get("/sessions/child.jsonl")).toBe(mounted);
+		expect(started).toBe(1);
+		// `create` never ran for the child's instance, so it registers nothing: the tool lives on the
+		// api the spawner's `create` was handed.
+		expect(child.registered).toEqual([]);
+		expect(child.entries.filter((recorded) => recorded.type === "code-mode-mount")).toEqual([
+			{ type: "code-mode-mount", payload: { sessionKey: "/sessions/child.jsonl", mounts: 2 } },
+		]);
+	});
+
 	it("reaps the kernels of sessions that are gone, and only those", async () => {
 		// The child case. RLM disposes a child through the *child's* runner, and the child loads no
 		// code-mode entry, so the kernel its spawner mounted is never told and never closed; the same
