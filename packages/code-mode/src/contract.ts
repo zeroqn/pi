@@ -27,8 +27,13 @@ export const REGISTRY_KEY = Symbol.for("pi-code-mode:registry");
 export const PUBLISHER = "pi-code-mode";
 /** An integer, bumped on any breaking change to this file's surface. pi has no version
  * query of its own, so this field is the only way a consumer can tell an old code mode
- * from an absent one (02 §5). */
-export const API_VERSION = 1;
+ * from an absent one (02 §5).
+ *
+ * A *supplier* reads it too. Code mode validates a contribution all-or-nothing, so an older code
+ * mode refuses a field it does not know **whole** — which makes a slot a package must be obeyed
+ * through unsafe to contribute blind. **2 added {@link Guard}**: a package that has to be obeyed
+ * rather than merely offered reads `handle.apiVersion` first and fails closed below 2. */
+export const API_VERSION = 2;
 
 export type HostFn = (...args: unknown[]) => Promise<unknown>;
 
@@ -54,6 +59,43 @@ export type OwnSession = {
 	firstIndex?: number;
 };
 
+/** The cwd mount's mode. `read-only` is monty's own (`[Errno 30]` on a write); `read-write` is
+ * what a session gets with no guard. */
+export type MountMode = "read-only" | "read-write";
+
+/** One host call, as the kernel is about to make it. */
+export type HostCall = {
+	/** The name the kernel resolved: `bash_host`, `find`, `tool`, `web_search`, … */
+	name: string;
+	/** What the cell passed, positionally, with a trailing kwargs object kept as the callee's
+	 * `bind` reads it — deliberately unnormalized, so the guard sees what the callee will see. */
+	args: unknown[];
+};
+
+/** What a guard answers for one call. Anything but an explicit refusal means "run it". */
+export type GuardVerdict = { allow: false; reason: string } | { allow: true } | undefined;
+
+/**
+ * The session's policy, as its owner states it — read-only mode is the one that exists.
+ *
+ * **One owner only**, like `onNotice`/`provenance`: a second declarer is refused whole. Both halves
+ * are optional, and a call is only refused by an explicit `{allow: false}`, so this slot decides
+ * rather than observes: watching a call is the journal's job, not a guard's.
+ */
+export type Guard = {
+	/**
+	 * Asked before **every** host call a cell can make — code mode's own base functions and every
+	 * contributor's. `{allow: false}` stops the call and raises the refusal in the sandbox; the call
+	 * is still recorded by the journal, so a replay raises the same exception instead of running it.
+	 */
+	before?: (call: HostCall) => GuardVerdict | Promise<GuardVerdict>;
+	/**
+	 * The mode this session's cwd mount gets. Asked at kernel start and again for every feed, so an
+	 * answer that changes mid-session takes effect at the next cell. `undefined` means `read-write`.
+	 */
+	mountMode?: () => MountMode | undefined;
+};
+
 export type Contribution = {
 	owner: string;
 	hostFns?: Record<string, HostFn>;
@@ -75,6 +117,8 @@ export type Contribution = {
 	onNotice?: (notice: Notice) => void;
 	/** Which journals this session replays, and what to seed its scratch from. One owner only. */
 	provenance?: (ctx: unknown, own: OwnSession) => Provenance;
+	/** Whether a host call may run, and which mode the cwd mount gets. One owner only. */
+	guard?: Guard;
 };
 
 export type Rejection = { name: string; reason: string };
@@ -160,6 +204,7 @@ const CONTRIBUTION_FIELDS = [
 	"guidelines",
 	"onNotice",
 	"provenance",
+	"guard",
 ];
 
 /** The static half of what the model and the kernel see. The *prelude's* base is not here:
@@ -400,6 +445,17 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 				const value = contribution[field as "onNotice" | "provenance"];
 				if (value !== undefined && typeof value !== "function") rejected.push({ name: field, reason: "not a function" });
 			}
+			if (contribution.guard !== undefined) {
+				const guard = contribution.guard;
+				if (typeof guard !== "object" || guard === null || Array.isArray(guard))
+					rejected.push({ name: "guard", reason: "not an object" });
+				else
+					for (const field of ["before", "mountMode"] as const) {
+						const value = guard[field];
+						if (value !== undefined && typeof value !== "function")
+							rejected.push({ name: `guard.${field}`, reason: "not a function" });
+					}
+			}
 			// Names other owners already hold: an owner may replace its own, never steal.
 			const taken = new Map<string, string>();
 			for (const [otherOwner, other] of accepted) {
@@ -416,7 +472,7 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 			// shape: a second declarer is **refused** rather than silently ignored, which is what a
 			// slot dispatched first-owner-wins would otherwise do. An owner may still replace its own,
 			// which is what keeps a second `session_start` free.
-			for (const field of ["onNotice", "provenance"] as const) {
+			for (const field of ["onNotice", "provenance", "guard"] as const) {
 				if (contribution[field] === undefined) continue;
 				for (const [otherOwner, other] of accepted) {
 					if (otherOwner === owner) continue;
@@ -459,6 +515,13 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 			for (const contribution of accepted.values()) lines.push(...(contribution.guidelines ?? []));
 			return lines;
 		},
+		/** The session's policy, from its one declarer. */
+		guard(): Guard | undefined {
+			for (const contribution of accepted.values()) {
+				if (contribution.guard) return contribution.guard;
+			}
+			return undefined;
+		},
 		/** How a kernel with no rlm reaches the model. */
 		notify(notice: Notice): boolean {
 			for (const contribution of accepted.values()) {
@@ -479,3 +542,18 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 }
 
 export type Ledger = ReturnType<typeof createLedger>;
+
+/**
+ * The exception a guard's refusal becomes in the sandbox.
+ *
+ * `PermissionError` on purpose, and it is the **name** that does the work rather than the type:
+ * monty maps a thrown JS error onto a Python exception by `.name` when that name is a known Python
+ * exception (`@pydantic/monty` `dist/session.js`, `jsErrorParts`), and `PermissionError` is on that
+ * list — the same exception the read-only mount itself raises (`[Errno 30]` is one). The journal
+ * records the name, so a replay raises the same exception rather than a `RuntimeError`.
+ */
+export function refusal(reason: string): Error {
+	const error = new Error(reason);
+	error.name = "PermissionError";
+	return error;
+}

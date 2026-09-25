@@ -422,7 +422,11 @@ describe("the contract's violations are caught (acceptance check 10)", () => {
 	});
 
 	it("(d) apiVersion 0 is reported as too old, with both numbers", () => {
-		expect(versionProblem({ apiVersion: 0 })).toContain("needs 1");
+		// Both numbers, derived rather than spelled: the build's own version is a decision
+		// (`API_VERSION`), and the check is that the reader says which one it needs.
+		expect(versionProblem({ apiVersion: 0 })).toBe(
+			`code mode's contract is version 0, and this build needs ${API_VERSION}`,
+		);
 	});
 
 	it("(e) an entry with no sessions map is not usable", () => {

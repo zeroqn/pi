@@ -1,14 +1,21 @@
 /** The host functions the sandbox reaches the host with: `bash_host`, `find`, `grep`,
  * `read_image` — plus whatever the contribution ledger merged in (`extra`).
  *
- * The base functions are code mode's (ticket 03); the delegation and background names are
- * contributed, and `bash_host` is the one base function that calls out to a contribution
- * (the observer hook, C1).
+ * The base functions are code mode's (ticket 03) and the background names are its own as well;
+ * everything else is contributed. **Both halves pass the session's guard** before they run
+ * (`readonly-guard` ticket 02): the guard's question is "may this call run", not "is this call
+ * yours", so a policy that has to hold for a session cannot be routed around by contributing a
+ * name of one's own.
+ *
+ * (There used to be an `onHostCall` observer here, invoked from `bash_host` alone. It was deleted
+ * for having no claimant — see `../rsi-oneway` ticket 09 — and a *guard* is not its return: that
+ * was a notification with no veto, and this is a decision that runs before the call.)
  */
 import { readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { run, spill, truncate } from "./output";
 import { bool, num, str } from "./util";
+import { refusal, type Guard } from "./contract";
 import type { createBackgroundManager } from "./background";
 import type { HostFns } from "./journal";
 
@@ -64,6 +71,32 @@ export function bind(args: unknown[], names: string[]): Record<string, unknown> 
 	return out;
 }
 
+/**
+ * The guard's gate: the same surface, with every call offered to the session's policy first.
+ *
+ * A refusal throws **before** the callee runs, and the wrapper carries the name of the function it
+ * wraps — monty identifies a host function by its JS `.name` (`recordingHost`'s note; a wrapper
+ * named `<anonymous>` binds as nothing and every later call through the binding raises `NameError`).
+ *
+ * With no `before` the surface is returned **unchanged**, not copied: a session with no guard has
+ * to behave exactly as it did before this existed.
+ */
+export function guarded(host: HostFns, guard?: Guard): HostFns {
+	const before = guard?.before;
+	if (!before) return host;
+	const wrapped: HostFns = {};
+	for (const [name, fn] of Object.entries(host)) {
+		const wrapper = async (...args: unknown[]) => {
+			const verdict = await before({ name, args });
+			if (verdict && verdict.allow === false) throw refusal(verdict.reason);
+			return fn(...args);
+		};
+		Object.defineProperty(wrapper, "name", { value: name });
+		wrapped[name] = wrapper;
+	}
+	return wrapped;
+}
+
 export function makeHost(options: {
 	root: string;
 	attachments: Attachment[];
@@ -71,9 +104,11 @@ export function makeHost(options: {
 	/** Code mode's own host functions and every accepted contribution, merged. */
 	extra: HostFns;
 	background: ReturnType<typeof createBackgroundManager>;
+	/** The session's policy, when its owner declared one (readonly-guard ticket 02). */
+	guard?: Guard;
 }): HostFns {
-	const { root, attachments, progress, extra, background: backgroundManager } = options;
-	return {
+	const { root, attachments, progress, extra, background: backgroundManager, guard } = options;
+	const base: HostFns = {
 		async bash_host(...args: unknown[]) {
 			const { command, timeout, background } = bind(args, ["command", "timeout", "background"]);
 			if (background === true) {
@@ -147,7 +182,7 @@ export function makeHost(options: {
 			return { path: absolute, attached: true, bytes: buffer.length, mime_type: mimeType };
 		},
 
-		// Injected last so the contributed surface (ticket 01) always wins.
-		...extra,
 	};
+	// Contributed names win over base ones (ticket 01), and both halves are gated before they run.
+	return { ...guarded(base, guard), ...guarded(extra, guard) };
 }

@@ -789,6 +789,7 @@ export function createKernel(options: {
 					progress,
 					extra: { ...backgroundHostFns(), ...ledger.hostFns() },
 					background,
+					guard: ledger.guard(),
 				});
 				const feedOptions = {
 					mount: [mount, scratchMount],
