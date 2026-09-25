@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHost } from "../host";
@@ -241,6 +241,8 @@ describe("the kernel route's fence (web-access's own output)", () => {
 		expect(result.title.startsWith(OPEN_MARKER)).toBe(true);
 		expect(result.chars).toBeGreaterThan(0);
 		expect(result.path.endsWith(".md")).toBe(true);
+		// The spill file itself is fenced: the model reads it with read_text/grep, not the envelope.
+		expect(readFileSync(result.path, "utf8").startsWith(OPEN_MARKER)).toBe(true);
 	});
 
 	it("leaves a raw fetch envelope alone (its bytes carry no text field)", async () => {

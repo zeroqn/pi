@@ -37,7 +37,7 @@ import {
 import { rsiBindChild, rsiChildExtensions, rsiStatus } from "./rsi-seam";
 import skillBridge from "../../skill-bridge/src/index";
 import { errorText, str } from "./util";
-import { resolveWebHook } from "./web-hook";
+import { resolveWebHook, webSystemPrompt, webSystemPromptTail } from "./web-hook";
 
 const MAX_DEPTH = 2;
 const MAX_LIVE_CHILDREN = 8;
@@ -48,6 +48,8 @@ const MAX_LIVE_CHILDREN = 8;
  * a running session.
  */
 const webHook = await resolveWebHook();
+/** The hook's system-prompt rule, if the module carries one. Empty for an absent or older hook. */
+const webRule = webSystemPrompt(webHook);
 
 export default function (pi: any) {
 	return createRlm(pi, null);
@@ -73,6 +75,8 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	let toldModel = false;
 	let webReason: string | null = null;
 	let webNotified = false;
+	/** True once this session's kernel got the web host functions (so the rule is not a promise). */
+	let webContributed = false;
 	const notices: Notice[] = [];
 	let parentBusy = false;
 
@@ -170,20 +174,39 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	}
 
 	/**
-	 * One line saying code mode is unavailable, once, when there is no kernel at all. The skills
-	 * block is RSI's own now, so this handler renders nothing else.
+	 * Two things appended to the turn's system prompt: the one-line "code mode is unavailable"
+	 * notice (once, when there is no kernel at all), and the web hook's untrusted-content rule
+	 * (whenever this session's kernel got the web host functions — the route a spawned child has,
+	 * since a child loads no ambient extensions). The skills block is RSI's own handler now.
 	 *
 	 * It **appends to `event.systemPrompt`** rather than replacing it, and that is the invariant the
 	 * two extensions depend on: `before_agent_start` handlers chain, each seeing the previous one's
-	 * result, so rlm's line (load order 2) and RSI's block (load order 3) both survive. A handler
+	 * result, so rlm's text (load order 2) and RSI's block (load order 3) both survive. A handler
 	 * that returned a bare string would silently drop the other's text.
 	 */
 	pi.on("before_agent_start", async (event: any) => {
 		try {
-			if (!inertReason || toldModel) return undefined;
-			toldModel = true;
-			const line = `\n\n## Code mode is unavailable\n${inertReason}\nThere is no \`python\` tool in this session.\n`;
-			return { systemPrompt: `${event.systemPrompt}${line}` };
+			let prompt: string = event.systemPrompt;
+			let changed = false;
+			if (inertReason && !toldModel) {
+				toldModel = true;
+				prompt += `\n\n## Code mode is unavailable\n${inertReason}\nThere is no \`python\` tool in this session.\n`;
+				changed = true;
+			}
+			// The web hook's untrusted-content rule, appended whenever this session's kernel got the
+			// web host functions. It is appended here and not only by web-access's own entry because a
+			// **spawned child loads no ambient extensions**: this handler is the only one that runs
+			// for a child, and a cell that can fetch a page must have the rule. The `includes` check
+			// keeps a root session — where web-access's entry appends the same text later in load
+			// order — from carrying it twice.
+			if (webContributed) {
+				const tail = webSystemPromptTail(webRule, prompt);
+				if (tail) {
+					prompt += tail;
+					changed = true;
+				}
+			}
+			return changed ? { systemPrompt: prompt } : undefined;
 		} catch {
 			// A prompt we cannot build must never take a turn down.
 			return undefined;
@@ -267,7 +290,10 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 					// because the cell's `onUpdate` is code mode's to know.
 					progress: (text) => handle.progress()?.(text),
 				});
-				if (web.contribution) contributions.push(web.contribution);
+				if (web.contribution) {
+					contributions.push(web.contribution);
+					webContributed = true;
+				}
 				if (web.reason) webReason = web.reason;
 				return contributions;
 			},

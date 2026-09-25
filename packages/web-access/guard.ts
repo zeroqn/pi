@@ -49,13 +49,28 @@ export const SYSTEM_PROMPT_SECTION = [
 /**
  * Fence one text value: the opening marker, the preamble, the value, the closing marker.
  *
- * Idempotent, because a value can pass through the guard twice (a re-entrant handler, or a cell that
- * prints an already-fenced envelope): a value already carrying the marker is returned unchanged
- * rather than double-wrapped.
+ * **Always wraps**, even when the value already contains the marker. A content check for
+ * idempotency is also a bypass: the value comes from the network, and a page carrying
+ * `<untrusted_web_content>` would be handed through *unfenced*, with a marker it forged itself.
+ * Re-entry is instead handled where it can actually happen — `installGuard`'s `tool_result`
+ * handler recognises its own exact wrapper, not any occurrence of the marker.
  */
 export function fenceText(text: string): string {
-	if (text.includes(OPEN_MARKER)) return text;
 	return `${OPEN_MARKER}${PREAMBLE}\n${text}\n${CLOSE_MARKER}`;
+}
+
+/**
+ * Append the rule to a system prompt unless it already carries it.
+ *
+ * One text, two appenders: this package's extension entry (a session that has it installed) and
+ * rlm's hook handler (a session whose web host functions came through `RLM_WEB_MODULE`, including a
+ * spawned child, which loads no ambient extensions). `before_agent_start` handlers chain in load
+ * order, so whichever runs first appends and the other sees the text and leaves it alone.
+ */
+export function withGuardSection(systemPrompt: string): string {
+	return systemPrompt.includes(SYSTEM_PROMPT_SECTION)
+		? systemPrompt
+		: `${systemPrompt}\n\n${SYSTEM_PROMPT_SECTION}`;
 }
 
 type TextPart = { type: "text"; text: string };
@@ -78,7 +93,7 @@ export function installGuard(pi: GuardPi): void {
 	// Layer 1: the system-prompt rule, rebuilt fresh each run (the runner starts from the base prompt
 	// every run, so this never accumulates).
 	pi.on("before_agent_start", async (event) => ({
-		systemPrompt: `${event.systemPrompt}\n\n${SYSTEM_PROMPT_SECTION}`,
+		systemPrompt: withGuardSection(event.systemPrompt),
 	}));
 
 	// Layer 2: fence guarded pi-tool results. Returns a partial patch; details, isError and usage
@@ -86,9 +101,10 @@ export function installGuard(pi: GuardPi): void {
 	// themselves attacker-influenced text, so there is no isError special-case.
 	pi.on("tool_result", async (event) => {
 		if (!GUARDED_TOOLS.has(event.toolName)) return;
-		// Idempotency: skip if already wrapped (chained handlers, re-entry).
-		const firstText = event.content.find((item) => item.type === "text") as TextPart | undefined;
-		if (firstText && firstText.text.includes(OPEN_MARKER)) return;
+		// Idempotency: skip only if the result already *starts with our exact wrapper*. Testing for
+		// the marker anywhere would let a page that contains it skip the fence altogether.
+		const first = event.content[0] as TextPart | undefined;
+		if (first && first.type === "text" && first.text === `${PREAMBLE}\n${OPEN_MARKER}`) return;
 		return {
 			content: [
 				{ type: "text", text: `${PREAMBLE}\n${OPEN_MARKER}` },

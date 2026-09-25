@@ -72,7 +72,11 @@ One `contribute()` call, at `session_start`, before the first cell:
 - **The web hook's wiring**: `RLM_WEB_MODULE` is resolved once at load, so nothing is promised that
   cannot be called, and instantiated per kernel — a child's fetches spill into the child's own
   scratch — then contributed as `web-access`'s host functions and sentences. rlm does not import
-  web-access and never learns what the functions do.
+  web-access and never learns what the functions do. The module may also export a
+  `WEB_SYSTEM_PROMPT`, which rlm appends to a session's prompt whenever that session's kernel got
+  the web functions; that is how a **spawned child** (which loads no ambient extensions) gets the
+  untrusted-content rule, deduped against the extension entry that appends the same text in a root
+  session.
 
 ## Tests
 

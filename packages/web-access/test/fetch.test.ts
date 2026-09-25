@@ -3,12 +3,20 @@ import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fetchContent, spillPath } from "../fetch";
+import { CLOSE_MARKER, fenceText, OPEN_MARKER, PREAMBLE } from "../guard";
 
 const PUBLIC = "93.184.216.34";
 const guard = { allowRanges: [] as string[], domainPolicy: { allow: [] as string[], deny: [] as string[] }, lookup: async () => [PUBLIC] };
 
 function scratch(): string {
 	return mkdtempSync(join(tmpdir(), "pi-web-access-fetch-"));
+}
+
+/** Strip the fence a spilled text file carries, so a page-text comparison is still readable. */
+function plain(text: string): string {
+	const prefix = `${OPEN_MARKER}${PREAMBLE}\n`;
+	const suffix = `\n${CLOSE_MARKER}`;
+	return text.startsWith(prefix) && text.endsWith(suffix) ? text.slice(prefix.length, -suffix.length) : text;
 }
 
 function respond(body: string | Uint8Array, contentType: string, status = 200) {
@@ -37,12 +45,15 @@ describe("fetch_content, markdown mode (tickets 04 and 05)", () => {
 		expect(result.path.endsWith(".md")).toBe(true);
 		const spilled = readFileSync(result.path, "utf8");
 		if (!("chars" in result)) throw new Error("expected a markdown envelope");
-		expect(result.chars).toBe(spilled.length);
+		// The file is fenced, and `chars`/`head` still describe the *page text*, not the wrapper.
+		expect(spilled.startsWith(`${OPEN_MARKER}${PREAMBLE}`)).toBe(true);
+		expect(spilled.endsWith(CLOSE_MARKER)).toBe(true);
+		expect(result.chars).toBe(plain(spilled).length);
 		expect(spilled).toContain("sandboxed Python subset written in Rust");
 		expect(spilled).toContain("second paragraph");
 		expect(spilled).not.toContain("Cookie policy");
 		expect(spilled).not.toContain("All rights reserved");
-		expect(result.head).toBe(spilled.slice(0, 2000));
+		expect(result.head).toBe(plain(spilled).slice(0, 2000));
 		expect(result.head.length).toBeLessThanOrEqual(2000);
 	});
 
@@ -56,7 +67,7 @@ describe("fetch_content, markdown mode (tickets 04 and 05)", () => {
 		expect(other.path).not.toBe(first.path);
 	});
 
-	it("passes text-ish bodies through untouched, with the type's extension", async () => {
+	it("passes text-ish bodies through, fenced on disk, with the type's extension", async () => {
 		const dir = scratch();
 		const text = await fetchContent("http://example.com/a.txt", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: respond("plain body", "text/plain; charset=utf-8").impl });
 		expect(text.path.endsWith(".txt")).toBe(true);
@@ -64,6 +75,7 @@ describe("fetch_content, markdown mode (tickets 04 and 05)", () => {
 		expect(text.chars).toBe(10);
 		expect(text.head).toBe("plain body");
 		expect(text.title).toBe("");
+		expect(readFileSync(text.path, "utf8")).toBe(fenceText("plain body"));
 
 		const json = await fetchContent("http://example.com/a.json", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: respond('{"a":1}', "application/json").impl });
 		expect(json.path.endsWith(".json")).toBe(true);
@@ -88,6 +100,9 @@ describe("fetch_content, markdown mode (tickets 04 and 05)", () => {
 		// contract is built on (ticket 05): chars 0, a note, and the raw HTML on disk.
 		expect(result.chars).toBe(0);
 		expect(result.note).toMatch(/no readable content/);
+		// A text-ish raw fallback is fenced too: the HTML is page text a cell may read.
+		expect(result.note).toMatch(/fenced/);
+		expect(readFileSync(result.path, "utf8").startsWith(OPEN_MARKER)).toBe(true);
 		expect(readFileSync(result.path, "utf8")).toContain("window.boot()");
 	});
 

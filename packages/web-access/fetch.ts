@@ -9,6 +9,10 @@
  *
  * Unsupported content types raise `ValueError` in **both** modes: scope decides what is
  * acceptable, mode decides how it is delivered.
+ *
+ * **Every text spilled to disk is fenced** (`fenceText`): the model reads these files with
+ * `read_text`/`grep`, so the file itself must say the content is untrusted, not only the envelope
+ * that points at it. Byte spills (raw mode, a PDF with no text, an empty body) stay bytes.
  */
 
 import { createHash } from "node:crypto";
@@ -20,6 +24,7 @@ import TurndownService from "turndown";
 import { extractText, getDocumentProxy } from "unpdf";
 import { webError } from "./errors";
 import { fetchGuarded, type GuardOptions } from "./ssrf";
+import { fenceText } from "./guard";
 
 export const HEAD_CHARS = 2000;
 
@@ -132,7 +137,7 @@ export async function fetchContent(url: string, options: FetchOptions): Promise<
 		}
 		if (!text) return spillRawBody(buffer, finalUrl, contentType, "the PDF yielded no text", options);
 		const path = spillPath(options.scratchDir, finalUrl, "txt");
-		writeFileSync(path, text);
+		writeFileSync(path, fenceText(text));
 		options.progress?.(`fetch_content: ${text.length} chars of PDF text to ${path}`);
 		return { url: finalUrl, title: "", path, chars: text.length, head: text.slice(0, HEAD_CHARS) };
 	}
@@ -141,7 +146,7 @@ export async function fetchContent(url: string, options: FetchOptions): Promise<
 	if (!isHtml(contentType)) {
 		if (!body.trim()) return spillRawBody(buffer, finalUrl, contentType, "the response was empty", options);
 		const path = spillPath(options.scratchDir, finalUrl, extensionFor(contentType));
-		writeFileSync(path, body);
+		writeFileSync(path, fenceText(body));
 		options.progress?.(`fetch_content: ${body.length} chars (${contentType}) to ${path}`);
 		return { url: finalUrl, title: "", path, chars: body.length, head: body.slice(0, HEAD_CHARS) };
 	}
@@ -151,7 +156,7 @@ export async function fetchContent(url: string, options: FetchOptions): Promise<
 		return spillRawBody(buffer, finalUrl, contentType, "no readable content", options);
 	}
 	const path = spillPath(options.scratchDir, finalUrl, "md");
-	writeFileSync(path, extracted.markdown);
+	writeFileSync(path, fenceText(extracted.markdown));
 	options.progress?.(`fetch_content: ${extracted.markdown.length} chars of markdown to ${path}`);
 	return {
 		url: finalUrl,
@@ -166,7 +171,11 @@ export async function fetchContent(url: string, options: FetchOptions): Promise<
  *  silently empty page (ticket 05). */
 function spillRawBody(buffer: Uint8Array, url: string, contentType: string, why: string, options: FetchOptions): MarkdownEnvelope {
 	const path = spillPath(options.scratchDir, url, extensionFor(contentType));
-	writeFileSync(path, buffer);
+	// A text-ish raw body is still page text a cell may read, so it is fenced. A binary body (a PDF
+	// with no extractable text) cannot be, and the note says what the file holds.
+	const text = isTextish(contentType) || isHtml(contentType) ? decodeBody(buffer, contentType) : "";
+	const textish = text.trim().length > 0;
+	writeFileSync(path, textish ? fenceText(text) : buffer);
 	options.progress?.(`fetch_content: ${why}; the raw response is at ${path}`);
 	return {
 		url,
@@ -174,7 +183,7 @@ function spillRawBody(buffer: Uint8Array, url: string, contentType: string, why:
 		path,
 		chars: 0,
 		head: "",
-		note: `${why}; the file holds the raw response (${contentType}, ${buffer.length} bytes)`,
+		note: `${why}; the file holds the raw response (${contentType}, ${buffer.length} bytes)${textish ? ", fenced" : ""}`,
 	};
 }
 

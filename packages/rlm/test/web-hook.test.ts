@@ -7,6 +7,8 @@ import {
 	resolveWebHook,
 	webDescriptionSuffix,
 	webPromptGuidelines,
+	webSystemPrompt,
+	webSystemPromptTail,
 } from "../src/web-hook";
 
 /**
@@ -47,6 +49,22 @@ describe("resolving the hook at load time (ticket 03)", () => {
 		expect(webDescriptionSuffix(plan)).toContain("web_search");
 		expect(webDescriptionSuffix(plan)).toContain("fetch_content");
 		expect(webPromptGuidelines(plan).length).toBe(2);
+	});
+
+	it("reads the module's optional system-prompt rule, and has none when it is omitted", async () => {
+		const rule = "## Untrusted External Content\n\nrule text";
+		const withRule = await resolveWebHook({
+			RLM_WEB_MODULE: moduleFile(`${GOOD}\nexport const WEB_SYSTEM_PROMPT = ${JSON.stringify(rule)};\n`),
+		});
+		expect(webSystemPrompt(withRule)).toBe(rule);
+		expect(webSystemPrompt(await resolveWebHook({ RLM_WEB_MODULE: moduleFile(GOOD) }))).toBe("");
+		expect(webSystemPrompt({ status: "none" })).toBe("");
+	});
+
+	it("appends the rule to a prompt that lacks it, and not to one that already has it", () => {
+		expect(webSystemPromptTail("RULE", "base")).toBe("\n\nRULE");
+		expect(webSystemPromptTail("RULE", "base\n\nRULE")).toBe("");
+		expect(webSystemPromptTail("", "base")).toBe("");
 	});
 
 	it("reports a module that throws on import, and promises nothing", async () => {

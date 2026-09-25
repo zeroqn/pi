@@ -27,12 +27,22 @@ import { fetchContent, type FetchEnvelope, type FetchMode } from "./fetch";
 import { searchAnySearch } from "./providers/anysearch";
 import { searchDuckDuckGo } from "./providers/duckduckgo";
 import type { SearchResult } from "./providers/types";
-import { fenceText, installGuard, type GuardPi } from "./guard";
+import { fenceText, installGuard, SYSTEM_PROMPT_SECTION, type GuardPi } from "./guard";
 
 export const SEARCH_TIMEOUT_MS = 30_000;
 export const FETCH_TIMEOUT_MS = 60_000;
 export const DEFAULT_NUM_RESULTS = 5;
 export const MAX_NUM_RESULTS = 20;
+
+/**
+ * The hook's system-prompt rule, under the name rlm looks for.
+ *
+ * A spawned child loads no ambient extensions, so this package's extension entry never runs there;
+ * rlm contributes the host functions to the child's kernel, and reads this export so the child's
+ * prompt carries the same rule. Optional by design — an older module without it contributes the
+ * functions and no rule, exactly as before.
+ */
+export const WEB_SYSTEM_PROMPT = SYSTEM_PROMPT_SECTION;
 
 export type HostContext = {
 	cwd: string;
@@ -150,8 +160,8 @@ function fenceSearchEnvelope(envelope: SearchEnvelope): SearchEnvelope {
 }
 
 /** Fence the free-text fields of a fetch envelope: the raw envelope has none (the bytes are on
- *  disk), the markdown one has `title` and `head`. The spilled file itself is left unfenced — a
- *  cell that reads it gets raw text and must treat it as untrusted on the same rule. */
+ *  disk), the markdown one has `title` and `head`. The spilled *file* is fenced by `fetchContent`
+ *  itself, so a cell that reads or greps it sees the markers too. */
 function fenceFetchEnvelope(envelope: FetchEnvelope): FetchEnvelope {
 	if (!("head" in envelope)) return envelope;
 	return { ...envelope, title: fenceText(envelope.title), head: fenceText(envelope.head) };

@@ -1,9 +1,11 @@
 /**
  * The web host-function hook — map ticket 03.
  *
- * rlm owns the wire: the two names, the descriptor text, the journal entries and the
- * failure surface. A module named by `RLM_WEB_MODULE` owns the implementations, and is
- * asked for them once per kernel with that kernel's context.
+ * rlm owns the wire: the two names, the descriptor text, the journal entries, the failure
+ * surface and the optional system-prompt rule. A module named by `RLM_WEB_MODULE` owns the
+ * implementations, and is asked for them once per kernel with that kernel's context. The rule is
+ * read from the module (not written here) because the module's extension entry never loads in a
+ * spawned child while its host functions are contributed there — see `WEB_SYSTEM_PROMPT`.
  *
  * Two moments, deliberately separate:
  *
@@ -31,7 +33,7 @@ export type WebFactory = (ctx: WebContext) => unknown;
 
 export type WebPlan =
 	| { status: "none" }
-	| { status: "loaded"; module: string; factory: WebFactory }
+	| { status: "loaded"; module: string; factory: WebFactory; systemPrompt?: string }
 	| { status: "error"; module: string; reason: string };
 
 export type WebInstantiation =
@@ -69,7 +71,20 @@ export async function resolveWebHook(env: NodeJS.ProcessEnv = process.env): Prom
 	if (typeof factory !== "function") {
 		return { status: "error", module: resolved, reason: "module does not export createHost()" };
 	}
-	return { status: "loaded", module: resolved, factory: factory as WebFactory };
+	// Optional system-prompt rule. It has to come from the module because the module's *extension
+	// entry* never loads in a spawned child, while its host functions are contributed there — so
+	// reading it here is the only way a child's prompt learns what the fences around its web
+	// content mean. An older module without it is still a valid hook.
+	const systemPrompt =
+		isRecord(imported) && typeof imported.WEB_SYSTEM_PROMPT === "string"
+			? imported.WEB_SYSTEM_PROMPT
+			: undefined;
+	return {
+		status: "loaded",
+		module: resolved,
+		factory: factory as WebFactory,
+		...(systemPrompt ? { systemPrompt } : {}),
+	};
 }
 
 /**
@@ -123,4 +138,22 @@ export function webDescriptionSuffix(plan: WebPlan): string {
 /** Same rule for the guidelines: nothing is promised that cannot be called. */
 export function webPromptGuidelines(plan: WebPlan): string[] {
 	return plan.status === "loaded" ? [...WEB_GUIDELINES] : [];
+}
+
+/** The module's system-prompt rule, or "" when there is none (hook absent, or an older module). */
+export function webSystemPrompt(plan: WebPlan): string {
+	return plan.status === "loaded" ? (plan.systemPrompt ?? "") : "";
+}
+
+/**
+ * `\n\n<rule>` for a prompt that does not carry it yet; `""` when there is no rule or the prompt
+ * already has it.
+ *
+ * There are two appenders and they chain: web-access's own extension entry (a session where the
+ * package is installed) and rlm's `before_agent_start` handler (any session whose web functions came
+ * through this hook — including a spawned child, which loads no ambient extensions). They append the
+ * *same* text, so whichever runs first wins and the other recognises it.
+ */
+export function webSystemPromptTail(rule: string, prompt: string): string {
+	return rule.length > 0 && !prompt.includes(rule) ? `\n\n${rule}` : "";
 }

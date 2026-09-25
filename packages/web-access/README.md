@@ -85,8 +85,14 @@ Two layers, defense in depth, both ported from the former `pi-web-guard`:
    and the pi route — the installed `pi-web-access` tools — is fenced on its `tool_result`.
 
 The markers are a **soft** boundary: a hostile page can emit a closing tag, so they back the rule
-up, never replace it. The spilled markdown file is not fenced — a cell that reads it gets raw text
-and must treat it as untrusted on the same rule.
+up, never replace it. Every text spilled to disk is fenced as well (`fetch.ts` writes the page text
+through `fenceText`), so a cell that reads or greps the file sees the markers; a byte spill (raw
+mode, a PDF with no text, an empty body) is not, and the `note` says what the file holds.
+
+The rule also reaches a **spawned child**. A child loads no ambient extensions, so its cells get the
+web host functions through rlm's `RLM_WEB_MODULE` hook and nothing else; `host.ts` therefore exports
+`WEB_SYSTEM_PROMPT`, which rlm reads and appends in its own `before_agent_start` — deduped against
+this extension's entry, which appends the same text in a root session.
 
 ## The SSRF guard
 
