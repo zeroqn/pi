@@ -155,3 +155,34 @@ _Avoid_: skill tool, skill API
 How a name is *read* — through the provider that claims it, or from the file it names. Distinct from
 the order the block lists entries in, which puts pi's own first.
 _Avoid_: resolution, lookup
+
+## Read-only mode
+
+**Read-only mode**:
+The query-only mode: `/readonly`, `Ctrl+Alt+R` or `--readonly`, persisted in the session and restored on
+a resume. It governs **the workspace** — file tools, shell commands, and a cell's workspace mount — and a
+declared exemption list is the only way an extension's capability reaches a cell while it is on.
+_Avoid_: safe mode, lockdown, sandbox (this is a guardrail against incident, not a sandbox)
+
+**Guard**:
+The single-owner contribution a session's policy answers a kernel through: asked before **every** host
+call, and for the mode the session's workspace mount gets. The guard is the *policy*, not the answer.
+_Avoid_: hook, veto (that is the answer), observer (an observer decides nothing)
+
+**Refusal**:
+A guard's "no" for one call. It is raised **before** the callee runs, as a `PermissionError` — the same
+exception the read-only mount itself raises — and the journal records it, so a replay re-raises it rather
+than running the call.
+_Avoid_: block, denial
+
+**Exemption**:
+One entry in read-only mode's allowlist: an extension's capability permitted while the mode is on, written
+by hand with a reason. **Purely for extensions** — never a model-facing escape, and never something an
+extension grants itself, so that nothing is permitted without a person deciding it.
+_Avoid_: allowlist entry (the list is the allowlist; one line of it is an exemption), whitelist exception
+
+**Per-feed mount**:
+The mount set handed to monty with *each* feed rather than bound to the session — which is what makes a
+mode change land on the next cell with the kernel, its variables and its journal intact, and what makes
+"read-only starts at the next cell" one story for the mount, the shell gate and the live shells alike.
+_Avoid_: dynamic mount, hot mount
