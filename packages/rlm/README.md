@@ -69,7 +69,9 @@ One `contribute()` call, at `session_start`, before the first cell:
 - **The skills block**: pi renders no skills for a session whose active tools are `["python"]`, so
   rlm appends the block itself — the human tier from the event plus the learned store from the RSI
   seam.
-- **The web hook's wiring**: `RLM_WEB_MODULE` is resolved once at load, so nothing is promised that
+- **The web hook is gone** (`.scratch/host-bridge` ticket 07): web-access registers with the host
+  bridge itself, and `web-hook.ts`, `bind.ts` and the `rlm-web` session entries are deleted. What
+  follows is what the wiring *was*: `RLM_WEB_MODULE` was resolved once at load, so nothing was promised that
   cannot be called, and instantiated per kernel — a child's fetches spill into the child's own
   scratch — then contributed as `web-access`'s host functions and sentences. rlm does not import
   web-access and never learns what the functions do. The module may also export a
@@ -89,7 +91,7 @@ bun test        # 59 tests, 0 fail
 `fork-source.test.ts` (which journals a fork replays), `prelude-tail.test.ts` (the contributed
 prelude names routing to host functions, in a real kernel), `rsi-seam.test.ts`,
 `skills-block.test.ts`, `owner-free.test.ts` (which pins that nothing under `src/` names an owner)
-and `web-hook.test.ts`.
+and `web-hook.test.ts` (both deleted with the hook).
 
 ## Run it
 

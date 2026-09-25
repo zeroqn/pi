@@ -15,11 +15,9 @@
  *  - **Provenance.** Which journals this session replays and which scratch to seed from is
  *    rlm's rule (v1 ticket 13), so rlm answers and code mode reads.
  */
+import type { KernelContribution } from "../../host-bridge/src/client";
 import { journalSourceOf } from "./children";
-import type { CodeModeContribution } from "./bind";
 import { PRELUDE_TAIL } from "./prelude-rlm";
-import { instantiateWebHook, webDescriptionSuffix, webPromptGuidelines } from "./web-hook";
-import type { WebPlan } from "./web-hook";
 
 /** The snippet's last words, verbatim: code mode's half stops where these begin. */
 export const SNIPPET_CONNECTOR = " and delegation";
@@ -42,7 +40,7 @@ export function rlmContribution(options: {
 	/** Notices are rlm's machinery; code mode raises them (ticket 03, C2). */
 	onNotice: (notice: { key: string; content: string; customType?: string; cancelled?: () => boolean }) => void;
 	provenance: ProvenanceInputs;
-}): CodeModeContribution {
+}): KernelContribution {
 	return {
 		owner: options.owner ?? "rlm",
 		// The delegation surface, and nothing else. The learned-skill host functions and their
@@ -64,36 +62,6 @@ export function rlmContribution(options: {
 			});
 			if (!source) return { journals: [] };
 			return { journals: source.files, seedScratchFrom: source.seedFrom };
-		},
-	};
-}
-
-/**
- * web-access, as a contribution of its own. rlm resolves the module once at load (so the
- * description can promise exactly what exists) and instantiates it per kernel — a child's
- * fetches spill into the child's own scratch — then hands the functions over, which is the
- * whole of the coupling: nothing is imported between the two extensions.
- */
-export function webAccessContribution(options: {
-	hook: WebPlan;
-	cwd: string;
-	sessionFile?: string;
-	progress: (text: string) => void;
-}): { contribution: CodeModeContribution | null; reason?: string } {
-	const instantiated = instantiateWebHook(options.hook, {
-		cwd: options.cwd,
-		sessionFile: options.sessionFile,
-		progress: options.progress,
-	});
-	// Unset is silent and normal; configured-but-broken is recorded (ticket 03's web rules).
-	if (instantiated.status === "none") return { contribution: null };
-	if (instantiated.status === "error") return { contribution: null, reason: instantiated.reason };
-	return {
-		contribution: {
-			owner: "web-access",
-			hostFns: instantiated.fns as Record<string, (...args: unknown[]) => Promise<unknown>>,
-			description: webDescriptionSuffix(options.hook),
-			guidelines: webPromptGuidelines(options.hook),
 		},
 	};
 }

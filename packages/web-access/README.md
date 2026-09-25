@@ -9,15 +9,14 @@ a closed ticket's decision; the map holds the reasoning and the evidence.
 
 ## What it is (and is not)
 
-- **A kernel hook, not a tool.** rlm imports this module at load time and calls
-  `createHost(ctx)` once per kernel:
-
-  ```bash
-  export RLM_WEB_MODULE=/workspace/pi/extensions/packages/web-access/host.ts
-  ```
-
-  The returned functions join the same host surface as `bash`, `find`, `grep` and
-  `read_image`, so journal recording, name-keyed binding and replay apply to them unchanged.
+- **A contributor to the host bridge, not a tool.** This package registers itself with
+  `pi-host-bridge` at module load — `webAccessRegistration` in `host.ts`, whose `session(input)`
+  answers `createHost({cwd, sessionFile, progress})` plus this package's description, guidelines and
+  the untrusted-content rule. The seam mounts, contributes and records on its behalf, for a root
+  session and for a **spawned child** alike (where no ambient extension loads, which is what the old
+  `RLM_WEB_MODULE` hook existed to work around). The returned functions join the same host surface as
+  `bash`, `find`, `grep` and `read_image`, so journal recording, name-keyed binding and replay apply
+  to them unchanged.
 - **It registers no pi-level tools.** `pi install` loads the file's default export, which
   registers the untrusted-content guard and nothing else — no tool of its own, which is what
   keeps it from colliding with the installed `pi-web-access` (whose `web_search` is the
@@ -89,10 +88,10 @@ up, never replace it. Every text spilled to disk is fenced as well (`fetch.ts` w
 through `fenceText`), so a cell that reads or greps the file sees the markers; a byte spill (raw
 mode, a PDF with no text, an empty body) is not, and the `note` says what the file holds.
 
-The rule also reaches a **spawned child**. A child loads no ambient extensions, so its cells get the
-web host functions through rlm's `RLM_WEB_MODULE` hook and nothing else; `host.ts` therefore exports
-`WEB_SYSTEM_PROMPT`, which rlm reads and appends in its own `before_agent_start` — deduped against
-this extension's entry, which appends the same text in a root session.
+The rule also reaches a **spawned child**, and there is one thing that carries it there: the
+registration above hands `WEB_SYSTEM_PROMPT` to the seam, which appends it once per session, deduped
+by text against this extension's own entry (that entry still appends it in a session where the
+composition did not run — a read/bash session, where the pi-level `web_search` tool is also live).
 
 ## The SSRF guard
 

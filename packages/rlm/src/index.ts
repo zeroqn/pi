@@ -17,29 +17,22 @@
  *    recorded reason, one line to the model, and everything else still working (ticket 01's
  *    failure table; a throwing factory would kill the whole process — ticket 02 §1).
  */
-import { bindCodeMode, type CodeModeHandle } from "./bind";
 import { bindChild, childCeiling, childFactories, childStatus } from "../../host-bridge/src/compose";
-import { type ChildCeiling, setChildDetector } from "../../host-bridge/src/convention";
+import {
+	type ChildCeiling,
+	sessionKey,
+	sessionRecord,
+	setChildDetector,
+} from "../../host-bridge/src/convention";
 import { createChildManager, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./children";
 import type { ChildKernelContext, Notice } from "./children";
-import { rlmContribution, webAccessContribution } from "./contribution";
-import { delegationHostFns } from "./delegation";
+// Imported for its side effect on the seam, and for the session deps this file files with it.
+import { forgetRlmSessionDeps, setRlmSessionDeps } from "./registration";
 import { rsiBindChild, rsiChildExtensions, rsiStatus } from "./rsi-seam";
 import skillBridge from "../../skill-bridge/src/index";
 import { errorText, str } from "./util";
-import { resolveWebHook, webSystemPrompt, webSystemPromptTail } from "./web-hook";
-
 const MAX_DEPTH = 2;
 const MAX_LIVE_CHILDREN = 8;
-
-/**
- * The web hook is resolved once, at load time, so nothing is ever promised that cannot be
- * called. Top-level await is accepted by pi's loader, and the environment cannot change under
- * a running session.
- */
-const webHook = await resolveWebHook();
-/** The hook's system-prompt rule, if the module carries one. Empty for an absent or older hook. */
-const webRule = webSystemPrompt(webHook);
 
 export default function (pi: any) {
 	return createRlm(pi, null);
@@ -59,14 +52,10 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	// so the header is the only signal that survives (v1 ticket 13).
 	let parentSessionFile: string | undefined;
 	let ownDepth = childContext ? childContext.depth : 0;
-	let codeMode: CodeModeHandle | null = null;
-	/** Why there is no kernel in this session, when there is none. */
-	let inertReason: string | null = null;
+	/** Why there is no kernel in this session, when there is none — read from the seam's record. */
 	let toldModel = false;
-	let webReason: string | null = null;
-	let webNotified = false;
-	/** True once this session's kernel got the web host functions (so the rule is not a promise). */
-	let webContributed = false;
+	/** Once per session, so a preflight problem is reported to the human once. */
+	let reportedKernel = false;
 	const notices: Notice[] = [];
 	let parentBusy = false;
 
@@ -174,29 +163,46 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	 * result, so rlm's text (load order 2) and RSI's block (load order 3) both survive. A handler
 	 * that returned a bare string would silently drop the other's text.
 	 */
-	pi.on("before_agent_start", async (event: any) => {
+	/**
+	 * One thing appended to the turn's system prompt: the "code mode is unavailable" notice, once per
+	 * session, read from the composition root's **record** (`.scratch/host-bridge` ticket 06).
+	 *
+	 * rlm no longer mounts, so a mount result is not something it has: the record is written in the
+	 * seam's `session_start` — later in the manifest than this entry, earlier than any turn — and the
+	 * kernel's own preflight problems land there too, which is why the human notice is raised here
+	 * rather than in `session_start`.
+	 *
+	 * It **appends to `event.systemPrompt`** rather than replacing it, and that is the invariant every
+	 * other contributor depends on: `before_agent_start` handlers chain, each seeing the previous one's
+	 * result, so rlm's text (load order 2), the seam's appended prompt text and skill-bridge's block all
+	 * survive. A handler that returned a bare string would silently drop the others' text.
+	 */
+	pi.on("before_agent_start", async (event: any, ctx: any) => {
 		try {
-			let prompt: string = event.systemPrompt;
-			let changed = false;
-			if (inertReason && !toldModel) {
-				toldModel = true;
-				prompt += `\n\n## Code mode is unavailable\n${inertReason}\nThere is no \`python\` tool in this session.\n`;
-				changed = true;
-			}
-			// The web hook's untrusted-content rule, appended whenever this session's kernel got the
-			// web host functions. It is appended here and not only by web-access's own entry because a
-			// **spawned child loads no ambient extensions**: this handler is the only one that runs
-			// for a child, and a cell that can fetch a page must have the rule. The `includes` check
-			// keeps a root session — where web-access's entry appends the same text later in load
-			// order — from carrying it twice.
-			if (webContributed) {
-				const tail = webSystemPromptTail(webRule, prompt);
-				if (tail) {
-					prompt += tail;
-					changed = true;
+			const record = sessionRecord(sessionKey(ctx));
+			if (!record) return undefined;
+			if (record.problems.length > 0 && !reportedKernel) {
+				reportedKernel = true;
+				for (const problem of record.problems) {
+					notifyHuman(ctx, `python kernel: ${problem}`);
+					try {
+						pi.appendEntry("rlm-preflight", { problem });
+					} catch {
+						/* diagnostics must never fail a session */
+					}
 				}
 			}
-			return changed ? { systemPrompt: prompt } : undefined;
+			try {
+				ctx?.ui?.setStatus?.("rlm", record.mounted ? "code-mode (monty)" : "kernel unavailable");
+			} catch {
+				/* no UI in this mode */
+			}
+			if (record.mounted || toldModel) return undefined;
+			toldModel = true;
+			const why = record.problems[0] ?? "the kernel could not be mounted";
+			return {
+				systemPrompt: `${event.systemPrompt}\n\n## Code mode is unavailable\n${why}\nThere is no \`python\` tool in this session.\n`,
+			};
 		} catch {
 			// A prompt we cannot build must never take a turn down.
 			return undefined;
@@ -238,78 +244,30 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			rsiBindChild({ sessionFile: ctx?.sessionManager?.getSessionFile?.() });
 		}
 
-		const problems: string[] = [];
-			const bound = await bindCodeMode({
-			pi,
-			ctx,
-			contributions: (handle) => {
-				const contributions = [
-					rlmContribution({
-						hostFns: delegationHostFns({
-							manager,
-							childContext,
-							ownDepth,
-							sessionFile: () => sessionCtx?.sessionManager?.getSessionFile?.(),
-							currentCell: () => handle.currentCell(),
-							// This session's own surface, whichever instance this is: at the root it is the root's, in
-							// a child it is that child's — which is what makes the ceiling transitive (ticket 01 §3).
-							ownSurface: () => {
-								try {
-									return pi.getActiveTools?.() ?? [];
-								} catch {
-									return [];
-								}
-							},
-							ownerDispatch: dispatchNotice,
-						}),
-						onNotice: dispatchNotice,
-						provenance: {
-							startReason,
-							previousSessionFile,
-							parentSessionFile,
-							isChild,
-						},
-					}),
-				];
-				const web = webAccessContribution({
-					hook: webHook,
-					cwd: ctx?.cwd ?? root,
-					sessionFile: ctx?.sessionManager?.getSessionFile?.(),
-					// A fetch reports into the running cell, unchanged: the handle owns the sink
-					// because the cell's `onUpdate` is code mode's to know.
-					progress: (text) => handle.progress()?.(text),
-				});
-				if (web.contribution) {
-					contributions.push(web.contribution);
-					webContributed = true;
+		// This session's contribution is filed for the composition root, which asks every contributor in
+		// its own `session_start` — later than this entry, and earlier than the first cell. The handle
+		// travels the other way, in the answer, because `currentCell()` is the kernel's to know.
+		setRlmSessionDeps(sessionKey(ctx), {
+			manager,
+			childContext,
+			ownDepth,
+			ownSurface: () => {
+				try {
+					return pi.getActiveTools?.() ?? [];
+				} catch {
+					return [];
 				}
-				if (web.reason) webReason = web.reason;
-				return contributions;
 			},
+			sessionFile: () => sessionCtx?.sessionManager?.getSessionFile?.(),
+			ownerDispatch: dispatchNotice,
+			provenance: { startReason, previousSessionFile, parentSessionFile, isChild },
 		});
 
-		if (bound.status === "bound") {
-			codeMode = bound.handle;
-			// The tool bridge is **not** adopted here any more (`.scratch/host-bridge` ticket 05): the
-			// composition root asks every contributor for this session in its own `session_start`,
-			// which runs after this one, and writes the record the surface entry reads. What rlm still
-			// does is bind the session's *owners* to a child before that happens, and report the
-			// kernel's own preflight.
-			problems.push(...bound.problems);
-			for (const rejection of bound.rejections) {
-				const names = rejection.rejected.map((r) => r.name).join(", ");
-				problems.push(`${rejection.owner}'s contribution was refused whole: ${names} (${rejection.rejected[0]?.reason ?? ""})`);
-			}
-		} else {
-			inertReason = bound.reason;
-			problems.push(bound.reason);
-		}
-
 		if (!childContext) {
-			// Recorded unconditionally — including on failure — because this entry is the only
-			// durable evidence of whether the kernel and the session's owners were available.
+			// Recorded unconditionally: this entry is the durable evidence of which owners were available,
+			// while the kernel's own record is the seam's `host-bridge` entry.
 			try {
-				pi.appendEntry("rlm-tools", { tools: childStatus(), problems, startReason });
+				pi.appendEntry("rlm-tools", { tools: childStatus(), startReason });
 			} catch {
 				/* diagnostics must never fail a session */
 			}
@@ -318,55 +276,6 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			pi.appendEntry("rlm-rsi", { status: rsiStatus(), startReason });
 		} catch {
 			/* diagnostics must never fail a session */
-		}
-		// Web bookkeeping: unset is silent and normal; configured is recorded always; broken is
-		// recorded, told to the human, and told to the model once at the first cell.
-		if (webHook.status === "loaded") {
-			try {
-				pi.appendEntry("rlm-web", { module: webHook.module, status: "loaded", contract: ["web_search", "fetch_content"] });
-			} catch {
-				/* see above */
-			}
-		} else if (webHook.status === "error") {
-			try {
-				pi.appendEntry("rlm-web", { module: webHook.module, status: "error", reason: webHook.reason });
-			} catch {
-				/* see above */
-			}
-			notifyHuman(ctx, `web host functions unavailable: ${webHook.reason}`);
-		} else if (webReason) {
-			// Configured, resolved, but the module failed the per-kernel contract check.
-			try {
-				pi.appendEntry("rlm-web", { module: "RLM_WEB_MODULE", status: "error", reason: webReason });
-			} catch {
-				/* see above */
-			}
-			if (!webNotified) {
-				webNotified = true;
-				notifyHuman(ctx, `web host functions unavailable: ${webReason}`);
-			}
-		}
-
-		if (problems.length === 0) {
-			try {
-				ctx.ui?.setStatus?.("rlm", "code-mode (monty)");
-			} catch {
-				/* no UI in this mode */
-			}
-			return;
-		}
-		try {
-			ctx.ui?.setStatus?.("rlm", "kernel unavailable");
-		} catch {
-			/* no UI in this mode */
-		}
-		for (const problem of problems) {
-			notifyHuman(ctx, `python kernel: ${problem}`);
-			try {
-				pi.appendEntry("rlm-preflight", { problem });
-			} catch {
-				/* see above */
-			}
 		}
 	});
 
@@ -384,9 +293,14 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	 * and retires its own registry entry in *its* handler, and the two handlers share no state
 	 * (ticket 01 §6).
 	 */
-	pi.on("session_shutdown", async () => {
+	pi.on("session_shutdown", async (_event: any, ctx: any) => {
 		await manager?.shutdownAll();
 		notices.length = 0;
+		try {
+			forgetRlmSessionDeps(sessionKey(ctx));
+		} catch {
+			/* a session that cannot be keyed has no deps to forget */
+		}
 	});
 }
 

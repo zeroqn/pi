@@ -29,6 +29,14 @@ import { searchDuckDuckGo } from "./providers/duckduckgo";
 import type { SearchResult } from "./providers/types";
 import { fenceText, installGuard, SYSTEM_PROMPT_SECTION, type GuardPi } from "./guard";
 
+import {
+	API_VERSION as HOST_API_VERSION,
+	type ContributorAnswer,
+	type ContributorRegistration,
+	type SessionInput,
+	registerContributor,
+} from "../host-bridge/src/convention";
+
 export const SEARCH_TIMEOUT_MS = 30_000;
 export const FETCH_TIMEOUT_MS = 60_000;
 export const DEFAULT_NUM_RESULTS = 5;
@@ -267,3 +275,58 @@ export type HostDeps = { fetchImpl?: typeof fetch; config?: WebConfig };
 export default function piWebAccess(pi: GuardPi): void {
 	installGuard(pi);
 }
+
+/**
+ * The host bridge registration (`.scratch/host-bridge` ticket 07).
+ *
+ * The two functions used to reach a kernel through rlm: `RLM_WEB_MODULE` named this file, rlm imported
+ * it once, instantiated it per kernel and owned the wire — the names, the description, the guidelines
+ * and the guard's prompt rule all lived in `rlm/src/web-hook.ts`. That is gone. This package registers
+ * itself with `pi-host-bridge` at module load, and the seam mounts, contributes and records on its
+ * behalf — for a **spawned child** too, where no ambient extension loads and the old hook was the only
+ * route.
+ *
+ * The prose moved with it, verbatim: the description sentences, the two guideline lines and the
+ * untrusted-content rule are this package's words about its own functions, not rlm's.
+ */
+const WEB_ACCESS_OWNER = "web-access";
+
+const WEB_ACCESS_DESCRIPTION =
+	" Host functions also include await web_search(query, num_results=5, provider=None, domain_filter=None), which searches DuckDuckGo and then AnySearch " +
+	'and returns {query, provider, results:[{title,url,snippet,content}], errors}; and await fetch_content(url, mode="markdown"), which writes the page text ' +
+	'to SCRATCH and returns {url, title, path, chars, head} — read or grep that path for more than the head. mode="raw" writes the response bytes and ' +
+	'returns {url, path, bytes, content_type} instead. Fetches are http and https only and refuse local and private addresses: a check on this tool, not a ' +
+	"sandbox — the kernel's bash is unfiltered.";
+
+const WEB_ACCESS_GUIDELINES = [
+	"Use await web_search(query, num_results=5, provider=None, domain_filter=None) for web research: it returns {query, provider, results:[{title,url,snippet,content}], errors}, where a per-provider failure beside a success is data in errors.",
+	'Use await fetch_content(url, mode="markdown") to read a page: it writes the text to SCRATCH and returns {url, title, path, chars, head}, so grep or read the path instead of printing the head twice; mode="raw" writes the bytes and returns {path, bytes, content_type}.',
+];
+
+/** What this package contributes to one session: the two host functions, their prose, and the rule. */
+export function webAccessAnswer(input: SessionInput): ContributorAnswer {
+	return {
+		contribution: {
+			owner: WEB_ACCESS_OWNER,
+			hostFns: createHost({
+				cwd: input.cwd,
+				sessionFile: input.sessionFile,
+				progress: input.progress,
+			}),
+			description: WEB_ACCESS_DESCRIPTION,
+			guidelines: WEB_ACCESS_GUIDELINES,
+		},
+		// Appended once per session by the seam, deduped by text — in a spawned child, where this
+		// package's own entry never runs, the seam is the only appender.
+		systemPrompt: WEB_SYSTEM_PROMPT,
+	};
+}
+
+export const webAccessRegistration: ContributorRegistration = {
+	key: "pi-web-access",
+	owner: WEB_ACCESS_OWNER,
+	apiVersion: HOST_API_VERSION,
+	session: (input) => webAccessAnswer(input),
+};
+
+registerContributor(webAccessRegistration);
