@@ -195,6 +195,10 @@ export function createKernel(options: {
 	 */
 	const cwdMounts = new Map<MountMode, InstanceType<typeof MontyModule.MountDir>>();
 	let scratchMount: InstanceType<typeof MontyModule.MountDir> | null = null;
+	/** The mode the last feed ran under, so a change can be noticed rather than only observed. */
+	let lastMode: MountMode | null = null;
+	/** What a mode change did, waiting for the next cell to say it. */
+	let modeNote: string | null = null;
 	let root = "";
 	let scratch = "";
 	let attachments: Attachment[] = [];
@@ -290,12 +294,39 @@ export function createKernel(options: {
 	}
 
 	/**
+	 * A change of the workspace's rules, and the one thing the mount cannot do about it: a **background
+	 * shell** is a host process, so a session that turns read-only while one is running would keep
+	 * writing to the workspace the mode claims is frozen (readonly-guard ticket 10).
+	 *
+	 * Only *into* read-only, and only on a change: turning the mode off has nothing to kill — starting a
+	 * shell while read-only was refused — and must not surprise anyone by killing their shells. Asked
+	 * per feed **and at the end of every turn**, so a turn where the model answers without running a
+	 * cell still kills; the moment is the same one the mount changes at, which is what keeps "read-only
+	 * starts at the next cell" one story rather than three.
+	 */
+	async function noteModeChange(mode: MountMode): Promise<void> {
+		const previous = lastMode;
+		lastMode = mode;
+		if (previous === null || previous === mode || mode !== "read-only") return;
+		const killed = await background.shutdownAll("read-only mode turned on");
+		if (killed.length === 0) return;
+		modeNote =
+			`# read-only mode turned on: ${killed.length} background shell(s) started while the workspace was writable were killed (${killed.join(", ")}).\n`;
+		try {
+			pi.appendEntry("code-mode-mode-change", { mode, killed });
+		} catch {
+			/* diagnostics only */
+		}
+	}
+
+	/**
 	 * The mode — and the mount — for this feed. A failure is a **refusal, never a downgrade**: a
 	 * session whose policy says read-only must not fall back to a writable workspace, so the caller
 	 * is handed a problem to report instead of a mount to use.
 	 */
-	function mountFor(monty: typeof MontyModule): { mount: InstanceType<typeof MontyModule.MountDir> } | { problem: string } {
+	async function mountFor(monty: typeof MontyModule): Promise<{ mount: InstanceType<typeof MontyModule.MountDir> } | { problem: string }> {
 		const mode = cwdMode();
+		await noteModeChange(mode);
 		const existing = cwdMounts.get(mode);
 		if (existing) return { mount: existing };
 		try {
@@ -354,7 +385,7 @@ export function createKernel(options: {
 		// The workspace's mode is the guard's answer, and a mount that cannot be made is a **start**
 		// failure rather than a cell refusal — the kernel is not running, and the next cell rebuilds
 		// it (the pinned "does not cache a failed start" contract).
-		const first = mountFor(monty);
+		const first = await mountFor(monty);
 		if ("problem" in first) throw new Error(first.problem);
 		const sessionFile = sessionFilePath(ctx);
 		journalPath = sessionFile ? `${sessionFile}.rlm-journal.jsonl` : "";
@@ -818,7 +849,7 @@ export function createKernel(options: {
 				const monty = await loadMonty();
 				// Per feed, and before anything else is prepared for the cell: a session that must be
 				// read-only is refused here rather than run against a mount it was told not to have.
-				const resolved = mountFor(monty);
+				const resolved = await mountFor(monty);
 				if ("problem" in resolved) {
 					return {
 						content: [{ type: "text", text: `# the python kernel refused this cell: ${resolved.problem}` }],
@@ -923,6 +954,10 @@ export function createKernel(options: {
 					body += cellRebuild;
 					cellRebuild = null;
 				}
+				if (modeNote) {
+					body += modeNote;
+					modeNote = null;
+				}
 				if (cellRotations > 0) {
 					body += `# kernel reclaimed mid-cell (${cellRotations}x); nothing was lost.\n`;
 				}
@@ -986,6 +1021,13 @@ export function createKernel(options: {
 	}
 
 	async function endTurn(): Promise<void> {
+		// The other half of the mode-change check: a turn where the model answered without running a
+		// cell still ends the shells a mode change made unsafe.
+		try {
+			await noteModeChange(cwdMode());
+		} catch {
+			/* a kill that fails must not fail the turn */
+		}
 		// A failed rotation is usually transient (pool exhaustion), so the failure cap is per
 		// turn rather than per session.
 		rotateFailures = 0;
@@ -1014,6 +1056,8 @@ export function createKernel(options: {
 		journal = [];
 		journalPath = "";
 		restored = null;
+		lastMode = null;
+		modeNote = null;
 		ownNotices.length = 0;
 	}
 

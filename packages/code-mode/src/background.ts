@@ -215,12 +215,22 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 			}
 		},
 
-		async shutdownAll(): Promise<void> {
+		/**
+		 * Kill every running handle, and answer with the ids.
+		 *
+		 * The ids are for a caller that is *not* the session's end — a mode change, which kills what the
+		 * mount cannot reach and then has to say what it did (readonly-guard ticket 10) — and `reason`
+		 * is a parameter for the same caller: "the session ended" would be a lie there.
+		 */
+		async shutdownAll(reason = "the session ended"): Promise<string[]> {
+			const killed: string[] = [];
 			for (const record of records.values()) {
 				if (record.status !== "running") continue;
 				killProcess(record);
-				finish(record, "killed", "the session ended", null);
+				finish(record, "killed", reason, null);
+				killed.push(record.id);
 			}
+			return killed;
 		},
 	};
 }

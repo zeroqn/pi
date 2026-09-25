@@ -432,3 +432,71 @@ describe("a session's cwd mount", () => {
 		expect((handle.kernel as Kernel).execute({ code: "1+1" }, undefined, made.ctx)).rejects.toThrow("invalid mount mode");
 	});
 });
+
+// ---------------------------------------------------------------------------
+// The mode change's other half (ticket 10): a background shell is a host process, so the mount cannot
+// reach it. These use a **real** shell and a **real** canary: the proof is that the file never appears,
+// not that a status field says "killed".
+// ---------------------------------------------------------------------------
+
+describe("a mode change and the shells the mount cannot reach", () => {
+	let dir: string;
+
+	beforeEach(() => {
+		delete glob[REGISTRY_KEY];
+		dir = mkdtempSync(join(tmpdir(), "code-mode-bg-"));
+	});
+
+	/** A session whose guard answers a mode this test can flip, before the kernel starts. */
+	function session(mode: string) {
+		const pi = fakePi();
+		codeMode(pi as never);
+		const entry = glob[REGISTRY_KEY] as RegistryEntry;
+		const made = sessionCtx(dir, sessionFileIn(dir, "bg"));
+		const handle = entry.mount(pi as never, made.ctx);
+		const state = { mode };
+		handle.contribute({ owner: "readonly-mode", guard: { mountMode: () => state.mode as never } });
+		return { pi, handle, made, state };
+	}
+
+	const cell = async (handle: { kernel: unknown }, made: { ctx: unknown }, code: string) =>
+		textOf(await (handle.kernel as Kernel).execute({ code }, undefined, made.ctx));
+
+	const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+	maybe("kills the shells a change into read-only makes unsafe, and says so", async () => {
+		const { handle, made, state } = session("read-write");
+		const canary = join(dir, "bg-canary");
+		// A real shell on the real filesystem: the mount is irrelevant to it, which is why this exists.
+		await cell(handle, made, `await bash("sleep 2 && touch ${canary}", background=True)`);
+
+		state.mode = "read-only";
+		const next = await cell(handle, made, "print('next')");
+		expect(next).toContain("read-only mode turned on");
+		expect(next).toContain("1 background shell(s)");
+
+		// Long enough for the sleep to have finished and written, had it survived the group kill.
+		await settle(3000);
+		expect(existsSync(canary)).toBe(false);
+	});
+
+	maybe("does not kill anything when the mode turns off again", async () => {
+		const { handle, made, state } = session("read-only");
+		const canary = join(dir, "bg-kept");
+		await cell(handle, made, `await bash("sleep 1 && touch ${canary}", background=True)`);
+
+		// A relaxation has nothing to kill, and must not surprise anyone by killing their shells.
+		state.mode = "read-write";
+		const next = await cell(handle, made, "print('next')");
+		expect(next).not.toContain("read-only mode turned on");
+
+		await settle(2000);
+		expect(existsSync(canary)).toBe(true);
+	});
+
+	maybe("says nothing at all when the mode never changes", async () => {
+		const { handle, made } = session("read-write");
+		await cell(handle, made, "x = 1");
+		expect(await cell(handle, made, "print('quiet')")).not.toContain("background shell");
+	});
+});
