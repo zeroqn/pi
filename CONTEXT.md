@@ -47,6 +47,37 @@ The process-global meeting point where the kernels of the running process are pu
 packages to find.
 _Avoid_: service locator, bus
 
+**Host surface**:
+The table of names a cell can call that are not Python: code mode's base host functions plus every
+contributor's. The kernel materializes it; who writes into it is the host bridge's question.
+_Avoid_: tool list, API surface, kernel surface
+
+**Contributor**:
+An extension that adds to a session's host surface by registering with the host bridge — rlm, the tool
+bridge, the skill bridge, web-access.
+_Avoid_: plugin, extension point, provider (a provider supplies skills to the skill bridge)
+
+**Owner**:
+An extension whose *pi tools* the tool bridge publishes on a cell's behalf. A publisher behind the tool
+bridge, not a contributor in its own right: Magic Context is the live one.
+_Avoid_: contributor, publisher (of the tool bridge's slot)
+
+**Client** (of the registry):
+A package that reaches code mode's registry to mount a session's kernel and contribute — or only to
+hold the handle, which is what rsi does.
+_Avoid_: consumer, mounter
+
+**Composition root**:
+Whoever mounts a session's kernel, asks every contributor for it and writes the session's record — for
+a root and a child alike. `pi-host-bridge` is it.
+_Avoid_: orchestrator, kernel owner
+
+**The child notion**:
+Everything a package must know about child sessions — whether this one is a child, which factories it
+loads, what it may hold (the ceiling) and what it was given. It lives in one place, the host bridge;
+the *policy* stays with the contributors.
+_Avoid_: child mode, inheritance
+
 ## The agent side
 
 **rlm**:
