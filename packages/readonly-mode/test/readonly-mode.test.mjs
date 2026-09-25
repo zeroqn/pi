@@ -208,13 +208,23 @@ function load({ flag = false, active = ["read", "bash", "edit", "write", "todowr
 
 	// A real session file, so the seam keys this session the way it keys a live one.
 	const file = sessionFile ?? `/sessions/readonly-mode-${(sessionCounter += 1)}.jsonl`;
+	// What this session's own transcript received from another extension — which is how a spawner
+	// writes the marker into a child's session.
+	const transcript = [];
 	const ctx = {
 		ui: {
 			notify: (message) => notifications.push(message),
 			setStatus: (key, value) => statuses.set(key, value),
 			theme: { fg: (_color, text) => text },
 		},
-		sessionManager: { getEntries: () => entries, getSessionFile: () => file },
+		sessionManager: {
+			getEntries: () => entries,
+			getSessionFile: () => file,
+			appendCustomEntry: (type, data) => {
+				transcript.push({ type, data });
+				return `entry-${transcript.length}`;
+			},
+		},
 	};
 
 	return {
@@ -226,6 +236,7 @@ function load({ flag = false, active = ["read", "bash", "edit", "write", "todowr
 		statuses,
 		ctx,
 		file,
+		transcript,
 		tools: () => activeTools,
 	};
 }
@@ -627,4 +638,104 @@ test("a grandchild inherits through a child", async () => {
 test("a registration answers for its own session and its children, and for nobody else", async () => {
 	const parent = await cellLane();
 	assert.deepEqual(ask(parent.registration, "/sessions/stranger.jsonl", false), {});
+});
+
+// ---------------------------------------------------------------------------
+// The inherited hold (ticket 02): the marker a spawner writes into a child's own
+// transcript, and who may lift it.
+// ---------------------------------------------------------------------------
+
+const INHERITED = "readonly-mode-inherited";
+const marker = (enabled) => ({ type: "custom", customType: INHERITED, data: { enabled, from: "/sessions/parent.jsonl" } });
+
+/** The child ctx a spawner hands to the seam: a real session whose transcript we can read. */
+function childCtx(file) {
+	const transcript = [];
+	return {
+		transcript,
+		ctx: {
+			ui: { notify() {}, setStatus() {}, theme: { fg: (_c, text) => text } },
+			sessionManager: {
+				getEntries: () => [],
+				getSessionFile: () => file,
+				appendCustomEntry: (type, data) => {
+					transcript.push({ type, data });
+					return `entry-${transcript.length}`;
+				},
+			},
+		},
+	};
+}
+
+test("a spawner writes its answer into the child's own transcript, every time it answers", async () => {
+	const parent = await cellLane();
+	const childFile = "/sessions/marked-child.jsonl";
+	spawn(childFile, parent.key);
+	const child = childCtx(childFile);
+	const askWith = (ctx) =>
+		parent.registration.session({ ctx, sessionKey: childFile, handle: { apiVersion: 2 }, isChild: true, cwd: "/workspace" });
+
+	// Writable: the marker still lands, so a later resume is not left guessing — and so a relaxation
+	// rewrites a read-only record rather than leaving it behind.
+	askWith(child.ctx);
+	assert.deepEqual(child.transcript.at(-1), { type: INHERITED, data: { enabled: false, from: parent.key } });
+
+	await toggleOn(parent.h);
+	askWith(child.ctx);
+	assert.deepEqual(child.transcript.at(-1), { type: INHERITED, data: { enabled: true, from: parent.key } });
+});
+
+test("a resumed child that carries the marker starts read-only", async () => {
+	const h = load({ entries: [marker(true)] });
+	await h.handlers.session_start[0]({}, h.ctx);
+	assert.ok(h.statuses.get("readonly-mode"), "expected the status line");
+	assert.deepEqual(h.tools(), ["read", "bash", "todowrite", "read_symbol"]);
+	// And the guard agrees, so the kernel is mounted read-only without the child being told anything.
+	const { guard } = await (async () => {
+		const registration = contributors().find((r) => r.key === `readonly-mode@${sessionKey(h.ctx)}`);
+		return registration.session({
+			ctx: h.ctx,
+			sessionKey: sessionKey(h.ctx),
+			handle: { apiVersion: 2 },
+			isChild: true,
+			cwd: "/workspace",
+		}).contribution;
+	})();
+	assert.equal(guard.mountMode(), "read-only");
+});
+
+test("a resumed child may lift the hold itself, and the lift is what persists", async () => {
+	const h = load({ entries: [marker(true)] });
+	await h.handlers.session_start[0]({}, h.ctx);
+
+	await toggleOn(h); // the mode is on, so this turns it off
+	assert.equal(h.statuses.get("readonly-mode"), undefined);
+	assert.deepEqual(h.tools(), ["read", "bash", "edit", "write", "todowrite", "read_symbol"]);
+	// Its own decision is written down as its own, which is what makes it survive the next resume.
+	assert.equal(h.appended.at(-1).data.enabled, false);
+	assert.doesNotMatch(h.notifications.at(-1), /held by the session that spawned/);
+});
+
+test("a live hold cannot be lifted from inside the child, and the toggle says why", async () => {
+	const parent = await cellLane();
+	await toggleOn(parent.h);
+	const childFile = "/sessions/held-child.jsonl";
+	spawn(childFile, parent.key);
+
+	const child = load({ sessionFile: childFile });
+	await child.handlers.session_start[0]({}, child.ctx);
+	assert.ok(child.statuses.get("readonly-mode"), "the child inherits the live hold");
+
+	await toggleOn(child); // tries to turn it off
+	assert.match(child.notifications.at(-1), /held by the session that spawned/);
+	assert.ok(child.statuses.get("readonly-mode"), "the hold is not the child's to lift");
+	// Nothing was written down as the child's own decision, so a resume cannot mistake it for one.
+	assert.deepEqual(child.appended, []);
+});
+
+test("a root session with neither marker nor floor is unchanged", async () => {
+	const h = load();
+	await h.handlers.session_start[0]({}, h.ctx);
+	assert.equal(h.statuses.get("readonly-mode"), undefined);
+	assert.deepEqual(h.tools(), ["read", "bash", "edit", "write", "todowrite", "read_symbol"]);
 });

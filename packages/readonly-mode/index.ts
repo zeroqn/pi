@@ -206,9 +206,31 @@ interface ReadOnlyState {
 	toolsBefore?: string[];
 }
 
+/**
+ * The marker a spawner writes into **a child's** transcript: the mode it spawned that child under.
+ *
+ * It is read back by the child's own instance when that child is resumed — which is the case the live
+ * floor cannot cover, because a floor is the spawner's *live* answer and a child resumed in a later
+ * process has no spawner to ask. Written every time this session answers for a child, so a relaxation
+ * rewrites it rather than leaving a read-only record behind.
+ */
+interface InheritedState {
+	enabled: boolean;
+	/** The session that wrote it, so a reader can see where a hold came from. */
+	from?: string;
+}
+
+const INHERITED_ENTRY = "readonly-mode-inherited";
+
 export default function readonlyModeExtension(pi: ExtensionAPI): void {
-	let enabled = false;
+	/** This session's own decision — the flag, a toggle, or a restored state entry. `undefined` means
+	 *  it has none, which is what lets a *remembered* hold apply without winning over a real choice. */
+	let own: boolean | undefined;
+	/** The hold this session was spawned under, read from its own transcript (see {@link InheritedState}). */
+	let inherited = false;
 	let toolsBefore: string[] | undefined;
+	/** This session's key, once the seam has asked it for one. */
+	let ownKey: string | undefined;
 	/**
 	 * Set when this session's kernel cannot be governed — a code mode too old to know the `guard`, or a
 	 * seam that would not take the registration. It is the only thing that can make a session's
@@ -227,12 +249,40 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	const children = new Set<string>();
 
 	/**
-	 * Whether the kernel for `forKey` is read-only: this session's own flag, or a floor a parent holds
-	 * over it. Both halves are read live, so the spawner's toggle reaches its children.
+	 * The live hold over a session: a spawner in **this process**, whose answer is read live so its
+	 * toggle reaches its children. `undefined` when nothing holds it.
 	 */
-	function isOn(forKey: string): boolean {
-		if (enabled) return true;
-		return floor.get(forKey)?.() === true;
+	function holdOn(forKey: string): boolean | undefined {
+		return floor.get(forKey)?.();
+	}
+
+	/**
+	 * Whether the kernel for `forKey` is read-only, in the order that decides who may change it:
+	 *
+	 *   1. **a live hold** — a spawner in this process. It wins over everything, so a child cannot lift
+	 *      it from inside; the toggle says so rather than reporting an "off" that would not take.
+	 *   2. **this session's own decision**, when it has one.
+	 *   3. **the inherited marker** — the fallback when nobody can be asked, which is the whole point of
+	 *      writing it into the child's own transcript.
+	 */
+	function stateFor(forKey: string): boolean {
+		const held = holdOn(forKey);
+		if (held !== undefined) return held;
+		if (forKey === ownKey) return own ?? inherited;
+		return false;
+	}
+
+	/**
+	 * This session's own answer, for the layers that are about *this session* rather than a kernel: the
+	 * tool filter, the prompt, the vetoes, the status line.
+	 *
+	 * The fallback is for the window before the seam has keyed this session (a command or a turn cannot
+	 * arrive before `session_start`, but a test drives the factory without one), and it is the same
+	 * answer the two would give.
+	 */
+	function on(): boolean {
+		if (ownKey !== undefined) return stateFor(ownKey);
+		return own ?? inherited;
 	}
 	/** Sessions the seam told us are roots: the inventory check's stale half is only sound there. */
 	const roots = new Set<string>();
@@ -243,9 +293,9 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	 *  floor a parent holds over it — so a toggle lands on the next cell with no rebuild. */
 	function guardFor(forKey: string): KernelGuard {
 		return {
-			mountMode: () => (isOn(forKey) ? "read-only" : "read-write"),
+			mountMode: () => (stateFor(forKey) ? "read-only" : "read-write"),
 			before: (call) => {
-				if (!isOn(forKey)) return undefined;
+				if (!stateFor(forKey)) return undefined;
 				const route = ROUTES[call.name];
 				if (route !== undefined) {
 					// A route call with no name is introspection (`await tool()` lists what is published),
@@ -319,18 +369,23 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 
 	function registerForSession(ctx: ExtensionContext): void {
 		const key = sessionKey(ctx);
+		ownKey = key;
 		const registered = registerContributor({
 			key: `${OWNER}@${key}`,
 			owner: OWNER,
 			apiVersion: HOST_API_VERSION,
 			session: (input: SessionInput) => {
-				const own = input.sessionKey === key;
+				const mine = input.sessionKey === key;
 				// A **spawned child** loads no ambient extension, so its kernel would be mounted with
 				// nobody's answer to inherit if this registration did not give it one.
-				if (!own && !children.has(input.sessionKey)) return {};
-				if (own) {
+				if (!mine && !children.has(input.sessionKey)) return {};
+				if (mine) {
 					if (input.isChild) roots.delete(key);
 					else roots.add(key);
+				} else {
+					// The marker that outlives this process: written into the **child's** transcript, every
+					// time, so a resume in a later process finds the mode it was spawned under.
+					writeInherited(input.ctx, stateFor(input.sessionKey));
 				}
 				if (input.handle.apiVersion < GUARD_API_VERSION) {
 					// A contribution is validated all-or-nothing, so an older code mode refuses the guard
@@ -341,13 +396,13 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 						`${input.handle.apiVersion}, and a guard needs ${GUARD_API_VERSION}. The python tool is refused while the mode is on.`;
 					// Only a session's own instance can refuse its own tool, so the flag is only set for
 					// this session: an ungovernable child is reported, and its own instance refuses its tool.
-					if (own) {
+					if (mine) {
 						cellLane = "unenforceable";
 						unenforceable = problem;
 					}
 					return { problems: [problem] };
 				}
-				if (own) cellLane = "mounted";
+				if (mine) cellLane = "mounted";
 				return { contribution: { owner: OWNER, guard: guardFor(input.sessionKey) } };
 			},
 			/**
@@ -363,7 +418,7 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 				if (!input.parentSessionFile || resolve(input.parentSessionFile) !== key) return;
 				const childKey = resolve(input.childSessionFile);
 				children.add(childKey);
-				floor.set(childKey, () => isOn(key));
+				floor.set(childKey, () => stateFor(key));
 			},
 		});
 		if (registered.registered) return;
@@ -375,12 +430,27 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 		}
 	}
 
+	/**
+	 * Write this session's answer into a child's own transcript. Best effort: a marker that cannot be
+	 * written must not fail the mount that asked for it, and its absence degrades to what the child had
+	 * before this existed — its own state, or nothing.
+	 */
+	function writeInherited(ctx: unknown, held: boolean): void {
+		try {
+			const manager = (ctx as { sessionManager?: { appendCustomEntry?: (type: string, data?: unknown) => string } } | null)
+				?.sessionManager;
+			manager?.appendCustomEntry?.(INHERITED_ENTRY, { enabled: held, from: ownKey } satisfies InheritedState);
+		} catch {
+			/* a marker is a convenience for a later resume, never a precondition */
+		}
+	}
+
 	function updateStatus(ctx: ExtensionContext): void {
-		ctx.ui.setStatus(STATUS_KEY, enabled ? ctx.ui.theme.fg("warning", "🔒 read-only") : undefined);
+		ctx.ui.setStatus(STATUS_KEY, on() ? ctx.ui.theme.fg("warning", "🔒 read-only") : undefined);
 	}
 
 	function persist(): void {
-		pi.appendEntry<ReadOnlyState>(STATE_ENTRY, { enabled, toolsBefore });
+		pi.appendEntry<ReadOnlyState>(STATE_ENTRY, { enabled: own === true, toolsBefore });
 	}
 
 	function applyReadOnlyTools(): void {
@@ -390,10 +460,20 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	}
 
 	function setEnabled(next: boolean, ctx: ExtensionContext): void {
-		if (next === enabled) return;
-		enabled = next;
+		// A **live** hold is not this session's to lift (`../readonly-guard` ticket 05: a child can never
+		// be wider than the session that spawned it). Saying "off" while the guard keeps refusing would be
+		// exactly the lie the tri-state exists to avoid, so the toggle says why instead.
+		if (!next && ownKey !== undefined && holdOn(ownKey) === true) {
+			ctx.ui.notify(
+				"Read-only mode is held by the session that spawned this one, so it cannot be turned off here.",
+				"warning",
+			);
+			return;
+		}
+		if (next === on()) return;
+		own = next;
 
-		if (enabled) {
+		if (on()) {
 			applyReadOnlyTools();
 			ctx.ui.notify("Read-only mode on: write tools disabled, shell commands gated.");
 		} else {
@@ -414,17 +494,17 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 
 	pi.registerCommand("readonly", {
 		description: "Toggle read-only mode (no file modifications)",
-		handler: async (_args, ctx) => setEnabled(!enabled, ctx),
+		handler: async (_args, ctx) => setEnabled(!on(), ctx),
 	});
 
 	pi.registerShortcut("ctrl+alt+r", {
 		description: "Toggle read-only mode",
-		handler: async (ctx) => setEnabled(!enabled, ctx),
+		handler: async (ctx) => setEnabled(!on(), ctx),
 	});
 
 	// Layer 1's backstop, plus the bash gate, plus the cell lane's floor.
 	pi.on("tool_call", async (event) => {
-		if (!enabled) return undefined;
+		if (!on()) return undefined;
 
 		// A cell the kernel cannot govern must not be offered at all: a session that shows the
 		// read-only prompt and runs a writable kernel is worse than one that refuses.
@@ -463,7 +543,7 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	// Layer 1's instruction half: ambient, per turn, so it costs nothing to
 	// leave the transcript clean when the mode goes off.
 	pi.on("before_agent_start", async (event, ctx) => {
-		if (!enabled) return undefined;
+		if (!on()) return undefined;
 		// The cell half only where there is a governed kernel to describe. A plain pi session has no
 		// cell, and telling it about a mount it does not have is how a prompt starts lying.
 		const cell = cellLane === "mounted" ? `\n${READ_ONLY_CELL_PROMPT}` : "";
@@ -478,19 +558,32 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
-		if (pi.getFlag("readonly") === true) enabled = true;
+		// A launch flag is a decision by the user about *this* session, so it is an opinion rather than
+		// an inheritance — it beats a marker, exactly as a toggle would.
+		if (pi.getFlag("readonly") === true) own = true;
 
 		const entries = ctx.sessionManager.getEntries();
+		let sawOwn = false;
 		for (let i = entries.length - 1; i >= 0; i--) {
-			const entry = entries[i] as { type?: string; customType?: string; data?: ReadOnlyState };
-			if (entry.type === "custom" && entry.customType === STATE_ENTRY) {
-				enabled = entry.data?.enabled ?? enabled;
+			const entry = entries[i] as {
+				type?: string;
+				customType?: string;
+				data?: ReadOnlyState & InheritedState;
+			};
+			if (entry.type !== "custom") continue;
+			// Newest of each kind wins, and the two are read independently: a child can carry both the
+			// hold it was spawned under and a decision it made itself afterwards.
+			if (entry.customType === STATE_ENTRY && !sawOwn) {
+				sawOwn = true;
+				own = entry.data?.enabled ?? own;
 				toolsBefore = entry.data?.toolsBefore ?? toolsBefore;
-				break;
+			}
+			if (entry.customType === INHERITED_ENTRY && !inherited) {
+				inherited = entry.data?.enabled === true;
 			}
 		}
 
-		if (enabled) applyReadOnlyTools();
+		if (on()) applyReadOnlyTools();
 		// After the state is restored and before `host-bridge` composes this session (it is declared
 		// later in the manifest), so the kernel is mounted with this session's answer already in place.
 		registerForSession(ctx);
