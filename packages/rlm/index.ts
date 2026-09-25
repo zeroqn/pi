@@ -24,7 +24,14 @@ import {
 	sessionRecord,
 	setChildDetector,
 } from "../host-bridge/src/convention";
-import { createChildManager, headerParentSession, modelRuntime, readChildProvenance, resolveOwnDepth } from "./src/children";
+import {
+	createChildManager,
+	headerParentSession,
+	modelRuntime,
+	readChildProvenance,
+	resolveOwnDepth,
+	statusLine,
+} from "./src/children";
 import type { ChildKernelContext, Notice } from "./src/children";
 // Imported for its side effect on the seam, and for the session deps this file files with it.
 import { forgetRlmSessionDeps, setRlmSessionDeps } from "./src/registration";
@@ -108,7 +115,27 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				runtime: () => modelRuntime(),
 				maxDepth: MAX_DEPTH,
 				maxLive: MAX_LIVE_CHILDREN,
+				// The footer's count is the manager's to announce, not something to poll for: a child
+				// spawned or finished mid-turn would otherwise go unsaid until the next turn boundary.
+				onChange: () => renderStatus(sessionCtx),
 			});
+
+	/**
+	 * The footer line: the kernel's state, and how many children are working right now. Written at the
+	 * turn boundary — by which time the composition root's record, the seam's own `session_start`, has
+	 * landed — and from the manager's change signal (spawn, completion, resume, remove, teardown), so
+	 * the count is live mid-turn rather than as stale as the last boundary. A session with no UI
+	 * (print mode, a headless child) simply shows nothing.
+	 */
+	function renderStatus(ctx: any) {
+		try {
+			const record = sessionRecord(sessionKey(ctx));
+			if (!record) return;
+			ctx?.ui?.setStatus?.("rlm", statusLine(record.mounted, manager?.liveCount() ?? 0));
+		} catch {
+			/* no UI in this mode */
+		}
+	}
 
 	/**
 	 * Child notices (v1 ticket 06). pi cannot retract a delivered message, so a notice is held
@@ -190,11 +217,7 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 					}
 				}
 			}
-			try {
-				ctx?.ui?.setStatus?.("rlm", record.mounted ? "code-mode (monty)" : "kernel unavailable");
-			} catch {
-				/* no UI in this mode */
-			}
+			renderStatus(ctx);
 			if (record.mounted || toldModel) return undefined;
 			toldModel = true;
 			const why = record.problems[0] ?? "the kernel could not be mounted";

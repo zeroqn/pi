@@ -116,6 +116,12 @@ export interface ChildManagerDeps {
 	runtime: () => Promise<any>;
 	maxDepth: number;
 	maxLive: number;
+	/**
+	 * Called whenever a record's status changes how many children are working — the status line's
+	 * signal, so the footer's count is live mid-turn rather than as stale as the last turn boundary.
+	 * Optional: a caller that only delegates never sees it.
+	 */
+	onChange?: () => void;
 }
 
 let piModulePromise: Promise<any> | null = null;
@@ -422,7 +428,12 @@ function usageOfRecord(record: ChildRecord): ChildHandle["usage"] | undefined {
  * reach a second `finally` that updated its status but dispatched nothing, so `send`ing a
  * finished child and ending the turn left the parent waiting for a notice that never came.
  */
-async function runChildTurn(record: ChildRecord, prompt: string): Promise<void> {
+async function runChildTurn(
+	record: ChildRecord,
+	prompt: string,
+	/** The manager's change signal: this turn's ending is a change in how many children work. */
+	changed: () => void,
+): Promise<void> {
 	try {
 		await record.session?.prompt(prompt);
 		record.status = "done";
@@ -432,6 +443,7 @@ async function runChildTurn(record: ChildRecord, prompt: string): Promise<void> 
 	} finally {
 		record.ended_at = new Date().toISOString();
 		record.usage = usageOfRecord(record);
+		changed();
 		const spent = record.usage?.total_tokens ? ` ${record.usage.total_tokens} tokens` : "";
 		const detail = [
 			`[${record.child_id} "${record.name}"] finished: ${record.status}${spent}`,
@@ -490,6 +502,19 @@ export function markNoticeReadIfFinished(record: { status: ChildStatus; noticeRe
 export function createChildManager(deps: ChildManagerDeps) {
 	const records = new Map<string, ChildRecord>();
 	let counter = 0;
+
+	/**
+	 * Every transition that changes how many children are working is announced, so the status line's
+	 * count is live rather than as stale as the last turn boundary. A footer must never break a child,
+	 * so a throwing listener is swallowed.
+	 */
+	function changed(): void {
+		try {
+			deps.onChange?.();
+		} catch {
+			/* the status line is not worth a child's turn */
+		}
+	}
 
 	/** Direct children with their tokens — the edges of one level of the tree. */
 	function directChildren(): Array<{ session_file: string | null; tokens: number }> {
@@ -643,13 +668,14 @@ export function createChildManager(deps: ChildManagerDeps) {
 			countedIds: new Set<string>(),
 		};
 		records.set(id, record);
+		changed();
 
 		// Register this manager under its own session file so the root can total the tree.
 		const ownFile = deps.ownSessionFile?.();
 		if (ownFile && !managerChildren.has(ownFile)) registerManagerView(ownFile, directChildren);
 
 		// Admission-only: the turn runs on its own, and completion is a notice.
-		void runChildTurn(record, request.prompt);
+		void runChildTurn(record, request.prompt, changed);
 
 		return handleOf(record);
 	}
@@ -683,6 +709,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 			}
 			record.status = "stopped";
 			record.ended_at = new Date().toISOString();
+			changed();
 		}
 		record.deleted = true;
 		record.noticeRead = true;
@@ -701,7 +728,8 @@ export function createChildManager(deps: ChildManagerDeps) {
 			record.ended_at = null;
 			record.reason = undefined;
 			record.noticeRead = false;
-			void runChildTurn(record, text);
+			changed();
+			void runChildTurn(record, text, changed);
 		}
 		return handleOf(record);
 	}
@@ -720,8 +748,10 @@ export function createChildManager(deps: ChildManagerDeps) {
 
 		/** Ticket 06: parent teardown kills descendants and marks them terminal. */
 		async shutdownAll(): Promise<void> {
+			let stoppedAny = false;
 			for (const record of records.values()) {
 				if (record.status !== "running") continue;
+				stoppedAny = true;
 				record.status = "stopped";
 				record.ended_at = new Date().toISOString();
 				try {
@@ -734,6 +764,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 				// resources open).
 				await disposeChildSession(record.session);
 			}
+			if (stoppedAny) changed();
 		},
 	};
 }
@@ -791,4 +822,18 @@ export async function findModels(runtime: any, query?: string, limit = 20): Prom
 		context_window: model.contextWindow ?? model.context_window ?? null,
 		reasoning: model.reasoning ?? model.supportsReasoning ?? null,
 	}));
+}
+
+/**
+ * The footer line rlm writes (`ctx.ui.setStatus("rlm", …)`): the kernel's state, and how many
+ * children are working when there are any.
+ *
+ * `live` is `liveCount()` — every running record in this session's manager, which for a root is every
+ * live descendant, grandchildren included. Zero is left unsaid rather than shown as `0`, because the
+ * line is read every turn. Print mode's UI is a no-op, so a child's own instance may call this
+ * harmlessly.
+ */
+export function statusLine(mounted: boolean, live: number): string {
+	const kernel = mounted ? "rlm: code-mode (monty)" : "rlm: kernel unavailable";
+	return live > 0 ? `${kernel} ch: ${live} running` : kernel;
 }

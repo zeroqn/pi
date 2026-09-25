@@ -11,10 +11,18 @@
  * would hand a child a root's spawning authority, and a cost that double-counts would
  * misreport what a tree spent.
  */
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+	capturedSessionOptions,
+	completeTurn,
+	holdTurn,
+	installFakePi,
+	releaseTurnNow,
+	setTurnBehavior,
+} from "./fake-pi";
 import {
 	CHILD_ENTRY_TYPE,
 	type CostTotals,
@@ -29,6 +37,7 @@ import {
 	childPromptFor,
 	registerManagerView,
 	resolveOwnDepth,
+	statusLine,
 	treeTokens,
 } from "../src/children";
 
@@ -225,44 +234,9 @@ describe("the read rule (ticket 06)", () => {
  * The manager, driven end-to-end with pi mocked
  * ------------------------------------------------------------------ */
 
-/**
- * `spawn` reaches pi through a dynamic import, which is the only thing standing between
- * these tests and a real child session. Mocking it lets the notice path be exercised for
- * real — statuses, withdrawal, `send` — instead of only through the extracted pieces. The
- * child's turn blocks until the test releases it, so "still running" is controllable.
- */
-let releaseTurn: (() => void) | null = null;
-let turnBehavior: () => Promise<void> = () =>
-	new Promise<void>((resolve) => {
-		releaseTurn = resolve;
-	});
+installFakePi();
 
-/** Every option bag the manager handed pi, so a test can read what a child was actually built with. */
-const capturedSessionOptions: any[] = [];
-
-mock.module("@earendil-works/pi-coding-agent", () => ({
-	SettingsManager: { create: () => ({}) },
-	DefaultResourceLoader: class {
-		async reload() {}
-	},
-	SessionManager: { create: () => ({ appendCustomEntry() {} }) },
-	createAgentSession: async (options: any) => {
-		capturedSessionOptions.push(options);
-		return {
-			session: {
-				sessionFile: "/tmp/child.jsonl",
-				model: null,
-				bindExtensions: async () => {},
-				prompt: () => turnBehavior(),
-				followUp: async () => {},
-				abort: async () => {},
-				dispose: () => {},
-			},
-		};
-	},
-}));
-
-function managerHarness() {
+function managerHarness(onChange?: () => void) {
 	const notices: Notice[] = [];
 	const manager = createChildManager({
 		cwd: () => "/tmp/work",
@@ -271,6 +245,7 @@ function managerHarness() {
 		runtime: async () => ({}),
 		maxDepth: 2,
 		maxLive: 8,
+		onChange,
 	});
 	return {
 		manager,
@@ -285,8 +260,7 @@ function managerHarness() {
 				ownerDispatch: (notice) => notices.push(notice),
 			}),
 		release: () => {
-			releaseTurn?.();
-			releaseTurn = null;
+			releaseTurnNow();
 		},
 	};
 }
@@ -296,11 +270,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
 
 describe("the manager's notices (ticket 06)", () => {
 	beforeEach(() => {
-		releaseTurn = null;
-		turnBehavior = () =>
-			new Promise<void>((resolve) => {
-				releaseTurn = resolve;
-			});
+		holdTurn();
 	});
 
 	it("a status check on a running child leaves its completion notice standing", async () => {
@@ -350,18 +320,15 @@ describe("the manager's notices (ticket 06)", () => {
 
 	it("carries a failure's reason, and a later success does not restate it", async () => {
 		const h = managerHarness();
-		turnBehavior = async () => {
+		setTurnBehavior(async () => {
 			throw new Error("boom");
-		};
+		});
 		const handle = await h.spawn();
 		await settle();
 		expect(h.notices[0]!.content).toContain("boom");
 
 		// Resuming clears the previous ending, so a success must not repeat the old failure.
-		turnBehavior = () =>
-			new Promise<void>((resolve) => {
-				releaseTurn = resolve;
-			});
+		holdTurn();
 		await h.manager.send(handle.child_id, "again");
 		h.release();
 		await settle();
@@ -372,14 +339,69 @@ describe("the manager's notices (ticket 06)", () => {
 });
 
 /* ------------------------------------------------------------------ *
+ * The status line's count
+ * ------------------------------------------------------------------ */
+
+describe("the working count the status line reads", () => {
+	beforeEach(() => {
+		holdTurn();
+	});
+
+	it("announces every transition that changes how many children are working", async () => {
+		let changes = 0;
+		const h = managerHarness(() => {
+			changes++;
+		});
+
+		const handle = await h.spawn();
+		expect(changes).toBe(1);
+		expect(h.manager.liveCount()).toBe(1);
+
+		h.release();
+		await settle();
+		expect(changes).toBe(2);
+		expect(h.manager.liveCount()).toBe(0);
+
+		// Resuming a finished child puts it back to work, so it counts again...
+		await h.manager.send(handle.child_id, "again");
+		expect(changes).toBe(3);
+		expect(h.manager.liveCount()).toBe(1);
+
+		// ...and removing it stops it, so the count falls without a turn ever finishing.
+		await h.manager.remove(handle.child_id);
+		expect(changes).toBe(4);
+		expect(h.manager.liveCount()).toBe(0);
+	});
+
+	it("falls to zero when the session tears its children down", async () => {
+		let changes = 0;
+		const h = managerHarness(() => {
+			changes++;
+		});
+		await h.spawn("one");
+		await h.spawn("two");
+		expect(h.manager.liveCount()).toBe(2);
+
+		await h.manager.shutdownAll();
+		expect(h.manager.liveCount()).toBe(0);
+		expect(changes).toBe(3);
+	});
+
+	it("names the kernel, and says nothing about zero children", () => {
+		expect(statusLine(true, 0)).toBe("rlm: code-mode (monty)");
+		expect(statusLine(true, 2)).toBe("rlm: code-mode (monty) ch: 2 running");
+		expect(statusLine(false, 0)).toBe("rlm: kernel unavailable");
+	});
+});
+
+/* ------------------------------------------------------------------ *
  * The ceiling (child-surface tickets 01, 03)
  * ------------------------------------------------------------------ */
 
 describe("the ceiling a child is built with", () => {
 	beforeEach(() => {
 		capturedSessionOptions.length = 0;
-		releaseTurn = null;
-		turnBehavior = async () => {};
+		completeTurn();
 	});
 
 	function harnessWith(overrides: Record<string, unknown> = {}) {
