@@ -5,9 +5,9 @@
  *
  * `.scratch/code-mode/acceptance-baseline.md` holds the same numbers, the three fragments
  * the split removed from the pre-split description, what rlm contributes in their place, and
- * the two amendments since: code mode's own search guidelines, contents and then paths. Those
- * are why the second guideline test below pins a *whole-array* hash while the first still pins
- * the pre-split six.
+ * the three amendments since: code mode's own guidelines for searching contents, for finding
+ * paths, and for listing a directory. Those are why the second guideline test below pins a
+ * *whole-array* hash while the first still pins the pre-split six.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -31,13 +31,14 @@ describe("the base surface (acceptance check 2)", () => {
 		expect(BASE_GUIDELINES[0]).toStartWith("Use python for work that is stateful");
 	});
 
-	// The two deliberate additions since the split, one per search primitive. They are here rather
-	// than in a contribution because they route what code mode owns, and they are pinned because
-	// they are what the model reads: a cell that never sees them searches with bash.
-	it("carries the two search guidelines, the only lines added since", () => {
-		expect(BASE_GUIDELINES.length).toBe(8);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("61d8db8e1f9ca59696bc71e9d3a57bb47015b60eaa803387f3ea06b617e8f64a");
+	// The three deliberate additions since the split: search, then find, then list. They are here
+	// rather than in a contribution because they route what code mode owns, and they are pinned
+	// because they are what the model reads -- a cell that never sees them reaches for bash.
+	it("carries the three added guidelines, the only lines since the split", () => {
+		expect(BASE_GUIDELINES.length).toBe(9);
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("08de9e0ebff33663b6d9ad5deebe9c29e13490a1904798aa558e0187b49b688e");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
+		expect(BASE_GUIDELINES[8]).toStartWith("In python, list a directory with");
 	});
 });
