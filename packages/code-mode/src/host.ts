@@ -197,7 +197,11 @@ export function makeHost(options: {
 			if (result.exitCode !== 0 && !result.stdout.trim()) {
 				throw new Error(`find failed: ${result.stderr.trim() || `exit ${result.exitCode}`}`);
 			}
-			return result.stdout.split("\n").filter(Boolean).slice(0, limit);
+			// Sorted, because fd walks in parallel and hands paths back in whatever order its threads
+			// finished: a cell that takes the first of a set would get a different one twice. It orders
+			// what came back, it does not rank -- a result that hit `limit` is still whichever entries
+			// fd stopped after, so that set is not the alphabetically first ones.
+			return result.stdout.split("\n").filter(Boolean).sort().slice(0, limit);
 		},
 
 		async grep(...args: unknown[]): Promise<Match[]> {

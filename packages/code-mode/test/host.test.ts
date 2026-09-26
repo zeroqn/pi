@@ -85,19 +85,21 @@ describe("a real grep call, whichever engine this host has", () => {
 
 describe("find, whose two knobs come from the shell calls it replaces", () => {
 	const host = (root: string) => makeHost({ root, attachments: [], extra: {}, background: {} as never });
-	// fd's order is its own traversal's and a truncated result is whichever `limit` entries it
-	// reached first, so these assertions sort rather than pin an order fd never promised.
-	const sorted = (paths: string[]) => paths.slice().sort();
 
-	it("narrows by max_depth and by type, and marks a directory with a trailing slash", async () => {
+	// These assert order rather than sorting the expectation: that is the point of the sort in the
+	// host function. Note the residual -- a run that hit `limit` is still whichever entries fd
+	// stopped after, so the sort makes a *result* repeatable, not a truncated *set*.
+	it("narrows by max_depth and by type, marks a directory with a trailing slash, and sorts", async () => {
 		const root = mkdtempSync(join(tmpdir(), "code-mode-find-"));
 		mkdirSync(join(root, "a", "b"), { recursive: true });
 		writeFileSync(join(root, "a", "one.txt"), "");
 		writeFileSync(join(root, "a", "b", "two.txt"), "");
 		const find = host(root).find;
-		expect(sorted(await find("*.txt"))).toEqual([join(root, "a", "b", "two.txt"), join(root, "a", "one.txt")]);
+		// `a/b/two.txt` sorts before `a/one.txt`, and it is the deeper one: the sort is lexical over
+		// the whole path, not a traversal order that happens to look sorted.
+		expect(await find("*.txt")).toEqual([join(root, "a", "b", "two.txt"), join(root, "a", "one.txt")]);
 		expect(await find("*.txt", { max_depth: 2 })).toEqual([join(root, "a", "one.txt")]);
-		expect(sorted(await find("*", { type: "directory" }))).toEqual([`${join(root, "a")}/`, `${join(root, "a", "b")}/`]);
+		expect(await find("*", { type: "directory" })).toEqual([`${join(root, "a")}/`, `${join(root, "a", "b")}/`]);
 	});
 
 	it("fails loudly on a type fd does not know, rather than answering with no matches", async () => {
