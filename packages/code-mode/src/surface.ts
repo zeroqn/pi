@@ -30,4 +30,5 @@ export const BASE_GUIDELINES = [
 	"In python there are no third-party imports and no generators, inheritance or decorators. When you need real CPython or a library, use await bash(\"python3 ...\").",
 	"In python, bulk file reads are faster through await bash(...) than through the kernel's own open(): each file operation is a separate host call. Use Python loops for logic over files, not for reading many of them.",
 	"In python, search file contents with `await grep(pattern, path=..., glob=..., literal=...)` rather than `bash(\"grep ...\")`: it is ripgrep when the host has it, so it honours `.gitignore` and returns `{path, line, text}` records you can index. Keep shell grep for what it cannot do \u2014 a pipe into `grep -v`, a `grep -l` file list, `xargs`.",
+	"In python, find paths with `await find(glob, path=..., max_depth=..., type=\"file\")` rather than `bash(\"find ...\")`: it is fd, so it skips what `.gitignore` skips, needs no `2>/dev/null | head`, and gives a directory a trailing `/`. Shell out for what it cannot answer \u2014 `-newer`/`-size` predicates, `-exec`, and the sizes and times `ls -la` prints.",
 ];
