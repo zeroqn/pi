@@ -198,7 +198,7 @@ Answer the question. Nothing on disk may change while this mode is on.
  * commands, and a cell is neither. Say what actually happens in there, and say why a refusal is
  * worth reporting rather than working around.
  */
-const READ_ONLY_CELL_PROMPT = `- In a code-mode session your Python runs in one kernel whose workspace is mounted read-only: \`write_text\`, \`edit_text\`, \`mkdirp\` and \`open(..., "w")\` raise \`PermissionError\` there, and a mutating shell command run with \`await bash(...)\` is refused by the same allowlist as above.
+const READ_ONLY_CELL_PROMPT = `- In a code-mode session your Python runs in one kernel whose workspace is mounted read-only: \`write_text\`, \`edit_text\`, \`mkdirp\` and \`open(..., "w")\` raise \`PermissionError\` there, and a mutating shell command run with \`await bash(...)\` is refused by the same allowlist as above. A bounded \`sleep\` of up to 30 seconds is allowed, so pacing a read of something another process is still writing is a supported way to answer.
 - A few extension capabilities stay available inside a cell — delegation, web reads, the context store — because they do not write the workspace. That is a declared exception, not a licence: anything else is refused by name, and if you need a capability that is refused, say which one and stop rather than looking for another route.`;
 
 interface ReadOnlyState {

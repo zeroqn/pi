@@ -112,6 +112,8 @@ const ALLOWED = [
 	"npm list --depth=0",
 	"yarn why react",
 	"curl -s https://example.com",
+	// Pacing a read, which is the whole reason sleep is on the list.
+	"sleep 5",
 	"curl --silent --location https://example.com",
 	// Quoted text is inert, including a pipe inside a search pattern.
 	"rg -n 'foo|bar' src",
@@ -155,6 +157,27 @@ test("blocks commands that could modify the workspace", () => {
 		assert.equal(verdict.ok, false, `expected blocked: ${command}`);
 		assert.ok(verdict.reason, `blocked command needs a reason: ${command}`);
 	}
+});
+
+test("bounded sleep: a literal number of seconds, and not a long one", () => {
+	// The point of it: a research session watching something another process is still writing.
+	for (const command of ["sleep 0", "sleep 5", "sleep 30", "  sleep 12  "]) {
+		assert.equal(checkReadOnlyCommand(command).ok, true, `expected allowed: ${command}`);
+	}
+
+	// Over the bound, told what to do instead rather than refused flatly.
+	const long = checkReadOnlyCommand("sleep 999");
+	assert.equal(long.ok, false);
+	assert.match(long.reason, /limited to 30 seconds/);
+	assert.match(long.reason, /read again/);
+
+	// Everything that is not a bounded literal, including the forms GNU sleep accepts.
+	for (const command of ["sleep", "sleep infinity", "sleep 5s", "sleep 1m", "sleep 0.5", "sleep -1"]) {
+		const verdict = checkReadOnlyCommand(command);
+		assert.equal(verdict.ok, false, `expected blocked: ${command}`);
+		assert.match(verdict.reason, /whole number of seconds/, `reason for ${command}: ${verdict.reason}`);
+	}
+	assert.equal(checkReadOnlyCommand("sleep 5 && ls").ok, false, "composition is still composition");
 });
 
 test("allows the reads a query session needs", () => {
@@ -510,6 +533,9 @@ test("the prompt describes the cell only where there is a governed kernel to des
 	assert.match(withCell, /your Python runs in one kernel whose workspace is mounted read-only/);
 	assert.match(withCell, /raise `PermissionError` there/);
 	assert.match(withCell, /declared exception, not a licence/);
+	// Research under the mode needs to be able to wait between two reads, and the prompt has to say so
+	// or the model will not know the wait is available.
+	assert.match(withCell, /A bounded `sleep` of up to 30 seconds is allowed/);
 
 	// Off is off: neither half is injected.
 	await h.commands.readonly.handler("", h.ctx);

@@ -16,7 +16,10 @@
  *  3. Per-command rules. Commands that can write through a flag of their own
  *     (find -delete, fd -x, sort -o, tree -o, curl -o, ...), and commands whose
  *     only read-only form is a version probe, a read subcommand, or a plain
- *     GET, get an extra gate.
+ *     GET, get an extra gate. `sleep` is the odd one out — it writes nothing and
+ *     reads nothing — so it is gated on its argument instead: a bounded literal,
+ *     because pacing a read is an errand this mode should support and an
+ *     unbounded wait is not.
  *
  * The gate reasons about text, so it blocks whatever it cannot reason about.
  * It is a guardrail against incident, not a sandbox: bash still has the process
@@ -33,6 +36,8 @@ const HINT =
 	"Use the read, ffgrep, fffind or zvec_grep tools instead of shelling out, or run /readonly to leave read-only mode.";
 
 const ALLOWED_COMMANDS = new Set([
+	// Pacing a read. Bounded literal only — see the sleep gate below.
+	"sleep",
 	// File and directory inspection.
 	"cat", "head", "tail", "less", "more", "nl", "wc", "file", "stat", "du", "df", "tree",
 	"ls", "pwd", "basename", "dirname", "realpath", "readlink", "which", "whereis",
@@ -50,6 +55,22 @@ const ALLOWED_COMMANDS = new Set([
 	// Plain GET to stdout only (see the curl gate).
 	"curl",
 ]);
+
+/**
+ * `sleep`, and the only form of it this mode has a use for.
+ *
+ * It reads nothing, so it earns its place on a different ground: **pacing a read**. Research under
+ * read-only mode legitimately means watching something a process *outside* this session is still
+ * writing — a build log, a spool file, a service's output — and that needs a wait between two reads.
+ *
+ * What it must not be is unbounded: `sleep infinity`, or a number of a size that is really "until
+ * something else happens", is a stalled host call rather than a read, and a cell that hangs is worse
+ * than one that is told to read again. The number must also be a **literal**, which costs nothing to
+ * require — expansion is already impossible here — and keeps the bound checkable without evaluating
+ * anything.
+ */
+const SLEEP_BOUND_SECONDS = 30;
+const SLEEP_LITERAL = /^\s*sleep\s+(\d+)\s*$/;
 
 const VERSION_ONLY_COMMANDS = new Set(["node", "python", "python3", "deno", "bun", "go", "cargo", "rustc"]);
 const VERSION_ONLY = /^\s*(node|python|python3|deno|bun|go|cargo|rustc)\s+(--version|-v|-V|--help|-h)\s*$/;
@@ -202,6 +223,19 @@ function check(command: string, depth: number): CommandVerdict {
 
 	if (VERSION_ONLY_COMMANDS.has(base) && !VERSION_ONLY.test(line)) {
 		return block(`${base} would execute code; in read-only mode it is limited to --version and --help`);
+	}
+	if (base === "sleep") {
+		const literal = line.match(SLEEP_LITERAL)?.[1];
+		if (literal === undefined) {
+			return block(
+				`sleep takes a whole number of seconds, up to ${SLEEP_BOUND_SECONDS}; read-only mode will not wait on a computed or unbounded duration`,
+			);
+		}
+		if (Number(literal) > SLEEP_BOUND_SECONDS) {
+			return block(
+				`sleep is limited to ${SLEEP_BOUND_SECONDS} seconds in read-only mode; wait that long, read, and read again if it is still changing`,
+			);
+		}
 	}
 	if (PACKAGE_MANAGERS.has(base) && !PKG_READ.test(line)) {
 		return block(
