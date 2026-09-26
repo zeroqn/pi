@@ -133,6 +133,11 @@ const EXEMPT_HOST_CALLS: Array<{ name: string; reason: string }> = [
 	{ name: "fetch_content", reason: "reads one page into the session's scratch" },
 	{ name: "skills_host", reason: "lists learned skills" },
 	{ name: "skill_host", reason: "reads one skill file" },
+	{
+		name: "ask_user_question",
+		reason:
+			"asks the user a question and waits: nothing is written, and the read-only mount still refuses any effect the answer might suggest",
+	},
 	{ name: "tool", reason: "the tool bridge's route; the capability it carries is judged below" },
 	{ name: "ctx_search", reason: "reads the context store" },
 	{ name: "ctx_expand", reason: "reads the context store" },

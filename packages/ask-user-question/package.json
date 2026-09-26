@@ -1,0 +1,35 @@
+{
+	"name": "pi-ask-user-question",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "The questionnaire a code-mode cell can ask: a pi-host-bridge contributor that exposes ask_user_question to the kernel. Ported from @juicesharp/rpiv-ask-user-question.",
+	"keywords": [
+		"pi-package",
+		"pi",
+		"code-mode",
+		"questionnaire",
+		"tui"
+	],
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	},
+	"dependencies": {
+		"typebox": "^1.1.24"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*"
+	},
+	"scripts": {
+		"test": "bun test",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"typescript": "^5.8.0",
+		"@types/bun": "^1.4.2"
+	}
+}
