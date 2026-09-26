@@ -186,3 +186,16 @@ The mount set handed to monty with *each* feed rather than bound to the session 
 mode change land on the next cell with the kernel, its variables and its journal intact, and what makes
 "read-only starts at the next cell" one story for the mount, the shell gate and the live shells alike.
 _Avoid_: dynamic mount, hot mount
+
+**Inherited hold**:
+The mode a child session was spawned under, kept in the child's own transcript by the session that
+spawned it, so that a child resumed after that session is gone comes back read-only instead of silently
+writable. Distinct from a **live hold** — a spawner still in the process — which the child cannot lift;
+an inherited hold is an initial state the child's own `/readonly` may change.
+_Avoid_: parent mode, saved state, sticky mode
+
+**Pending read-only**:
+Read-only mode asked for and not yet on, because background shells are still running and the answer to the
+toggle's question was *wait*. The status line says so, the mode's ordinary effects have not begun, and it
+starts by itself once nothing is running.
+_Avoid_: queued, deferred mode, half-on
