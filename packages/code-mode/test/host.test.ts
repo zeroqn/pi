@@ -1,10 +1,11 @@
 /**
- * The `grep` host function's backend: ripgrep when the host has it, GNU grep when it has not, and
- * one shape (`path:line:text`) read back from either. A cell should not be able to tell which
- * engine answered, except through the files that engine's own ignore rules leave out.
+ * The two search host functions. `grep`: ripgrep when the host has it, GNU grep when it has not,
+ * and one shape (`path:line:text`) read back from either — a cell should not be able to tell which
+ * engine answered, except through the files that engine's own ignore rules leave out. `find`: fd,
+ * with the two knobs the shell `find`s in the journals actually used.
  */
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type GrepQuery, grepArgv, makeHost, parseGrepOutput } from "../src/host";
@@ -79,5 +80,28 @@ describe("a real grep call, whichever engine this host has", () => {
 		// Exit 1 with nothing on stdout is how both engines say "no matches". It is an empty list,
 		// never an error and never a sentinel line a cell could mistake for a hit.
 		expect(await grep("NOTHING-ANYWHERE-9f3c", { literal: true })).toEqual([]);
+	});
+});
+
+describe("find, whose two knobs come from the shell calls it replaces", () => {
+	const host = (root: string) => makeHost({ root, attachments: [], extra: {}, background: {} as never });
+	// fd's order is its own traversal's and a truncated result is whichever `limit` entries it
+	// reached first, so these assertions sort rather than pin an order fd never promised.
+	const sorted = (paths: string[]) => paths.slice().sort();
+
+	it("narrows by max_depth and by type, and marks a directory with a trailing slash", async () => {
+		const root = mkdtempSync(join(tmpdir(), "code-mode-find-"));
+		mkdirSync(join(root, "a", "b"), { recursive: true });
+		writeFileSync(join(root, "a", "one.txt"), "");
+		writeFileSync(join(root, "a", "b", "two.txt"), "");
+		const find = host(root).find;
+		expect(sorted(await find("*.txt"))).toEqual([join(root, "a", "b", "two.txt"), join(root, "a", "one.txt")]);
+		expect(await find("*.txt", { max_depth: 2 })).toEqual([join(root, "a", "one.txt")]);
+		expect(sorted(await find("*", { type: "directory" }))).toEqual([`${join(root, "a")}/`, `${join(root, "a", "b")}/`]);
+	});
+
+	it("fails loudly on a type fd does not know, rather than answering with no matches", async () => {
+		const root = mkdtempSync(join(tmpdir(), "code-mode-find-bad-"));
+		await expect(host(root).find("*", { type: "bogus" })).rejects.toThrow(/find failed/);
 	});
 });

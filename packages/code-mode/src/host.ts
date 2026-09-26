@@ -176,10 +176,17 @@ export function makeHost(options: {
 		},
 
 		async find(...args: unknown[]) {
-			const bound = bind(args, ["pattern", "path", "limit"]);
+			const bound = bind(args, ["pattern", "path", "limit", "max_depth", "type"]);
 			const searchPath = str(bound.path) || root;
 			const limit = num(bound.limit, 1000);
+			const maxDepth = num(bound.max_depth, 0);
+			const kind = str(bound.type);
 			const argv = ["--glob", "--color=never", "--hidden", "--no-require-git", "--max-results", String(limit)];
+			// fd's own two knobs, passed through rather than re-tabulated: a `type` fd does not know
+			// exits 2 and lists the ones it takes, which is louder than a silent no-match. These are
+			// the two shells out of the journal's `find` traffic: `-maxdepth` 117 times, `-type` 57.
+			if (maxDepth > 0) argv.push("--max-depth", String(maxDepth));
+			if (kind) argv.push("--type", kind);
 			let effective = str(bound.pattern);
 			if (effective.includes("/")) {
 				argv.push("--full-path");
