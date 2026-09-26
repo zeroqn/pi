@@ -11,7 +11,7 @@
  * for having no claimant — see `../rsi-oneway` ticket 09 — and a *guard* is not its return: that
  * was a notification with no veto, and this is a decision that runs before the call.)
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { run, spill, truncate } from "./output";
 import { bool, num, str } from "./util";
@@ -22,8 +22,22 @@ import type { HostFns } from "./journal";
 /** Where the host functions that shell out live, and how long a cell's output may be —
  * code mode's own environment knobs (ticket 03). */
 const FD = process.env.RLM_FD ?? "/nix/store/5j3vslc4gccb95xnzr1mxhgwrc0wfgad-fd-10.4.2/bin/fd";
-const ZG = process.env.RLM_ZG ?? "zg";
 const SHELL = process.env.RLM_SHELL ?? process.env.SHELL ?? "/bin/bash";
+
+/** `grep` is ripgrep when the host has it and GNU grep when it has not: the primitive is "search
+ * the files", not "call one engine", so the first one on PATH answers and the other catches the
+ * host that lacks it. The two want different flags, so the kind travels beside the path. */
+const RG = onPath("rg");
+const GREP_KIND: "rg" | "grep" = RG ? "rg" : "grep";
+const GREP = RG ?? onPath("grep") ?? "grep";
+
+/** The first `name` on PATH, or null. Probed once at load: this is the host's PATH, not a cell's. */
+function onPath(name: string): string | null {
+	for (const dir of (process.env.PATH ?? "").split(":")) {
+		if (dir && existsSync(join(dir, name))) return join(dir, name);
+	}
+	return null;
+}
 
 const MIME: Record<string, string> = {
 	".png": "image/png",
@@ -37,23 +51,52 @@ const MIME: Record<string, string> = {
 export type TextPart = { type: "text"; text: string };
 export type ImagePart = { type: "image"; data: string; mimeType: string };
 export type Attachment = ImagePart & { path: string };
-type Match = { path: string | null; line: number | null; text: string };
+/** One hit, as a cell reads it. Both engines are asked for the file name and the line number, so
+ * neither field is ever absent — which is what lets a cell index on them without a null check. */
+type Match = { path: string; line: number; text: string };
 
-export function parseZgOutput(text: string): Match[] {
+/** `path:line:text`, which is what ripgrep and GNU grep both print once the file name is forced.
+ * A context line (`path-line-text`) and any other chatter are skipped, as they always were. */
+export function parseGrepOutput(text: string): Match[] {
 	const matches: Match[] = [];
-	let current: string | null = null;
 	for (const raw of text.split("\n")) {
-		if (!raw.trim()) continue;
-		if (!/^\s/.test(raw)) {
-			current = raw.trim();
-			continue;
-		}
-		if (!current) continue;
-		const hit = /(\d+):(.*)$/.exec(raw);
+		if (!raw) continue;
+		const hit = /^(.*?):(\d+):(.*)$/.exec(raw);
 		if (!hit) continue;
-		matches.push({ path: current, line: Number(hit[1]), text: hit[2].replace(/^\t/, "").trimEnd() });
+		matches.push({ path: hit[1], line: Number(hit[2]), text: hit[3].trimEnd() });
 	}
 	return matches;
+}
+
+/** What a cell asked for, in the engine's terms rather than the cell's. */
+export type GrepQuery = {
+	pattern: string;
+	path: string;
+	glob: string | null;
+	ignoreCase: boolean;
+	literal: boolean;
+	context: number;
+	limit: number;
+};
+
+/** The flags each engine needs to answer one question the same way. `--with-filename`/`-H` are
+ * forced so both print `path:line:text` (ripgrep drops the path when handed a single file), and
+ * `--hidden` is ripgrep's alone: GNU grep has no ignore rules to re-enable. */
+export function grepArgv(kind: "rg" | "grep", query: GrepQuery): string[] {
+	const argv =
+		kind === "rg"
+			? ["--hidden", "--with-filename", "--line-number", "--no-heading", "--color=never"]
+			: ["-r", "-n", "-H", "--color=never"];
+	if (query.ignoreCase) argv.push("-i");
+	if (query.literal) argv.push("-F");
+	if (query.glob) {
+		if (kind === "rg") argv.push("--glob", query.glob);
+		else argv.push(query.glob.startsWith("!") ? `--exclude=${query.glob.slice(1)}` : `--include=${query.glob}`);
+	}
+	if (query.context) argv.push("-C", String(query.context));
+	argv.push("-m", String(query.limit));
+	argv.push(kind === "rg" ? "--" : "-e", query.pattern, query.path);
+	return argv;
 }
 
 export function bind(args: unknown[], names: string[]): Record<string, unknown> {
@@ -153,23 +196,22 @@ export function makeHost(options: {
 		async grep(...args: unknown[]): Promise<Match[]> {
 			const bound = bind(args, ["pattern", "path", "glob", "ignore_case", "literal", "context", "limit"]);
 			const limit = num(bound.limit, 100);
-			const argv = ["query", "--rg", "--hidden"];
-			if (bool(bound.ignore_case)) argv.push("-i");
-			if (bool(bound.literal)) argv.push("-F");
-			if (bound.glob) argv.push("--glob", str(bound.glob));
-			if (bound.context) argv.push("-C", str(bound.context));
-			argv.push("-m", String(limit), str(bound.pattern), str(bound.path) || root);
-			const result = await run(ZG, argv, { cwd: root });
-			const parsed = parseZgOutput(result.stdout);
-			if (parsed.length > 0) return parsed.slice(0, limit);
-			if (!result.stdout.trim()) {
-				throw new Error(`grep produced nothing: ${result.stderr.trim() || `exit ${result.exitCode}`}`);
-			}
-			return result.stdout
-				.split("\n")
-				.filter(Boolean)
-				.slice(0, limit)
-				.map((line) => ({ path: null, line: null, text: line }));
+			const query: GrepQuery = {
+				pattern: str(bound.pattern),
+				path: str(bound.path) || root,
+				glob: bound.glob ? str(bound.glob) : null,
+				ignoreCase: bool(bound.ignore_case),
+				literal: bool(bound.literal),
+				context: bound.context ? num(bound.context, 0) : 0,
+				limit,
+			};
+			const result = await run(GREP, grepArgv(GREP_KIND, query), { cwd: root });
+			const matches = parseGrepOutput(result.stdout);
+			if (matches.length > 0) return matches.slice(0, limit);
+			// Both engines answer exit 1 with nothing on stdout when the pattern is simply not
+			// there: an empty result, not a failure. Anything else silent is a failure, and says so.
+			if (result.exitCode === 1) return [];
+			throw new Error(`grep failed: ${result.stderr.trim() || `exit ${result.exitCode}`}`);
 		},
 
 		async read_image(...args: unknown[]) {

@@ -113,16 +113,17 @@ way a contributor's host functions reach a kernel — then the contributors them
 `-e /workspace/pi/extensions/packages/rlm/index.ts` for delegation and
 `-e /workspace/pi/extensions/packages/web-access/host.ts` for web host functions.
 
-Environment overrides: `RLM_FD` (find backend), `RLM_ZG` (grep backend), `RLM_SHELL`. `MONTY_BIN`
-is only needed on a host without `/lib64/ld-linux-x86-64.so.2` — NixOS, musl; the flake's
-`.#monty-bin` is the published worker patched for Nix (do **not** use `.#monty`, the local checkout
-at protocol 3).
+Environment overrides: `RLM_FD` (find backend), `RLM_SHELL`. `grep` takes none: it is **ripgrep
+when `rg` is on `PATH`, GNU `grep` when it is not**, so a host without ripgrep still searches — with
+that engine's own ignore rules, which is the whole reason to prefer ripgrep. `MONTY_BIN` is only
+needed on a host without `/lib64/ld-linux-x86-64.so.2` — NixOS, musl; the flake's `.#monty-bin` is
+the published worker patched for Nix (do **not** use `.#monty`, the local checkout at protocol 3).
 
 ## Tests
 
 ```bash
 cd /workspace/pi/extensions/packages/code-mode
-bun test        # 68 tests, 0 fail
+bun test        # 120 tests, 0 fail
 ```
 
 The monty-backed tests skip themselves without a worker, so the suite is runnable anywhere. The
