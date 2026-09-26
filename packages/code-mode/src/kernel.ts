@@ -1072,5 +1072,24 @@ export function createKernel(options: {
 		progress: () => currentProgress,
 		problems: () => ensurePreflight(),
 		contribute: (contribution) => ledger.accept(contribution),
+		/** What a policy needs in order to name the shells it would stop (readonly-limits ticket 03). */
+		backgrounds: () =>
+			background.list().map((handle) => ({
+				id: handle.id,
+				command: handle.command,
+				status: handle.status,
+				started_at: handle.started_at,
+			})),
+		killBackgrounds: async (ids?: string[]) => {
+			const wanted = ids && ids.length > 0 ? new Set(ids.map(String)) : null;
+			const killed: string[] = [];
+			for (const handle of background.list()) {
+				if (handle.status !== "running") continue;
+				if (wanted && !wanted.has(handle.id)) continue;
+				background.kill(handle.id);
+				killed.push(handle.id);
+			}
+			return killed;
+		},
 	};
 }

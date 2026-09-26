@@ -171,7 +171,14 @@ test("allows the reads a query session needs", () => {
 
 let sessionCounter = 0;
 
-function load({ flag = false, active = ["read", "bash", "edit", "write", "todowrite", "read_symbol"], entries = [], sessionFile } = {}) {
+function load({
+	flag = false,
+	active = ["read", "bash", "edit", "write", "todowrite", "read_symbol"],
+	entries = [],
+	sessionFile,
+	hasUI = false,
+	confirm = null,
+} = {}) {
 	const handlers = {};
 	const commands = {};
 	const shortcuts = {};
@@ -211,11 +218,17 @@ function load({ flag = false, active = ["read", "bash", "edit", "write", "todowr
 	// What this session's own transcript received from another extension — which is how a spawner
 	// writes the marker into a child's session.
 	const transcript = [];
+	const confirmations = [];
 	const ctx = {
+		hasUI,
 		ui: {
 			notify: (message) => notifications.push(message),
 			setStatus: (key, value) => statuses.set(key, value),
 			theme: { fg: (_color, text) => text },
+			confirm: async (title, message) => {
+				confirmations.push({ title, message });
+				return confirm ? confirm(title, message) : false;
+			},
 		},
 		sessionManager: {
 			getEntries: () => entries,
@@ -237,6 +250,7 @@ function load({ flag = false, active = ["read", "bash", "edit", "write", "todowr
 		ctx,
 		file,
 		transcript,
+		confirmations,
 		tools: () => activeTools,
 	};
 }
@@ -341,20 +355,33 @@ test("--readonly starts gated, and a resumed session restores the mode", async (
  * `handleApiVersion` is the contract version the mounted code mode reports: 2 knows the `guard`
  * slot, anything lower does not.
  */
-async function cellLane({ flag = false, entries = [], handleApiVersion = 2, isChild = false } = {}) {
-	const h = load({ flag, entries });
+async function cellLane({ flag = false, entries = [], handleApiVersion = 2, isChild = false, shells = [], hasUI = false, confirm = null } = {}) {
+	const h = load({ flag, entries, hasUI, confirm });
 	await h.handlers.session_start[0]({}, h.ctx);
 	const key = sessionKey(h.ctx);
 	const registration = contributors().find((r) => r.owner === "readonly-mode" && r.key.endsWith(key));
+	// The two handle members a policy uses to see and stop the shells the mount cannot reach.
+	const handle = {
+		apiVersion: handleApiVersion,
+		backgrounds: () => shells,
+		killBackgrounds: async (ids) => {
+			const wanted = ids && ids.length > 0 ? ids : null;
+			const killed = shells
+				.filter((shell) => shell.status === "running" && (!wanted || wanted.includes(shell.id)))
+				.map((shell) => shell.id);
+			for (const id of killed) shells.find((shell) => shell.id === id).status = "killed";
+			return killed;
+		},
+	};
 	const answer = registration?.session({
 		ctx: h.ctx,
 		sessionKey: key,
-		handle: { apiVersion: handleApiVersion },
+		handle,
 		isChild,
 		cwd: "/workspace",
 		sessionFile: undefined,
 	});
-	return { h, key, registration, answer, guard: answer?.contribution?.guard };
+	return { h, key, registration, answer, shells, guard: answer?.contribution?.guard };
 }
 
 const allowed = (verdict) => verdict === undefined;
@@ -738,4 +765,73 @@ test("a root session with neither marker nor floor is unchanged", async () => {
 	await h.handlers.session_start[0]({}, h.ctx);
 	assert.equal(h.statuses.get("readonly-mode"), undefined);
 	assert.deepEqual(h.tools(), ["read", "bash", "edit", "write", "todowrite", "read_symbol"]);
+});
+
+// ---------------------------------------------------------------------------
+// The shells the mount cannot reach (ticket 03): the toggle asks, and "wait"
+// means the mode waits.
+// ---------------------------------------------------------------------------
+
+const aShell = (id = "bg-1") => ({
+	id,
+	command: "npm run build",
+	status: "running",
+	started_at: "2026-09-25T14:00:00.000Z",
+});
+
+test("with no dialog-capable UI the shells are killed, not waited for", async () => {
+	const { h, shells } = await cellLane({ shells: [aShell()] });
+	await toggleOn(h);
+	assert.equal(shells[0].status, "killed");
+	assert.equal(h.statuses.get("readonly-mode"), "🔒 read-only");
+	assert.match(h.notifications.join(" "), /killed 1 background shell\(s\)/);
+	// The mode is on and the tools are filtered: nobody was available to say otherwise.
+	assert.ok(!h.tools().includes("edit"));
+});
+
+test("with a UI the toggle asks, and kills the ones it is told to kill", async () => {
+	const { h, shells } = await cellLane({ shells: [aShell()], hasUI: true, confirm: () => true });
+	await toggleOn(h);
+	assert.equal(shells[0].status, "killed");
+	assert.equal(h.statuses.get("readonly-mode"), "🔒 read-only");
+	assert.equal(h.confirmations.length, 1);
+	// The question names what it is about to stop, not a count it guessed.
+	assert.match(h.confirmations[0].message, /bg-1 — npm run build/);
+});
+
+test("answering no keeps the mode off until the shells finish, and the status says so", async () => {
+	const { h, shells } = await cellLane({ shells: [aShell()], hasUI: true, confirm: () => false });
+	await toggleOn(h);
+
+	assert.equal(shells[0].status, "running", "a spared shell is left alone");
+	assert.equal(h.statuses.get("readonly-mode"), "🔒 read-only (waiting for 1 shell(s))");
+	assert.ok(h.tools().includes("edit"), "the mode is not on, so nothing has been taken away");
+	assert.match(h.notifications.join(" "), /off until 1 background shell\(s\) finish/);
+
+	// The wait ends at the turn boundary, once nothing is running — and the turn is the first read-only
+	// one, because the prompt is built after this.
+	shells[0].status = "done";
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.equal(h.statuses.get("readonly-mode"), "🔒 read-only");
+	assert.ok(!h.tools().includes("edit"));
+	const prompt = (await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx))?.systemPrompt ?? "";
+	assert.match(prompt, /## Read-only mode \(active\)/);
+});
+
+test("a wait still running at the boundary stays a wait", async () => {
+	const { h } = await cellLane({ shells: [aShell()], hasUI: true, confirm: () => false });
+	await toggleOn(h);
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.equal(h.statuses.get("readonly-mode"), "🔒 read-only (waiting for 1 shell(s))");
+});
+
+test("a second /readonly cancels the wait rather than asking again", async () => {
+	const { h, shells } = await cellLane({ shells: [aShell()], hasUI: true, confirm: () => false });
+	await toggleOn(h);
+	await toggleOn(h); // cancels
+
+	assert.equal(h.statuses.get("readonly-mode"), undefined);
+	assert.equal(h.confirmations.length, 1, "the second press asks nothing");
+	assert.equal(shells[0].status, "running");
+	assert.match(h.notifications.at(-1), /wait was cancelled/);
 });

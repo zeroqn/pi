@@ -499,4 +499,28 @@ describe("a mode change and the shells the mount cannot reach", () => {
 		await cell(handle, made, "x = 1");
 		expect(await cell(handle, made, "print('quiet')")).not.toContain("background shell");
 	});
+
+	maybe("hands a policy the shells it is holding, and stops exactly the ones it names", async () => {
+		const { handle, made } = session("read-write");
+		const canaryA = join(dir, "accessor-a");
+		const canaryB = join(dir, "accessor-b");
+		// Two real shells, so the id filter has something to leave alone.
+		await cell(handle, made, `await bash("sleep 2 && touch ${canaryA}", background=True)`);
+		await cell(handle, made, `await bash("sleep 2 && touch ${canaryB}", background=True)`);
+
+		const kernel = handle.kernel as Kernel;
+		const running = kernel.backgrounds?.().filter((entry) => entry.status === "running") ?? [];
+		expect(running).toHaveLength(2);
+		// Enough to name one to a human, and nothing more.
+		expect(Object.keys(running[0] ?? {}).sort()).toEqual(["command", "id", "started_at", "status"]);
+		expect(running[0]?.command).toContain("sleep 2");
+
+		const first = running[0]?.id ?? "";
+		expect(await kernel.killBackgrounds?.([first])).toEqual([first]);
+		expect(kernel.backgrounds?.().filter((entry) => entry.status === "running")).toHaveLength(1);
+
+		await settle(3000);
+		expect(existsSync(canaryA)).toBe(false);
+		expect(existsSync(canaryB)).toBe(true);
+	});
 });

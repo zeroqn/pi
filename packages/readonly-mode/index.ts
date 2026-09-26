@@ -34,7 +34,7 @@
 
 import { resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { KernelGuard, KernelGuardVerdict } from "../host-bridge/src/client.ts";
+import type { KernelBackground, KernelGuard, KernelGuardVerdict, KernelHandle } from "../host-bridge/src/client.ts";
 import {
 	API_VERSION as HOST_API_VERSION,
 	registerContributor,
@@ -231,6 +231,13 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	let toolsBefore: string[] | undefined;
 	/** This session's key, once the seam has asked it for one. */
 	let ownKey: string | undefined;
+	/** This session's kernel, kept for the one thing a policy cannot reach any other way: its shells. */
+	let kernel: KernelHandle | undefined;
+	/**
+	 * How many shells the mode is waiting for. Set when the user answers *wait* instead of *kill*, and
+	 * cleared when nothing is running — so the mode is never on while something can still write.
+	 */
+	let pending: number | null = null;
 	/**
 	 * Set when this session's kernel cannot be governed — a code mode too old to know the `guard`, or a
 	 * seam that would not take the registration. It is the only thing that can make a session's
@@ -270,6 +277,22 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 		if (held !== undefined) return held;
 		if (forKey === ownKey) return own ?? inherited;
 		return false;
+	}
+
+	/** The background shells still running in this session's kernel. Empty without one, or without the
+	 *  handle members an older code mode does not have. */
+	function runningShells(): KernelBackground[] {
+		try {
+			return (kernel?.backgrounds?.() ?? []).filter((handle) => handle.status === "running");
+		} catch {
+			return [];
+		}
+	}
+
+	/** One shell, for a human: what it is, and what it is doing. */
+	function describe(handle: KernelBackground): string {
+		const line = handle.command.split("\n")[0]?.slice(0, 80) ?? "";
+		return `${handle.id} — ${line} (started ${handle.started_at})`;
 	}
 
 	/**
@@ -380,6 +403,7 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 				// nobody's answer to inherit if this registration did not give it one.
 				if (!mine && !children.has(input.sessionKey)) return {};
 				if (mine) {
+					kernel = input.handle;
 					if (input.isChild) roots.delete(key);
 					else roots.add(key);
 				} else {
@@ -446,7 +470,17 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	}
 
 	function updateStatus(ctx: ExtensionContext): void {
-		ctx.ui.setStatus(STATUS_KEY, on() ? ctx.ui.theme.fg("warning", "🔒 read-only") : undefined);
+		if (on()) {
+			ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg("warning", "🔒 read-only"));
+			return;
+		}
+		if (pending !== null) {
+			// Asked for, and not on yet: saying just "read-only" here would be the lie this state exists
+			// to avoid.
+			ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg("warning", `🔒 read-only (waiting for ${pending} shell(s))`));
+			return;
+		}
+		ctx.ui.setStatus(STATUS_KEY, undefined);
 	}
 
 	function persist(): void {
@@ -459,7 +493,61 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 		pi.setActiveTools(active.filter((name) => !isWriterTool(name)));
 	}
 
-	function setEnabled(next: boolean, ctx: ExtensionContext): void {
+	/**
+	 * Settle the shells the mode cannot reach, before it turns on.
+	 *
+	 * A background shell is a host process, so the read-only mount cannot touch it: the mode either stops
+	 * it or does not start. With a dialog-capable UI the user answers — kill them now, or wait for them to
+	 * finish — and **wait means the mode waits** rather than starting with a writer inside it. With no UI
+	 * nobody can be asked and the answer is *kill*, because enabling the mode is the decision (`ctx.hasUI`
+	 * is false in print and RPC, where pi's `confirm` is a stub that always answers no).
+	 *
+	 * Answers whether the mode may turn on now.
+	 */
+	async function disposeOfShells(running: KernelBackground[], ctx: ExtensionContext): Promise<boolean> {
+		if (ctx.hasUI === true) {
+			let kill = true;
+			try {
+				kill = await ctx.ui.confirm(
+					"Read-only mode",
+					`${running.length} background shell(s) are still running and can write to the workspace:\n\n` +
+						`${running.map(describe).join("\n")}\n\n` +
+						"Kill them now? Answering no keeps read-only mode off until they finish.",
+					{ timeout: 60_000 },
+				);
+			} catch {
+				// Nobody answered. The mode's promise is the freeze, so it is not the shells that win.
+				kill = true;
+			}
+			if (!kill) return false;
+		}
+		let killed: string[] = [];
+		try {
+			killed = (await kernel?.killBackgrounds?.(running.map((handle) => handle.id))) ?? [];
+		} catch {
+			/* a kill that fails is a shell that keeps running; the mode still turns on below */
+		}
+		ctx.ui.notify(
+			`Read-only mode: killed ${killed.length} background shell(s) started while the workspace was writable` +
+				(killed.length > 0 ? ` (${killed.join(", ")})` : "") +
+				". Consider running /readonly again later if a shell is still finishing.",
+			"warning",
+		);
+		return true;
+	}
+
+	/**
+	 * Whether a pending read-only may start now — asked at the turn boundary, before the model runs, so
+	 * the turn it resolves on is the first read-only one. Not a timer: a session that goes idle with
+	 * shells still running is a session where nothing is running cells either.
+	 */
+	async function resolvePending(ctx: ExtensionContext): Promise<void> {
+		if (pending === null || runningShells().length > 0) return;
+		pending = null;
+		await setEnabled(true, ctx);
+	}
+
+	async function setEnabled(next: boolean, ctx: ExtensionContext): Promise<void> {
 		// A **live** hold is not this session's to lift (`../readonly-guard` ticket 05: a child can never
 		// be wider than the session that spawned it). Saying "off" while the guard keeps refusing would be
 		// exactly the lie the tri-state exists to avoid, so the toggle says why instead.
@@ -471,6 +559,20 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 			return;
 		}
 		if (next === on()) return;
+		if (next) {
+			const running = runningShells();
+			if (running.length > 0 && !(await disposeOfShells(running, ctx))) {
+				pending = running.length;
+				updateStatus(ctx);
+				ctx.ui.notify(
+					`Read-only mode is off until ${running.length} background shell(s) finish: ${running.map((h) => h.id).join(", ")}. ` +
+						"Run /readonly again to cancel the wait.",
+					"info",
+				);
+				return;
+			}
+		}
+		pending = null;
 		own = next;
 
 		if (on()) {
@@ -492,14 +594,26 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 		default: false,
 	});
 
+	/** The toggle, with the one answer that is not simply on-or-off: a second press while the mode is
+	 *  waiting cancels the wait rather than asking again. */
+	async function toggle(ctx: ExtensionContext): Promise<void> {
+		if (pending !== null) {
+			pending = null;
+			updateStatus(ctx);
+			ctx.ui.notify("Read-only mode: the wait was cancelled, so the mode is off.", "info");
+			return;
+		}
+		await setEnabled(!on(), ctx);
+	}
+
 	pi.registerCommand("readonly", {
 		description: "Toggle read-only mode (no file modifications)",
-		handler: async (_args, ctx) => setEnabled(!on(), ctx),
+		handler: async (_args, ctx) => toggle(ctx),
 	});
 
 	pi.registerShortcut("ctrl+alt+r", {
 		description: "Toggle read-only mode",
-		handler: async (ctx) => setEnabled(!on(), ctx),
+		handler: async (ctx) => toggle(ctx),
 	});
 
 	// Layer 1's backstop, plus the bash gate, plus the cell lane's floor.
@@ -543,6 +657,8 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	// Layer 1's instruction half: ambient, per turn, so it costs nothing to
 	// leave the transcript clean when the mode goes off.
 	pi.on("before_agent_start", async (event, ctx) => {
+		// Before the early return: a pending mode is *off*, and this boundary is where the wait ends.
+		await resolvePending(ctx);
 		if (!on()) return undefined;
 		// The cell half only where there is a governed kernel to describe. A plain pi session has no
 		// cell, and telling it about a mount it does not have is how a prompt starts lying.

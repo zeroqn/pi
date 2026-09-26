@@ -124,6 +124,19 @@ export type Contribution = {
 export type Rejection = { name: string; reason: string };
 export type Receipt = { owner: string; accepted: string[]; rejected: Rejection[] };
 
+/**
+ * One background shell, as a consumer of the handle needs to see it: enough to name it to a human.
+ *
+ * Deliberately a projection rather than the handle's whole record — a caller deciding whether to stop a
+ * shell needs to say *which* shell and *what it is doing*, and nothing else.
+ */
+export type BackgroundInfo = {
+	id: string;
+	command: string;
+	status: string;
+	started_at: string;
+};
+
 /** What a kernel must provide for the mounter to wrap it into a handle. */
 export type KernelHandleCore = {
 	currentCell: () => string;
@@ -135,6 +148,17 @@ export type KernelHandleCore = {
 	/** The preflight's answer. Async because the checks are: a caller that needs them (rlm,
 	 * to report them on its own surface) awaits, and the answer is memoised. */
 	problems: () => Promise<string[]>;
+	/**
+	 * The background shells this session's kernel is holding, running or finished.
+	 *
+	 * On the handle rather than in a contribution because a **policy** has to be able to name what it
+	 * would stop: a read-only mode cannot reach a host process, so a mode that claims the workspace is
+	 * frozen has to be able to see the shells that would write to it, and to say which ones to a human.
+	 * Optional, so an older code mode is served exactly as it was.
+	 */
+	backgrounds?: () => BackgroundInfo[];
+	/** Kill the running ones — all of them, or exactly `ids` — answering with what it killed. */
+	killBackgrounds?: (ids?: string[]) => Promise<string[]>;
 	contribute: (contribution: Contribution) => Receipt;
 };
 

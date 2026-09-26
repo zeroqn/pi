@@ -37,6 +37,9 @@ export type KernelNotice = {
 /** Which journals a session replays, and which scratch to seed from. rlm owns the rule. */
 export type KernelProvenance = { journals: string[]; seedScratchFrom?: string };
 
+/** One background shell, as a consumer of the handle needs to see it — code mode's shape, mirrored. */
+export type KernelBackground = { id: string; command: string; status: string; started_at: string };
+
 /** One host call, as the kernel is about to make it. Code mode's own shape, mirrored. */
 export type KernelHostCall = { name: string; args: unknown[] };
 
@@ -97,6 +100,9 @@ export type KernelHandle = {
 	progress: () => ((text: string) => void) | undefined;
 	problems: () => Promise<string[]>;
 	contribute: (contribution: KernelContribution) => KernelReceipt;
+	/** The background shells this kernel is holding, and how to stop the running ones. */
+	backgrounds?: () => KernelBackground[];
+	killBackgrounds?: (ids?: string[]) => Promise<string[]>;
 };
 
 export type KernelEntry = {
