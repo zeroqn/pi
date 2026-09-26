@@ -63,8 +63,8 @@ export function fenceText(text: string): string {
  * Append the rule to a system prompt unless it already carries it.
  *
  * One text, two appenders: this package's extension entry (a session that has it installed) and
- * rlm's hook handler (a session whose web host functions came through `RLM_WEB_MODULE`, including a
- * spawned child, which loads no ambient extensions). `before_agent_start` handlers chain in load
+ * `pi-host-bridge`'s seam, which appends the contributor's `systemPrompt` — the only appender in a
+ * spawned child, where no ambient extension loads. `before_agent_start` handlers chain in load
  * order, so whichever runs first appends and the other sees the text and leaves it alone.
  */
 export function withGuardSection(systemPrompt: string): string {

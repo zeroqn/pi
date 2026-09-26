@@ -34,18 +34,14 @@ git clone --recurse-submodules https://github.com/zeroqn/pi.git
 cd pi && bun install && bun run check
 ```
 
-Two things no package manager can supply:
+One thing no package manager can supply:
 
 ```bash
 export MONTY_BIN=/path/to/monty/bin/monty           # code-mode's worker
-export RLM_WEB_MODULE="$PWD/packages/web-access/host.ts"   # web-access -> kernel
 ```
 
 - `MONTY_BIN` — code-mode's [monty](https://github.com/pydantic/monty) worker is a native binary,
   not the npm dependency of the same name. Without it the kernel cannot start.
-- `RLM_WEB_MODULE` — how web-access is joined to the kernel. Nothing is imported; rlm reads the
-  module name, resolves it once so the tool description only promises what exists, and contributes
-  the `createHost(ctx)` it exports per kernel.
 - `zvec-grep` needs the `zg` CLI on `PATH` (or `ZVEC_GREP_BIN` pointing at it). The
   `-pi-native` extension only relocates another package's config file, so it does nothing unless that
   package is installed.

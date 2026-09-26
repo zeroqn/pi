@@ -108,8 +108,10 @@ pi -ne -e /workspace/pi/extensions/packages/code-mode/index.ts -nbt \
    --session-dir /tmp/cm-sessions -p "your task"
 ```
 
-Add `-e /workspace/pi/extensions/packages/rlm/index.ts` for delegation, and
-`RLM_WEB_MODULE=/workspace/pi/extensions/packages/web-access/host.ts` for web host functions.
+Add `-e /workspace/pi/extensions/packages/host-bridge/index.ts` — the composition root, and the only
+way a contributor's host functions reach a kernel — then the contributors themselves:
+`-e /workspace/pi/extensions/packages/rlm/index.ts` for delegation and
+`-e /workspace/pi/extensions/packages/web-access/host.ts` for web host functions.
 
 Environment overrides: `RLM_FD` (find backend), `RLM_ZG` (grep backend), `RLM_SHELL`. `MONTY_BIN`
 is only needed on a host without `/lib64/ld-linux-x86-64.so.2` — NixOS, musl; the flake's

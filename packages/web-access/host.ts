@@ -4,10 +4,11 @@
  *
  * This file is two things at once, deliberately:
  *
- *   - the **kernel hook**: `RLM_WEB_MODULE=/workspace/pi/extensions/packages/web-access/host.ts`
- *     makes rlm import it at load and call `createHost(ctx)` once per kernel, where the
- *     returned `{ web_search, fetch_content }` join the same host surface as `bash`,
- *     `find`, `grep` and `read_image` (map ticket 03);
+ *   - a **host bridge contributor**: `webAccessRegistration` at the bottom registers this package
+ *     with `pi-host-bridge` at module load, and the seam asks it once per session
+ *     (`webAccessAnswer`), whose `createHost(ctx)` has the returned `{ web_search, fetch_content }`
+ *     join the same host surface as `bash`, `find`, `grep` and `read_image` (map ticket 03;
+ *     `.scratch/host-bridge` ticket 07);
  *   - a **pi package entry** whose default export registers the guard, so `pi install` on this
  *     directory loads it. The extension still registers **no** pi-level tools — that was
  *     round 2's decision, and it is what keeps it from colliding with the installed
