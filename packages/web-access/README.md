@@ -57,9 +57,13 @@ f = await fetch_content("https://example.com/paper.pdf", "raw")   # the bytes, o
   ordered list. An unknown name raises `ValueError`.
 - `domain_filter` takes hostnames; a `-` prefix denies. Applied here, identically for both
   providers: over-fetch, then keep the first `num_results` survivors.
-- Content types: HTML is extracted to markdown, `text/*`/JSON/XML pass through, PDFs go
-  through `unpdf`, and anything else raises `ValueError` in both modes. A page with nothing
-  extractable spills its raw body and says so in `note`.
+- Content types: HTML is extracted to markdown, `text/*`/JSON/XML pass through, and PDFs go
+  through `unpdf`. A **declared** type that is none of those raises `ValueError` in both modes —
+  but `application/octet-stream`, which is also what a missing `Content-Type` header becomes
+  here, is not refused: the bytes decide, so HTML and text are delivered as if the type had been
+  declared (with a `note` naming the declaration they were guessed against) and a body that is
+  not text spills raw with a `note`. A page with nothing extractable spills its raw body and
+  says so in `note`.
 
 ### Errors, in sandbox terms
 
@@ -67,7 +71,7 @@ Only monty's built-in exception types cross the boundary, so the mapping is deli
 
 | raises | when |
 | --- | --- |
-| `TypeError` / `ValueError` | wrong argument types; unknown provider; the SSRF guard refusing a URL; an unsupported content type |
+| `TypeError` / `ValueError` | wrong argument types; unknown provider; the SSRF guard refusing a URL; a declared content type that is not text, HTML or PDF (an `image/png`, say — `application/octet-stream` is sniffed instead) |
 | `TimeoutError` | a provider or fetch ran out of its budget (30 s per search, 60 s per fetch) |
 | `OSError` | transport, DNS, TLS, a non-2xx response |
 | `RuntimeError` | every provider failed; too many redirects |

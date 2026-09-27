@@ -28,6 +28,17 @@ function respond(body: string | Uint8Array, contentType: string, status = 200) {
 	return { impl, calls };
 }
 
+/** A response the server sent with no `Content-Type` at all (the spec gives a string body a
+ *  default, so it is deleted): `fetchContent` then assumes octet-stream. */
+function respondBare(body: string | Uint8Array, status = 200) {
+	const impl = (async () => {
+		const response = new Response(body as BodyInit, { status });
+		response.headers.delete("content-type");
+		return response;
+	}) as unknown as typeof fetch;
+	return { impl };
+}
+
 const article = `<!doctype html><html><head><title>Monty notes</title></head><body>
   <nav><a href="/">Home</a> · Cookie policy · Subscribe to our newsletter</nav>
   <article><h1>Monty notes</h1>
@@ -134,6 +145,61 @@ describe("fetch_content, raw mode (ticket 05: the bytes, on disk)", () => {
 		expect(result.path.endsWith(".html")).toBe(true);
 		expect(readFileSync(result.path, "utf8")).toBe(article);
 		expect(result.bytes).toBe(Buffer.byteLength(article));
+	});
+});
+
+describe("fetch_content, an undeclared content type (sniffed, not refused)", () => {
+	const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02, 0x03]);
+
+	it("delivers an octet-stream text body as text, and says where the type came from", async () => {
+		const dir = scratch();
+		const result = await fetchContent("http://example.com/notes", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: respond("plain body", "application/octet-stream").impl });
+		if (!("chars" in result)) throw new Error("expected a markdown envelope");
+		expect(result.path.endsWith(".txt")).toBe(true);
+		expect(result.chars).toBe(10);
+		expect(result.head).toBe("plain body");
+		expect(result.note).toMatch(/server declared application\/octet-stream; the body decodes as text/);
+		expect(readFileSync(result.path, "utf8")).toBe(fenceText("plain body"));
+	});
+
+	it("does the same when the server sends no content type at all", async () => {
+		const dir = scratch();
+		const result = await fetchContent("http://example.com/notes", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: respondBare("plain body").impl });
+		if (!("chars" in result)) throw new Error("expected a markdown envelope");
+		expect(result.path.endsWith(".txt")).toBe(true);
+		expect(result.chars).toBe(10);
+		expect(readFileSync(result.path, "utf8")).toBe(fenceText("plain body"));
+	});
+
+	it("extracts an undeclared HTML body instead of handing back raw markup", async () => {
+		const dir = scratch();
+		const result = await fetchContent("http://example.com/post", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: respondBare(article).impl });
+		if (!("chars" in result)) throw new Error("expected a markdown envelope");
+		expect(result.path.endsWith(".md")).toBe(true);
+		expect(result.title).toBe("Monty notes");
+		const spilled = readFileSync(result.path, "utf8");
+		expect(spilled).toContain("sandboxed Python subset written in Rust");
+		expect(spilled).not.toContain("Cookie policy");
+		expect(result.chars).toBe(plain(spilled).length);
+		expect(result.note).toMatch(/the body decodes as HTML/);
+	});
+
+	it("spills an octet-stream body that is not text, with a note rather than a decode", async () => {
+		const dir = scratch();
+		const result = await fetchContent("http://example.com/blob", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: respond(bytes, "application/octet-stream").impl });
+		if (!("chars" in result)) throw new Error("expected a markdown envelope");
+		expect(result.chars).toBe(0);
+		expect(result.note).toMatch(/not text despite the application\/octet-stream declaration/);
+		expect(readFileSync(result.path).equals(Buffer.from(bytes))).toBe(true);
+	});
+
+	it("raw mode writes the bytes of an octet-stream response, as it always did", async () => {
+		const dir = scratch();
+		const result = await fetchContent("http://example.com/blob", { mode: "raw", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: respond("plain body", "application/octet-stream").impl });
+		if (!("bytes" in result)) throw new Error("expected a raw envelope");
+		expect(result.content_type).toBe("application/octet-stream");
+		expect(result.path.endsWith(".bin")).toBe(true);
+		expect(readFileSync(result.path, "utf8")).toBe("plain body");
 	});
 });
 

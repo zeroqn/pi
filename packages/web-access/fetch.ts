@@ -7,8 +7,11 @@
  *               plus `note` when nothing was extractable (the raw body is spilled instead)
  *   raw      -> { url, path, bytes, content_type }           the bytes, on disk
  *
- * Unsupported content types raise `ValueError` in **both** modes: scope decides what is
- * acceptable, mode decides how it is delivered.
+ * A declared type that is not text, HTML or PDF raises `ValueError` in **both** modes: scope
+ * decides what is acceptable, mode decides how it is delivered. `application/octet-stream` is not
+ * one of those — it is the server declining to say, and it is also what a missing header becomes
+ * — so there the bytes decide: HTML and text are delivered as if the type had been declared, and
+ * a body that is not text spills raw with a `note`.
  *
  * **Every text spilled to disk is fenced** (`fenceText`): the model reads these files with
  * `read_text`/`grep`, so the file itself must say the content is untrusted, not only the envelope
@@ -72,6 +75,29 @@ function isHtml(contentType: string): boolean {
 	return type.includes("text/html") || type.includes("application/xhtml");
 }
 
+/** `application/octet-stream` is what a server sends when it does not know the type, and what
+ *  `fetchContent` assumes when the header is missing entirely — so it is not a refusal, it is an
+ *  invitation to read the bytes (sniffBody). A *declared* non-text type still refuses. */
+function isUnknownType(contentType: string): boolean {
+	const type = contentType.toLowerCase();
+	return type === "application/octet-stream" || type === "binary/octet-stream";
+}
+
+const SNIFF_BYTES = 8192;
+
+/** What an undeclared body actually is, read from the bytes. A NUL byte, or any control byte
+ *  outside tab/newline/form-feed/carriage-return, is enough to call it binary; a UTF-8 sample
+ *  that opens as HTML is HTML, and anything else that decodes is text. */
+function sniffBody(buffer: Uint8Array): "html" | "text" | "binary" {
+	const sample = buffer.subarray(0, SNIFF_BYTES);
+	for (const byte of sample) {
+		if (byte === 0) return "binary";
+		if (byte < 0x20 && byte !== 0x09 && byte !== 0x0a && byte !== 0x0c && byte !== 0x0d) return "binary";
+	}
+	const head = new TextDecoder("utf-8").decode(sample);
+	return /^\s*(?:<!doctype\s+html|<html[\s>]|<head[\s>]|<body[\s>])/i.test(head) ? "html" : "text";
+}
+
 function decodeBody(buffer: Uint8Array, contentType: string): string {
 	const charset = /charset=["']?([\w-]+)/i.exec(contentType)?.[1] ?? "utf-8";
 	try {
@@ -114,8 +140,8 @@ export async function fetchContent(url: string, options: FetchOptions): Promise<
 	const buffer = new Uint8Array(await response.arrayBuffer());
 
 	const supported = isTextish(contentType) || isHtml(contentType) || contentType.toLowerCase().includes("pdf");
-	if (!supported) {
-		throw webError("ValueError", `unsupported content type ${contentType} at ${finalUrl} (raw returns the bytes of text, HTML and PDF responses only)`);
+	if (!supported && !isUnknownType(contentType)) {
+		throw webError("ValueError", `unsupported content type ${contentType} at ${finalUrl} (text, HTML, PDF and undeclared bodies only)`);
 	}
 
 	if (options.mode === "raw") {
@@ -125,7 +151,17 @@ export async function fetchContent(url: string, options: FetchOptions): Promise<
 		return { url: finalUrl, path, bytes: buffer.length, content_type: contentType };
 	}
 
-	// markdown mode
+	// markdown mode. A declared type we cannot deliver refused above; an undeclared one is decided
+	// here, by the bytes.
+	const sniff = supported ? null : sniffBody(buffer);
+	if (sniff === "binary") {
+		return spillRawBody(buffer, finalUrl, contentType, `the body is not text despite the ${contentType} declaration`, options);
+	}
+	// Sniffed HTML and text are delivered as if the server had said so; the note records that the
+	// type was a non-answer rather than an extraction guess.
+	const type = sniff === "html" ? "text/html" : sniff === "text" ? "text/plain" : contentType;
+	const note = sniff ? `the server declared ${contentType}; the body decodes as ${sniff === "html" ? "HTML" : "text"}` : undefined;
+
 	if (contentType.toLowerCase().includes("pdf")) {
 		let text: string;
 		try {
@@ -143,17 +179,17 @@ export async function fetchContent(url: string, options: FetchOptions): Promise<
 	}
 
 	const body = decodeBody(buffer, response.headers.get("content-type") ?? "");
-	if (!isHtml(contentType)) {
+	if (!isHtml(type)) {
 		if (!body.trim()) return spillRawBody(buffer, finalUrl, contentType, "the response was empty", options);
-		const path = spillPath(options.scratchDir, finalUrl, extensionFor(contentType));
+		const path = spillPath(options.scratchDir, finalUrl, extensionFor(type));
 		writeFileSync(path, fenceText(body));
 		options.progress?.(`fetch_content: ${body.length} chars (${contentType}) to ${path}`);
-		return { url: finalUrl, title: "", path, chars: body.length, head: body.slice(0, HEAD_CHARS) };
+		return { url: finalUrl, title: "", path, chars: body.length, head: body.slice(0, HEAD_CHARS), ...(note ? { note } : {}) };
 	}
 
 	const extracted = extractMarkdown(body, finalUrl);
 	if (!extracted) {
-		return spillRawBody(buffer, finalUrl, contentType, "no readable content", options);
+		return spillRawBody(buffer, finalUrl, type, "no readable content", options);
 	}
 	const path = spillPath(options.scratchDir, finalUrl, "md");
 	writeFileSync(path, fenceText(extracted.markdown));
@@ -164,6 +200,7 @@ export async function fetchContent(url: string, options: FetchOptions): Promise<
 		path,
 		chars: extracted.markdown.length,
 		head: extracted.markdown.slice(0, HEAD_CHARS),
+		...(note ? { note } : {}),
 	};
 }
 
