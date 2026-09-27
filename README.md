@@ -13,18 +13,19 @@ one is a fork.
 | [`web-access`](packages/web-access) | `web_search`/`fetch_content` host functions for the kernel, plus the untrusted-web-content guard. |
 | [`zvec-grep`](packages/zvec-grep) | `zvec_grep_search`/`zvec_grep_rg` host functions for the kernel, plus the `/zg-*` index commands. |
 | [`advisor`](packages/advisor) | `advisor()` in a cell: escalate to a stronger reviewer model, ported from rpiv-advisor. `/advisor` picks the model. |
+| [`ask-user-question`](packages/ask-user-question) | `ask_user_question()` in a cell: the questionnaire, ported from rpiv-ask-user-question. Root sessions only. |
 | [`tool-bridge`](packages/tool-bridge) | Another extension's published pi tools, callable from inside a cell as `await tool(...)`. |
 | [`readonly-mode`](packages/readonly-mode) | Query-only mode: removes writer tools, gates bash, injects a prompt. |
 | [`magic-context`](packages/magic-context) | Forked. Cross-session memory and context management for pi. **Prebuilt** — see below. |
 
-Eleven of them compose into one code-mode runtime. `code-mode` owns the kernel and the `python` tool,
-and `host-bridge` is the composition root — the one client of code-mode's registry, and what asks
-each contributor for a session. `rlm`, `skill-bridge`, `tool-bridge`, `web-access`, `zvec-grep` and `advisor`
-register with it, a contract rather than an import, and each *contributes* the host functions, prelude
-lines and sentences it is responsible for; `readonly-mode` registers to contribute the policy that
-governs a cell; `rsi` reaches the same client only to hold a kernel handle, and contributes nothing.
-`tool-bridge` also carries the reconciler that keeps pi's active set to the tools a cell cannot stand
-in for. Uninstall any contributor and the kernel still runs, with fewer names in it; uninstall
+Eleven of them compose into one code-mode runtime. `code-mode` owns the kernel and the `python` tool, and
+`host-bridge` is the composition root — the one client of code-mode's registry, and what asks each
+contributor for a session. `rlm`, `skill-bridge`, `tool-bridge`, `web-access`, `zvec-grep`, `advisor` and
+`ask-user-question` register with it, a contract rather than an import, and each *contributes* the host
+functions, prelude lines and sentences it is responsible for; `readonly-mode` registers to contribute the
+policy that governs a cell; `rsi` reaches the same client only to hold a kernel handle, and contributes
+nothing. `tool-bridge` also carries the reconciler that keeps pi's active set to the tools a cell cannot
+stand in for. Uninstall any contributor and the kernel still runs, with fewer names in it; uninstall
 `code-mode` and the others say so instead of half-working. The other one, `magic-context`, is independent.
 
 ## Setup
