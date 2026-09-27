@@ -1,14 +1,18 @@
 /**
  * The two search host functions. `grep`: ripgrep when the host has it, GNU grep when it has not,
  * and one shape (`path:line:text`) read back from either — a cell should not be able to tell which
- * engine answered, except through the files that engine's own ignore rules leave out. `find`: fd,
- * with the two knobs the shell `find`s in the journals actually used.
+ * engine answered, except through the files that engine's own ignore rules leave out. `find`: fd
+ * when the host has it, GNU find when it has not, with the two knobs the shell `find`s in the
+ * journals actually used — one list of paths read back from either, a directory marked the same way.
+ *
+ * The argv of both engines is pinned here, because the live call below can only exercise the one
+ * this host has: CI has neither fd nor ripgrep, and a dev box's fd comes from `RLM_FD`.
  */
 import { describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type GrepQuery, grepArgv, makeHost, parseGrepOutput } from "../src/host";
+import { type FindQuery, type GrepQuery, findArgv, grepArgv, makeHost, parseFindOutput, parseGrepOutput } from "../src/host";
 
 function query(over: Partial<GrepQuery> = {}): GrepQuery {
 	return {
@@ -80,6 +84,91 @@ describe("a real grep call, whichever engine this host has", () => {
 		// Exit 1 with nothing on stdout is how both engines say "no matches". It is an empty list,
 		// never an error and never a sentinel line a cell could mistake for a hit.
 		expect(await grep("NOTHING-ANYWHERE-9f3c", { literal: true })).toEqual([]);
+	});
+});
+
+describe("find's two engines, whose flags are not each other's", () => {
+	function findQuery(over: Partial<FindQuery> = {}): FindQuery {
+		return { pattern: "*.txt", path: "/w", limit: 1000, maxDepth: 0, type: "", ...over };
+	}
+
+	it("asks fd for a glob, hidden files, and its two knobs by name", () => {
+		expect(findArgv("fd", findQuery({ limit: 5, maxDepth: 2, type: "directory" }))).toEqual([
+			"--glob",
+			"--color=never",
+			"--hidden",
+			"--no-require-git",
+			"--max-results",
+			"5",
+			"--max-depth",
+			"2",
+			"--type",
+			"directory",
+			"--",
+			"*.txt",
+			"/w",
+		]);
+	});
+
+	it("tells fd when the pattern names a path, and writes the depth into the glob", () => {
+		expect(findArgv("fd", findQuery({ pattern: "src/*.ts" }))).toEqual([
+			"--glob",
+			"--color=never",
+			"--hidden",
+			"--no-require-git",
+			"--max-results",
+			"1000",
+			"--full-path",
+			"--",
+			"**/src/*.ts",
+			"/w",
+		]);
+	});
+
+	it("asks GNU find for a depth, a letter instead of the type's name, and the type it prints", () => {
+		expect(findArgv("find", findQuery({ maxDepth: 2, type: "directory" }))).toEqual([
+			"/w",
+			"-mindepth",
+			"1",
+			"-maxdepth",
+			"2",
+			"-type",
+			"d",
+			"-name",
+			"*.txt",
+			"-printf",
+			"%y %p\\n",
+		]);
+	});
+
+	it("matches the whole path with -path, whose `*` already crosses separators", () => {
+		expect(findArgv("find", findQuery({ pattern: "src/*.ts" }))).toEqual([
+			"/w",
+			"-mindepth",
+			"1",
+			"-path",
+			"**/src/*.ts",
+			"-printf",
+			"%y %p\\n",
+		]);
+	});
+
+	it("maps fd's type names onto find's own letters and primaries, and leaves the rest to -type", () => {
+		const tail = ["-name", "*.txt", "-printf", "%y %p\\n"];
+		expect(findArgv("find", findQuery({ type: "x" }))).toEqual(["/w", "-mindepth", "1", "-executable", ...tail]);
+		expect(findArgv("find", findQuery({ type: "block-device" }))).toEqual(["/w", "-mindepth", "1", "-type", "b", ...tail]);
+		expect(findArgv("find", findQuery({ type: "empty" }))).toEqual(["/w", "-mindepth", "1", "-empty", ...tail]);
+		expect(findArgv("find", findQuery({ type: "bogus" }))).toEqual(["/w", "-mindepth", "1", "-type", "bogus", ...tail]);
+	});
+
+	it("turns an empty pattern into the glob that matches everything, which the engines spell alike", () => {
+		expect(findArgv("fd", findQuery({ pattern: "" })).slice(-2)).toEqual(["*", "/w"]);
+		expect(findArgv("find", findQuery({ pattern: "" }))).toEqual(["/w", "-mindepth", "1", "-name", "*", "-printf", "%y %p\\n"]);
+	});
+
+	it("gives a directory a trailing slash whichever engine printed it", () => {
+		expect(parseFindOutput("fd", "/w/a/\n/w/a/one.txt\n")).toEqual(["/w/a/", "/w/a/one.txt"]);
+		expect(parseFindOutput("find", "d /w/a\nf /w/a/one.txt\n")).toEqual(["/w/a/", "/w/a/one.txt"]);
 	});
 });
 

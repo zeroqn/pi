@@ -36,7 +36,7 @@ describe("the base surface (acceptance check 2)", () => {
 	// because they are what the model reads -- a cell that never sees them reaches for bash.
 	it("carries the three added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(9);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("08de9e0ebff33663b6d9ad5deebe9c29e13490a1904798aa558e0187b49b688e");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("2221398fb0987346077fff58ab1fe1678be82aeeef4c57d861de0c48f6cf74f1");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, list a directory with");

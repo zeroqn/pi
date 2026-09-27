@@ -19,9 +19,8 @@ import { refusal, type Guard } from "./contract";
 import type { createBackgroundManager } from "./background";
 import type { HostFns } from "./journal";
 
-/** Where the host functions that shell out live, and how long a cell's output may be —
- * code mode's own environment knobs (ticket 03). */
-const FD = process.env.RLM_FD ?? "/nix/store/5j3vslc4gccb95xnzr1mxhgwrc0wfgad-fd-10.4.2/bin/fd";
+/** Where the shell the host functions that shell out run in lives, and how long a cell's output
+ * may be — code mode's own environment knobs (ticket 03). */
 const SHELL = process.env.RLM_SHELL ?? process.env.SHELL ?? "/bin/bash";
 
 /** `grep` is ripgrep when the host has it and GNU grep when it has not: the primitive is "search
@@ -30,6 +29,15 @@ const SHELL = process.env.RLM_SHELL ?? process.env.SHELL ?? "/bin/bash";
 const RG = onPath("rg");
 const GREP_KIND: "rg" | "grep" = RG ? "rg" : "grep";
 const GREP = RG ?? onPath("grep") ?? "grep";
+
+/** `find` is fd when the host has it and GNU find when it has not — the same rule, for the same
+ * reason: a primitive that answers only on a host with one engine is not "find the files", it is
+ * "find them where fd is installed". `RLM_FD` pins fd for a host whose fd is not on PATH (empty
+ * counts as unset, so the probe still runs). The two engines want different argv and print
+ * differently, so the kind travels beside the path here too. */
+const FD = process.env.RLM_FD || onPath("fd");
+const FIND_KIND: "fd" | "find" = FD ? "fd" : "find";
+const FIND = FD ?? onPath("find") ?? "find";
 
 /** The first `name` on PATH, or null. Probed once at load: this is the host's PATH, not a cell's. */
 function onPath(name: string): string | null {
@@ -97,6 +105,86 @@ export function grepArgv(kind: "rg" | "grep", query: GrepQuery): string[] {
 	argv.push("-m", String(query.limit));
 	argv.push(kind === "rg" ? "--" : "-e", query.pattern, query.path);
 	return argv;
+}
+
+/** What a cell asked `find` for, in the engine's terms rather than the cell's. */
+export type FindQuery = {
+	pattern: string;
+	path: string;
+	limit: number;
+	maxDepth: number;
+	type: string;
+};
+
+/** fd names a type and GNU find takes a letter for most of them — and has a primary of its own for
+ * the two fd names that are not a `-type` at all. A name neither engine knows is handed to `-type`
+ * to be rejected there, which is the same loud failure fd gives it. */
+const FIND_TYPE: Record<string, string[]> = {
+	file: ["-type", "f"],
+	f: ["-type", "f"],
+	directory: ["-type", "d"],
+	dir: ["-type", "d"],
+	d: ["-type", "d"],
+	symlink: ["-type", "l"],
+	l: ["-type", "l"],
+	"block-device": ["-type", "b"],
+	b: ["-type", "b"],
+	"char-device": ["-type", "c"],
+	c: ["-type", "c"],
+	socket: ["-type", "s"],
+	s: ["-type", "s"],
+	pipe: ["-type", "p"],
+	p: ["-type", "p"],
+	executable: ["-executable"],
+	x: ["-executable"],
+	empty: ["-empty"],
+	e: ["-empty"],
+};
+
+/** The flags each engine needs to answer one question the same way. fd's own two knobs are passed
+ * through rather than re-tabulated: a `type` fd does not know exits 2 and prints the ones it takes,
+ * which is louder than a silent no-match and does not drift from fd's own list. */
+export function findArgv(kind: "fd" | "find", query: FindQuery): string[] {
+	// A pattern with a separator is matched against the whole path by both engines. fd has to be
+	// told (`--full-path`) and wants the `**/` that says "at any depth" written out; find's `-path`
+	// is the whole path already, and its `*` crosses separators on its own. An empty pattern is the
+	// one thing the two do not agree on unwritten, so it becomes the glob that matches everything.
+	const deep = query.pattern.includes("/");
+	let glob = query.pattern || "*";
+	if (deep && !glob.startsWith("/") && !glob.startsWith("**/") && glob !== "**") glob = `**/${glob}`;
+	if (kind === "fd") {
+		const argv = ["--glob", "--color=never", "--hidden", "--no-require-git", "--max-results", String(query.limit)];
+		if (query.maxDepth > 0) argv.push("--max-depth", String(query.maxDepth));
+		if (query.type) argv.push("--type", query.type);
+		if (deep) argv.push("--full-path");
+		return [...argv, "--", glob, query.path];
+	}
+	// `-mindepth 1`, because fd never answers with the search root itself and a cell cannot tell the
+	// two engines apart if one of them lists it. `-printf '%y %p'` rather than `-print`, because the
+	// type character is what lets the parse below mark a directory the way fd marks it.
+	const argv = [query.path, "-mindepth", "1"];
+	if (query.maxDepth > 0) argv.push("-maxdepth", String(query.maxDepth));
+	if (query.type) argv.push(...(FIND_TYPE[query.type] ?? ["-type", query.type]));
+	argv.push(deep ? "-path" : "-name", glob);
+	argv.push("-printf", "%y %p\\n");
+	return argv;
+}
+
+/** One path per line, a directory with fd's trailing `/`, whichever engine printed it. fd prints
+ * that itself; GNU find is asked for the type character beside the path so this can add it. */
+export function parseFindOutput(kind: "fd" | "find", text: string): string[] {
+	const paths: string[] = [];
+	for (const raw of text.split("\n")) {
+		if (!raw) continue;
+		if (kind === "fd") {
+			paths.push(raw);
+			continue;
+		}
+		const hit = /^([a-z]) (.*)$/.exec(raw);
+		if (!hit) continue;
+		paths.push(hit[1] === "d" ? `${hit[2]}/` : hit[2]);
+	}
+	return paths;
 }
 
 export function bind(args: unknown[], names: string[]): Record<string, unknown> {
@@ -177,31 +265,24 @@ export function makeHost(options: {
 
 		async find(...args: unknown[]) {
 			const bound = bind(args, ["pattern", "path", "limit", "max_depth", "type"]);
-			const searchPath = str(bound.path) || root;
-			const limit = num(bound.limit, 1000);
-			const maxDepth = num(bound.max_depth, 0);
-			const kind = str(bound.type);
-			const argv = ["--glob", "--color=never", "--hidden", "--no-require-git", "--max-results", String(limit)];
-			// fd's own two knobs, passed through rather than re-tabulated: a `type` fd does not know
-			// exits 2 and lists the ones it takes, which is louder than a silent no-match. These are
-			// the two shells out of the journal's `find` traffic: `-maxdepth` 117 times, `-type` 57.
-			if (maxDepth > 0) argv.push("--max-depth", String(maxDepth));
-			if (kind) argv.push("--type", kind);
-			let effective = str(bound.pattern);
-			if (effective.includes("/")) {
-				argv.push("--full-path");
-				if (!effective.startsWith("/") && !effective.startsWith("**/") && effective !== "**") effective = `**/${effective}`;
-			}
-			argv.push("--", effective, searchPath);
-			const result = await run(FD, argv, { cwd: root });
+			const query: FindQuery = {
+				pattern: str(bound.pattern),
+				path: str(bound.path) || root,
+				limit: num(bound.limit, 1000),
+				maxDepth: num(bound.max_depth, 0),
+				type: str(bound.type),
+			};
+			const result = await run(FIND, findArgv(FIND_KIND, query), { cwd: root });
 			if (result.exitCode !== 0 && !result.stdout.trim()) {
 				throw new Error(`find failed: ${result.stderr.trim() || `exit ${result.exitCode}`}`);
 			}
 			// Sorted, because fd walks in parallel and hands paths back in whatever order its threads
-			// finished: a cell that takes the first of a set would get a different one twice. It orders
-			// what came back, it does not rank -- a result that hit `limit` is still whichever entries
-			// fd stopped after, so that set is not the alphabetically first ones.
-			return result.stdout.split("\n").filter(Boolean).sort().slice(0, limit);
+			// finished, and find walks in an order of its own: a cell that takes the first of a set
+			// would get a different one twice. It orders what came back, it does not rank -- a result
+			// that hit `limit` is still whichever entries the engine stopped after, so that set is not
+			// the alphabetically first ones. fd stops early (`--max-results`); find has no such flag,
+			// so there the walk is whole and the cut is the first ones, at the cost the flag avoids.
+			return parseFindOutput(FIND_KIND, result.stdout).sort().slice(0, query.limit);
 		},
 
 		async grep(...args: unknown[]): Promise<Match[]> {
