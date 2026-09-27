@@ -33,7 +33,7 @@ export interface CommandVerdict {
 }
 
 const HINT =
-	"Use the read, ffgrep, fffind or zvec_grep tools instead of shelling out, or run /readonly to leave read-only mode.";
+	"Use the read, ffgrep or fffind tools instead of shelling out (in a cell, await zvec_grep_rg(...) is the exact-search route), or run /readonly to leave read-only mode.";
 
 const ALLOWED_COMMANDS = new Set([
 	// Pacing a read. Bounded literal only — see the sleep gate below.

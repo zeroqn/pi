@@ -144,6 +144,19 @@ const EXEMPT_HOST_CALLS: Array<{ name: string; reason: string }> = [
 	{ name: "ctx_memory", reason: "Magic Context's own store, which this mode deliberately does not govern" },
 	{ name: "ctx_note", reason: "Magic Context's own store (see ctx_memory)" },
 	{ name: "ctx_reduce", reason: "Magic Context's own store (see ctx_memory)" },
+	// zvec-grep (`.scratch/zvec-grep` ticket 05). The ranked search is *not* read-only and the reason
+	// says so rather than hiding it: an indexed query writes inside the index's own directory, and a
+	// stale index is refreshed in the background when the shared daemon is up. Measured, not assumed —
+	// `tools/zg-writes/results.jsonl`, 15 rows.
+	{
+		name: "zvec_grep_search",
+		reason:
+			"searches the workspace's index; the query itself writes only inside <root>/.zvec-grep (a lock and a last-accessed stamp no flag turns off), and with the daemon up a stale index is refreshed in the background",
+	},
+	{
+		name: "zvec_grep_rg",
+		reason: "runs a bundled ripgrep over the workspace and writes nothing at all, in any mode",
+	},
 ];
 
 const EXEMPT = new Set(EXEMPT_HOST_CALLS.map((entry) => entry.name));
@@ -191,7 +204,7 @@ Answer the question. Nothing on disk may change while this mode is on.
 
 - The write tools are disabled and mutating shell commands are blocked. Do not look for a way around that, and do not ask for the mode to be turned off unless the user asks for a change.
 - If the question is ambiguous, restate it in your own words and ask one clarifying question rather than guessing at intent.
-- Look before you answer. Use the read, ffgrep, fffind and zvec_grep tools for code, and cite file paths with line numbers.
+- Look before you answer. Use the read, ffgrep and fffind tools for code, and cite file paths with line numbers.
 - Say you could not verify something instead of asserting it. If the answer needs execution, say what you would run.
 - Answer what was asked: no unrequested implementation plan, no "want me to go ahead and fix it?".`;
 
@@ -204,7 +217,8 @@ Answer the question. Nothing on disk may change while this mode is on.
  * worth reporting rather than working around.
  */
 const READ_ONLY_CELL_PROMPT = `- In a code-mode session your Python runs in one kernel whose workspace is mounted read-only: \`write_text\`, \`edit_text\`, \`mkdirp\` and \`open(..., "w")\` raise \`PermissionError\` there, and a mutating shell command run with \`await bash(...)\` is refused by the same allowlist as above. A bounded \`sleep\` of up to 30 seconds is allowed, so pacing a read of something another process is still writing is a supported way to answer.
-- A few extension capabilities stay available inside a cell — delegation, web reads, the context store — because they do not write the workspace. That is a declared exception, not a licence: anything else is refused by name, and if you need a capability that is refused, say which one and stop rather than looking for another route.`;
+- A few extension capabilities stay available inside a cell — delegation, web reads, the context store — because they do not write the workspace. That is a declared exception, not a licence: anything else is refused by name, and if you need a capability that is refused, say which one and stop rather than looking for another route.
+- \`await zvec_grep_search(...)\` (ranked; needs an index) and \`await zvec_grep_rg(command)\` (exact; needs nothing) are the search to use here, and both are exempt. The second writes nothing at all. The first is *not* itself read-only: every indexed query writes a lock and a last-accessed stamp inside the workspace's \`.zvec-grep/\` directory, and with the shared daemon up a stale index is refreshed in the background. That directory is the index's own and never your sources — it is the one write this mode allows.`;
 
 interface ReadOnlyState {
 	enabled: boolean;
