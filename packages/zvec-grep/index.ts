@@ -1,13 +1,15 @@
 /**
- * zvec-grep (zg) integration for pi.
+ * zvec-grep (zg) on a code-mode surface.
  *
- * pi intentionally ships without a built-in MCP client, so this extension exposes zvec-grep's
- * local-first search layer:
+ * This package registers **no pi tool**. It is a `pi-host-bridge` contributor — the shape
+ * `pi-web-access` established and `pi-ask-user-question` repeated — whose offer is two host functions a
+ * code-mode cell calls:
  *
- *   - zvec_grep_search : ranked hybrid / lexical / vector search over the index
- *   - zvec_grep_rg     : exhaustive managed ripgrep (no index required)
+ *     hits  = await zvec_grep_search(query="where is auth validated", limit=7)
+ *     lines = await zvec_grep_rg("rg -n -F loadTheme -g '*.ts' src | head -40")
  *
- * plus user-invoked maintenance commands:
+ * plus user-invoked maintenance commands, which a host function cannot replace because a human types
+ * them:
  *
  *   /zg-enable [--rebuild] [--root <path>] [embedding-model]   (index + server on)
  *   /zg-index [--rebuild] [--drop] [--root <path>] [embedding-model]
@@ -16,13 +18,13 @@
  *   /zg-status-all [<scan-root>]   (list every indexed workspace + last-index time)
  *   /zg-server [on|off|status]
  *
+ * The two pi tools that stood here were unreachable: code mode's mount calls `setActiveTools(["python"])`
+ * on every session, so no surface ever offered them while the routing block told the model to call
+ * them. `.scratch/zvec-grep` is the effort that moved the lane.
+ *
  * Default strategy (A): a single parent workspace containing the related repos. Point `workspaceRoot`
  * at it once; every search and index then uses that one index, so ranking is fused across all repos.
  * Per-repo indexes with a `roots` fan-out (strategy B) remain available as an explicit escalation.
- *
- * The extension auto-detects both CLI generations:
- *   - "modern" (zg >= 0.2.1): `zg <query>`, `zg --rg`, `zg --index`, `zg --status`
- *   - "legacy" (zg <= 0.2.0): `zg query`, `zg query --rg`, `zg index`, `zg status`
  *
  * Optional configuration:
  *   ZVEC_GREP_BIN        Path to the zg binary (default: "zg")
@@ -30,34 +32,32 @@
  *   ZVEC_GREP_PI_STATUS  "0" to disable the session_start footer status
  *   ZVEC_GREP_PI_WORKSPACE  Strategy A parent workspace root (A default)
  *   ZVEC_GREP_PI_ROOTS   Strategy B comma/newline-separated roots (opt-in)
+ *   ZVEC_GREP_EMBEDDING  Embedding model for a new index
  *
- * The two search capabilities are becoming **host functions a code-mode cell calls**
- * (`.scratch/zvec-grep`): `src/host.ts` holds them, and the two `registerTool` calls below are what
- * ticket 04 deletes. Everything the entry and the commands share — argv, the CLI generation, the
- * spawned process, the root rules — lives in `src/cli.ts` and `src/config.ts` now, and is reachable
- * without booting pi.
+ * Two CLI generations are auto-detected (`src/cli.ts`): modern (zg >= 0.2.1) and legacy
+ * (zg <= 0.2.0, which this host has).
+ *
+ * Registration happens at module load, not from the factory: pi loads each extension entry through its
+ * own jiti instance, so the factory may never run in the process that composes a session, while the
+ * process-global slot host-bridge reads is written either way.
  */
-import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { Type, type Static } from "typebox";
 
 import {
+	API_VERSION,
+	registerContributor,
+	type ContributorAnswer,
+	type SessionInput,
+} from "../host-bridge/src/convention.ts";
+import {
 	INDEX_TIMEOUT_MS,
-	RG_TIMEOUT_MS,
-	buildRgArgs,
-	buildSearchArgs,
-	SEARCH_TIMEOUT_MS,
 	STATUS_TIMEOUT_MS,
 	createZgCli,
-	formatRootResults,
 	lastNonEmptyLine,
 	parseIndexArgs,
-	runAcrossRoots,
 	serverAction,
-	tokenizeRgCommand,
-	type CliStyle,
 	type Exec,
 } from "./src/cli.ts";
 import {
@@ -65,8 +65,60 @@ import {
 	configuredRoots,
 	configuredWorkspaceRoot,
 	ensureNestedRepoInclude,
-	resolveTargetRoots,
 } from "./src/config.ts";
+import { createZvecGrepHost } from "./src/host.ts";
+
+/** This package's name in a kernel's receipts, records and refusals. */
+export const OWNER = "zvec-grep";
+
+/**
+ * The contribution's prose, in cell terms — the package's own words about its own functions.
+ *
+ * No `systemPrompt` rides with it, unlike web-access's untrusted-content rule or
+ * `ask_user_question`'s "this exists" note: these sentences land in the `python` tool's description
+ * through the ledger, for a root and a child alike, so a second copy in the system prompt would only
+ * be a copy. The routing rule *between* the search routes is the user's, and lives in the prompt.
+ */
+export const ZVEC_GREP_DESCRIPTION =
+	" Host functions also include await zvec_grep_search(query=…, limit=7, globs=[…], file_types=[…])" +
+	" for ranked hybrid, lexical and vector search over this workspace's zvec-grep index, and await" +
+	" zvec_grep_rg(command) for exhaustive managed ripgrep, which needs no index and takes the ripgrep" +
+	` command you would otherwise run — e.g. await zvec_grep_rg("rg -n -F loadTheme -g '*.ts' src | head -40").` +
+	" Both return what zg printed, as text bounded at 80 000 characters, and raise RuntimeError only when" +
+	" every root failed; root defaults to this session's directory, and roots=[…] fans out over several" +
+	" workspaces. zg must be on PATH (or ZVEC_GREP_BIN must point at it) and the workspace needs an index" +
+	" (/zg-index builds one). Read-only mode permits both calls.";
+
+export const ZVEC_GREP_GUIDELINES = [
+	"Use await zvec_grep_search(query=…) when the answer is grounded in this workspace but the exact wording or location is unknown, or when semantic, fuzzy, relationship, chronology, causality, comparison or cross-file synthesis is needed; it needs a built index.",
+	"Do not use zvec_grep_search for open-world knowledge or external facts unrelated to the local workspace — that is await web_search(...).",
+	"Use await zvec_grep_rg(command) for exhaustive exact, literal or regex search when ranked indexed results are not appropriate; scope it with a path, -g/--glob or -t/--type, and append `| head -N` to bound the output.",
+	"Its arguments are snake_case (file_types, excluded_file_types, symbol_type, prefer_symbol, modified_after, modified_before); the old camelCase spellings still bind. An unknown parameter raises ValueError and nothing runs, on purpose — a misspelled argument is meant to be loud.",
+];
+
+/** What this package contributes to one session. It does not branch on `isChild`: a delegated coding task wants search as much as its spawner does, and there is no UI to gate on. */
+export function zvecGrepAnswer(input: SessionInput): ContributorAnswer {
+	return {
+		contribution: {
+			owner: OWNER,
+			hostFns: createZvecGrepHost({
+				cwd: input.cwd,
+				progress: input.progress,
+			}),
+			description: ZVEC_GREP_DESCRIPTION,
+			guidelines: ZVEC_GREP_GUIDELINES,
+		},
+	};
+}
+
+export const zvecGrepRegistration = {
+	key: "pi-zvec-grep",
+	owner: OWNER,
+	apiVersion: API_VERSION,
+	session: (input: SessionInput) => zvecGrepAnswer(input),
+};
+
+registerContributor(zvecGrepRegistration);
 
 function statusEnabled(): boolean {
 	const value = process.env.ZVEC_GREP_PI_STATUS?.trim().toLowerCase();
@@ -170,202 +222,17 @@ function formatWorkspaceList(
 	return [`Indexed workspaces under ${scanRoot} (${workspaces.length})`, "", ...lines].join("\n");
 }
 
-const SEARCH_PARAMS = Type.Object({
-	query: Type.Optional(
-		Type.String({ description: "One hybrid natural-language or exact query." }),
-	),
-	queries: Type.Optional(
-		Type.Array(Type.String(), { description: "Multiple hybrid query groups." }),
-	),
-	fts: Type.Optional(
-		Type.Array(Type.String(), {
-			description: "Ranked lexical query groups (not exhaustive occurrence lookup).",
-		}),
-	),
-	vector: Type.Optional(
-		Type.Array(Type.String(), { description: "Semantic-only query groups." }),
-	),
-	fuse: Type.Optional(
-		Type.Boolean({ description: "Fuse every query group into one ranked list." }),
-	),
-	limit: Type.Optional(
-		Type.Number({ description: "Maximum results per group (default 7, max 50)." }),
-	),
-	globs: Type.Optional(
-		Type.Array(Type.String(), { description: "Include globs; prefix with ! to exclude." }),
-	),
-	iglobs: Type.Optional(
-		Type.Array(Type.String(), { description: "Case-insensitive include globs." }),
-	),
-	fileTypes: Type.Optional(
-		Type.Array(Type.String(), { description: "ripgrep file types to include (e.g. ts)." }),
-	),
-	excludedFileTypes: Type.Optional(
-		Type.Array(Type.String(), { description: "ripgrep file types to exclude." }),
-	),
-	symbolType: Type.Optional(
-		StringEnum(["module", "class", "interface", "function", "value", "alias"] as const, {
-			description: "Restrict results to an indexed symbol type.",
-		}),
-	),
-	preferSymbol: Type.Optional(
-		Type.Boolean({ description: "Prefer an exact indexed symbol match." }),
-	),
-	modifiedAfter: Type.Optional(
-		Type.String({ description: "Only files modified after a date or epoch milliseconds." }),
-	),
-	modifiedBefore: Type.Optional(
-		Type.String({ description: "Only files modified before a date or epoch milliseconds." }),
-	),
-	preview: Type.Optional(
-		StringEnum(["none", "short", "full"] as const, { description: "Source preview size." }),
-	),
-	refresh: Type.Optional(
-		StringEnum(["background", "wait", "off"] as const, {
-			description: "Index refresh policy. Defaults: server=background, direct=off.",
-		}),
-	),
-	mode: Type.Optional(
-		StringEnum(["direct", "server", "auto"] as const, {
-			description: "Execution transport. Defaults to the zg configuration.",
-		}),
-	),
-	roots: Type.Optional(
-		Type.Array(Type.String(), {
-			description:
-				"Multiple absolute workspace roots to search in one call. Results are grouped per root. Overrides `root` and any configured roots.",
-		}),
-	),
-	root: Type.Optional(
-		Type.String({
-			description: "Absolute workspace root to search. Defaults to pi's current directory.",
-		}),
-	),
-});
-
-const RG_PARAMS = Type.Object({
-	command: Type.String({
-		description:
-			"The ripgrep command to run, e.g. \"rg -n -F 'loadTheme' -g '*.ts' src\". Parsed into arguments without a shell. A trailing `| head -N` bounds the output.",
-	}),
-	roots: Type.Optional(
-		Type.Array(Type.String(), {
-			description:
-				"Multiple absolute workspace roots to search in one call. Results are grouped per root.",
-		}),
-	),
-	root: Type.Optional(
-		Type.String({
-			description: "Absolute workspace root to search. Defaults to pi's current directory.",
-		}),
-	),
-});
-
-type SearchParams = Static<typeof SEARCH_PARAMS>;
-type RgParams = Static<typeof RG_PARAMS>;
+/** Every footer value says whose line it is; the key stays `"zvec-grep"`. */
+function status(text: string): string {
+	return `zg: ${text}`;
+}
 
 export default function zvecGrepExtension(pi: ExtensionAPI) {
-	// pi's executor is still what the commands and the (not yet deleted) tools run through, and
-	// `createZgCli` takes it as a parameter so there is one CLI implementation rather than two.
+	// pi's executor is what the commands run through — a user-invoked command can be cancelled with the
+	// session. The host functions cannot use it: a contributor is handed no `pi` (host-bridge's
+	// `SessionInput`), so `src/cli.ts` spawns for itself, which is what `pi.exec` does anyway.
 	const piExec: Exec = (command, args, options) => pi.exec(command, args, options);
 	const cli = createZgCli({ exec: piExec });
-
-	pi.registerTool({
-		name: "zvec_grep_search",
-		label: "zvec-grep search",
-		description:
-			"Ranked hybrid, lexical, and semantic search over the zvec-grep index of the current workspace. Use when the answer is grounded in local files but the wording or location is unknown, or when semantic, fuzzy, cross-file, chronological, or comparative synthesis is needed. Requires an existing index (`/zg-index`).",
-		promptSnippet: "Ranked semantic + lexical search over the indexed workspace (zvec-grep)",
-		promptGuidelines: [
-			"Use zvec_grep_search when the answer should be grounded in the current workspace but exact wording or location is unknown, or when semantic, fuzzy, relationship, chronology, causality, comparison, or cross-file synthesis is required.",
-			"Do not use zvec_grep_search for open-world knowledge or external facts unrelated to the local workspace.",
-			"Use zvec_grep_search before native grep/rg only when no sufficient exact anchor (quotation, identifier, filename, regex) is available; otherwise prefer exact search.",
-		],
-		parameters: SEARCH_PARAMS,
-		async execute(_toolCallId, params, signal, onUpdate, ctx) {
-			const roots = resolveTargetRoots(ctx.cwd, params.roots, params.root);
-			const hasQuery = Boolean(
-				params.query ||
-					(params.queries?.length ?? 0) > 0 ||
-					(params.fts?.length ?? 0) > 0 ||
-					(params.vector?.length ?? 0) > 0,
-			);
-			if (!hasQuery) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: "zvec_grep_search requires at least one of query, queries, fts, or vector.",
-						},
-					],
-					isError: true,
-					details: { roots },
-				};
-			}
-
-			const style: CliStyle = await cli.style(ctx.cwd);
-			const args = buildSearchArgs(style, params);
-			onUpdate?.({
-				content: [
-					{
-						type: "text",
-						text:
-							roots.length > 1
-								? `Searching ${roots.length} workspaces…`
-								: "Searching the indexed workspace…",
-					},
-				],
-				details: { roots },
-			});
-
-			const outcomes = await runAcrossRoots(cli, roots, args, signal, SEARCH_TIMEOUT_MS);
-			const { text, failed } = formatRootResults("zvec-grep search", outcomes, {
-				header: roots.length > 1,
-			});
-			return {
-				content: [{ type: "text", text }],
-				isError: failed === outcomes.length,
-				details: { roots, args, style },
-			};
-		},
-	});
-
-	pi.registerTool({
-		name: "zvec_grep_rg",
-		label: "zvec-grep rg",
-		description:
-			"Exhaustive managed ripgrep over the workspace. No index required. Pass the ripgrep command you would otherwise run; it is parsed into arguments and never executed by a shell. Append `| head -N` to bound output.",
-		promptSnippet: "Exhaustive managed ripgrep search (zvec-grep, no index required)",
-		promptGuidelines: [
-			"Use zvec_grep_rg for exhaustive exact, literal, or regex search when ranked indexed results from zvec_grep_search are not appropriate.",
-			"Scope broad zvec_grep_rg searches with command paths, -g/--glob, or -t/--type.",
-		],
-		parameters: RG_PARAMS,
-		async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-			const roots = resolveTargetRoots(ctx.cwd, params.roots, params.root);
-			const { args: rgArgs, head } = tokenizeRgCommand(params.command);
-			if (rgArgs.length === 0) {
-				return {
-					content: [{ type: "text", text: "zvec_grep_rg requires a ripgrep command." }],
-					isError: true,
-					details: { roots },
-				};
-			}
-
-			const style: CliStyle = await cli.style(ctx.cwd);
-			const args = buildRgArgs(style, rgArgs);
-			const outcomes = await runAcrossRoots(cli, roots, args, signal, RG_TIMEOUT_MS);
-			const { text, failed } = formatRootResults("zvec-grep rg", outcomes, {
-				header: roots.length > 1,
-				head,
-			});
-			return {
-				content: [{ type: "text", text }],
-				isError: failed === outcomes.length,
-				details: { roots, args, style },
-			};
-		},
-	});
 
 	pi.registerCommand("zg-enable", {
 		description:
@@ -383,7 +250,7 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 			const style = await cli.style(ctx.cwd);
 
 			ensureNestedRepoInclude(targetRoot);
-			ctx.ui.setStatus("zvec-grep", `indexing ${targetRoot}…`);
+			ctx.ui.setStatus("zvec-grep", status(`indexing ${targetRoot}…`));
 			const indexArgs = style === "legacy" ? ["index"] : ["--index"];
 			if (model) indexArgs.push("--embedding", model);
 			if (parsed.rebuild) indexArgs.push("--rebuild");
@@ -393,13 +260,13 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 			});
 			const indexOk = indexResult.code === 0;
 
-			ctx.ui.setStatus("zvec-grep", "starting zvec-grep server…");
+			ctx.ui.setStatus("zvec-grep", status("starting server…"));
 			const serverResult = await serverAction(cli, style, "on", targetRoot);
 			const serverOk = serverResult.code === 0;
 
 			ctx.ui.setStatus(
 				"zvec-grep",
-				indexOk && serverOk ? "index ready · server on" : "setup incomplete",
+				status(indexOk && serverOk ? "index ready · server on" : "setup incomplete"),
 			);
 			const indexLine = indexOk
 				? lastNonEmptyLine(indexResult.stdout) || "index updated"
@@ -449,7 +316,7 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 			if (rebuild) cliArgs.push("--rebuild");
 			if (drop) cliArgs.push("--drop", "--yes");
 
-			ctx.ui.setStatus("zvec-grep", drop ? "dropping index…" : `indexing ${targetRoot}…`);
+			ctx.ui.setStatus("zvec-grep", status(drop ? "dropping index…" : `indexing ${targetRoot}…`));
 			try {
 				const result = await cli.run(cliArgs, {
 					cwd: targetRoot,
@@ -466,7 +333,7 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 					lastNonEmptyLine(result.stdout) || "zvec-grep index updated.",
 					"info",
 				);
-				ctx.ui.setStatus("zvec-grep", "index ready");
+				ctx.ui.setStatus("zvec-grep", status("index ready"));
 			} catch (error) {
 				ctx.ui.notify(
 					`zvec-grep index failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -496,7 +363,7 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 			let failures = 0;
 			for (const [index, root] of roots.entries()) {
 				ensureNestedRepoInclude(root);
-				ctx.ui.setStatus("zvec-grep", `indexing ${index + 1}/${roots.length}: ${root}`);
+				ctx.ui.setStatus("zvec-grep", status(`indexing ${index + 1}/${roots.length}: ${root}`));
 				const cliArgs = style === "legacy" ? ["index"] : ["--index"];
 				if (model) cliArgs.push("--embedding", model);
 				if (rebuild) cliArgs.push("--rebuild");
@@ -512,7 +379,7 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 					);
 				}
 			}
-			ctx.ui.setStatus("zvec-grep", failures === 0 ? "index ready" : "index incomplete");
+			ctx.ui.setStatus("zvec-grep", status(failures === 0 ? "index ready" : "index incomplete"));
 			ctx.ui.notify(
 				`Updated ${roots.length - failures}/${roots.length} workspace(s).`,
 				failures === 0 ? "info" : "warning",
@@ -598,10 +465,10 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 			});
 			ctx.ui.setStatus(
 				"zvec-grep",
-				result.code === 0 ? "index ready" : "no index — run /zg-index",
+				status(result.code === 0 ? "index ready" : "no index — run /zg-index"),
 			);
 		} catch {
-			// zg is not installed or not on PATH; tools surface the error when used.
+			// zg is not installed or not on PATH; the host functions surface the error when used.
 		}
 	});
 
