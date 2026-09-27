@@ -18,7 +18,7 @@ _Avoid_: sandbox, VM, interpreter
 
 **Host function**:
 A function the kernel reaches out to the host with — `bash`, `find`, `grep`, `read_image`, and the
-delegation and web names that other packages contribute.
+delegation, web and zvec-grep names that other packages contribute.
 _Avoid_: tool, native function
 
 **Mount** (verb):
