@@ -88,10 +88,12 @@ of the hint row it was the first thing a narrow terminal clipped.
 ## Vendored
 
 Vendored from [`@juicesharp/rpiv-ask-user-question`](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question)
-**v2.11.0** (MIT — see `LICENSE`, unchanged). The diff base is that package as installed at
-`~/.pi/agent/npm/node_modules/@juicesharp/rpiv-ask-user-question`, byte-identical to the mono checkout at
-`/workspace/pi/thirdpart-extensions/rpiv-mono/packages/rpiv-ask-user-question`. Upstream is a **reference**,
-not a subtree: `diff -r` against that path is the way to see what this port changed.
+**v2.11.0** (MIT — see `LICENSE`, unchanged). The diff base is the mono checkout at
+`/workspace/pi/thirdpart-extensions/rpiv-mono/packages/rpiv-ask-user-question` — every shipped `.ts` file is
+byte-identical there, and it additionally carries the tests, the docs, the CHANGELOG and the images. (The
+installed copy under `~/.pi/agent/npm/node_modules/…` was the cross-check while both existed; it and its
+`@juicesharp/rpiv-config` dependency are deleted, 2026-09-27.) Upstream is a **reference**, not a subtree:
+`diff -r` against that path is the way to see what this port changed.
 
 ### Vendored delta
 
