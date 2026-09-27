@@ -139,6 +139,15 @@ const EXEMPT_HOST_CALLS: Array<{ name: string; reason: string }> = [
 			"asks the user a question and waits: nothing is written, and the read-only mount still refuses any effect the answer might suggest",
 	},
 	{ name: "tool", reason: "the tool bridge's route; the capability it carries is judged below" },
+	// pi-advisor (`.scratch/rpiv-advisor` ticket 09). It reads this session's own transcript and the model
+	// registry and writes nothing — the same lane `web_search` and `fetch_content` are exempt for. The
+	// reviewer call is metered, so the reason says so rather than hiding it: the cost is the price of the
+	// ask, not a side effect on the workspace.
+	{
+		name: "advisor",
+		reason:
+			"consults a reviewer model about this session's own branch: it reads the transcript and the model registry, and writes nothing (the reviewer call itself is metered)",
+	},
 	{ name: "ctx_search", reason: "reads the context store" },
 	{ name: "ctx_expand", reason: "reads the context store" },
 	{ name: "ctx_memory", reason: "Magic Context's own store, which this mode deliberately does not govern" },
