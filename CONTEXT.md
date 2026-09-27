@@ -18,7 +18,7 @@ _Avoid_: sandbox, VM, interpreter
 
 **Host function**:
 A function the kernel reaches out to the host with — `bash`, `find`, `grep`, `read_image`, and the
-delegation, web and zvec-grep names that other packages contribute.
+delegation, web, zvec-grep and advisor names that other packages contribute.
 _Avoid_: tool, native function
 
 **Mount** (verb):
@@ -155,6 +155,33 @@ _Avoid_: skill tool, skill API
 How a name is *read* — through the provider that claims it, or from the file it names. Distinct from
 the order the block lists entries in, which puts pi's own first.
 _Avoid_: resolution, lookup
+
+## The advisor
+
+**Advisor**:
+The stronger reviewer model a cell consults when the executor wants a second opinion — reached as
+`advisor()`, never as a pi tool. The *capability*, not the model: which model answers is a choice the
+user persists, and whether the capability exists at all is the gate's.
+_Avoid_: consultant, helper model
+
+**Executor**:
+The model running the task, whose branch is forwarded to the advisor, and whose model and reasoning
+level the blocklist is written against. The advisor is judged *for* an executor, which is why a
+blocklist entry is meaningless without one.
+_Avoid_: main model, primary model, driver
+
+**The gate**:
+The mount-time decision that `advisor` exists in a session at all: a persisted `modelKey` that resolves,
+and an executor the blocklist does not cover. One answer per session, taken when the kernel is mounted,
+because a contribution cannot be added after the first cell — which is why `/advisor` says the next
+session rather than this one.
+_Avoid_: check, guard (read-only mode has the guard), condition
+
+**The surface block**:
+The `## Available Executor Surface` text prepended to the advisor's payload: what the executor's cell can
+call, since the reviewer sees no system prompt and no tool schemas. Static prose plus the host functions
+the session actually landed.
+_Avoid_: inventory (upstream's word for the `getAllTools` dump this replaces), tool list
 
 ## Read-only mode
 

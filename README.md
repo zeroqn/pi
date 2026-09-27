@@ -12,20 +12,20 @@ one is a fork.
 | [`rsi`](packages/rsi) | Background loop learns reusable skills from sessions and maintains them. |
 | [`web-access`](packages/web-access) | `web_search`/`fetch_content` host functions for the kernel, plus the untrusted-web-content guard. |
 | [`zvec-grep`](packages/zvec-grep) | `zvec_grep_search`/`zvec_grep_rg` host functions for the kernel, plus the `/zg-*` index commands. |
+| [`advisor`](packages/advisor) | `advisor()` in a cell: escalate to a stronger reviewer model, ported from rpiv-advisor. `/advisor` picks the model. |
 | [`tool-bridge`](packages/tool-bridge) | Another extension's published pi tools, callable from inside a cell as `await tool(...)`. |
 | [`readonly-mode`](packages/readonly-mode) | Query-only mode: removes writer tools, gates bash, injects a prompt. |
-| [`rpiv-advisor-pi-native`](packages/rpiv-advisor-pi-native) | Keeps rpiv-advisor's config in pi's own config tree. |
 | [`magic-context`](packages/magic-context) | Forked. Cross-session memory and context management for pi. **Prebuilt** — see below. |
 
-Nine of them compose into one code-mode runtime. `code-mode` owns the kernel and the `python` tool,
+Eleven of them compose into one code-mode runtime. `code-mode` owns the kernel and the `python` tool,
 and `host-bridge` is the composition root — the one client of code-mode's registry, and what asks
-each contributor for a session. `rlm`, `skill-bridge`, `tool-bridge`, `web-access` and `zvec-grep`
+each contributor for a session. `rlm`, `skill-bridge`, `tool-bridge`, `web-access`, `zvec-grep` and `advisor`
 register with it, a contract rather than an import, and each *contributes* the host functions, prelude
 lines and sentences it is responsible for; `readonly-mode` registers to contribute the policy that
 governs a cell; `rsi` reaches the same client only to hold a kernel handle, and contributes nothing.
 `tool-bridge` also carries the reconciler that keeps pi's active set to the tools a cell cannot stand
 in for. Uninstall any contributor and the kernel still runs, with fewer names in it; uninstall
-`code-mode` and the others say so instead of half-working. The other two are independent.
+`code-mode` and the others say so instead of half-working. The other one, `magic-context`, is independent.
 
 ## Setup
 
@@ -42,15 +42,13 @@ export MONTY_BIN=/path/to/monty/bin/monty           # code-mode's worker
 
 - `MONTY_BIN` — code-mode's [monty](https://github.com/pydantic/monty) worker is a native binary,
   not the npm dependency of the same name. Without it the kernel cannot start.
-- `zvec-grep` needs the `zg` CLI on `PATH` (or `ZVEC_GREP_BIN` pointing at it). The
-  `-pi-native` extension only relocates another package's config file, so it does nothing unless that
-  package is installed.
+- `zvec-grep` needs the `zg` CLI on `PATH` (or `ZVEC_GREP_BIN` pointing at it).
 
 Install one at a time, or the whole set from the root manifest:
 
 ```bash
 pi install ./packages/rlm      # one package
-pi install .                   # or this repo's root, whose manifest declares all eleven
+pi install .                   # or this repo's root, whose manifest declares all twelve
 ```
 
 ## The fork
