@@ -171,8 +171,10 @@ export function mountAdvisor(ctx: unknown): MountOutcome {
  *
  * `reaches` names `advisor` on purpose: it is the capability a cell reaches through this contribution, and
  * in a code-mode session pi-tool-bridge's rule reads that name as "a cell can call this, do not offer it as
- * a pi tool" — which is also what keeps a not-yet-retired `@juicesharp/rpiv-advisor` from running its own
- * tool lane beside this one.
+ * a pi tool" — the same declaration that kept a still-installed `@juicesharp/rpiv-advisor` from running its
+ * own tool lane beside this one while both were present. That package is retired now; the declaration
+ * stays because it is the honest description of the capability, and it is what would strip a re-installed
+ * one.
  */
 export function advisorAnswer(input: SessionInput): ContributorAnswer | null {
 	const outcome = mountAdvisor(input.ctx);

@@ -85,11 +85,11 @@ running session keeps the reviewer it was mounted with.
 ## Vendored
 
 Vendored from [`@juicesharp/rpiv-advisor`](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-advisor)
-**v2.11.0** (MIT — see `LICENSE`, unchanged). The diff base is that package as installed at
-`~/.pi/agent/npm/node_modules/@juicesharp/rpiv-advisor`, byte-identical to the mono checkout at
-`/workspace/pi/thirdpart-extensions/rpiv-mono/packages/rpiv-advisor` apart from `package.json`'s version.
-Upstream is a **reference**, not a subtree: `diff -r` against that path is the way to see what this port
-changed.
+**v2.11.0** (MIT — see `LICENSE`, unchanged). The diff base is the mono checkout at
+`/workspace/pi/thirdpart-extensions/rpiv-mono/packages/rpiv-advisor` — the source repository, which carries
+everything the npm tarball published plus its 16 test files and its docs. (The installed copy under
+`~/.pi/agent/npm/node_modules/…` was the cross-check while both existed; it is deleted.) Upstream is a
+**reference**, not a subtree: `diff -r` against that path is the way to see what this port changed.
 
 ### Vendored delta
 
