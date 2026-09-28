@@ -2,7 +2,9 @@
  * `read_image` — plus whatever the contribution ledger merged in (`extra`).
  *
  * The base functions are code mode's (ticket 03) and the background names are its own as well;
- * everything else is contributed. **Both halves pass the session's guard** before they run
+ * everything else is contributed. **`grep` and `find` ask the session's engine first** and fall back to
+ * rg/fd when there is none or it throws (`fff-search` ticket 05): the two names, the normalized query
+ * and the returned shapes stay code mode's, so the engines are interchangeable behind them. **Both halves pass the session's guard** before they run
  * (`readonly-guard` ticket 02): the guard's question is "may this call run", not "is this call
  * yours", so a policy that has to hold for a session cannot be routed around by contributing a
  * name of one's own.
@@ -15,7 +17,17 @@ import { existsSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { run, spill, truncate } from "./output";
 import { bool, num, str } from "./util";
-import { refusal, type Guard } from "./contract";
+import {
+	type FindQuery,
+	type GrepQuery,
+	type Guard,
+	type Match,
+	refusal,
+	type SearchEngine,
+} from "./contract";
+
+/** The shapes the primitives ask their engines in, re-exported so a consumer can name them here. */
+export type { FindQuery, GrepQuery, Match, SearchEngine };
 import type { createBackgroundManager } from "./background";
 import type { HostFns } from "./journal";
 
@@ -59,10 +71,6 @@ const MIME: Record<string, string> = {
 export type TextPart = { type: "text"; text: string };
 export type ImagePart = { type: "image"; data: string; mimeType: string };
 export type Attachment = ImagePart & { path: string };
-/** One hit, as a cell reads it. Both engines are asked for the file name and the line number, so
- * neither field is ever absent — which is what lets a cell index on them without a null check. */
-type Match = { path: string; line: number; text: string };
-
 /** `path:line:text`, which is what ripgrep and GNU grep both print once the file name is forced.
  * A context line (`path-line-text`) and any other chatter are skipped, as they always were. */
 export function parseGrepOutput(text: string): Match[] {
@@ -75,17 +83,6 @@ export function parseGrepOutput(text: string): Match[] {
 	}
 	return matches;
 }
-
-/** What a cell asked for, in the engine's terms rather than the cell's. */
-export type GrepQuery = {
-	pattern: string;
-	path: string;
-	glob: string | null;
-	ignoreCase: boolean;
-	literal: boolean;
-	context: number;
-	limit: number;
-};
 
 /** The flags each engine needs to answer one question the same way. `--with-filename`/`-H` are
  * forced so both print `path:line:text` (ripgrep drops the path when handed a single file), and
@@ -106,15 +103,6 @@ export function grepArgv(kind: "rg" | "grep", query: GrepQuery): string[] {
 	argv.push(kind === "rg" ? "--" : "-e", query.pattern, query.path);
 	return argv;
 }
-
-/** What a cell asked `find` for, in the engine's terms rather than the cell's. */
-export type FindQuery = {
-	pattern: string;
-	path: string;
-	limit: number;
-	maxDepth: number;
-	type: string;
-};
 
 /** fd names a type and GNU find takes a letter for most of them — and has a primary of its own for
  * the two fd names that are not a `-type` at all. A name neither engine knows is handed to `-type`
@@ -237,8 +225,11 @@ export function makeHost(options: {
 	background: ReturnType<typeof createBackgroundManager>;
 	/** The session's policy, when its owner declared one (readonly-guard ticket 02). */
 	guard?: Guard;
+	/** What answers `grep`/`find` before rg/fd, when the session declared an engine
+	 * (`fff-search` ticket 05). Absent is the ordinary state, and leaves both primitives as they were. */
+	engine?: SearchEngine;
 }): HostFns {
-	const { root, attachments, progress, extra, background: backgroundManager, guard } = options;
+	const { root, attachments, progress, extra, background: backgroundManager, guard, engine } = options;
 	const base: HostFns = {
 		async bash_host(...args: unknown[]) {
 			const { command, timeout, background } = bind(args, ["command", "timeout", "background"]);
@@ -264,14 +255,26 @@ export function makeHost(options: {
 		},
 
 		async find(...args: unknown[]) {
-			const bound = bind(args, ["pattern", "path", "limit", "max_depth", "type"]);
+			const bound = bind(args, ["pattern", "path", "limit", "max_depth", "type", "fuzzy"]);
 			const query: FindQuery = {
 				pattern: str(bound.pattern),
 				path: str(bound.path) || root,
 				limit: num(bound.limit, 1000),
 				maxDepth: num(bound.max_depth, 0),
 				type: str(bound.type),
+				fuzzy: bool(bound.fuzzy),
 			};
+			// As `grep`: the session's engine first, rg/fd when there is none or it throws. The *sort* is
+			// the parity half and therefore this function's, unless the cell asked for the engine's own
+			// ranking (`fuzzy`) — sorting a ranked answer would throw away the reason to ask for one.
+			if (engine) {
+				try {
+					const found = await engine.find(query);
+					return query.fuzzy ? found.slice(0, query.limit) : [...found].sort().slice(0, query.limit);
+				} catch {
+					/* the fallback is the rule, not a failure path */
+				}
+			}
 			const result = await run(FIND, findArgv(FIND_KIND, query), { cwd: root });
 			if (result.exitCode !== 0 && !result.stdout.trim()) {
 				throw new Error(`find failed: ${result.stderr.trim() || `exit ${result.exitCode}`}`);
@@ -286,7 +289,7 @@ export function makeHost(options: {
 		},
 
 		async grep(...args: unknown[]): Promise<Match[]> {
-			const bound = bind(args, ["pattern", "path", "glob", "ignore_case", "literal", "context", "limit"]);
+			const bound = bind(args, ["pattern", "path", "glob", "ignore_case", "literal", "context", "limit", "fuzzy"]);
 			const limit = num(bound.limit, 100);
 			const query: GrepQuery = {
 				pattern: str(bound.pattern),
@@ -296,7 +299,20 @@ export function makeHost(options: {
 				literal: bool(bound.literal),
 				context: bound.context ? num(bound.context, 0) : 0,
 				limit,
+				fuzzy: bool(bound.fuzzy),
 			};
+			// The session's engine first; rg/grep when there is none, or when the engine throws. The
+			// engine is handed the *normalized* query and owns nothing else: the limit is applied here,
+			// for the same reason the base path applies it — a cell's contract is the shape and the cut,
+			// not whichever engine answered. `fuzzy` reaches the engine as part of the query; the base
+			// engines have no such notion and ignore it.
+			if (engine) {
+				try {
+					return (await engine.grep(query)).slice(0, limit);
+				} catch {
+					/* the fallback is the rule, not a failure path */
+				}
+			}
 			const result = await run(GREP, grepArgv(GREP_KIND, query), { cwd: root });
 			const matches = parseGrepOutput(result.stdout);
 			if (matches.length > 0) return matches.slice(0, limit);

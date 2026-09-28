@@ -58,7 +58,7 @@ Published **at module load**, first publisher wins:
 // globalThis[Symbol.for("pi-code-mode:registry")]
 {
   publisher: "pi-code-mode",
-  apiVersion: 1,                       // the contract's version, not the package's
+  apiVersion: 3,                       // the contract's version, not the package's
   sessions: Map<string, KernelHandle>, // one kernel per session key
   mount(pi, ctx): KernelHandle,        // idempotent by session key
 }
@@ -68,8 +68,8 @@ Published **at module load**, first publisher wins:
   `code-mode-mount` trace: pi will happily host two kernels behind one session and never say a
   word, so the rule lives here and this is its observable. The session key is the absolute session
   file, or — for an unpersisted session — the session manager's identity.
-- **`handle.contribute({ owner, hostFns, prelude, description, snippet, guidelines, onHostCall,
-  onNotice, provenance })`** returns `{ owner, accepted, rejected }`, and validation is
+- **`handle.contribute({ owner, hostFns, prelude, description, snippet, guidelines, onNotice,
+  provenance, guard, search })`** returns `{ owner, accepted, rejected }`, and validation is
   **all-or-nothing**: one rejected name means nothing from that call is applied, because a prelude
   line whose host function was rejected is a `NameError` at call time. A contribution is idempotent
   per owner, and the tool's description, snippet and guidelines are recomposed — by re-registering
@@ -77,15 +77,20 @@ Published **at module load**, first publisher wins:
   composed surface is deterministic.
 - **The window closes at the kernel.** The prelude is fed once, at the first cell; a contribution
   after that is refused whole with `kernel already started`.
-- **Two observer hooks, first owner wins**: `onHostCall(name, args)` — called by the base host
-  functions that opt in (today `bash_host`) so a package can see every command without owning the
-  function — and `onNotice(notice)`, which is how a finished background handle reaches rlm's notice
+- **`onNotice(notice)`**, first owner wins, is how a finished background handle reaches rlm's notice
   machinery. With no owner for a notice, code mode holds it until no cell is running and sends it
-  itself.
+  itself. It was one of two observer hooks until `onHostCall` was deleted for having no claimant
+  (`../rsi-oneway` ticket 09) — watching a call is the journal's job now.
 - **`provenance(ctx, own)`** asks the contributor which journals to replay and which scratch to seed
   from. With no contributor the rule is the trivial one — this session's own journal, no seeding —
   because a code-mode-only resume that silently started empty is the failure that rule exists to
   prevent.
+- **`search = { grep(query), find(query) }`** answers the two search primitives before rg/fd, in the
+  primitives' own normalized shapes (`GrepQuery`/`FindQuery` in, `Match[]`/`string[]` out). Absent, or
+  throwing, leaves them on the host's own engines; the sort and the cut stay code mode's, except behind
+  an explicit `fuzzy=True`. **One owner only**, and the reason the contract is version 3 —
+  `docs/adr/0006-an-engine-slot-for-a-sessions-search.md` records why it is a slot rather than two new
+  names.
 - **`apiVersion` is the only version signal there is.** pi exposes no extension enumeration and no
   version query, so a consumer cannot tell *absent* from *old* from *inert* any other way.
 

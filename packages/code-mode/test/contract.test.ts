@@ -388,6 +388,50 @@ describe("contributing (tickets 01 and 03)", () => {
 	});
 });
 
+describe("the search slot (fff-search ticket 05)", () => {
+	const engine = () => ({
+		grep: async (query: unknown) => [{ path: "/w/a", line: 1, text: String(query) }],
+		find: async () => ["/w/a"],
+	});
+
+	it("answers the session from its one declarer, both halves declared together", () => {
+		const l = ledger();
+		const receipt = l.accept({ owner: "fff-search", search: engine() });
+		expect(receipt.rejected).toEqual([]);
+		expect(receipt.accepted).toContain("search");
+		expect(typeof l.search()?.grep).toBe("function");
+		expect(typeof l.search()?.find).toBe("function");
+	});
+
+	it("refuses a partial engine whole, and a value that is not an engine at all", () => {
+		// A half-declared engine would leave one primitive on rg/fd while the session believed the swap
+		// had happened — the half-arrived surface the all-or-nothing rule exists to prevent.
+		const l = ledger();
+		const partial = l.accept({ owner: "fff-search", search: { grep: async () => [] } } as never);
+		expect(partial.accepted).toEqual([]);
+		expect(partial.rejected[0]?.name).toBe("search.find");
+		expect(partial.rejected[0]?.reason).toBe("not a function");
+		expect(l.search()).toBeUndefined();
+
+		expect(l.accept({ owner: "fff-search", search: 3 } as never).rejected[0]?.reason).toBe("not an object");
+		expect(l.accept({ owner: "fff-search", search: [] } as never).rejected[0]?.reason).toBe("not an object");
+		expect(l.search()).toBeUndefined();
+	});
+
+	it("refuses a second declarer rather than ignoring it, and lets an owner replace its own", () => {
+		const l = ledger();
+		l.accept({ owner: "fff-search", search: engine() });
+		const second = l.accept({ owner: "rsi", search: engine() });
+		expect(second.rejected[0]?.name).toBe("search");
+		expect(second.rejected[0]?.reason).toBe("already declared by fff-search");
+		expect(second.accepted).toEqual([]);
+
+		const again = l.accept({ owner: "fff-search", search: engine() });
+		expect(again.rejected).toEqual([]);
+		expect(l.search()).toBeDefined();
+	});
+});
+
 /**
  * Acceptance check 10: the seam's tests must fail when the contract is violated. Each case
  * below is one of the five violations named there.

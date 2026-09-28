@@ -60,15 +60,51 @@ export type KernelGuard = {
 	mountMode?: () => "read-only" | "read-write" | undefined;
 };
 
+/** One grep hit, as a cell reads it. Code mode's own shape, mirrored. */
+export type KernelMatch = { path: string; line: number; text: string };
+
+/** What a cell asked `grep` for, in the engine's terms rather than the cell's. Mirrored. */
+export type KernelGrepQuery = {
+	pattern: string;
+	path: string;
+	glob: string | null;
+	ignoreCase: boolean;
+	literal: boolean;
+	context: number;
+	limit: number;
+	fuzzy: boolean;
+};
+
+/** What a cell asked `find` for, in the engine's terms rather than the cell's. Mirrored. */
+export type KernelFindQuery = {
+	pattern: string;
+	path: string;
+	limit: number;
+	maxDepth: number;
+	type: string;
+	fuzzy: boolean;
+};
+
+/**
+ * The session's search engine, mirrored from code mode's `SearchEngine` (contract version 3,
+ * `fff-search` ticket 05): what answers `grep`/`find` before rg/fd. A contributor that offers one
+ * sends it inside its contribution; the ledger validates it all-or-nothing, and a code mode older
+ * than 3 refuses the whole contribution rather than half-applying it.
+ */
+export type KernelSearchEngine = {
+	grep(query: KernelGrepQuery): Promise<KernelMatch[]>;
+	find(query: KernelFindQuery): Promise<string[]>;
+};
+
 /**
  * What a contributor writes into a kernel. This mirrors code-mode's own `Contribution` — the fields
  * are the publisher's, and this module must not widen them (standing preference 2: no change to code
  * mode's contract). `owner`, `onNotice`, `provenance` and `guard` are single-owner there: a second
  * declarer of a slot is refused whole by the ledger, not silently ignored.
  *
- * The mirror tracks the publisher's *version*: `guard` arrived with contract version 2, and a
- * consumer that reads the registry compares `handle.apiVersion` before sending one (a contributor
- * cannot: the ledger refuses it whole, and the session would never learn).
+ * The mirror tracks the publisher's *version*: `guard` arrived with contract version 2 and `search`
+ * with 3, and a consumer that reads the registry compares `handle.apiVersion` before sending one (a
+ * contributor cannot: the ledger refuses it whole, and the session would never learn).
  */
 export type KernelContribution = {
 	owner: string;
@@ -83,6 +119,8 @@ export type KernelContribution = {
 		own: { sessionFile?: string; firstIndex?: number },
 	) => KernelProvenance;
 	guard?: KernelGuard;
+	/** What answers `grep`/`find`, when this session has an engine of its own. One owner only. */
+	search?: KernelSearchEngine;
 };
 
 export type KernelRejection = { name: string; reason: string };

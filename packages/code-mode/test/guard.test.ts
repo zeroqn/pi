@@ -168,9 +168,10 @@ describe("the guard's gate", () => {
 	});
 
 	it("pins the contract version a supplier has to check before contributing", () => {
-		// An older code mode refuses `guard` as an unknown field *whole*, so a package that must be
-		// obeyed reads this before contributing. `handle.apiVersion` is where it reads it.
-		expect(API_VERSION).toBe(2);
+		// An older code mode refuses `guard` or `search` as an unknown field *whole*, so a package
+		// that must be obeyed — or that has an engine to offer — reads this before contributing.
+		// `handle.apiVersion` is where it reads it. 2 added `guard`; 3 added `search`.
+		expect(API_VERSION).toBe(3);
 	});
 });
 

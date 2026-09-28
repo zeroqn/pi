@@ -31,9 +31,10 @@ export const PUBLISHER = "pi-code-mode";
  *
  * A *supplier* reads it too. Code mode validates a contribution all-or-nothing, so an older code
  * mode refuses a field it does not know **whole** — which makes a slot a package must be obeyed
- * through unsafe to contribute blind. **2 added {@link Guard}**: a package that has to be obeyed
- * rather than merely offered reads `handle.apiVersion` first and fails closed below 2. */
-export const API_VERSION = 2;
+ * through unsafe to contribute blind. **2 added {@link Guard} and 3 added {@link SearchEngine}**: a package that has to be obeyed
+ * rather than merely offered reads `handle.apiVersion` first, and fails closed below the version
+ * it needs. */
+export const API_VERSION = 3;
 
 export type HostFn = (...args: unknown[]) => Promise<unknown>;
 
@@ -96,6 +97,48 @@ export type Guard = {
 	mountMode?: () => MountMode | undefined;
 };
 
+/** One grep hit, as a cell reads it. Both engines are asked for the file name and the line number, so
+ * neither field is ever absent — which is what lets a cell index on them without a null check. */
+export type Match = { path: string; line: number; text: string };
+
+/** What a cell asked `grep` for, in the engine's terms rather than the cell's. */
+export type GrepQuery = {
+	pattern: string;
+	path: string;
+	glob: string | null;
+	ignoreCase: boolean;
+	literal: boolean;
+	context: number;
+	limit: number;
+	/** The cell asked for the engine's own matching and ordering rather than rg/fd's. */
+	fuzzy: boolean;
+};
+
+/** What a cell asked `find` for, in the engine's terms rather than the cell's. */
+export type FindQuery = {
+	pattern: string;
+	path: string;
+	limit: number;
+	maxDepth: number;
+	type: string;
+	/** As {@link GrepQuery.fuzzy}. */
+	fuzzy: boolean;
+};
+
+/**
+ * The session's search engine, when its owner declared one — FFF is the one that exists.
+ *
+ * **One owner only**, in the same all-or-nothing family as `guard`/`provenance`/`onNotice`. The slot is
+ * deliberately *not* a pair of host functions named `grep`/`find`: those names are code mode's own
+ * (`BASE_HOST_FNS`), and a contributor that owned them would own the fallback as well. An engine answers
+ * the same **normalized** questions the base functions ask rg/fd, in the same shapes, so that a cell
+ * cannot tell which one answered — which is the property that makes a swap safe at all.
+ */
+export type SearchEngine = {
+	grep(query: GrepQuery): Promise<Match[]>;
+	find(query: FindQuery): Promise<string[]>;
+};
+
 export type Contribution = {
 	owner: string;
 	hostFns?: Record<string, HostFn>;
@@ -119,6 +162,8 @@ export type Contribution = {
 	provenance?: (ctx: unknown, own: OwnSession) => Provenance;
 	/** Whether a host call may run, and which mode the cwd mount gets. One owner only. */
 	guard?: Guard;
+	/** What answers `grep`/`find`, when this session has an engine of its own. One owner only. */
+	search?: SearchEngine;
 };
 
 export type Rejection = { name: string; reason: string };
@@ -229,6 +274,7 @@ const CONTRIBUTION_FIELDS = [
 	"onNotice",
 	"provenance",
 	"guard",
+	"search",
 ];
 
 /** The static half of what the model and the kernel see. The *prelude's* base is not here:
@@ -480,6 +526,19 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 							rejected.push({ name: `guard.${field}`, reason: "not a function" });
 					}
 			}
+			if (contribution.search !== undefined) {
+				const engine = contribution.search;
+				if (typeof engine !== "object" || engine === null || Array.isArray(engine))
+					rejected.push({ name: "search", reason: "not an object" });
+				else
+					// Both halves are required: a partial engine would leave one primitive quietly on
+					// rg/fd while the session believed it had been swapped, which is a half-arrived
+					// surface of exactly the kind the all-or-nothing rule exists to prevent.
+					for (const field of ["grep", "find"] as const) {
+						if (typeof engine[field] !== "function")
+							rejected.push({ name: `search.${field}`, reason: "not a function" });
+					}
+			}
 			// Names other owners already hold: an owner may replace its own, never steal.
 			const taken = new Map<string, string>();
 			for (const [otherOwner, other] of accepted) {
@@ -496,7 +555,7 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 			// shape: a second declarer is **refused** rather than silently ignored, which is what a
 			// slot dispatched first-owner-wins would otherwise do. An owner may still replace its own,
 			// which is what keeps a second `session_start` free.
-			for (const field of ["onNotice", "provenance", "guard"] as const) {
+			for (const field of ["onNotice", "provenance", "guard", "search"] as const) {
 				if (contribution[field] === undefined) continue;
 				for (const [otherOwner, other] of accepted) {
 					if (otherOwner === owner) continue;
@@ -543,6 +602,13 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 		guard(): Guard | undefined {
 			for (const contribution of accepted.values()) {
 				if (contribution.guard) return contribution.guard;
+			}
+			return undefined;
+		},
+		/** The session's search engine, from its one declarer. */
+		search(): SearchEngine | undefined {
+			for (const contribution of accepted.values()) {
+				if (contribution.search) return contribution.search;
 			}
 			return undefined;
 		},

@@ -23,6 +23,7 @@ function query(over: Partial<GrepQuery> = {}): GrepQuery {
 		literal: false,
 		context: 0,
 		limit: 100,
+		fuzzy: false,
 		...over,
 	};
 }
@@ -89,7 +90,7 @@ describe("a real grep call, whichever engine this host has", () => {
 
 describe("find's two engines, whose flags are not each other's", () => {
 	function findQuery(over: Partial<FindQuery> = {}): FindQuery {
-		return { pattern: "*.txt", path: "/w", limit: 1000, maxDepth: 0, type: "", ...over };
+		return { pattern: "*.txt", path: "/w", limit: 1000, maxDepth: 0, type: "", fuzzy: false, ...over };
 	}
 
 	it("asks fd for a glob, hidden files, and its two knobs by name", () => {
@@ -194,5 +195,92 @@ describe("find, whose two knobs come from the shell calls it replaces", () => {
 	it("fails loudly on a type fd does not know, rather than answering with no matches", async () => {
 		const root = mkdtempSync(join(tmpdir(), "code-mode-find-bad-"));
 		await expect(host(root).find("*", { type: "bogus" })).rejects.toThrow(/find failed/);
+	});
+});
+
+describe("the session's engine, when one was contributed (fff-search ticket 05)", () => {
+	const dir = () => mkdtempSync(join(tmpdir(), "code-mode-engine-"));
+	const engineHost = (root: string, engine: unknown, guard?: unknown) =>
+		makeHost({
+			root,
+			attachments: [],
+			extra: {},
+			background: {} as never,
+			engine: engine as never,
+			guard: guard as never,
+		});
+
+	it("answers grep from the engine, with the cell's question normalized and the cut made here", async () => {
+		const root = dir();
+		const seen: GrepQuery[] = [];
+		const host = engineHost(root, {
+			grep: async (query: GrepQuery) => {
+				seen.push(query);
+				return [0, 1, 2, 3, 4].map((i) => ({ path: `/w/${i}`, line: i + 1, text: "hit" }));
+			},
+			find: async () => [],
+		});
+		expect(
+			await host.grep("needle", { glob: "*.ts", ignore_case: true, literal: true, context: 2, limit: 3, fuzzy: true }),
+		).toEqual([0, 1, 2].map((i) => ({ path: `/w/${i}`, line: i + 1, text: "hit" })));
+		// The engine is handed the *cell's* question in normalized form, `fuzzy` included: it never
+		// sees argv, and it does not own the cut.
+		expect(seen).toEqual([
+			{
+				pattern: "needle",
+				path: root,
+				glob: "*.ts",
+				ignoreCase: true,
+				literal: true,
+				context: 2,
+				limit: 3,
+				fuzzy: true,
+			},
+		]);
+	});
+
+	it("sorts a parity find here, and leaves a fuzzy find in the engine's own order", async () => {
+		const root = dir();
+		const host = engineHost(root, { grep: async () => [], find: async () => ["/w/b", "/w/a"] });
+		// The sort is the parity half and therefore the primitive's: sorting a ranked answer would
+		// throw away the reason to ask for one, which is what `fuzzy` is for.
+		expect(await host.find("*", { limit: 1 })).toEqual(["/w/a"]);
+		expect(await host.find("*", { limit: 1, fuzzy: true })).toEqual(["/w/b"]);
+	});
+
+	it("falls back to the host's own engines when the engine throws", async () => {
+		const root = dir();
+		writeFileSync(join(root, "a.txt"), "first\nsecond has the NEEDLE\n");
+		const host = engineHost(root, {
+			grep: async () => {
+				throw new Error("the index is gone");
+			},
+			find: async () => {
+				throw new Error("the index is gone");
+			},
+		});
+		// Q4a: a throw from the engine is not a cell's failure, and the answer is the same shape.
+		expect(await host.grep("NEEDLE", { literal: true })).toEqual([
+			{ path: join(root, "a.txt"), line: 2, text: "second has the NEEDLE" },
+		]);
+		expect(await host.find("*.txt")).toEqual([join(root, "a.txt")]);
+	});
+
+	it("asks the guard first, so a refusal is never papered over by the fallback", async () => {
+		const root = dir();
+		let ran = 0;
+		const host = engineHost(
+			root,
+			{
+				grep: async () => {
+					ran += 1;
+					throw new Error("unreachable: the guard refused");
+				},
+				find: async () => [],
+			},
+			{ before: () => ({ allow: false, reason: "read-only mode: refusing grep" }) },
+		);
+		await expect(host.grep("x")).rejects.toThrow(/refusing grep/);
+		expect(ran).toBe(0);
 	});
 });
