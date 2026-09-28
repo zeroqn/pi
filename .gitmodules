@@ -2,3 +2,7 @@
 	path = vendor/magic-context
 	url = https://github.com/zeroqn/magic-context
 	branch = pi-agents
+[submodule "vendor/fff"]
+	path = vendor/fff
+	url = https://github.com/zeroqn/fff
+	branch = pi

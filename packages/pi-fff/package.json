@@ -1,0 +1,39 @@
+{
+	"name": "pi-fff-prebuilt",
+	"version": "0.11.1-nightly.2c45bec",
+	"description": "Prebuilt @ff-labs/pi-fff from the zeroqn/fff fork (branch pi) - generated, do not edit.",
+	"type": "module",
+	"license": "MIT",
+	"private": true,
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"fff",
+		"search"
+	],
+	"pi": {
+		"extensions": [
+			"./index.js"
+		]
+	},
+	"dependencies": {
+		"@ff-labs/fff-bun": "0.11.0",
+		"@ff-labs/fff-node": "0.11.0"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*",
+		"@sinclair/typebox": "*"
+	},
+	"scripts": {
+		"postinstall": "node -e \"process.exit(0)\""
+	},
+	"builtFrom": {
+		"submodule": "vendor/fff",
+		"commit": "2c45bec999e45e9631db5f89a44b14dac7a6de49",
+		"shortCommit": "2c45bec",
+		"upstreamVersion": "0.11.0",
+		"fork": "zeroqn/fff#pi"
+	}
+}
