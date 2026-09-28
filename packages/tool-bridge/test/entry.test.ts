@@ -151,16 +151,18 @@ describe("a resumed child (child-surface ticket 03 §5)", () => {
 
 		// Direction 1 of the child's reconcile — keep only ceiling ∩ registered — which no other check
 		// reaches: a spawned child's registry was already filtered by pi at construction.
-		expect(active).toEqual(["python", "todowrite"]);
+		// The fallback ceiling is code mode's own tool and nothing else: no owner declares a
+		// child-eligible tool any more (`one-tool-surface` ticket 06), so nothing is restored either.
+		expect(active).toEqual(["python"]);
 		expect(entries).toEqual([
 			{
 				customType: "rlm-child-surface",
 				data: {
-					surface: ["python", "todowrite"],
-					ceiling: ["python", "todowrite"],
+					surface: ["python"],
+					ceiling: ["python"],
 					source: "fallback",
 					deactivated: ["read", "bash", "edit", "write", "ctx_memory", "ctx_note"],
-					restored: ["todowrite"],
+					restored: [],
 				},
 			},
 		]);

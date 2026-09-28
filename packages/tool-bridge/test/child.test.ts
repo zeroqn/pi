@@ -94,44 +94,29 @@ beforeEach(() => {
 });
 
 describe("the child's tools (child-surface ticket 06)", () => {
-	it("registers the capability's definition and no proxy of its own", async () => {
-		installRegistry({ childTodo: () => ({ definition: TODO, capture: () => {} }) });
+	it("registers no tool of its own: a child's tools are its cell's", async () => {
+		// `one-tool-surface` ticket 06. The child used to hold `todowrite` as a real pi tool, from a
+		// capability the registry handed over; now the tool is *published*, so the same definition is
+		// reached with `tool("todowrite", …)` from the child's own cell and the duplicate route is gone.
+		installRegistry();
 		try {
 			const { pi, tools, run } = childSurface();
 			applyFactories(pi);
 
 			expect(tools.size).toBe(0); // nothing registers before the session starts
 			await run("session_start", {}, childCtx());
-			// `todowrite`, and nothing else: the three tools a child used to hold as proxies are reached
-			// from its own cell now.
-			expect([...tools.keys()]).toEqual(["todowrite"]);
-			expect([...tools.keys()].filter((name) => name.startsWith("ctx_"))).toEqual([]);
+			expect([...tools.keys()]).toEqual([]);
 		} finally {
 			clearRegistry();
 		}
 	});
 
-	it("registers the instance's own definition, not a copy", async () => {
-		installRegistry({ childTodo: () => ({ definition: TODO, capture: () => {} }) });
-		try {
-			const { pi, tools, run } = childSurface();
-			applyFactories(pi);
-			await run("session_start", {}, childCtx());
-			// Identity: a child's tool *is* the object the instance registered for a root, so the two can
-			// never drift and no drift pin is needed.
-			expect(tools.get("todowrite")).toBe(TODO);
-		} finally {
-			clearRegistry();
-		}
-	});
-
-	it("forwards message_end to the capture, with the child's own ctx", async () => {
+	it("still scrubs the child's messages on message_end, with the child's own ctx", async () => {
+		// The forwarding that survives: the transform tags messages, so the tags have to go before the
+		// child's own transcript persists them.
 		const seen: Array<{ message: unknown; ctx: unknown }> = [];
 		installRegistry({
-			childTodo: () => ({
-				definition: TODO,
-				capture: (message: unknown, ctx: unknown) => seen.push({ message, ctx }),
-			}),
+			scrubMessage: (message: unknown) => seen.push({ message, ctx: undefined }),
 		});
 		try {
 			const { pi, run } = childSurface();
@@ -140,22 +125,7 @@ describe("the child's tools (child-surface ticket 06)", () => {
 			await run("session_start", {}, ctx);
 			const message = { role: "assistant", content: [] };
 			await run("message_end", { message }, ctx);
-			// The capture rides the hook the bridge already has for scrubbing — the one that catches a
-			// todowrite-shaped call even when pi could not execute it.
-			expect(seen).toEqual([{ message, ctx }]);
-		} finally {
-			clearRegistry();
-		}
-	});
-
-	it("registers nothing when the instance offers no capability at all", async () => {
-		installRegistry(); // no childTodo — an older Magic Context, or todowrite disabled
-		try {
-			const { pi, tools, run } = childSurface();
-			applyFactories(pi);
-			await run("session_start", {}, childCtx());
-			expect(tools.size).toBe(0);
-			expect(childStatus()).toContain("no childTodo");
+			expect(seen).toEqual([{ message, ctx: undefined }]);
 		} finally {
 			clearRegistry();
 		}
@@ -164,7 +134,6 @@ describe("the child's tools (child-surface ticket 06)", () => {
 	it("releases the child's session state *and its binding* when the child ends", async () => {
 		const cleared: Array<[string, string | undefined]> = [];
 		installRegistry({
-			childTodo: () => ({ definition: TODO, capture: () => {} }),
 			clearSession: (id: string, file?: string) => cleared.push([id, file]),
 		});
 		try {
@@ -182,7 +151,6 @@ describe("the child's tools (child-surface ticket 06)", () => {
 		const bound: unknown[] = [];
 		installRegistry({
 			bindChild: (input: unknown) => bound.push(input),
-			childTodo: () => ({ definition: TODO, capture: () => {} }),
 		});
 		try {
 			const { pi, run } = childSurface();
@@ -206,12 +174,14 @@ describe("the child's tools (child-surface ticket 06)", () => {
 describe("the ceiling's policy half (child-surface ticket 03)", () => {
 	it("narrows the spawning session's surface to what a child may hold", () => {
 		const { ceiling, source, dropped } = childCeiling(["python", "ask_user_question", "todowrite"]);
-		expect(ceiling).toEqual(["python", "todowrite"]);
+		// No owner declares a child-eligible tool any more (`one-tool-surface` ticket 06), so a child's
+		// ceiling is code mode's own tool and nothing else.
+		expect(ceiling).toEqual(["python"]);
 		expect(source).toBe("spawner");
-		// Neither of these is declared child-eligible by any owner — `ask_user_question` needs a UI a
-		// child does not have — and naming what was excluded is what tells a narrowed child from a
-		// broken one.
-		expect(dropped).toEqual(["ask_user_question"]);
+		// Every other name is excluded — `ask_user_question` needs a UI a child does not have, and
+		// `todowrite`/`ctx_*` are reached from the child's own cell — and naming what was excluded is what
+		// tells a narrowed child from a broken one.
+		expect(dropped).toEqual(["ask_user_question", "todowrite"]);
 	});
 
 	it("names code mode's own tool once, and no owner has to declare it", () => {

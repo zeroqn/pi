@@ -11,16 +11,13 @@
  * The shim does four things:
  *   - binds the child explicitly — the header is not enough, because a `/fork` also carries
  *     `parentSession` (v1 ticket 04/16);
- *   - registers the child's **`todowrite`** from the capability the registry hands over, and forwards the
- *     child's `message_end` to that capability's capture, so the tool and the thing that records its state
- *     are one value (`.scratch/child-surface/` ticket 05);
  *   - forwards `context`, `session_before_compact`, `message_end` and `session_shutdown`.
  *
- * It **no longer registers `ctx_search`/`ctx_reduce`/`ctx_expand` as proxies** (`.scratch/child-surface/`
- * ticket 03 §4): a child reaches those from its own cell through the tool bridge, whose generated line
- * states how. Two routes to one effect was the thing this whole seam exists to remove, and the proxies
- * also meant a child's manual advertised tools that the bridge could not offer in a session with no
- * kernel.
+ * It **registers no tool of its own** — not the three `ctx_*` proxies it used to (`child-surface` ticket
+ * 03 §4) and not `todowrite` (`one-tool-surface` ticket 06). A child reaches every one of them from its
+ * own cell through the tool bridge, whose generated line states how: two routes to one effect was the
+ * thing this whole seam exists to remove, and each removed route also meant a child holding tools the
+ * bridge could not offer in a session with no kernel.
  *
  * Until the registry exists, every hook is a no-op and children fall back to pi's native compaction. That
  * is a **degradation, not a failure**: the bridge must run correctly with this owner absent, old, or
@@ -42,18 +39,6 @@ interface MagicContextRegistry {
 		cwd?: string;
 	}): void;
 	clearSession?(sessionId: string, sessionFile?: string): void;
-	/**
-	 * A bound child's todo capability, or `undefined` when the instance cannot serve one.
-	 *
-	 * **One value, both halves** (`.scratch/child-surface/` ticket 05): a child is never given the tool
-	 * without the capture, because a `todowrite` whose state is never recorded is the failure this whole
-	 * convention exists to prevent. Its absence is therefore the whole answer to "may a child hold it?" —
-	 * and it is absent in an older Magic Context, so a shim must read it optionally.
-	 */
-	childTodo?(): {
-		definition: Record<string, unknown>;
-		capture(message: unknown, ctx: unknown): void;
-	};
 }
 
 /**
@@ -82,12 +67,7 @@ function statusLine(): string {
 	if (!registry) {
 		return "magic-context: no registry — children fall back to pi's native compaction (degradation, not failure)";
 	}
-	if (!registry.childTodo) {
-		return "magic-context: registry found, but it has no childTodo — children are context-managed without a todo tool (older Magic Context)";
-	}
-	return registry.childTodo()
-		? "magic-context: registry found — children are context-managed by the parent's instance, reach its tools from a cell through the bridge, and hold its own todowrite"
-		: "magic-context: registry found — children are context-managed and reach its tools from a cell, but no todo tool (todowrite disabled in this project)";
+	return "magic-context: registry found — children are context-managed by the parent's instance and reach its tools, todos included, from their own cell through the bridge";
 }
 
 /**
@@ -111,10 +91,6 @@ function shimFor(parentSessionFile: string | undefined) {
 	return (childPi: any): void => {
 		const registry = findMagicContextRegistry();
 		if (!registry) return;
-		// Resolved once, in the child's own `session_start`, and read by the `message_end` handler
-		// below: one value carrying the tool *and* its capture, so the two cannot come apart.
-		let todo: { definition: Record<string, unknown>; capture(m: unknown, c: unknown): void } | undefined;
-
 		childPi.on("session_start", async (_event: unknown, ctx: any) => {
 			// Explicit binding: the parent already knows it is spawning, and the header is not enough —
 			// a /fork also carries `parentSession` (v1 ticket 04/16). Best effort, because this runs in
@@ -132,18 +108,11 @@ function shimFor(parentSessionFile: string | undefined) {
 				/* binding is best effort */
 			}
 
-			// `.scratch/child-surface/` ticket 05: the child's own `todowrite`, from the one value the
-			// registry hands over. Registered only when that value exists, so an older Magic Context (or a
-			// project with todowrite disabled) offers the child nothing rather than a tool whose state
-			// would never be recorded. No activation step: the ceiling admits `todowrite` (Magic Context
-			// declares it child-eligible) and pi activates an allowed registration itself.
-			todo = registry.childTodo?.();
-			if (!todo) return;
-			try {
-				childPi.registerTool(todo.definition);
-			} catch {
-				// A refused registration must not take the child's session down.
-			}
+			// Nothing is registered for the child (`.scratch/one-tool-surface/` ticket 06): the child's
+			// tools are its *cell's*, as they are for a root, so the shim's job is the binding and the
+			// forwarding below and nothing more. The one tool it used to register — `todowrite` — is
+			// published now, and `tool("todowrite", …)` reaches the same definition with the same
+			// capture behind it (`observePiToolCallStart`), which is why the duplicate route is gone.
 		});
 
 		childPi.on("context", async (event: unknown, ctx: any) => {
@@ -173,16 +142,6 @@ function shimFor(parentSessionFile: string | undefined) {
 			} catch {
 				/* scrubbing is best effort */
 			}
-			// The capture rides the hook the bridge already has, which is the one Magic Context's own
-			// comment justifies for this path: it catches a todowrite-shaped call **even when pi could not
-			// execute it**, and the shape gate was written for it. `tool_execution_start` is deliberately
-			// not forwarded — that is where Magic Context's trigger machinery lives, and a child's plan is
-			// not a signal for it.
-			try {
-				todo?.capture(event?.message, ctx);
-			} catch {
-				/* capture is best effort, exactly as the scrub is */
-			}
 		});
 
 		childPi.on("session_shutdown", async (_event: unknown, ctx: any) => {
@@ -207,10 +166,10 @@ export const magicContext: OwnerModule = {
 	// `todowrite` writes nothing itself — Magic Context captures its state from the transcript — so a
 	// call routed through a cell would succeed and record nothing. It has to stay a real pi tool.
 	nativeOnly: ["todowrite"],
-	// Equal to `nativeOnly` today, and kept as its own list so a future divergence is a decision
-	// (map ticket 03). `ctx_*` is deliberately absent: after the split, a child reaches those from its
-	// cell through the bridge, and `ctx_search`/`ctx_reduce`/`ctx_expand` stay callable there (ticket 04).
-	childEligible: ["todowrite"],
+	// Nothing is declared child-eligible any more (`.scratch/one-tool-surface/` ticket 06): a child holds
+	// no tool of its own, and reaches every one of them — `ctx_*` and `todowrite` alike — from its cell
+	// through the bridge. The list stays on the type, because "may a child hold this?" is still a question
+	// an owner may have to answer.
 	childFactories: (request: ChildRequest) => [shimFor(request.parentSessionFile)],
 	bindChild: bind,
 	childStatus: statusLine,

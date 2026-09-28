@@ -34,12 +34,15 @@ describe("the owner list", () => {
 		expect(magicContext.nativeOnly).toEqual(["todowrite"]);
 	});
 
-	it("declares child eligibility as its own list, equal to native-only today", () => {
+	it("declares child eligibility as its own list, and today declares none", () => {
 		// Two lists answering two questions (`nativeOnly`: a *root* must keep it a pi tool;
-		// `childEligible`: a *child* may hold it). Equal today, and pinned so a divergence is a decision
-		// someone made rather than a drift nobody noticed.
-		expect(magicContext.childEligible).toEqual(magicContext.nativeOnly);
-		expect(childEligibleTools()).toContain("todowrite");
+		// `childEligible`: a *child* may hold it). They diverged deliberately once a child stopped
+		// holding tool of its own and started reaching them from its cell (`one-tool-surface` ticket 06)
+		// — which is the divergence the split into two lists existed to make a decision rather than
+		// drift. That `childEligible` is empty is the assertion; that `nativeOnly` still names
+		// `todowrite` is the task above, still true until the tool is published.
+		expect(magicContext.childEligible ?? []).toEqual([]);
+		expect(childEligibleTools()).toEqual([]);
 	});
 
 	it("keeps the acceptance probe out of the list unless something is measuring", () => {
