@@ -793,20 +793,20 @@ export function createKernel(options: {
 	function backgroundHostFns(): HostFns {
 		return {
 			async bg_poll(...args: unknown[]) {
-				const { id } = bind(args, ["id"]);
+				const { id } = bind(args, ["id"], "bg_poll");
 				const record = background.poll(String(id ?? ""));
 				if (record.status !== "running") bgReads.add(record.id);
 				return record;
 			},
 			async bg_read(...args: unknown[]) {
-				const { id, tail_bytes } = bind(args, ["id", "tail_bytes"]);
+				const { id, tail_bytes } = bind(args, ["id", "tail_bytes"], "bg_read");
 				const record = background.poll(String(id ?? ""));
 				if (record.status !== "running") bgReads.add(record.id);
 				const tail = typeof tail_bytes === "number" ? tail_bytes : 0;
 				return background.output(String(id ?? ""), tail || undefined);
 			},
 			async bg_kill(...args: unknown[]) {
-				const { id } = bind(args, ["id"]);
+				const { id } = bind(args, ["id"], "bg_kill");
 				return background.kill(String(id ?? ""));
 			},
 			async bg_list() {

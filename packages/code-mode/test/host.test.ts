@@ -346,3 +346,36 @@ describe("the session's engine, when one was contributed (fff-search ticket 05)"
 		expect(ran).toBe(0);
 	});
 });
+
+describe("the arguments a cell hands over (bind)", () => {
+	const host = (root: string) => makeHost({ root, attachments: [], extra: {}, background: {} as never });
+
+	// `glob` is a name `grep` binds and `find` does not. Dropping it silently answered with every path
+	// under the root, which reads as a filter that worked — the failure a cell cannot see in the answer.
+	it("refuses a keyword the primitive does not bind, and names it", async () => {
+		const root = mkdtempSync(join(tmpdir(), "code-mode-bind-"));
+		writeFileSync(join(root, "a.md"), "needle\n");
+		writeFileSync(join(root, "b.txt"), "needle\n");
+		const failure = await host(root)
+			.find("*.md", { glob: "*.md" } as never)
+			.catch((error: Error) => error);
+		// `.name` is what monty maps onto the Python exception, so this reaches the cell as a ValueError.
+		expect((failure as Error).name).toBe("ValueError");
+		expect((failure as Error).message).toContain('find has no parameter "glob"');
+		expect((failure as Error).message).toContain("pattern");
+		// The name `find` does bind still answers, and `glob` is still `grep`'s — a path filter there.
+		expect(await host(root).find("*.md")).toEqual([join(root, "a.md")]);
+		expect(await host(root).grep("needle", { glob: "*.md", literal: true })).toEqual([
+			{ path: join(root, "a.md"), line: 1, text: "needle" },
+		]);
+	});
+
+	it("refuses a surplus positional, and one name given twice", async () => {
+		const root = mkdtempSync(join(tmpdir(), "code-mode-bind-twice-"));
+		await expect(host(root).read_image("a.png", "extra")).rejects.toThrow(/read_image takes at most 1 positional/);
+		const failure = await host(root)
+			.find("*.md", { pattern: "*.txt" } as never)
+			.catch((error: Error) => error);
+		expect((failure as Error).message).toContain('"pattern" was given twice');
+	});
+});

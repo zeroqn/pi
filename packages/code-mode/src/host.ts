@@ -186,16 +186,42 @@ export function parseFindOutput(kind: "fd" | "find", text: string): string[] {
 	return paths;
 }
 
-export function bind(args: unknown[], names: string[]): Record<string, unknown> {
+/** The exception a cell sees for an argument its primitive cannot bind. `.name` is what monty maps
+ * onto the Python exception, so a misspelling arrives as a `ValueError` (`zvec_grep_*` refuses the
+ * same way, for the same reason: a caller who passed a parameter believes it did something). */
+function badArgument(message: string): Error {
+	const error = new Error(message);
+	error.name = "ValueError";
+	return error;
+}
+
+/** The arguments monty handed over: the positionals, and Python's keyword arguments as one trailing
+ * plain object.
+ *
+ * An unknown keyword and a surplus positional are **refused, not dropped**. `glob` is a name `grep`
+ * binds and `find` does not, so a cell writing `find(glob="*.md")` would otherwise get a full listing
+ * that reads as a filter that worked — the one failure a cell cannot detect from the answer. */
+export function bind(args: unknown[], names: string[], fn: string): Record<string, unknown> {
 	const list = [...args];
 	let kwargs: Record<string, unknown> = {};
 	const last = list[list.length - 1];
 	if (last && typeof last === "object" && !Array.isArray(last) && !Buffer.isBuffer(last)) {
 		kwargs = list.pop() as Record<string, unknown>;
 	}
+	if (list.length > names.length) {
+		throw badArgument(
+			`${fn} takes at most ${names.length} positional arguments (${names.join(", ")}), got ${list.length}`,
+		);
+	}
+	for (const key of Object.keys(kwargs)) {
+		if (!names.includes(key)) throw badArgument(`${fn} has no parameter "${key}" (takes ${names.join(", ")})`);
+	}
 	const out: Record<string, unknown> = {};
 	names.forEach((name, index) => {
 		const positional = list[index];
+		if (index < list.length && kwargs[name] !== undefined) {
+			throw badArgument(`${fn}: "${name}" was given twice, as a positional and by name`);
+		}
 		out[name] = positional !== undefined && positional !== null ? positional : (kwargs[name] ?? null);
 	});
 	return out;
@@ -243,7 +269,7 @@ export function makeHost(options: {
 	const { root, attachments, progress, extra, background: backgroundManager, guard, engine } = options;
 	const base: HostFns = {
 		async bash_host(...args: unknown[]) {
-			const { command, timeout, background } = bind(args, ["command", "timeout", "background"]);
+			const { command, timeout, background } = bind(args, ["command", "timeout", "background"], "bash");
 			if (background === true) {
 				return backgroundManager.start(str(command), timeout === null ? null : num(timeout, 0) || null);
 			}
@@ -266,7 +292,7 @@ export function makeHost(options: {
 		},
 
 		async find(...args: unknown[]) {
-			const bound = bind(args, ["pattern", "path", "limit", "max_depth", "type", "fuzzy", "index"]);
+			const bound = bind(args, ["pattern", "path", "limit", "max_depth", "type", "fuzzy", "index"], "find");
 			const query: FindQuery = {
 				pattern: str(bound.pattern),
 				path: str(bound.path) || root,
@@ -301,17 +327,11 @@ export function makeHost(options: {
 		},
 
 		async grep(...args: unknown[]): Promise<Match[]> {
-			const bound = bind(args, [
-				"pattern",
-				"path",
-				"glob",
-				"ignore_case",
-				"literal",
-				"context",
-				"limit",
-				"fuzzy",
-				"index",
-			]);
+			const bound = bind(
+				args,
+				["pattern", "path", "glob", "ignore_case", "literal", "context", "limit", "fuzzy", "index"],
+				"grep",
+			);
 			const limit = num(bound.limit, 100);
 			const query: GrepQuery = {
 				pattern: str(bound.pattern),
@@ -353,7 +373,7 @@ export function makeHost(options: {
 		},
 
 		async read_image(...args: unknown[]) {
-			const { path } = bind(args, ["path"]);
+			const { path } = bind(args, ["path"], "read_image");
 			const wanted = str(path);
 			const absolute = wanted.startsWith("/") ? wanted : join(root, wanted);
 			const buffer = readFileSync(absolute);

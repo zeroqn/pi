@@ -5,9 +5,10 @@
  *
  * `.scratch/code-mode/acceptance-baseline.md` holds the same numbers, the three fragments
  * the split removed from the pre-split description, what rlm contributes in their place, and
- * the three amendments since: code mode's own guidelines for searching contents, for finding
- * paths, and for listing a directory. Those are why the second guideline test below pins a
- * *whole-array* hash while the first still pins the pre-split six.
+ * the amendments since: code mode's own guidelines for searching contents, for finding
+ * paths, and for listing a directory, then the rename of `find`'s first parameter from `glob`
+ * to `pattern` — the name the host function actually binds. Those are why the second
+ * guideline test below pins a *whole-array* hash while the first still pins the pre-split six.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -36,7 +37,7 @@ describe("the base surface (acceptance check 2)", () => {
 	// because they are what the model reads -- a cell that never sees them reaches for bash.
 	it("carries the three added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(9);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("2221398fb0987346077fff58ab1fe1678be82aeeef4c57d861de0c48f6cf74f1");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("408163e34bef54c40b68543bff65de9fdb83a74f69c74da9e3938f08b457a610");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, list a directory with");
