@@ -12,6 +12,7 @@ two are forks.
 | [`rsi`](packages/rsi) | Background loop learns reusable skills from sessions and maintains them. |
 | [`web-access`](packages/web-access) | `web_search`/`fetch_content` host functions for the kernel, plus the untrusted-web-content guard. |
 | [`zvec-grep`](packages/zvec-grep) | `zvec_grep_search`/`zvec_grep_rg` host functions for the kernel, plus the `/zg-*` index commands. |
+| [`fff-search`](packages/fff-search) | [FFF](https://github.com/dmtrKovalenko/fff)'s index behind a cell's `grep`/`find`, when a cell asks for it (`fuzzy=True`). |
 | [`advisor`](packages/advisor) | `advisor()` in a cell: escalate to a stronger reviewer model, ported from rpiv-advisor. `/advisor` picks the model. |
 | [`ask-user-question`](packages/ask-user-question) | `ask_user_question()` in a cell: the questionnaire, ported from rpiv-ask-user-question. Root sessions only. |
 | [`tool-bridge`](packages/tool-bridge) | Another extension's published pi tools, callable from inside a cell as `await tool(...)`. |
@@ -19,10 +20,10 @@ two are forks.
 | [`magic-context`](packages/magic-context) | Forked. Cross-session memory and context management for pi. **Prebuilt** — see below. |
 | [`pi-fff`](packages/pi-fff) | Forked. [FFF](https://github.com/dmtrKovalenko/fff)'s indexed search, with the finder published for a cell's `grep`/`find`. **Prebuilt** — see below. |
 
-Eleven of them compose into one code-mode runtime. `code-mode` owns the kernel and the `python` tool, and
+Twelve of them compose into one code-mode runtime. `code-mode` owns the kernel and the `python` tool, and
 `host-bridge` is the composition root — the one client of code-mode's registry, and what asks each
-contributor for a session. `rlm`, `skill-bridge`, `tool-bridge`, `web-access`, `zvec-grep`, `advisor` and
-`ask-user-question` register with it, a contract rather than an import, and each *contributes* the host
+contributor for a session. `rlm`, `skill-bridge`, `tool-bridge`, `web-access`, `zvec-grep`, `advisor`,
+`ask-user-question` and `fff-search` register with it, a contract rather than an import, and each *contributes* the host
 functions, prelude lines and sentences it is responsible for; `readonly-mode` registers to contribute the
 policy that governs a cell; `rsi` reaches the same client only to hold a kernel handle, and contributes
 nothing. `tool-bridge` also carries the reconciler that keeps pi's active set to the tools a cell cannot
@@ -52,7 +53,7 @@ Install one at a time, or the whole set from the root manifest:
 
 ```bash
 pi install ./packages/rlm      # one package
-pi install .                   # or this repo's root, whose manifest declares all thirteen
+pi install .                   # or this repo's root, whose manifest declares all fourteen
 ```
 
 ## The forks
