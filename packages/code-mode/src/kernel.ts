@@ -21,6 +21,7 @@ import { clientVersion, loadMonty } from "./monty";
 import { spill, truncate } from "./output";
 import { prelude } from "./prelude";
 import { renderValue } from "./render";
+import { shellProblem } from "./shell";
 import { errorText } from "./util";
 
 // ---------------------------------------------------------------------------
@@ -765,6 +766,8 @@ export function createKernel(options: {
 				`the monty binding did not load: ${errorText(error)} — this is the compiled-Bun hazard; the extension points NAPI_RS_NATIVE_LIBRARY_PATH at the platform .node before importing`,
 			);
 		}
+		const shell = shellProblem();
+		if (shell) found.push(shell);
 		const workerPath = process.env.MONTY_BIN;
 		if (rotateAt >= maxSuspensions) {
 			found.push(

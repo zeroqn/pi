@@ -14,6 +14,7 @@
 import { spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { SHELL } from "./shell";
 
 export type BgStatus = "running" | "done" | "failed" | "killed" | "timeout";
 
@@ -90,7 +91,7 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 			throw new Error(`${running.length} background commands are already running; the limit is ${deps.cap}. Use bg_list() and kill one first.`);
 		}
 		const id = `bg-${++counter}`;
-		const child = spawn(process.env.RLM_SHELL ?? process.env.SHELL ?? "/bin/bash", ["-lc", command], {
+		const child = spawn(SHELL, ["-lc", command], {
 			cwd: deps.cwd(),
 			detached: true,
 			stdio: ["ignore", "pipe", "pipe"],

@@ -118,12 +118,12 @@ way a contributor's host functions reach a kernel — then the contributors them
 `-e /workspace/pi/extensions/packages/rlm/index.ts` for delegation and
 `-e /workspace/pi/extensions/packages/web-access/host.ts` for web host functions.
 
-Environment overrides: `RLM_SHELL`. The two search primitives take no other config and each falls
-back to the other engine:
+The two search primitives take no config and each falls back to the other engine:
 `grep` is **ripgrep when `rg` is on `PATH`, GNU `grep` when it is not**, and `find` is **fd when it
 is, GNU find when it is not** — so a host without either still searches, with that engine's own
 ignore rules (ripgrep and fd honour `.gitignore`, GNU grep and GNU find do not), which is the whole
-reason to prefer ripgrep and fd. `MONTY_BIN` is only
+reason to prefer ripgrep and fd. Host commands run in `$SHELL`, or `/bin/bash` when it is unset; a
+host with neither is a preflight problem, reported before the first cell. `MONTY_BIN` is only
 needed on a host without `/lib64/ld-linux-x86-64.so.2` — NixOS, musl; the flake's `.#monty-bin` is
 the published worker patched for Nix (do **not** use `.#monty`, the local checkout at protocol 3).
 

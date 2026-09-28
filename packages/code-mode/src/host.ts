@@ -16,6 +16,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { run, spill, truncate } from "./output";
+import { SHELL } from "./shell";
 import { bool, num, str } from "./util";
 import {
 	type FindQuery,
@@ -30,10 +31,6 @@ import {
 export type { FindQuery, GrepQuery, Match, SearchEngine };
 import type { createBackgroundManager } from "./background";
 import type { HostFns } from "./journal";
-
-/** Where the shell the host functions that shell out run in lives, and how long a cell's output
- * may be — code mode's own environment knobs (ticket 03). */
-const SHELL = process.env.RLM_SHELL ?? process.env.SHELL ?? "/bin/bash";
 
 /** `grep` is ripgrep when the host has it and GNU grep when it has not: the primitive is "search
  * the files", not "call one engine", so the first one on PATH answers and the other catches the
