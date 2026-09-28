@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type * as MontyModule from "@pydantic/monty/node";
 import { createBackgroundManager } from "./background";
-import type { Ledger, KernelHandleCore, MountMode, Notice, Provenance } from "./contract";
+import { BASE_HOST_FNS, type Ledger, type KernelHandleCore, type MountMode, type Notice, type Provenance } from "./contract";
 import { makeHost, bind, type Attachment } from "./host";
 import { appendJournal, readJournal, readJournals, recordingHost, replayHost, restoredLine } from "./journal";
 import type { CellRecord, HostCallRecord, HostFns, RestoreReport } from "./journal";
@@ -171,6 +171,54 @@ export type Kernel = KernelHandleCore & {
 export function sessionFilePath(ctx: any): string | undefined {
 	const file: string | undefined = ctx?.sessionManager?.getSessionFile?.();
 	return file ? resolve(file) : undefined;
+}
+
+/**
+ * What a cell reached, for the extensions on the other side of the host surface.
+ *
+ * A cell's calls are otherwise invisible to anyone but code mode: the transcript records one `python`
+ * call and its printed output, so an owner whose capability a cell used cannot tell that it was used at
+ * all — which is what broke Magic Context's note and reduce readouts (zeroqn/pi
+ * `.scratch/one-tool-surface/`). The trace rides the `python` result's `details`, where pi persists it
+ * with the message, so a later pass and a resumed session both see it.
+ *
+ * **Contributed** host functions only. Code mode's own base surface (`bash`, `read_text`, `grep`, …) is
+ * not what another extension needs to know about, and every cell calls it; a base name is therefore not
+ * recorded, and the trace stays about the *session's* capabilities.
+ *
+ * Arguments are a JSON-safe copy — primitives, arrays and plain objects, one level deep, strings cut to
+ * {@link CELL_CALL_ARG_CHARS} — so a huge or unserializable argument cannot bloat a transcript line. A
+ * call that raised is recorded too: it happened, and a reader that wants to know whether the cell *tried*
+ * something needs it. The bridge's own route is not resolved here: `tool("ctx_note", …)` is recorded as
+ * `{host: "tool", args: ["ctx_note", {…}]}`, because the naming belongs to whoever reads it.
+ */
+const CELL_CALL_LIMIT = 24;
+const CELL_CALL_ARG_CHARS = 200;
+
+function traceArg(value: unknown): unknown {
+	if (typeof value === "string") {
+		return value.length > CELL_CALL_ARG_CHARS ? `${value.slice(0, CELL_CALL_ARG_CHARS)}…` : value;
+	}
+	if (typeof value === "number" || typeof value === "boolean" || value === null) return value;
+	if (Array.isArray(value)) return value.slice(0, 8).map(traceArg);
+	if (value && typeof value === "object") {
+		const out: Record<string, unknown> = {};
+		for (const [key, inner] of Object.entries(value as Record<string, unknown>).slice(0, 16)) {
+			out[key] = traceArg(inner);
+		}
+		return out;
+	}
+	return undefined;
+}
+
+function summarizeCellCalls(calls: readonly HostCallRecord[]): Array<{ host: string; args: unknown[] }> {
+	const out: Array<{ host: string; args: unknown[] }> = [];
+	for (const call of calls) {
+		if (out.length >= CELL_CALL_LIMIT) break;
+		if (BASE_HOST_FNS.includes(call.name)) continue;
+		out.push({ host: call.name, args: (call.args ?? []).slice(0, 2).map(traceArg) });
+	}
+	return out;
 }
 
 export function createKernel(options: {
@@ -1001,6 +1049,9 @@ export function createKernel(options: {
 						fullOutputPath,
 						failed: Boolean(failure),
 						stderr: stderr ? stderr.slice(0, 400) : undefined,
+						// What this cell reached: the contributed host functions it called, in call
+						// order, for the extensions whose capabilities they are.
+						cellCalls: summarizeCellCalls(cellCalls),
 					},
 				};
 			});
