@@ -6,7 +6,7 @@
  * journals actually used — one list of paths read back from either, a directory marked the same way.
  *
  * The argv of both engines is pinned here, because the live call below can only exercise the one
- * this host has: CI has neither fd nor ripgrep, and a dev box's fd comes from `RLM_FD`.
+ * this host has: CI has neither fd nor ripgrep, and a dev box's fd is simply the one on `PATH`.
  */
 import { describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";

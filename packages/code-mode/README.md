@@ -118,8 +118,8 @@ way a contributor's host functions reach a kernel — then the contributors them
 `-e /workspace/pi/extensions/packages/rlm/index.ts` for delegation and
 `-e /workspace/pi/extensions/packages/web-access/host.ts` for web host functions.
 
-Environment overrides: `RLM_FD` (which fd `find` runs, for a host whose fd is not on `PATH`),
-`RLM_SHELL`. The two search primitives take no other config and each falls back to the other engine:
+Environment overrides: `RLM_SHELL`. The two search primitives take no other config and each falls
+back to the other engine:
 `grep` is **ripgrep when `rg` is on `PATH`, GNU `grep` when it is not**, and `find` is **fd when it
 is, GNU find when it is not** — so a host without either still searches, with that engine's own
 ignore rules (ripgrep and fd honour `.gitignore`, GNU grep and GNU find do not), which is the whole

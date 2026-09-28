@@ -44,10 +44,9 @@ const GREP = RG ?? onPath("grep") ?? "grep";
 
 /** `find` is fd when the host has it and GNU find when it has not — the same rule, for the same
  * reason: a primitive that answers only on a host with one engine is not "find the files", it is
- * "find them where fd is installed". `RLM_FD` pins fd for a host whose fd is not on PATH (empty
- * counts as unset, so the probe still runs). The two engines want different argv and print
+ * "find them where fd is installed". The two engines want different argv and print
  * differently, so the kind travels beside the path here too. */
-const FD = process.env.RLM_FD || onPath("fd");
+const FD = onPath("fd");
 const FIND_KIND: "fd" | "find" = FD ? "fd" : "find";
 const FIND = FD ?? onPath("find") ?? "find";
 
