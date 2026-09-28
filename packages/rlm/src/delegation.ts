@@ -37,7 +37,7 @@ export type DelegationDeps = {
 
 export function delegationHostFns(deps: DelegationDeps): Record<string, (...args: unknown[]) => Promise<unknown>> {
 	const spawnHandle = async (depth: number, args: unknown[]): Promise<ChildHandle> => {
-		const { prompt, name, model, thinking } = bind(args, ["prompt", "name", "model", "thinking"]);
+		const { prompt, name, model, thinking } = bind(args, ["prompt", "name", "model", "thinking"], "rlm.spawn");
 		const label = str(name).trim();
 		if (!label) throw new Error("rlm.spawn requires a name");
 		const inner = {
@@ -72,24 +72,24 @@ export function delegationHostFns(deps: DelegationDeps): Record<string, (...args
 			return spawnHandle(deps.ownDepth + 1, args);
 		},
 		async rlm_poll(...args: unknown[]) {
-			const { selector } = bind(args, ["selector"]);
+			const { selector } = bind(args, ["selector"], "rlm.poll");
 			return deps.childContext ? deps.childContext.poll(str(selector)) : deps.manager!.poll(str(selector));
 		},
 		async rlm_list() {
 			return deps.childContext ? deps.childContext.list() : deps.manager!.list();
 		},
 		async rlm_remove(...args: unknown[]) {
-			const { selector } = bind(args, ["selector"]);
+			const { selector } = bind(args, ["selector"], "rlm.remove");
 			return deps.childContext ? deps.childContext.remove(str(selector)) : deps.manager!.remove(str(selector));
 		},
 		async rlm_send(...args: unknown[]) {
-			const { selector, text } = bind(args, ["selector", "text"]);
+			const { selector, text } = bind(args, ["selector", "text"], "rlm.send");
 			return deps.childContext
 				? deps.childContext.send(str(selector), str(text))
 				: deps.manager!.send(str(selector), str(text));
 		},
 		async rlm_find_models(...args: unknown[]) {
-			const { query, limit } = bind(args, ["query", "limit"]);
+			const { query, limit } = bind(args, ["query", "limit"], "find_models");
 			const text = query ? str(query) : undefined;
 			const count = num(limit, 20);
 			return deps.childContext ? deps.childContext.findModels(text, count) : findModels(await modelRuntime(), text, count);
@@ -98,7 +98,7 @@ export function delegationHostFns(deps: DelegationDeps): Record<string, (...args
 			return { total_tokens: deps.manager ? deps.manager.treeCost() : 0, own_depth: deps.ownDepth };
 		},
 		async agent_message_send(...args: unknown[]) {
-			const { text, receiver_role } = bind(args, ["text", "receiver_role"]);
+			const { text, receiver_role } = bind(args, ["text", "receiver_role"], "agent_message.send");
 			const role = receiver_role ? str(receiver_role) : null;
 			if (deps.childContext && (!role || role === "parent")) {
 				deps.childContext.onMessage(str(text));
