@@ -31,14 +31,18 @@ export const API_VERSION = 1;
 
 /** Appended to the `python` tool's description; the contributor owns its own separators. */
 export const DESCRIPTION =
-	"\n\n`grep`/`find` with `fuzzy=True` answer from the workspace's FFF index instead of rg/fd: FFF's own" +
-	" fuzzy matching, frecency order, and a scan that does not walk the tree. That index does not cover" +
-	" dot-paths (`.scratch/`, `.github/`, `.env`) or files a `.gitignore` excludes; without `fuzzy=True`" +
-	" the two primitives use rg/fd, which do cover dot-paths.";
+	"\n\n`grep`/`find` answer from the workspace's FFF index instead of rg/fd when the call asks them to:" +
+	" `index=True` searches the index with rg's own matcher (the same matches, much faster, ordered by path" +
+	" and line), and `fuzzy=True` uses FFF's fuzzy matching and frecency order. Both lanes see what the" +
+	" index sees: it covers neither dot-paths (`.scratch/`, `.github/`, `.env`) nor files a `.gitignore`" +
+	" excludes, so they answer with fewer matches than rg over a workspace root; without either flag the" +
+	" two primitives use rg/fd, which do cover those.";
 
 export const GUIDELINES = [
-	"`await grep(…, fuzzy=True)` and `await find(…, fuzzy=True)` answer from the workspace's FFF index: faster and frecency-ranked, but blind to dot-paths (`.scratch/`, `.github/`, `.env`) and to gitignored files. Do not use them for an exhaustive audit, a rename sweep or any search that must include a dot-directory — the default (no `fuzzy=`) is rg/fd, which covers those.",
-	"In the index lane `find` takes `type=\"file\"` or `type=\"directory\"` and no `max_depth`; any other type or a depth bound is answered by fd instead.",
+	"`await grep(pattern, index=True)` / `await find(glob, index=True)` answer from the workspace's FFF index with rg's own matching — the fast lane for an exact search over a large tree: no tree walk, ordered by path then line, and the same matches as rg over the paths the index covers.",
+	"`await grep(pattern, fuzzy=True)` / `await find(glob, fuzzy=True)` use FFF's own fuzzy matching and frecency order — use it for a half-remembered name, not for an exact search.",
+	"Both index lanes are blind to dot-paths (`.scratch/`, `.github/`, `.env`) and to gitignored files, so do not use them for an exhaustive audit, a rename sweep or any search that must include a dot-directory — the default (neither flag) is rg/fd, which covers those.",
+	"In the index lanes `find` takes `type=\"file\"` or `type=\"directory\"` and no `max_depth`; an exact directory listing, a request for files and directories together, and fd's other types are answered by fd instead.",
 ];
 
 /**

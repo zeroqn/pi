@@ -110,7 +110,14 @@ export type GrepQuery = {
 	literal: boolean;
 	context: number;
 	limit: number;
-	/** The cell asked for the engine's own matching and ordering rather than rg/fd's. */
+	/**
+	 * The cell asked for the index with **rg's semantics**: `literal`/`ignore_case` decide the matcher,
+	 * and the answer is ordered the way this file orders every other one rather than by the engine's
+	 * ranking. The result *set* is the exact one; what it is not is rg's arrival order, which no index can
+	 * reproduce — an index answers from the files it has, not from a walk.
+	 */
+	index: boolean;
+	/** The cell asked for the engine's own matching and ordering rather than rg/fd's. Implies {@link index}. */
 	fuzzy: boolean;
 };
 
@@ -121,6 +128,8 @@ export type FindQuery = {
 	limit: number;
 	maxDepth: number;
 	type: string;
+	/** As {@link GrepQuery.index}. */
+	index: boolean;
 	/** As {@link GrepQuery.fuzzy}. */
 	fuzzy: boolean;
 };
@@ -133,6 +142,13 @@ export type FindQuery = {
  * (`BASE_HOST_FNS`), and a contributor that owned them would own the fallback as well. An engine answers
  * the same **normalized** questions the base functions ask rg/fd, in the same shapes, so that a cell
  * cannot tell which one answered — which is the property that makes a swap safe at all.
+ *
+ * **Two lanes, and the cell picks one.** `fuzzy` asks for the engine's own matching and ordering;
+ * `index` asks for the index with the cell's own matcher and this file's ordering — the fast exact lane.
+ * Without either, the engine is not called at all, which is what keeps rg/fd the default answer for every
+ * question a cell did not ask the index for. `{@link GrepQuery.index}` and `{@link GrepQuery.fuzzy}` are
+ * additive fields: a code mode that predates `index` never sets it, and an engine written against that
+ * older shape sees `false` and answers exactly as it did.
  */
 export type SearchEngine = {
 	grep(query: GrepQuery): Promise<Match[]>;

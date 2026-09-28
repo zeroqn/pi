@@ -72,6 +72,9 @@ export type KernelGrepQuery = {
 	literal: boolean;
 	context: number;
 	limit: number;
+	/** The index with rg's semantics: the fast exact lane. */
+	index: boolean;
+	/** The engine's own matching and ordering. Implies `index`. */
 	fuzzy: boolean;
 };
 
@@ -82,6 +85,9 @@ export type KernelFindQuery = {
 	limit: number;
 	maxDepth: number;
 	type: string;
+	/** As {@link KernelGrepQuery.index}. */
+	index: boolean;
+	/** As {@link KernelGrepQuery.fuzzy}. */
 	fuzzy: boolean;
 };
 

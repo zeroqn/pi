@@ -27,14 +27,18 @@ export type SlotPathItem = { relativePath: string };
 
 /** FFF's answer envelope: `ok` is a discriminant, and a failure carries the reason. */
 export type SlotResult<T> =
-	| { ok: true; value: { items: T[] } }
+	| { ok: true; value: { items: T[]; regexFallbackError?: string } }
 	| { ok: false; error: string };
 
-/** The three calls this engine makes, narrowed to what it uses. */
+/** The calls this engine makes, narrowed to what it uses. */
 export type SlotFinder = {
 	grep(query: string, options: Record<string, unknown>): SlotResult<SlotGrepItem>;
+	/** FFF's own glob matcher — a plain pattern, not the constraint dialect `grep` parses (see `engine.ts`). */
+	glob(query: string, options: Record<string, unknown>): SlotResult<SlotPathItem>;
 	fileSearch(query: string, options: Record<string, unknown>): SlotResult<SlotPathItem>;
 	directorySearch(query: string, options: Record<string, unknown>): SlotResult<SlotPathItem>;
+	/** Files and directories in one list, each tagged; FFF's own shape, so the engine reads a union. */
+	mixedSearch(query: string, options: Record<string, unknown>): SlotResult<unknown>;
 	/**
 	 * Resolves on timeout too, so the result says whether the index *became* ready rather than whether the
 	 * wait ended — and this engine ignores it either way, answering from whatever is indexed.

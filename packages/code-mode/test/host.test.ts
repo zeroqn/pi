@@ -23,6 +23,7 @@ function query(over: Partial<GrepQuery> = {}): GrepQuery {
 		literal: false,
 		context: 0,
 		limit: 100,
+		index: false,
 		fuzzy: false,
 		...over,
 	};
@@ -90,7 +91,16 @@ describe("a real grep call, whichever engine this host has", () => {
 
 describe("find's two engines, whose flags are not each other's", () => {
 	function findQuery(over: Partial<FindQuery> = {}): FindQuery {
-		return { pattern: "*.txt", path: "/w", limit: 1000, maxDepth: 0, type: "", fuzzy: false, ...over };
+		return {
+			pattern: "*.txt",
+			path: "/w",
+			limit: 1000,
+			maxDepth: 0,
+			type: "",
+			index: false,
+			fuzzy: false,
+			...over,
+		};
 	}
 
 	it("asks fd for a glob, hidden files, and its two knobs by name", () => {
@@ -234,18 +244,70 @@ describe("the session's engine, when one was contributed (fff-search ticket 05)"
 				literal: true,
 				context: 2,
 				limit: 3,
+				index: false,
 				fuzzy: true,
 			},
 		]);
 	});
 
-	it("sorts a parity find here, and leaves a fuzzy find in the engine's own order", async () => {
+	it("sorts the exact lane here, and leaves a fuzzy find in the engine's own order", async () => {
 		const root = dir();
 		const host = engineHost(root, { grep: async () => [], find: async () => ["/w/b", "/w/a"] });
 		// The sort is the parity half and therefore the primitive's: sorting a ranked answer would
-		// throw away the reason to ask for one, which is what `fuzzy` is for.
-		expect(await host.find("*", { limit: 1 })).toEqual(["/w/a"]);
+		// throw away the reason to ask for one, which is what `fuzzy` is for. The exact lane (`index`)
+		// is the reverse — the cell asked for `find`'s own ordering, and an index has no walk to copy.
+		expect(await host.find("*", { limit: 2, index: true })).toEqual(["/w/a", "/w/b"]);
 		expect(await host.find("*", { limit: 1, fuzzy: true })).toEqual(["/w/b"]);
+	});
+
+	it("orders the exact lane's grep by path then line, and leaves a fuzzy one alone", async () => {
+		const root = dir();
+		const unsorted = [
+			{ path: "/w/b.ts", line: 4, text: "hit" },
+			{ path: "/w/a.ts", line: 9, text: "hit" },
+			{ path: "/w/a.ts", line: 2, text: "hit" },
+		];
+		const seen: GrepQuery[] = [];
+		const host = engineHost(root, {
+			grep: async (query: GrepQuery) => {
+				seen.push(query);
+				return unsorted;
+			},
+			find: async () => [],
+		});
+
+		expect(await host.grep("needle", { index: true, literal: true })).toEqual([
+			{ path: "/w/a.ts", line: 2, text: "hit" },
+			{ path: "/w/a.ts", line: 9, text: "hit" },
+			{ path: "/w/b.ts", line: 4, text: "hit" },
+		]);
+		expect(seen[0]?.index).toBe(true);
+		expect(seen[0]?.fuzzy).toBe(false);
+
+		// FFF's ranking survives the fuzzy lane untouched.
+		expect(await host.grep("needle", { fuzzy: true })).toEqual(unsorted);
+	});
+
+	it("does not ask the engine at all when the cell named neither lane", async () => {
+		const root = dir();
+		writeFileSync(join(root, "a.txt"), "a line without the word\n");
+		const seen: string[] = [];
+		const host = engineHost(root, {
+			grep: async () => {
+				seen.push("grep");
+				return [{ path: "/w/engine", line: 1, text: "engine" }];
+			},
+			find: async () => {
+				seen.push("find");
+				return ["/w/engine"];
+			},
+		});
+
+		// The default answer is the host's own engine (rg, or GNU grep on a box without it): what this
+		// asserts is only that the index was not asked, which is what `seen` records.
+		expect(await host.grep("NOTHING-ANYWHERE-9f3c", { literal: true })).toEqual([]);
+		expect(await host.find("*.txt")).not.toEqual(["/w/engine"]);
+		expect(seen).toEqual([]);
 	});
 
 	it("falls back to the host's own engines when the engine throws", async () => {

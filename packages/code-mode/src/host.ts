@@ -158,6 +158,17 @@ export function findArgv(kind: "fd" | "find", query: FindQuery): string[] {
 	return argv;
 }
 
+/**
+ * The order the exact lane answers in: by path, then by line.
+ *
+ * Code mode's own, applied to an engine's answer — an index has no walk order to reproduce, and a cell that
+ * takes the first of a set must get the same one twice (`find`'s sort, for the same reason).
+ */
+export function compareMatches(a: Match, b: Match): number {
+	if (a.path !== b.path) return a.path < b.path ? -1 : 1;
+	return a.line - b.line;
+}
+
 /** One path per line, a directory with fd's trailing `/`, whichever engine printed it. fd prints
  * that itself; GNU find is asked for the type character beside the path so this can add it. */
 export function parseFindOutput(kind: "fd" | "find", text: string): string[] {
@@ -255,19 +266,20 @@ export function makeHost(options: {
 		},
 
 		async find(...args: unknown[]) {
-			const bound = bind(args, ["pattern", "path", "limit", "max_depth", "type", "fuzzy"]);
+			const bound = bind(args, ["pattern", "path", "limit", "max_depth", "type", "fuzzy", "index"]);
 			const query: FindQuery = {
 				pattern: str(bound.pattern),
 				path: str(bound.path) || root,
 				limit: num(bound.limit, 1000),
 				maxDepth: num(bound.max_depth, 0),
 				type: str(bound.type),
+				index: bool(bound.index),
 				fuzzy: bool(bound.fuzzy),
 			};
 			// As `grep`: the session's engine first, rg/fd when there is none or it throws. The *sort* is
 			// the parity half and therefore this function's, unless the cell asked for the engine's own
 			// ranking (`fuzzy`) — sorting a ranked answer would throw away the reason to ask for one.
-			if (engine) {
+			if (engine && (query.index || query.fuzzy)) {
 				try {
 					const found = await engine.find(query);
 					return query.fuzzy ? found.slice(0, query.limit) : [...found].sort().slice(0, query.limit);
@@ -289,7 +301,17 @@ export function makeHost(options: {
 		},
 
 		async grep(...args: unknown[]): Promise<Match[]> {
-			const bound = bind(args, ["pattern", "path", "glob", "ignore_case", "literal", "context", "limit", "fuzzy"]);
+			const bound = bind(args, [
+				"pattern",
+				"path",
+				"glob",
+				"ignore_case",
+				"literal",
+				"context",
+				"limit",
+				"fuzzy",
+				"index",
+			]);
 			const limit = num(bound.limit, 100);
 			const query: GrepQuery = {
 				pattern: str(bound.pattern),
@@ -299,16 +321,24 @@ export function makeHost(options: {
 				literal: bool(bound.literal),
 				context: bound.context ? num(bound.context, 0) : 0,
 				limit,
+				index: bool(bound.index),
 				fuzzy: bool(bound.fuzzy),
 			};
-			// The session's engine first; rg/grep when there is none, or when the engine throws. The
-			// engine is handed the *normalized* query and owns nothing else: the limit is applied here,
-			// for the same reason the base path applies it — a cell's contract is the shape and the cut,
-			// not whichever engine answered. `fuzzy` reaches the engine as part of the query; the base
-			// engines have no such notion and ignore it.
-			if (engine) {
+			// The session's engine first; rg/grep when there is none, when the cell asked for neither lane,
+			// or when the engine throws. The engine is handed the *normalized* query and owns nothing else:
+			// the limit is applied here, for the same reason the base path applies it — a cell's contract
+			// is the shape and the cut, not whichever engine answered. `index` and `fuzzy` reach the engine
+			// as part of the query; the base engines have no such notion and ignore them.
+			//
+			// The engine's answer is reordered in the exact lane and left alone in the fuzzy one: a cell that
+			// asked for the engine's *ranking* must get it, and one that asked for the index with rg's
+			// matcher must get a stable order. Neither can be rg's arrival order — that is a walk's, and an
+			// index does not walk — so the exact lane sorts by path then line, as `find` already does.
+			if (engine && (query.index || query.fuzzy)) {
 				try {
-					return (await engine.grep(query)).slice(0, limit);
+					const found = await engine.grep(query);
+					const ordered = query.fuzzy ? found : [...found].sort(compareMatches);
+					return ordered.slice(0, limit);
 				} catch {
 					/* the fallback is the rule, not a failure path */
 				}
