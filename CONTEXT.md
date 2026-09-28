@@ -122,6 +122,25 @@ The most a child session may be offered — its spawning session's surface, narr
 hold.
 _Avoid_: limit, cap
 
+**Dispatched call**:
+A pi tool call pi itself resolved against the surface — the event, the owner's `execute`, the result —
+which is what an owner's call-side effects have historically been wired to.
+_Avoid_: tool call (too broad: a cell-routed call is a call too), real call
+
+**Cell-routed call**:
+The same tool reached from inside a code-mode cell through the bridge: the owner's definition runs, but pi
+dispatches nothing by that name — the transcript records code mode's own tool, so an effect wired to
+pi's event never fires.
+_Avoid_: bridged call, proxied call, tool call
+
+**Call observer**:
+The one function per phase that turns "this call happened" into an owner's call-side effects — recording
+state, firing a trigger, clearing one — run for a dispatched *and* a cell-routed call, so the two routes
+cannot drift. A **dispatch-derived** observer reads only pi's event; a **transcript-derived** one reads
+pi's messages or the tags, and a cell-routed call leaves neither, so it stays blind until something
+writes the call down.
+_Avoid_: hook (pi's own event registration), handler, listener
+
 **Child-eligible**:
 A tool a child session may hold, declared by whoever owns it: a tool whose effect is pi's dispatch, or
 code mode's own tool. Every other tool is reached from a cell instead of being offered to the model.
