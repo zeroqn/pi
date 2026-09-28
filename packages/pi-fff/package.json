@@ -1,6 +1,6 @@
 {
 	"name": "pi-fff-prebuilt",
-	"version": "0.11.1-nightly.2c45bec",
+	"version": "0.11.1-nightly.3fb89d6",
 	"description": "Prebuilt @ff-labs/pi-fff from the zeroqn/fff fork (branch pi) - generated, do not edit.",
 	"type": "module",
 	"license": "MIT",
@@ -31,8 +31,8 @@
 	},
 	"builtFrom": {
 		"submodule": "vendor/fff",
-		"commit": "2c45bec999e45e9631db5f89a44b14dac7a6de49",
-		"shortCommit": "2c45bec",
+		"commit": "3fb89d6b8245b7a04e9581edbb922394041e6353",
+		"shortCommit": "3fb89d6",
 		"upstreamVersion": "0.11.0",
 		"fork": "zeroqn/fff#pi"
 	}
