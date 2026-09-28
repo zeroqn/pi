@@ -346,6 +346,7 @@ import {
   promptSurfaceHashMaterial,
   createPromptSurfaceRuntime,
   createPromptSurfaceGuidanceEpochCache,
+  cellToolCalls,
   SYNTH_USER_ID_PREFIX,
   resolvePiStableId,
   readPiSessionSnapshot,
@@ -470,6 +471,7 @@ import {
   renderMemoryBlockV2,
   stripMemoryMuralBlock,
   unifiedSearch,
+  TODO_TOOL_NAME,
   rememberTodowriteToolCallTodos,
   parseTodos,
   setTodoSnapshot,
@@ -478,7 +480,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-j0yscwgv.js";
+} from "./index-yb8njcjc.js";
 import {
   pushNotification2
 } from "./index-b3eqj1g6.js";
@@ -24481,6 +24483,12 @@ function hasVisibleNoteReadCallPi(messages) {
     const raw = messages[i];
     if (!raw || typeof raw !== "object")
       continue;
+    for (const call of cellToolCalls(raw)) {
+      if (call.name !== NOTE_TOOL_NAME)
+        continue;
+      if (call.params.action === READ_ACTION)
+        return true;
+    }
     const msg = raw;
     if (msg.role !== "assistant")
       continue;
@@ -25870,7 +25878,8 @@ function assertPiRawFallbackFits(messages, contextLimit, log, cause) {
 var CHILD_TOOL_ALLOWLIST = new Set([
   "ctx_search",
   "ctx_reduce",
-  "ctx_expand"
+  "ctx_expand",
+  "todowrite"
 ]);
 var CHILD_TAG_SENTENCE = "Messages and tool outputs are tagged with §N§ identifiers (e.g. §1§, §42§).";
 var CHILD_TAG_MARKER = "tagged with §N§ identifiers";
@@ -25947,7 +25956,8 @@ var BRIDGE_PUBLISHABLE_TOOL_NAMES = new Set([
   "ctx_memory",
   "ctx_note",
   "ctx_expand",
-  "ctx_reduce"
+  "ctx_reduce",
+  "todowrite"
 ]);
 function isBridgePublishable(name) {
   return BRIDGE_PUBLISHABLE_TOOL_NAMES.has(name);
@@ -26045,7 +26055,6 @@ function registerPiRegistry(options) {
   };
   registrations.add(registration);
   const facade = {
-    childTodo: () => options.childTodo?.(),
     transformContext: async (event, ctx) => resolve3(ctx)?.registry.transformContext(event, ctx),
     compact: async (ctx) => resolve3(ctx)?.registry.compact(ctx),
     scrubMessage: (message) => {
@@ -27008,7 +27017,9 @@ When dropping, do it silently and NEVER choose a large range before reviewing ev
 If older calls show [dropped §N§], never copy that system sentinel because it is not reply syntax; make a fresh real tool call and never fabricate or inline output.`;
 var CAVEMAN_COMPRESSION_WARNING = `
 **BEWARE**: History compression is on; older user AND assistant text — including your own earlier responses — has been deterministically rewritten in a terse caveman style (dropped articles, missing auxiliaries, \`//\` instead of connectives like \`because\`). This is automatic context compression that runs after the fact, not your actual prior wording or the user's. **DO NOT mimic this style in new turns.** Write fresh responses in normal prose. If you notice your output drifting into caveman cadence, that drift is in-context-learning bleeding from the compressed history — consciously revert to full sentences.`;
-function buildMagicContextSection(_agent, _legacyProtectionCount, ctxReduceCallable = true, dreamerEnabled = false, temporalAwarenessEnabled = false, cavemanTextCompressionEnabled = false, subagentMode = false, language, memoryEnabled = true, preset = "full", primaryOverride) {
+var TODO_LIST_GUIDANCE = `
+When work spans three or more steps, when the user gives you several tasks, or when you are tracking progress across a verify/fix loop, keep a todo list and update it with \`await tool("todowrite", todos=[…])\` from a cell. Pass the COMPLETE updated list every time — it replaces the prior list rather than appending to it — including pending, in_progress, completed and cancelled items that should remain visible. Mark exactly one todo \`in_progress\` before starting it, mark items \`completed\` as soon as they are done, and use \`cancelled\` only for work that is no longer needed. Never mark a todo completed while verification is failing, the implementation is partial, or an unresolved blocker remains — keep it \`in_progress\` and add or update a todo for the blocker.`;
+function buildMagicContextSection(_agent, _legacyProtectionCount, ctxReduceCallable = true, dreamerEnabled = false, temporalAwarenessEnabled = false, cavemanTextCompressionEnabled = false, subagentMode = false, language, memoryEnabled = true, preset = "full", primaryOverride, todoListCallable = false) {
   if (subagentMode) {
     const intro = preset === "light" ? SUBAGENT_REDUCE_INTRO_LIGHT() : SUBAGENT_REDUCE_INTRO();
     return `## Magic Context
@@ -27025,8 +27036,9 @@ Example: \`ctx_note(action="write", content="Implement X because Y", surface_con
   const languageGuidance = languageDirective ? `
 
 ${languageDirective}` : "";
+  const todoListGuidance = todoListCallable ? TODO_LIST_GUIDANCE : "";
   if (primaryOverride !== undefined) {
-    return `${primaryOverride}${temporalGuidance}${cavemanWarning}${languageGuidance}`;
+    return `${primaryOverride}${temporalGuidance}${cavemanWarning}${todoListGuidance}${languageGuidance}`;
   }
   if (!ctxReduceCallable) {
     if (preset === "light") {
@@ -27035,14 +27047,14 @@ ${languageDirective}` : "";
 ${LONG_TERM_PARTNER_FRAME}
 ${PARTNER_FRAME_CLOSER_NO_REDUCE_LIGHT}
 
-${BASE_INTRO_NO_REDUCE_LIGHT(memoryEnabled)}${smartNoteGuidance}${temporalGuidance}${cavemanWarning}${languageGuidance}`;
+${BASE_INTRO_NO_REDUCE_LIGHT(memoryEnabled)}${smartNoteGuidance}${temporalGuidance}${cavemanWarning}${todoListGuidance}${languageGuidance}`;
     }
     return `## Magic Context
 
 ${LONG_TERM_PARTNER_FRAME}
 ${PARTNER_FRAME_CLOSER_NO_REDUCE}
 
-${BASE_INTRO_NO_REDUCE(memoryEnabled)}${smartNoteGuidance}${temporalGuidance}${cavemanWarning}${languageGuidance}`;
+${BASE_INTRO_NO_REDUCE(memoryEnabled)}${smartNoteGuidance}${temporalGuidance}${cavemanWarning}${todoListGuidance}${languageGuidance}`;
   }
   if (preset === "light") {
     return `## Magic Context
@@ -27050,14 +27062,14 @@ ${BASE_INTRO_NO_REDUCE(memoryEnabled)}${smartNoteGuidance}${temporalGuidance}${c
 ${LONG_TERM_PARTNER_FRAME}
 ${PARTNER_FRAME_CLOSER_REDUCE_LIGHT}
 
-${BASE_INTRO_LIGHT(memoryEnabled)}${smartNoteGuidance}${temporalGuidance}${cavemanWarning}${languageGuidance}`;
+${BASE_INTRO_LIGHT(memoryEnabled)}${smartNoteGuidance}${temporalGuidance}${cavemanWarning}${todoListGuidance}${languageGuidance}`;
   }
   return `## Magic Context
 
 ${LONG_TERM_PARTNER_FRAME}
 ${PARTNER_FRAME_CLOSER_REDUCE}
 
-${BASE_INTRO(memoryEnabled)}${smartNoteGuidance}${temporalGuidance}${cavemanWarning}
+${BASE_INTRO(memoryEnabled)}${smartNoteGuidance}${temporalGuidance}${cavemanWarning}${todoListGuidance}
 ${GENERIC_SECTION}
 
 Prefer many small targeted operations over one large blanket operation, and keep the working set tidy as routine maintenance.${languageGuidance}`;
@@ -27071,7 +27083,7 @@ function buildMagicContextBlock(opts) {
   const includeGuidance = (opts.includeGuidance ?? true) && !existing.includes(MAGIC_CONTEXT_MARKER);
   if (!includeGuidance)
     return null;
-  return buildMagicContextSection(null, opts.protectedTags ?? 20, opts.ctxReduceCallable ?? true, opts.dreamerEnabled ?? false, opts.temporalAwarenessEnabled ?? false, opts.cavemanTextCompressionEnabled ?? false, false, opts.language, opts.memoryEnabled !== false, opts.promptSurfacePreset, opts.primaryGuidanceOverride);
+  return buildMagicContextSection(null, opts.protectedTags ?? 20, opts.ctxReduceCallable ?? true, opts.dreamerEnabled ?? false, opts.temporalAwarenessEnabled ?? false, opts.cavemanTextCompressionEnabled ?? false, false, opts.language, opts.memoryEnabled !== false, opts.promptSurfacePreset, opts.primaryGuidanceOverride, opts.todoListCallable ?? false);
 }
 function composeMagicContextSystemPrompt(basePrompt, block) {
   return block ? `${basePrompt}
@@ -34797,6 +34809,83 @@ function capturePiTodowriteMessageIfCompatible(args) {
   }
   return false;
 }
+function observePiToolCallStart(args) {
+  try {
+    if (args.name === "todowrite") {
+      const todos = args.args?.todos;
+      const sessionMeta = Array.isArray(todos) ? getOrCreateSessionMeta(args.db, args.sessionId) : null;
+      capturePiTodowriteArgsIfCompatible({
+        db: args.db,
+        sessionId: args.sessionId,
+        todos,
+        todowriteEnabled: args.todowriteEnabled,
+        todoOverlay: args.todoOverlay,
+        persist: Boolean(sessionMeta && !sessionMeta.isSubagent),
+        toolCallId: args.toolCallId
+      });
+      if (Array.isArray(todos) && todos.length > 0 && todos.every((t) => t.status === "completed" || t.status === "cancelled")) {
+        if (!args.compactionOff && sessionMeta && !sessionMeta.isSubagent) {
+          onNoteTrigger(args.db, args.sessionId, "todos_complete");
+        }
+      }
+    } else if (args.name === "ctx_note") {
+      clearNoteNudgeTriggerAndCooldown(args.db, args.sessionId);
+    }
+  } catch (err) {
+    warn(`observePiToolCallStart(${args.name}) failed (continuing):`, err);
+  }
+}
+function observePiToolCallEnd(args) {
+  try {
+    if (!args.compactionOff && args.name === "ctx_reduce") {
+      markPiChannel1Reduced(args.sessionId, args.db);
+    }
+  } catch (err) {
+    warn(`observePiToolCallEnd(${args.name}) failed (continuing):`, err);
+  }
+}
+async function executePublishedToolCall(args) {
+  const definition = args.definitions.get(args.name);
+  if (!definition) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: '${args.name}' is not available in this session.`
+        }
+      ],
+      details: undefined
+    };
+  }
+  const sessionId = args.ctx?.sessionManager?.getSessionId?.();
+  if (sessionId) {
+    observePiToolCallStart({
+      db: args.db,
+      sessionId,
+      name: args.name,
+      args: args.params,
+      toolCallId: undefined,
+      todowriteEnabled: args.todowriteEnabled,
+      todoOverlay: isBoundChild(args.ctx) ? undefined : args.todoOverlay,
+      compactionOff: args.compactionOff
+    });
+  }
+  try {
+    return await definition.execute(`bridge-${args.name}-${Date.now()}`, args.params, undefined, undefined, args.ctx);
+  } finally {
+    if (sessionId) {
+      observePiToolCallEnd({
+        db: args.db,
+        sessionId,
+        name: args.name,
+        compactionOff: args.compactionOff
+      });
+    }
+  }
+}
+function isTodoListDisciplineNeeded(args) {
+  return args.todowriteEnabled && !args.activeTools.includes(TODO_TOOL_NAME);
+}
 function info(message, data) {
   log(`${PREFIX2} ${message}`, data);
 }
@@ -35426,42 +35515,17 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
         const parentNames = [...registeredTools.keys()].filter((name) => registered.has(name) && (name !== "ctx_memory" || memoryEnabled));
         return narrowCatalogueForChild(parentNames, isBoundChild(ctx));
       },
-      execute: async (name, params, ctx) => {
-        const definition = registeredTools.get(name);
-        if (!definition) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error: '${name}' is not available in this session.`
-              }
-            ],
-            details: undefined
-          };
-        }
-        return definition.execute(`bridge-${name}-${Date.now()}`, params, undefined, undefined, ctx);
-      }
+      execute: (name, params, ctx) => executePublishedToolCall({
+        db,
+        name,
+        params,
+        ctx,
+        definitions: registeredTools,
+        todowriteEnabled,
+        todoOverlay,
+        compactionOff
+      })
     },
-    childTodo: () => todowriteDefinition ? {
-      definition: todowriteDefinition,
-      capture: (message, ctx) => {
-        const sessionId = ctx?.sessionManager?.getSessionId?.();
-        if (!sessionId)
-          return;
-        try {
-          capturePiTodowriteMessageIfCompatible({
-            db,
-            sessionId,
-            message,
-            todowriteEnabled: true,
-            todoOverlay: undefined,
-            persist: true
-          });
-        } catch (err) {
-          warn("childTodo: capture failed:", err);
-        }
-      }
-    } : undefined,
     registry: {
       transformContext: async (event, ctx) => {
         const sessionId = ctx?.sessionManager?.getSessionId?.();
@@ -35767,6 +35831,10 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
         includeGuidance: true,
         protectedTags: effectiveConfig.protected_tags,
         ctxReduceCallable: !compactionOff,
+        todoListCallable: isTodoListDisciplineNeeded({
+          todowriteEnabled,
+          activeTools: pi.getActiveTools()
+        }),
         dreamerEnabled: effectiveProjectDeps.dreamerEnabled,
         temporalAwarenessEnabled: effectiveConfig.temporal_awareness ?? false,
         cavemanTextCompressionEnabled: effectiveConfig.caveman_text_compression?.enabled === true,
@@ -35821,29 +35889,16 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
   });
   pi.on("tool_execution_start", async (event, ctx) => {
     try {
-      const sessionId = ctx.sessionManager.getSessionId();
-      if (event.toolName === "todowrite") {
-        const todoArgs = event.args;
-        const toolCallId = typeof event.toolCallId === "string" ? event.toolCallId : undefined;
-        const todos = todoArgs?.todos;
-        const sessionMeta = Array.isArray(todos) ? getOrCreateSessionMeta(db, sessionId) : null;
-        capturePiTodowriteArgsIfCompatible({
-          db,
-          sessionId,
-          todos,
-          todowriteEnabled,
-          todoOverlay,
-          persist: Boolean(sessionMeta && !sessionMeta.isSubagent),
-          toolCallId
-        });
-        if (Array.isArray(todos) && todos.length > 0 && todos.every((t) => t.status === "completed" || t.status === "cancelled")) {
-          if (!compactionOff && sessionMeta && !sessionMeta.isSubagent) {
-            onNoteTrigger(db, sessionId, "todos_complete");
-          }
-        }
-      } else if (event.toolName === "ctx_note") {
-        clearNoteNudgeTriggerAndCooldown(db, sessionId);
-      }
+      observePiToolCallStart({
+        db,
+        sessionId: ctx.sessionManager.getSessionId(),
+        name: event.toolName,
+        args: event.args,
+        toolCallId: typeof event.toolCallId === "string" ? event.toolCallId : undefined,
+        todowriteEnabled,
+        todoOverlay,
+        compactionOff
+      });
     } catch (err) {
       log(`tool_execution_start hook failed (continuing): ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -35853,9 +35908,12 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
       const sessionId = ctx.sessionManager.getSessionId();
       if (typeof sessionId !== "string" || sessionId.length === 0)
         return;
-      if (!compactionOff && event.toolName === "ctx_reduce") {
-        markPiChannel1Reduced(sessionId, db);
-      }
+      observePiToolCallEnd({
+        db,
+        sessionId,
+        name: event.toolName,
+        compactionOff
+      });
     } catch (err) {
       log(`tool_execution_end hook failed (continuing): ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -36042,8 +36100,12 @@ export {
   capturePiTodowriteMessageIfCompatible,
   claimProtectedTagsDeprecationNoticeOnce,
   src_default as default,
+  executePublishedToolCall,
   formatProtectedTagsDeprecationNotice,
   handlePiSessionBeforeCompact,
+  isTodoListDisciplineNeeded,
+  observePiToolCallEnd,
+  observePiToolCallStart,
   persistPiMessageEndModelMeta,
   persistPiPressureFromMessageEnd,
   resetClaimedProtectedTagsDeprecationNoticeForTesting,

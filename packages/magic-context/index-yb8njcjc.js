@@ -24611,6 +24611,37 @@ function createPromptSurfaceGuidanceEpochCache(runtime) {
   return cache;
 }
 
+// src/cell-calls-pi.ts
+var BRIDGE_HOST_FN = "tool";
+function isRecord3(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+function cellToolCalls(message) {
+  if (!isRecord3(message))
+    return [];
+  const details = message.details;
+  if (!isRecord3(details))
+    return [];
+  const trace = details.cellCalls;
+  if (!Array.isArray(trace))
+    return [];
+  const calls = [];
+  for (const record of trace) {
+    if (!isRecord3(record))
+      continue;
+    if (record.host !== BRIDGE_HOST_FN)
+      continue;
+    const args = record.args;
+    if (!Array.isArray(args))
+      continue;
+    const name = args[0];
+    if (typeof name !== "string" || name.length === 0)
+      continue;
+    calls.push({ name, params: isRecord3(args[1]) ? args[1] : {} });
+  }
+  return calls;
+}
+
 // src/read-session-pi.ts
 var SYNTH_USER_ID_PREFIX = "synth-user-";
 function resolvePiStableId(msg, index, entryIds, entryIdByRef) {
@@ -24858,10 +24889,12 @@ function synthesizeToolResultParts(msg) {
     output = fragments.join(`
 `);
   }
+  const tagToolName = cellToolCalls(msg).some((call) => call.name === "ctx_reduce") ? "ctx_reduce" : undefined;
   return [
     {
       type: "tool",
       tool,
+      ...tagToolName ? { tagToolName } : {},
       callID,
       state: {
         output
@@ -25294,13 +25327,13 @@ var QUALIFIER_FIELDS = ["variant", "thinking_level"];
 var TASK_MODEL_FIELDS = [...MODEL_FIELDS, ...QUALIFIER_FIELDS, "timeout_minutes"];
 var PRE_PER_HARNESS_BACKUP_SUFFIX = ".pre-per-harness.bak";
 var temporaryFileSequence = 0;
-function isRecord3(value) {
+function isRecord4(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function asDocument(text) {
   try {
     const document = parseJsonc(text.startsWith("\uFEFF") ? text.slice(1) : text);
-    return isRecord3(document) ? document : null;
+    return isRecord4(document) ? document : null;
   } catch {
     return null;
   }
@@ -25308,7 +25341,7 @@ function asDocument(text) {
 function getAtPath(document, path) {
   let current = document;
   for (const part of path) {
-    if (!isRecord3(current) || !Object.hasOwn(current, part))
+    if (!isRecord4(current) || !Object.hasOwn(current, part))
       return;
     current = current[part];
   }
@@ -25317,7 +25350,7 @@ function getAtPath(document, path) {
 function stableJson(value) {
   if (Array.isArray(value))
     return `[${value.map(stableJson).join(",")}]`;
-  if (!isRecord3(value))
+  if (!isRecord4(value))
     return JSON.stringify(value);
   return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
 }
@@ -25330,7 +25363,7 @@ function valueForDiagnostic(value) {
 function migrateEntryForHarness(value, harness) {
   if (Array.isArray(value))
     return value.map((entry) => migrateEntryForHarness(entry, harness));
-  if (!isRecord3(value) || !Object.hasOwn(value, "model"))
+  if (!isRecord4(value) || !Object.hasOwn(value, "model"))
     return value;
   const entry = { model: value.model };
   if (harness === "opencode" && Object.hasOwn(value, "variant")) {
@@ -25351,11 +25384,11 @@ function canCreateAtPath(document, path) {
   for (const part of path) {
     if (current === undefined)
       return true;
-    if (!isRecord3(current))
+    if (!isRecord4(current))
       return false;
     current = current[part];
   }
-  return current === undefined || isRecord3(current);
+  return current === undefined || isRecord4(current);
 }
 function flatFieldPath(parts) {
   return parts.join(".");
@@ -25396,7 +25429,7 @@ function updateDocumentForFlatFields(text) {
   };
   const migrateAgentFields = (agentName) => {
     const agent = document[agentName];
-    if (!isRecord3(agent))
+    if (!isRecord4(agent))
       return;
     for (const field of MODEL_FIELDS) {
       if (!Object.hasOwn(agent, field))
@@ -25427,11 +25460,11 @@ function updateDocumentForFlatFields(text) {
   migrateAgentFields("historian");
   migrateAgentFields("dreamer");
   const dreamer = document.dreamer;
-  const tasks = isRecord3(dreamer) ? dreamer.tasks : undefined;
-  if (isRecord3(tasks)) {
+  const tasks = isRecord4(dreamer) ? dreamer.tasks : undefined;
+  if (isRecord4(tasks)) {
     for (const taskName of Object.keys(tasks).sort()) {
       const task = tasks[taskName];
-      if (!isRecord3(task))
+      if (!isRecord4(task))
         continue;
       for (const field of TASK_MODEL_FIELDS) {
         if (!Object.hasOwn(task, field))
@@ -34313,7 +34346,7 @@ function resolveCtxExpandMode(args, domain) {
 }
 
 // ../plugin/src/tools/ctx-expand/render.ts
-function isRecord4(value) {
+function isRecord5(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function roleLabel(role) {
@@ -34342,15 +34375,15 @@ function keyArg(input) {
 function asToolPart(part) {
   const type = typeof part.type === "string" ? part.type : "";
   if (type === "tool") {
-    const state = isRecord4(part.state) ? part.state : null;
+    const state = isRecord5(part.state) ? part.state : null;
     const output = state && typeof state.output === "string" ? state.output : state && state.output != null ? JSON.stringify(state.output) : null;
-    const metadata = state && isRecord4(state.metadata) ? state.metadata : null;
+    const metadata = state && isRecord5(state.metadata) ? state.metadata : null;
     const title = state && typeof state.title === "string" && state.title || metadata && typeof metadata.title === "string" && metadata.title || null;
     return {
       name: typeof part.tool === "string" ? part.tool : "tool",
       callId: typeof part.callID === "string" ? part.callID : "",
       title,
-      input: state && isRecord4(state.input) ? state.input : null,
+      input: state && isRecord5(state.input) ? state.input : null,
       output
     };
   }
@@ -34359,7 +34392,7 @@ function asToolPart(part) {
       name: typeof part.name === "string" ? part.name : "tool",
       callId: typeof part.id === "string" ? part.id : "",
       title: null,
-      input: isRecord4(part.input) ? part.input : null,
+      input: isRecord5(part.input) ? part.input : null,
       output: null
     };
   }
@@ -34388,7 +34421,7 @@ function reasoningOf(part) {
   return null;
 }
 function renderPartPreview(part) {
-  if (!isRecord4(part))
+  if (!isRecord5(part))
     return null;
   const text = textOf(part);
   if (text !== null) {
@@ -34412,7 +34445,7 @@ function renderPartPreview(part) {
   return `    • [${type}]`;
 }
 function renderPartFull(part) {
-  if (!isRecord4(part))
+  if (!isRecord5(part))
     return null;
   const text = textOf(part);
   if (text !== null) {
@@ -41482,4 +41515,4 @@ function registerMagicContextTools(pi, opts) {
   ]);
 }
 
-export { COMPACTION_ENABLED_PATH, isDreamerRunnable, isCompactionEnabled, migrateMagicContextConfigLocations, withContentLanguageDirective, withMigrationLanguageDirective, buildPrimaryLanguageDirective, parseCron, nextOccurrence, nextDueAtMs, canonicalModelIdentity, piModelRefToCanonical, resolveModelRefForPi, modelRefLookupOrder, ompModelRefToCanonical, resolveModelRefForOmp, resolveModelConfigValue, resolveModelConfigOrDefault, DEFAULT_HISTORIAN_TIMEOUT_MS, getProtectedTokensTierOverrides, sanitizeDiagnosticText, hasShareabilitySensitiveText, FAIL_CLOSED_DOCTOR_COMMAND, formatFailClosedBlockingMessage, createFailClosedBlockingError, isFailClosedBlockingError, shouldBypassFailClosedBlock, createFailClosedController, setHarness, getHarness, ensureCortexKitArtifactGitignore, getProjectMagicContextHistorianDir, getMagicContextStorageResolution, getMagicContextStorageDir, log, sessionLog, flushLogger, ProjectIdentityError, resolveProjectIdentityStrict, resolveProjectIdentity, resolveProjectIdentityForSession, beginBootQuietPeriod, scheduleAfterBootQuiet, CTX_REDUCE_KEEP, newestCtxReduceTagNumbers, textMentionsRecentCommit, hasMeaningfulUserText, extractTexts, extractToolCallSummaries, preloadTokenizer, estimateTokens, normalizeText, stripWellFormedLeadingTagPrefix, stripPersistedAssistantText, byteSize, stripTagPrefix, peelLeadingMcTagNotation, prependTag, isRecord, estimateImageTokensFromDataUrl, normalizeTodoStateJson, buildSyntheticTodoPart, stripChannel1ReminderSpans, effectiveTailHygiene, CHANNEL1_SENTINEL, CHANNEL1_FLOOR_TOKENS, decideChannel1, evaluateChannel2, reclaimableToolOutputCount, buildChannel2Reminder, buildChannel1Reminder, planEmergencyDrop, updateTagByteSize, getRecentTagOwnerMessageIds, AGE_RECLAIM_MIN_TOKENS, getOldestActiveUnprotectedToolTags, getActiveToolTagsForAgeReclaim, getTriggerTagTokenUpperBound, updateTagInputByteSize, updateTagTokenCount, getPersistedToolTagAccounting, getAllStatusTagTokenTotalsFlat, updateTagInputTokenCount, tagTokenCountIsNull, backfillTagTokenCounts, insertTag, updateTagStatus, updateTagDropMode, updateCavemanDepth, hasPiFallbackMessageTags, findAdoptableFallbackTags, hasPiFallbackToolOwnerTags, findPiFallbackToolOwnerTags, adoptPiFallbackToolOwnerTag, adoptPiFallbackMessageTag, getMaxTagNumberBySession, getAssignableTagNumberByMessageId, deriveTagLoadFloor, getTagsBySession, getActiveTagsBySession, getTagsForPendingOperations, getTagsByNumbers, getDroppedTagsByNumbers, getMaxDroppedTagNumber, getToolTagNumberByOwner, getNullOwnerToolTag, adoptNullOwnerToolTag, resolveOpenCodeDbPath, assertOpenCodeStoreGeneration, openCodeDbPathExists, recordOpenCodeDbReadFailure, clearOpenCodeDbReadFailure, claimOpenCodeDbDiagnosticOnce, Database, closeQuietly, completedToolArcCrossesBoundary, estimateTrueRawMessageTokens, buildToolArcs, fenceBoundaryForCompletedToolArcs, fenceBoundaryForToolArcs, buildTrueRawTokenIndex, computeRawRangeFingerprint, invalidateTrueRawTokenCache, DROPPED_INPUT_MESSAGE, droppedInputMarker, containsDroppedInputPlaceholder, isEditTool, applyEditMarkerToInput, setRawMessageProvider, withRawMessageProvider, cleanUserText, withRawSessionMessageCache, readRawSessionMessages, primeTailRawMessageCache, getCachedAbsoluteMessageCount, primeInMemoryTailRawMessageCache, getRawSessionMessageCount, getRawSessionTagKeysThrough, getLegacyProtectedTailStartOrdinal, readSessionChunk, logSlowWriteTransaction, clearCompressionDepth, clearCompressionDepthRange, getMessageIndexSourceIdentity, isMessageIndexSourceCurrent, getLastIndexedOrdinal, getMessageIndexReconciliationStartOrdinal, isMessageIndexReconciledThrough, indexSingleMessage, indexMessagesAfterOrdinal, sweepOrphanedOpenCodeMessageIndexes, recordSessionProjectIdentity, COMPARTMENT_LEASE_RENEWAL_MS, acquireCompartmentLease, renewCompartmentLease, releaseCompartmentLease, releaseCompartmentLeaseBestEffort, isCompartmentLeaseHeld, isNoContentCompartment, HAS_COMPARTMENT_CONTENT_SQL, persistCachedM0, clearCachedM0M1, getCompartments, getLastCompartmentEndMessage, getLastCompartmentEndMessageId, getCompartmentsByEndMessageId, appendCompartments, saveRecompStagingPass, getRecompStaging, clearRecompStaging, getRecompPartialRange, setRecompPartialRange, escapeXmlAttr, escapeXmlContent, getModuleNoteEvaluationBridge, getContextStoreUuid, drainMirrorPages, parseCompartmentOutput, resolveWorkspaceShareCategories, resolveWorkspaceIdentitySet, expandWorkspaceIdentitySetWithAliases, sourceNameForMemory, computeWorkspaceEpochFingerprint, bumpEpochsForWorkspaceMembers, readProjectDocsCanonical, encodePiContentDecision, getPiContentDecisions, freezePiContentDecision, getNativeReplayState, saveNativeToolInputs, addNativeReasoningIds, copySessionStateForClone, getErrorMessage, describeError, piHarnessKindFromExecutable, setStoragePrivatePermissionEnforcement, getSchemaFenceRejection, getMigrationOnOpenRefusal, LATEST_SUPPORTED_VERSION, getDatabasePath, getPersistedSchemaVersion, setSqlitePragmaConfig, applySqliteTuningPragmas, runSqliteOptimize, openDatabase, openDatabaseAsync, queueM0Mutation, getMaxM0MutationId, queueMemoryMutation, getMemoryMutationsForRender, getMemoryMutationsForRenderByProjects, getMaxMemoryMutationId, getMaxMemoryMutationIdForProjects, MAX_EXECUTE_THRESHOLD, escalationBands, computeProtectionWindow, readEpochFloorSnapshot, getProtectionWindowForSession, isProviderOverflowFailClosedProven, describeProtectedTailDrainBudgetSkip, loadProtectedTailMeta, markProtectedTailPolicyV3Seeded, recordProtectedTailPublicationFloor, recordProtectedTailNoEligibleHead, getWrapupInProgressState, isWrapupInProgress, acquireWrapupInProgress, updateWrapupInProgress, releaseWrapupInProgress, resolveCompactionModeRecord, getCompactionModeRecord, setCompactionModeRecord, reserveProtectedTailDrainTokens, clearEmergencyDrainLatch, recordHistorianDrainFailure, clearHistorianDrainFailure, rollbackProtectedTailDrainReservation, clearPersistedReasoningWatermark, getEmergencyInputSample, setEmergencyDropSample, clearEmergencyDropSample, getLastNudgeUndropped, setLastNudgeUndropped, getChannel1NudgeState, setChannel1NudgeState, markChannel1PostReduceGracePending, captureChannel1PostReduceGraceBaseline, getChannel2NudgeState, getChannel2NudgeClaim, setChannel2NudgeState, casChannel2NudgeState, claimChannel2NudgeState, casChannel2NudgeClaim, getPersistedNoteNudge, setPersistedNoteNudgeTrigger, setPersistedNoteNudgeTriggerMessageId, getNoteNudgeAnchors, getAutoSearchHintDecisions, deliverNoteNudgeAtomic, appendAutoSearchHintDecision, pruneNoteNudgeAnchors, pruneAutoSearchHintDecisions, getPersistedTodoSyntheticAnchor, setPersistedTodoSyntheticAnchor, clearPersistedTodoSyntheticAnchor, getNoteLastReadAt, incrementHistorianFailure, clearHistorianFailureState, getOverflowState, recordOverflowDetected, clearEmergencyRecovery, clearDetectedContextLimit, getStrippedPlaceholderIds, applyStrippedPlaceholderDelta, NEWEST_REASONING_BEARING_ASSISTANT, THINKING_BINDING_RECOVERY_FROZEN_PREFIX, thinkingBindingRecoveryFrozenId, getThinkingBindingRecoveryTarget, armThinkingBindingRecovery, clearThinkingBindingRecoveryIf, getMergedReasoningStrippedIds, addMergedReasoningStrippedIds, getProcessedImageStrippedIds, addProcessedImageStrippedIds, getPendingCompactionMarkerState, clearPendingCompactionMarkerStateIf, getPendingPiCompactionMarkerState, setPendingPiCompactionMarkerState, clearPendingPiCompactionMarkerStateIf, getSessionsWithPendingPiMarker, setSessionWorkMetrics, getSessionWorkMetrics, resolveEpochFloorForPass, getOrCreateSessionMeta, updateSessionMeta, advanceToolReclaimWatermark, retryPendingSessionCleanups, retryPendingRustSessionCleanupsForProject, getNotes, getSessionNotes, getPendingSmartNotes, getReadySmartNotes, markNoteReady, markNoteChecked, queuePendingOp, getPendingOps, getPendingOpsCount, clearPendingOps, removePendingOp, PRIMER_CANDIDATE_TTL_MS, PRIMER_CANDIDATE_MAX_AGE_MS, primerOccurrenceKey, primerOccurrenceUtcDay, insertPrimerCandidates, updatePrimerCandidateEmbedding, getPrimerCandidatesByIds, getPrimerCandidatesForPromotion, countPrimerCandidatesForProject, getActivePrimers, createPrimer, updatePrimerSupport, updatePrimerAnswer, GLOBAL_USER_PROFILE_PROJECT_PATH, getProjectState, bumpProjectUserProfileVersion, saveSourceContent, getSourceContents, recordSubagentInvocation, getLatestHistorianInvocationId, BoundedSessionMap, MIN_PLAUSIBLE_CONTEXT_LIMIT, reloadWindowOverlay, getWindowOverlay, resolveWindowOverlayFacts, deriveWindowGeometry, hasTrustedAbsoluteWall, applyProvenInputFloor, formatWindowDerivationLine, isSaneLimit, resolveOutputReserve, getSdkContextLimit, formatConfigParseStatusLine, formatConfigParseNotice, claimConfigParseFailuresOnce, promptSurfaceHashMaterial, createPromptSurfaceRuntime, createPromptSurfaceGuidanceEpochCache, SYNTH_USER_ID_PREFIX, resolvePiStableId, readPiSessionSnapshot, readPiSessionMessages, readPiSessionMessagePage, findLastModelKeyFromBranch, convertEntriesToRawMessages, convertEntriesToRawMessagePage, computeCueContentHash, hasMuralCueColumns, getMuralCueState, memoryNeedsCue, setMuralCue, recordMuralCueRejection, invalidateMemory, computeNormalizedHash, hasMemoryShareableColumn, hasMemoryClassifiedAtColumn, getUnclassifiedMemoryIds, insertMemory, getMemoryByHash, getMemoriesByProject, getMemoriesByProjects, getMaxMemoryIdForProjects, getAllActiveMemoriesForMigration, getMemoryById, setMemoryClassification, archiveMemory, deleteMemory, getMemoryCount, getMemoryCountsByStatus, USER_MEMORY_CANDIDATE_TTL_MS, insertUserMemoryCandidates, getUserMemoryCandidates, deleteUserMemoryCandidates, pruneExpiredUserMemoryCandidates, insertUserMemory, getActiveUserMemories, updateUserMemoryContent, dismissUserMemory, getTaskScheduleState, getMostRecentTaskRunAt, pruneNonCanonicalTaskRows, deleteTaskScheduleRowsForProject, seedTaskScheduleState, writeTaskScheduleState, isRetrospectiveWindowProcessed, recordRetrospectiveWindowProcessed, curateCategoryForMemoryCategory, peekCurateCategoryScope, beginCurateCategoryRun, curateTaskStateAfterSuccess, formatSynapseLaneDescriptor, buildCanonicalChunkTextFromFts, buildCompartmentSummaryFallbackText, canonicalizeInMemoryChunkTextForEmbedding, chunkCanonicalText, chunkEmbeddingWindowsAreCurrent, replaceCompartmentChunkEmbeddings, cosineSimilarity, GIT_SWEEP_LEASE_RENEWAL_MS, acquireGitSweepLease, renewGitSweepLease, markGitSweepSuccessAndRelease, parkGitSweepNonIndexable, releaseGitSweepLease, describeShadowBackfillWriteRefusal, contentSha256, sweepStaleEmbeddingIdentitiesForProject, enqueueShadowEmbeddingItems, getProjectEmbeddingSnapshot, getProjectChunkEmbeddingModelId, getProjectEmbeddingMaxInputTokens, embedTextForProject, embedBatchForProject, embedItemsForProject, embedUnembeddedMemoriesForProject, drainCommitBacklogForProject, embedSessionCompartmentChunks, getEmbeddingCoverageStatus, promoteSessionFactsDurable, embedPromotedFacts, recordMemoryMapping, recordMemoryVerifications, getUnmappedMemoryIds, clearMemoryVerifications, getMemoryVerifications, resolveGitTopLevel, readGitHead, readGitChangedFilesSince, readGitFileChangeTimesSince, verificationFileExists, normalizeVerificationFiles, isDirectiveShapedProjectRule, takeCurateSafetyRefusalCount, wakePlaneStatus, indexCommitsForProject, embedUnembeddedCommits, loadPiConfig, ensureProjectRegisteredFromPiDirectory, resolvePiHarnessDetection, resolvePiHarnessKind, resolveMuralWire, updateCompactionMarkerAfterPublication, COMPARTMENT_RENDER_EPOCH, encodeCachedM0UpgradeIdentity, decodeCachedM0UpgradeIdentity, DEFAULT_HISTORY_BUDGET_TOKENS, renderCompartmentAtTier, renderDecayedCompartments, extractM0Block, TEMPORAL_MARKER_PATTERN, temporalMarkerPrefix, clearInjectionCache, getVisibleMemoryIds, renderMemoryBlock, DEFAULT_MEMORY_BUDGET_TOKENS, DEFAULT_USER_PROFILE_BUDGET_TOKENS, trimMemoriesToBudgetV2, trimWorkspaceMemoriesToBudgetV2, trimUserMemoriesToBudget, renderMemoryBlockV2, stripMemoryMuralBlock, unifiedSearch, rememberTodowriteToolCallTodos, parseTodos, setTodoSnapshot, registerTodoOverlay, registerTodoStateLifecycle, createTodowriteTool, syncCtxMemoryToolEnabled, registerMagicContextTools };
+export { COMPACTION_ENABLED_PATH, isDreamerRunnable, isCompactionEnabled, migrateMagicContextConfigLocations, withContentLanguageDirective, withMigrationLanguageDirective, buildPrimaryLanguageDirective, parseCron, nextOccurrence, nextDueAtMs, canonicalModelIdentity, piModelRefToCanonical, resolveModelRefForPi, modelRefLookupOrder, ompModelRefToCanonical, resolveModelRefForOmp, resolveModelConfigValue, resolveModelConfigOrDefault, DEFAULT_HISTORIAN_TIMEOUT_MS, getProtectedTokensTierOverrides, sanitizeDiagnosticText, hasShareabilitySensitiveText, FAIL_CLOSED_DOCTOR_COMMAND, formatFailClosedBlockingMessage, createFailClosedBlockingError, isFailClosedBlockingError, shouldBypassFailClosedBlock, createFailClosedController, setHarness, getHarness, ensureCortexKitArtifactGitignore, getProjectMagicContextHistorianDir, getMagicContextStorageResolution, getMagicContextStorageDir, log, sessionLog, flushLogger, ProjectIdentityError, resolveProjectIdentityStrict, resolveProjectIdentity, resolveProjectIdentityForSession, beginBootQuietPeriod, scheduleAfterBootQuiet, CTX_REDUCE_KEEP, newestCtxReduceTagNumbers, textMentionsRecentCommit, hasMeaningfulUserText, extractTexts, extractToolCallSummaries, preloadTokenizer, estimateTokens, normalizeText, stripWellFormedLeadingTagPrefix, stripPersistedAssistantText, byteSize, stripTagPrefix, peelLeadingMcTagNotation, prependTag, isRecord, estimateImageTokensFromDataUrl, normalizeTodoStateJson, buildSyntheticTodoPart, stripChannel1ReminderSpans, effectiveTailHygiene, CHANNEL1_SENTINEL, CHANNEL1_FLOOR_TOKENS, decideChannel1, evaluateChannel2, reclaimableToolOutputCount, buildChannel2Reminder, buildChannel1Reminder, planEmergencyDrop, updateTagByteSize, getRecentTagOwnerMessageIds, AGE_RECLAIM_MIN_TOKENS, getOldestActiveUnprotectedToolTags, getActiveToolTagsForAgeReclaim, getTriggerTagTokenUpperBound, updateTagInputByteSize, updateTagTokenCount, getPersistedToolTagAccounting, getAllStatusTagTokenTotalsFlat, updateTagInputTokenCount, tagTokenCountIsNull, backfillTagTokenCounts, insertTag, updateTagStatus, updateTagDropMode, updateCavemanDepth, hasPiFallbackMessageTags, findAdoptableFallbackTags, hasPiFallbackToolOwnerTags, findPiFallbackToolOwnerTags, adoptPiFallbackToolOwnerTag, adoptPiFallbackMessageTag, getMaxTagNumberBySession, getAssignableTagNumberByMessageId, deriveTagLoadFloor, getTagsBySession, getActiveTagsBySession, getTagsForPendingOperations, getTagsByNumbers, getDroppedTagsByNumbers, getMaxDroppedTagNumber, getToolTagNumberByOwner, getNullOwnerToolTag, adoptNullOwnerToolTag, resolveOpenCodeDbPath, assertOpenCodeStoreGeneration, openCodeDbPathExists, recordOpenCodeDbReadFailure, clearOpenCodeDbReadFailure, claimOpenCodeDbDiagnosticOnce, Database, closeQuietly, completedToolArcCrossesBoundary, estimateTrueRawMessageTokens, buildToolArcs, fenceBoundaryForCompletedToolArcs, fenceBoundaryForToolArcs, buildTrueRawTokenIndex, computeRawRangeFingerprint, invalidateTrueRawTokenCache, DROPPED_INPUT_MESSAGE, droppedInputMarker, containsDroppedInputPlaceholder, isEditTool, applyEditMarkerToInput, setRawMessageProvider, withRawMessageProvider, cleanUserText, withRawSessionMessageCache, readRawSessionMessages, primeTailRawMessageCache, getCachedAbsoluteMessageCount, primeInMemoryTailRawMessageCache, getRawSessionMessageCount, getRawSessionTagKeysThrough, getLegacyProtectedTailStartOrdinal, readSessionChunk, logSlowWriteTransaction, clearCompressionDepth, clearCompressionDepthRange, getMessageIndexSourceIdentity, isMessageIndexSourceCurrent, getLastIndexedOrdinal, getMessageIndexReconciliationStartOrdinal, isMessageIndexReconciledThrough, indexSingleMessage, indexMessagesAfterOrdinal, sweepOrphanedOpenCodeMessageIndexes, recordSessionProjectIdentity, COMPARTMENT_LEASE_RENEWAL_MS, acquireCompartmentLease, renewCompartmentLease, releaseCompartmentLease, releaseCompartmentLeaseBestEffort, isCompartmentLeaseHeld, isNoContentCompartment, HAS_COMPARTMENT_CONTENT_SQL, persistCachedM0, clearCachedM0M1, getCompartments, getLastCompartmentEndMessage, getLastCompartmentEndMessageId, getCompartmentsByEndMessageId, appendCompartments, saveRecompStagingPass, getRecompStaging, clearRecompStaging, getRecompPartialRange, setRecompPartialRange, escapeXmlAttr, escapeXmlContent, getModuleNoteEvaluationBridge, getContextStoreUuid, drainMirrorPages, parseCompartmentOutput, resolveWorkspaceShareCategories, resolveWorkspaceIdentitySet, expandWorkspaceIdentitySetWithAliases, sourceNameForMemory, computeWorkspaceEpochFingerprint, bumpEpochsForWorkspaceMembers, readProjectDocsCanonical, encodePiContentDecision, getPiContentDecisions, freezePiContentDecision, getNativeReplayState, saveNativeToolInputs, addNativeReasoningIds, copySessionStateForClone, getErrorMessage, describeError, piHarnessKindFromExecutable, setStoragePrivatePermissionEnforcement, getSchemaFenceRejection, getMigrationOnOpenRefusal, LATEST_SUPPORTED_VERSION, getDatabasePath, getPersistedSchemaVersion, setSqlitePragmaConfig, applySqliteTuningPragmas, runSqliteOptimize, openDatabase, openDatabaseAsync, queueM0Mutation, getMaxM0MutationId, queueMemoryMutation, getMemoryMutationsForRender, getMemoryMutationsForRenderByProjects, getMaxMemoryMutationId, getMaxMemoryMutationIdForProjects, MAX_EXECUTE_THRESHOLD, escalationBands, computeProtectionWindow, readEpochFloorSnapshot, getProtectionWindowForSession, isProviderOverflowFailClosedProven, describeProtectedTailDrainBudgetSkip, loadProtectedTailMeta, markProtectedTailPolicyV3Seeded, recordProtectedTailPublicationFloor, recordProtectedTailNoEligibleHead, getWrapupInProgressState, isWrapupInProgress, acquireWrapupInProgress, updateWrapupInProgress, releaseWrapupInProgress, resolveCompactionModeRecord, getCompactionModeRecord, setCompactionModeRecord, reserveProtectedTailDrainTokens, clearEmergencyDrainLatch, recordHistorianDrainFailure, clearHistorianDrainFailure, rollbackProtectedTailDrainReservation, clearPersistedReasoningWatermark, getEmergencyInputSample, setEmergencyDropSample, clearEmergencyDropSample, getLastNudgeUndropped, setLastNudgeUndropped, getChannel1NudgeState, setChannel1NudgeState, markChannel1PostReduceGracePending, captureChannel1PostReduceGraceBaseline, getChannel2NudgeState, getChannel2NudgeClaim, setChannel2NudgeState, casChannel2NudgeState, claimChannel2NudgeState, casChannel2NudgeClaim, getPersistedNoteNudge, setPersistedNoteNudgeTrigger, setPersistedNoteNudgeTriggerMessageId, getNoteNudgeAnchors, getAutoSearchHintDecisions, deliverNoteNudgeAtomic, appendAutoSearchHintDecision, pruneNoteNudgeAnchors, pruneAutoSearchHintDecisions, getPersistedTodoSyntheticAnchor, setPersistedTodoSyntheticAnchor, clearPersistedTodoSyntheticAnchor, getNoteLastReadAt, incrementHistorianFailure, clearHistorianFailureState, getOverflowState, recordOverflowDetected, clearEmergencyRecovery, clearDetectedContextLimit, getStrippedPlaceholderIds, applyStrippedPlaceholderDelta, NEWEST_REASONING_BEARING_ASSISTANT, THINKING_BINDING_RECOVERY_FROZEN_PREFIX, thinkingBindingRecoveryFrozenId, getThinkingBindingRecoveryTarget, armThinkingBindingRecovery, clearThinkingBindingRecoveryIf, getMergedReasoningStrippedIds, addMergedReasoningStrippedIds, getProcessedImageStrippedIds, addProcessedImageStrippedIds, getPendingCompactionMarkerState, clearPendingCompactionMarkerStateIf, getPendingPiCompactionMarkerState, setPendingPiCompactionMarkerState, clearPendingPiCompactionMarkerStateIf, getSessionsWithPendingPiMarker, setSessionWorkMetrics, getSessionWorkMetrics, resolveEpochFloorForPass, getOrCreateSessionMeta, updateSessionMeta, advanceToolReclaimWatermark, retryPendingSessionCleanups, retryPendingRustSessionCleanupsForProject, getNotes, getSessionNotes, getPendingSmartNotes, getReadySmartNotes, markNoteReady, markNoteChecked, queuePendingOp, getPendingOps, getPendingOpsCount, clearPendingOps, removePendingOp, PRIMER_CANDIDATE_TTL_MS, PRIMER_CANDIDATE_MAX_AGE_MS, primerOccurrenceKey, primerOccurrenceUtcDay, insertPrimerCandidates, updatePrimerCandidateEmbedding, getPrimerCandidatesByIds, getPrimerCandidatesForPromotion, countPrimerCandidatesForProject, getActivePrimers, createPrimer, updatePrimerSupport, updatePrimerAnswer, GLOBAL_USER_PROFILE_PROJECT_PATH, getProjectState, bumpProjectUserProfileVersion, saveSourceContent, getSourceContents, recordSubagentInvocation, getLatestHistorianInvocationId, BoundedSessionMap, MIN_PLAUSIBLE_CONTEXT_LIMIT, reloadWindowOverlay, getWindowOverlay, resolveWindowOverlayFacts, deriveWindowGeometry, hasTrustedAbsoluteWall, applyProvenInputFloor, formatWindowDerivationLine, isSaneLimit, resolveOutputReserve, getSdkContextLimit, formatConfigParseStatusLine, formatConfigParseNotice, claimConfigParseFailuresOnce, promptSurfaceHashMaterial, createPromptSurfaceRuntime, createPromptSurfaceGuidanceEpochCache, cellToolCalls, SYNTH_USER_ID_PREFIX, resolvePiStableId, readPiSessionSnapshot, readPiSessionMessages, readPiSessionMessagePage, findLastModelKeyFromBranch, convertEntriesToRawMessages, convertEntriesToRawMessagePage, computeCueContentHash, hasMuralCueColumns, getMuralCueState, memoryNeedsCue, setMuralCue, recordMuralCueRejection, invalidateMemory, computeNormalizedHash, hasMemoryShareableColumn, hasMemoryClassifiedAtColumn, getUnclassifiedMemoryIds, insertMemory, getMemoryByHash, getMemoriesByProject, getMemoriesByProjects, getMaxMemoryIdForProjects, getAllActiveMemoriesForMigration, getMemoryById, setMemoryClassification, archiveMemory, deleteMemory, getMemoryCount, getMemoryCountsByStatus, USER_MEMORY_CANDIDATE_TTL_MS, insertUserMemoryCandidates, getUserMemoryCandidates, deleteUserMemoryCandidates, pruneExpiredUserMemoryCandidates, insertUserMemory, getActiveUserMemories, updateUserMemoryContent, dismissUserMemory, getTaskScheduleState, getMostRecentTaskRunAt, pruneNonCanonicalTaskRows, deleteTaskScheduleRowsForProject, seedTaskScheduleState, writeTaskScheduleState, isRetrospectiveWindowProcessed, recordRetrospectiveWindowProcessed, curateCategoryForMemoryCategory, peekCurateCategoryScope, beginCurateCategoryRun, curateTaskStateAfterSuccess, formatSynapseLaneDescriptor, buildCanonicalChunkTextFromFts, buildCompartmentSummaryFallbackText, canonicalizeInMemoryChunkTextForEmbedding, chunkCanonicalText, chunkEmbeddingWindowsAreCurrent, replaceCompartmentChunkEmbeddings, cosineSimilarity, GIT_SWEEP_LEASE_RENEWAL_MS, acquireGitSweepLease, renewGitSweepLease, markGitSweepSuccessAndRelease, parkGitSweepNonIndexable, releaseGitSweepLease, describeShadowBackfillWriteRefusal, contentSha256, sweepStaleEmbeddingIdentitiesForProject, enqueueShadowEmbeddingItems, getProjectEmbeddingSnapshot, getProjectChunkEmbeddingModelId, getProjectEmbeddingMaxInputTokens, embedTextForProject, embedBatchForProject, embedItemsForProject, embedUnembeddedMemoriesForProject, drainCommitBacklogForProject, embedSessionCompartmentChunks, getEmbeddingCoverageStatus, promoteSessionFactsDurable, embedPromotedFacts, recordMemoryMapping, recordMemoryVerifications, getUnmappedMemoryIds, clearMemoryVerifications, getMemoryVerifications, resolveGitTopLevel, readGitHead, readGitChangedFilesSince, readGitFileChangeTimesSince, verificationFileExists, normalizeVerificationFiles, isDirectiveShapedProjectRule, takeCurateSafetyRefusalCount, wakePlaneStatus, indexCommitsForProject, embedUnembeddedCommits, loadPiConfig, ensureProjectRegisteredFromPiDirectory, resolvePiHarnessDetection, resolvePiHarnessKind, resolveMuralWire, updateCompactionMarkerAfterPublication, COMPARTMENT_RENDER_EPOCH, encodeCachedM0UpgradeIdentity, decodeCachedM0UpgradeIdentity, DEFAULT_HISTORY_BUDGET_TOKENS, renderCompartmentAtTier, renderDecayedCompartments, extractM0Block, TEMPORAL_MARKER_PATTERN, temporalMarkerPrefix, clearInjectionCache, getVisibleMemoryIds, renderMemoryBlock, DEFAULT_MEMORY_BUDGET_TOKENS, DEFAULT_USER_PROFILE_BUDGET_TOKENS, trimMemoriesToBudgetV2, trimWorkspaceMemoriesToBudgetV2, trimUserMemoriesToBudget, renderMemoryBlockV2, stripMemoryMuralBlock, unifiedSearch, TODO_TOOL_NAME, rememberTodowriteToolCallTodos, parseTodos, setTodoSnapshot, registerTodoOverlay, registerTodoStateLifecycle, createTodowriteTool, syncCtxMemoryToolEnabled, registerMagicContextTools };

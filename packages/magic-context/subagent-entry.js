@@ -8,7 +8,7 @@ import {
   ensureProjectRegisteredFromPiDirectory,
   resolvePiHarnessKind,
   registerMagicContextTools
-} from "./index-j0yscwgv.js";
+} from "./index-yb8njcjc.js";
 
 // src/subagent-entry.ts
 var SUBAGENT_DREAMER_ACTIONS_FLAG = "magic-context-dreamer-actions";
