@@ -41492,8 +41492,9 @@ function registerMagicContextTools(pi, opts) {
     pi.registerTool(ctxNote);
     pi.registerTool(ctxExpand);
   }
-  if (opts.todowriteEnabled !== false) {
-    pi.registerTool(opts.todowriteDefinition ?? createTodowriteTool());
+  const todowrite = opts.todowriteEnabled !== false ? opts.todowriteDefinition ?? createTodowriteTool() : undefined;
+  if (todowrite) {
+    pi.registerTool(todowrite);
     if (opts.todowriteCommandEnabled !== false) {
       registerTodosCommand(pi);
     }
@@ -41511,7 +41512,8 @@ function registerMagicContextTools(pi, opts) {
     [ctxMemory.name, ctxMemory],
     [ctxNote.name, ctxNote],
     [ctxExpand.name, ctxExpand],
-    [ctxReduce.name, ctxReduce]
+    [ctxReduce.name, ctxReduce],
+    ...todowrite ? [[todowrite.name, todowrite]] : []
   ]);
 }
 

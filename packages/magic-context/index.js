@@ -480,7 +480,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-yb8njcjc.js";
+} from "./index-48be3h6a.js";
 import {
   pushNotification2
 } from "./index-b3eqj1g6.js";
