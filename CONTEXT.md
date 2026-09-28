@@ -114,7 +114,10 @@ _Avoid_: child tool list
 
 **Native-only tool**:
 A tool that must stay a real pi tool because its effect is pi's dispatch rather than its own
-`execute`, so the convention forbids publishing it.
+`execute`, so the convention forbids publishing it. **Nothing declares one today** — `todowrite` was the
+only member, and it stopped qualifying when its effect moved into the bridge's executor rather than the
+convention learning an exception; the declaration stays because the question ("must this stay a real pi
+tool?") is one only an owner can answer about its own tool.
 _Avoid_: pi-only tool
 
 **Ceiling**:
