@@ -42,8 +42,12 @@ describe("the contribution", () => {
 
 	it("carries the prose that tells the model what the index costs", () => {
 		const { description, guidelines } = contributionOf(fffSearchAnswer({ cwd: "/root" } as never));
+		// The cost is the coverage caveat, and it rides in the description (the routing rule between
+		// the lanes is the user's, in `APPEND_SYSTEM.md`); the guideline left here is the shape of the
+		// index lane's `find`, which is not derivable from the description.
 		expect(description).toContain("fuzzy=True");
-		expect(guidelines?.join(" ")).toContain(".scratch/");
+		expect(description).toContain(".scratch/");
+		expect(guidelines?.join(" ")).toContain("max_depth");
 	});
 
 	it("registers under its own key at module load", () => {

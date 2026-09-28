@@ -38,10 +38,13 @@ export const DESCRIPTION =
 	" excludes, so they answer with fewer matches than rg over a workspace root; without either flag the" +
 	" two primitives use rg/fd, which do cover those.";
 
+/**
+ * The prose about the *primitive*, not about which route to take: the routing rule *between* code
+ * mode's own lanes, the index lanes and `zvec_grep_*` is the user's and lives in the prompt — the
+ * split `zvec-grep` states for its own prose. What is left here is the shape of the index lane's
+ * `find`, which the caller cannot read off the description.
+ */
 export const GUIDELINES = [
-	"`await grep(pattern, index=True)` / `await find(glob, index=True)` answer from the workspace's FFF index with rg's own matching — the fast lane for an exact search over a large tree: no tree walk, ordered by path then line, and the same matches as rg over the paths the index covers.",
-	"`await grep(pattern, fuzzy=True)` / `await find(glob, fuzzy=True)` use FFF's own fuzzy matching and frecency order — use it for a half-remembered name, not for an exact search.",
-	"Both index lanes are blind to dot-paths (`.scratch/`, `.github/`, `.env`) and to gitignored files, so do not use them for an exhaustive audit, a rename sweep or any search that must include a dot-directory — the default (neither flag) is rg/fd, which covers those.",
 	"In the index lanes `find` takes `type=\"file\"` or `type=\"directory\"` and no `max_depth`; an exact directory listing, a request for files and directories together, and fd's other types are answered by fd instead.",
 ];
 
