@@ -33,6 +33,7 @@ import {
 	statusLine,
 } from "./src/children";
 import type { ChildKernelContext, Notice } from "./src/children";
+import { loadRlmConfig } from "./src/config";
 // Imported for its side effect on the seam, and for the session deps this file files with it.
 import { forgetRlmSessionDeps, setRlmSessionDeps } from "./src/registration";
 import { rsiBindChild, rsiChildExtensions, rsiStatus } from "./src/rsi-seam";
@@ -62,6 +63,8 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	let toldModel = false;
 	/** Once per session, so a preflight problem is reported to the human once. */
 	let reportedKernel = false;
+	/** Whether `rlm.json` lets the environment change this session's behavior (config.ts). */
+	let envOverridesAllowed = false;
 	const notices: Notice[] = [];
 	let parentBusy = false;
 
@@ -115,10 +118,35 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				runtime: () => modelRuntime(),
 				maxDepth: MAX_DEPTH,
 				maxLive: MAX_LIVE_CHILDREN,
+				// Read at spawn time: the config is resolved at *this* session's start (config.ts).
+				allowEnvOverrides: () => envOverridesAllowed,
 				// The footer's count is the manager's to announce, not something to poll for: a child
 				// spawned or finished mid-turn would otherwise go unsaid until the next turn boundary.
 				onChange: () => renderStatus(sessionCtx),
 			});
+
+	/**
+	 * `RLM_CHILD_PROMPT` is set or it is not, and either way the human hears about it once: a control
+	 * that only drops prompt sentences leaves no trace in a transcript, so "it is in effect" and "it is
+	 * set but ignored" are both worth a line. Root sessions only — a child's prompt is its spawner's
+	 * decision, and in a child this instance's `pi` is the spawner's (see the `rlm-tools` entry above).
+	 */
+	function reportEnvironmentOverride(ctx: any, isChild: boolean) {
+		const value = process.env.RLM_CHILD_PROMPT;
+		if (isChild || value === undefined) return;
+		notifyHuman(
+			ctx,
+			envOverridesAllowed
+				? `RLM_CHILD_PROMPT=${value} is in effect: delegated children get the pre-v2 prompt (rlm.json allows environment overrides)`
+				: `RLM_CHILD_PROMPT=${value} is ignored: rlm.json does not allow environment overrides, so children get v2's prompt`,
+			"warning",
+		);
+		try {
+			pi.appendEntry("rlm-environment", { variable: "RLM_CHILD_PROMPT", value, honored: envOverridesAllowed });
+		} catch {
+			/* diagnostics must never fail a session */
+		}
+	}
 
 	/**
 	 * The footer line: the kernel's state, and how many children are working right now. Written at the
@@ -265,6 +293,17 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			rsiBindChild({ sessionFile: ctx?.sessionManager?.getSessionFile?.() });
 		}
 
+		// What the environment is allowed to change here is `rlm.json`'s to say (config.ts), and the
+		// answer is announced rather than left to be found: `RLM_CHILD_PROMPT` only removes two prompt
+		// sentences, which is exactly the switch nobody notices is on. Resolved once per session — a
+		// child's spawn reads it through the manager's thunk, and it is the *spawner's* answer that
+		// shapes the child's prompt.
+		envOverridesAllowed = loadRlmConfig({
+			cwd: root,
+			projectTrusted: ctx?.isProjectTrusted?.() === true,
+		}).allowEnvironmentOverrides;
+		reportEnvironmentOverride(ctx, isChild);
+
 		// This session's contribution is filed for the composition root, which asks every contributor in
 		// its own `session_start` — later than this entry, and earlier than the first cell. The handle
 		// travels the other way, in the answer, because `currentCell()` is the kernel's to know.
@@ -325,9 +364,9 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	});
 }
 
-function notifyHuman(ctx: any, text: string) {
+function notifyHuman(ctx: any, text: string, level: "info" | "warning" | "error" = "error") {
 	try {
-		ctx?.ui?.notify?.(text, "error");
+		ctx?.ui?.notify?.(text, level);
 	} catch {
 		/* no UI in this mode */
 	}

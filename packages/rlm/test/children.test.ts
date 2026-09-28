@@ -201,13 +201,24 @@ describe("the child prompt's shapes (v2 ticket 05)", () => {
 		expect(below).not.toContain("your own children");
 	});
 
-	it("drops the added sentences under the A/B control", () => {
+	it("drops the added sentences under the A/B control, when rlm.json allows it", () => {
 		process.env.RLM_CHILD_PROMPT = "none";
 		try {
-			const control = childPromptFor({ name: "c", depth: 1 }, 2).join(" ");
+			const control = childPromptFor({ name: "c", depth: 1 }, 2, true).join(" ");
 			expect(control).not.toContain("persistent Python kernel");
 			expect(control).toContain('You are "c", a delegated child session (depth 1)');
 			expect(control).toContain("agent_message.send");
+		} finally {
+			delete process.env.RLM_CHILD_PROMPT;
+		}
+	});
+
+	it("ignores the A/B control when rlm.json does not allow environment overrides", () => {
+		process.env.RLM_CHILD_PROMPT = "none";
+		try {
+			const prompt = childPromptFor({ name: "c", depth: 1 }, 2).join(" ");
+			expect(prompt).toContain("You may delegate with rlm.spawn");
+			expect(childPromptFor({ name: "c", depth: 1 }, 2, false).join(" ")).toBe(prompt);
 		} finally {
 			delete process.env.RLM_CHILD_PROMPT;
 		}

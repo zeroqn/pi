@@ -16,6 +16,9 @@ import { mock } from "bun:test";
 /** Every option bag the manager handed pi, so a test can read what a child was actually built with. */
 export const capturedSessionOptions: any[] = [];
 
+/** Every option bag given to `DefaultResourceLoader` — where a child's appended prompt is decided. */
+export const capturedLoaderOptions: any[] = [];
+
 let releaseTurn: (() => void) | null = null;
 
 /** A turn that blocks until `releaseTurnNow()`, so "still running" is controllable. */
@@ -56,6 +59,9 @@ export function installFakePi(): void {
 		SettingsManager: { create: () => ({}) },
 		ModelRuntime: { create: () => ({}) },
 		DefaultResourceLoader: class {
+			constructor(options: any) {
+				capturedLoaderOptions.push(options);
+			}
 			async reload() {}
 		},
 		SessionManager: { create: () => ({ appendCustomEntry() {} }) },

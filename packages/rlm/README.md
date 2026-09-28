@@ -80,18 +80,35 @@ One `contribute()` call, at `session_start`, before the first cell:
   untrusted-content rule, deduped against the extension entry that appends the same text in a root
   session.
 
+## Configuration: `rlm.json`
+
+One file, one knob:
+
+```json
+{ "allowEnvironmentOverrides": true }
+```
+
+`RLM_CHILD_PROMPT=none` is the child prompt A/B control (`childPromptFor`). An environment variable
+is inherited by whatever launched pi and appears in no transcript, so it is honored only when this
+file says so: **off by default**, and an override that is off is announced at session start rather
+than silently ignored — a variable that does nothing looks exactly like one that was never set. Read
+from `<agent dir>/rlm.json`, i.e. `~/.pi/agent/rlm.json` (`PI_CODING_AGENT_DIR` wins, the override pi
+itself honors), then `<cwd>/.pi/rlm.json`, so the project wins; the project file is read only for a
+trusted project, because it can loosen this posture. `src/config.ts` owns the rule.
+
 ## Tests
 
 ```bash
 cd /workspace/pi/extensions/packages/rlm
-bun test        # 59 tests, 0 fail
+bun test        # 63 tests, 0 fail
 ```
 
-`test/delegation`-adjacent suites are `children.test.ts` (spawning, caps, cost and provenance),
-`fork-source.test.ts` (which journals a fork replays), `prelude-tail.test.ts` (the contributed
-prelude names routing to host functions, in a real kernel), `rsi-seam.test.ts`,
-`skills-block.test.ts`, `owner-free.test.ts` (which pins that nothing under `src/` names an owner)
-and `web-hook.test.ts` (both deleted with the hook).
+`test/delegation`-adjacent suites are `children.test.ts` (spawning, caps, cost, provenance and the
+child prompt's two shapes), `fork-source.test.ts` (which journals a fork replays),
+`prelude-tail.test.ts` (the contributed prelude names routing to host functions, in a real kernel),
+`rsi-seam.test.ts`, `skills-block.test.ts`, `owner-free.test.ts` (which pins that nothing under
+`src/` names an owner), `config.test.ts` and `environment.test.ts` (the `rlm.json` gate, the second
+driven through the entry) and `web-hook.test.ts` (both deleted with the hook).
 
 ## Run it
 

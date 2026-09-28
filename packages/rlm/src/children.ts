@@ -117,6 +117,11 @@ export interface ChildManagerDeps {
 	maxDepth: number;
 	maxLive: number;
 	/**
+	 * Whether `rlm.json` lets the environment change a child's prompt (config.ts). A thunk because the
+	 * config is read at session start, after this manager is built.
+	 */
+	allowEnvOverrides?: () => boolean;
+	/**
 	 * Called whenever a record's status changes how many children are working — the status line's
 	 * signal, so the footer's count is live mid-turn rather than as stale as the last turn boundary.
 	 * Optional: a caller that only delegates never sees it.
@@ -471,12 +476,18 @@ async function runChildTurn(
  * `RLM_CHILD_PROMPT=none` drops the added sentences and leaves the pre-v2 prompt. That is
  * a **diagnostic, not a feature**: v2's criterion for this contract is an A/B — the same
  * task with and without the added prompt must produce the same artefact — and a
- * comparison needs a control that differs in exactly that one way.
+ * comparison needs a control that differs in exactly that one way. Being a diagnostic is also why
+ * the environment does not decide it on its own: `rlm.json` has to allow environment overrides
+ * (config.ts), so the control cannot be left on by a variable no transcript shows.
  */
-export function childPromptFor(request: { name: string; depth: number }, maxDepth: number): string[] {
+export function childPromptFor(
+	request: { name: string; depth: number },
+	maxDepth: number,
+	allowEnvironmentOverride = false,
+): string[] {
 	const identity = `You are "${request.name}", a delegated child session (depth ${request.depth}). Work the task and answer it.`;
 	const reporting = "Use agent_message.send(text) to send anything your parent needs before you finish.";
-	if (process.env.RLM_CHILD_PROMPT === "none") return [identity, reporting];
+	if (allowEnvironmentOverride && process.env.RLM_CHILD_PROMPT === "none") return [identity, reporting];
 	return [
 		identity,
 		request.depth < maxDepth
@@ -605,7 +616,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 				deps.kernelFactoryFor(context),
 				...(deps.childFactories?.({ ...request, ceiling }) ?? []),
 			],
-			appendSystemPrompt: childPromptFor(request, deps.maxDepth),
+			appendSystemPrompt: childPromptFor(request, deps.maxDepth, deps.allowEnvOverrides?.() ?? false),
 		});
 		await loader.reload();
 
