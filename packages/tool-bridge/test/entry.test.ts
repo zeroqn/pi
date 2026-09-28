@@ -46,7 +46,9 @@ function surface(active: string[], ctx: unknown) {
 		mounted: true,
 		owners: ["magic-context"],
 		installed: ["tool"],
-		reaches: ["ctx_memory"],
+		// `todowrite` is published now (`.scratch/one-tool-surface/` ticket 05), so it is a reached name
+		// like `ctx_memory`: stripped, and no longer re-activated by a native-only declaration.
+		reaches: ["ctx_memory", "todowrite"],
 		promptTexts: [],
 		problems: [],
 	});
@@ -65,14 +67,16 @@ describe("the entry's two moments", () => {
 		const ctx = ctxFor("session-start");
 		const { active, handlers } = surface(["python", "ctx_memory"], ctx);
 		handlers.get("session_start")?.({}, ctx);
-		expect(active).toEqual(["python", "todowrite"]);
+		// The surface the model is offered is the kernel's tool alone: every published name goes, and
+		// nothing comes back to take a cell's place.
+		expect(active).toEqual(["python"]);
 	});
 
 	it("still reconciles before each turn", () => {
 		const ctx = ctxFor("per-turn");
 		const { active, handlers } = surface(["python", "ctx_memory"], ctx);
 		handlers.get("before_agent_start")?.({}, ctx);
-		expect(active).toEqual(["python", "todowrite"]);
+		expect(active).toEqual(["python"]);
 	});
 
 	it("leaves a session with no record exactly as it was", () => {
@@ -176,12 +180,12 @@ describe("a resumed child (child-surface ticket 03 §5)", () => {
 		mounted: true,
 		owners: ["magic-context"],
 		installed: ["tool"],
-		reaches: ["ctx_memory"],
+		reaches: ["ctx_memory", "todowrite"],
 		promptTexts: [],
 		problems: [],
 	});
 		handlers.get("session_start")?.({}, ctx);
-		expect(active).toEqual(["python", "todowrite"]);
+		expect(active).toEqual(["python"]);
 		expect(entries).toEqual([]);
 	});
 });

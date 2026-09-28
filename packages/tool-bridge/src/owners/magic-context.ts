@@ -163,9 +163,11 @@ function shimFor(parentSessionFile: string | undefined) {
 /** What this owner declares to the bridge. */
 export const magicContext: OwnerModule = {
 	name: "magic-context",
-	// `todowrite` writes nothing itself — Magic Context captures its state from the transcript — so a
-	// call routed through a cell would succeed and record nothing. It has to stay a real pi tool.
-	nativeOnly: ["todowrite"],
+	// No native-only tool any more (`.scratch/one-tool-surface/` ticket 05): `todowrite` was the only
+	// member, and it stopped qualifying when its effect moved into the bridge's executor — the owner's
+	// `execute` now runs the same observers pi's dispatch runs for it. The declaration stays on the type,
+	// because "must this stay a real pi tool?" is still a question an owner can only answer about its own
+	// tool (the mechanism is tested in `test/adapter.test.ts` with a fixture).
 	// Nothing is declared child-eligible any more (`.scratch/one-tool-surface/` ticket 06): a child holds
 	// no tool of its own, and reaches every one of them — `ctx_*` and `todowrite` alike — from its cell
 	// through the bridge. The list stays on the type, because "may a child hold this?" is still a question

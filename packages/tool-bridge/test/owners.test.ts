@@ -27,11 +27,16 @@ describe("the owner list", () => {
 		expect(names).toContain("magic-context");
 	});
 
-	it("unions native-only names without duplicates", () => {
+	it("unions native-only names, and today declares none", () => {
+		// `todowrite` was the only member, and it stopped qualifying when its effect moved into the
+		// bridge's executor (`.scratch/one-tool-surface/` ticket 05): a call routed through a cell now
+		// records what pi's dispatch would have recorded, so there is nothing left to keep active. The
+		// mechanism itself is pinned in `test/adapter.test.ts` with a fixture, because this declaration is
+		// a statement an owner makes and not a property of the reader.
 		const names = nativeOnlyTools();
-		expect(names).toContain("todowrite");
+		expect(names).toEqual([]);
 		expect(new Set(names).size).toBe(names.length);
-		expect(magicContext.nativeOnly).toEqual(["todowrite"]);
+		expect(magicContext.nativeOnly ?? []).toEqual([]);
 	});
 
 	it("declares child eligibility as its own list, and today declares none", () => {
@@ -39,8 +44,8 @@ describe("the owner list", () => {
 		// `childEligible`: a *child* may hold it). They diverged deliberately once a child stopped
 		// holding tool of its own and started reaching them from its cell (`one-tool-surface` ticket 06)
 		// — which is the divergence the split into two lists existed to make a decision rather than
-		// drift. That `childEligible` is empty is the assertion; that `nativeOnly` still names
-		// `todowrite` is the task above, still true until the tool is published.
+		// drift. Both lists are empty today; each is asserted on its own terms rather than against the
+		// other, which is what let them diverge without a second decision.
 		expect(magicContext.childEligible ?? []).toEqual([]);
 		expect(childEligibleTools()).toEqual([]);
 	});
