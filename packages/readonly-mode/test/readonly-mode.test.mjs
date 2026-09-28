@@ -471,6 +471,8 @@ test("the tool bridge's route is judged on the name it carries", async () => {
 
 	assert.ok(allowed(route("ctx_search", { query: "x" })), "a listed capability");
 	assert.ok(allowed(route("ctx_memory", { content: "x" })), "Magic Context's store is deliberately exempt");
+	// A cell's todo list (`.scratch/one-tool-surface/` ticket 07): session state, not a workspace write.
+	assert.ok(allowed(route("todowrite", { todos: [] })), "the session's own todo list");
 	assert.ok(allowed(route()), "introspection (`await tool()` lists) asks for nothing");
 	assert.ok(allowed(route({ name: "ctx_expand" })), "a named call lands in the kwargs object");
 

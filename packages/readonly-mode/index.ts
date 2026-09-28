@@ -153,6 +153,16 @@ const EXEMPT_HOST_CALLS: Array<{ name: string; reason: string }> = [
 	{ name: "ctx_memory", reason: "Magic Context's own store, which this mode deliberately does not govern" },
 	{ name: "ctx_note", reason: "Magic Context's own store (see ctx_memory)" },
 	{ name: "ctx_reduce", reason: "Magic Context's own store (see ctx_memory)" },
+	// `todowrite` joined this lane when it was published (`.scratch/one-tool-surface/` ticket 07). It is
+	// session *state* rather than a workspace write — the same judgement the four `ctx_*` entries above
+	// rest on — and a read-only session still plans its work: refusing it would cost the model the list
+	// it tracks that work with, while changing nothing on disk. What the mode governs is the workspace's
+	// content, and no todo reaches it.
+	{
+		name: "todowrite",
+		reason:
+			"records the session's own todo list, which is session state and not a workspace write (the same lane the ctx_* entries are exempt for)",
+	},
 	// zvec-grep (`.scratch/zvec-grep` ticket 05). The ranked search is *not* read-only and the reason
 	// says so rather than hiding it: an indexed query writes inside the index's own directory, and a
 	// stale index is refreshed in the background when the shared daemon is up. Measured, not assumed —
