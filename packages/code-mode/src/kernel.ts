@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
 import type * as MontyModule from "@pydantic/monty/node";
 import { createBackgroundManager } from "./background";
 import { BASE_HOST_FNS, type Ledger, type KernelHandleCore, type MountMode, type Notice, type Provenance } from "./contract";
-import { makeHost, bind, type Attachment } from "./host";
+import { makeHost, bind, plainArgs, type Attachment } from "./host";
 import { appendJournal, readJournal, readJournals, recordingHost, replayHost, restoredLine } from "./journal";
 import type { CellRecord, HostCallRecord, HostFns, RestoreReport } from "./journal";
 import { clientVersion, loadMonty } from "./monty";
@@ -200,6 +200,9 @@ function traceArg(value: unknown): unknown {
 		return value.length > CELL_CALL_ARG_CHARS ? `${value.slice(0, CELL_CALL_ARG_CHARS)}…` : value;
 	}
 	if (typeof value === "number" || typeof value === "boolean" || value === null) return value;
+	// Monty's containers never reach here: `plainArgs` converts them at the boundary, so what a cell
+	// passed is what this reduces. A `Map` that arrived anyway would reduce to `{}` rather than throw,
+	// which is the failure the boundary exists to prevent (`.scratch/one-tool-surface/` ticket 08).
 	if (Array.isArray(value)) return value.slice(0, 8).map(traceArg);
 	if (value && typeof value === "object") {
 		const out: Record<string, unknown> = {};
@@ -936,12 +939,16 @@ export function createKernel(options: {
 					printCallback: streams,
 					// The counting wrapper goes outside the recording one: it has to hand monty the
 					// very promise its driver registers, so the settle it sees is the one that matters.
+					// `plainArgs` sits outside the recording wrapper, and inside the counting one: the
+					// journal and the trace record what a host *received*, so recording monty's containers
+					// would have written `[{}, {}]` where the cell passed `[{"content": …}]`, while the
+					// counter still has to hand monty the very promise its driver registers.
 					externalLookup: countHostCalls(
-						recordingHost(hostFns, (name, args, result, error) => {
+						plainArgs(recordingHost(hostFns, (name, args, result, error) => {
 							// A call that raised is journaled too, so the cell that caught it replays
 							// (rlm-web ticket 11) instead of stopping the rebuild.
 							cellCalls.push(error ? { name, args, error } : { name, args, result });
-						}),
+						})),
 						hostChain,
 					),
 					os: (name: string) => {

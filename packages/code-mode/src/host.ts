@@ -197,6 +197,61 @@ function badArgument(message: string): Error {
  * An unknown keyword and a surplus positional are **refused, not dropped**. `glob` is a name `grep`
  * binds and `find` does not, so a cell writing `find(glob="*.md")` would otherwise get a full listing
  * that reads as a filter that worked — the one failure a cell cannot detect from the answer. */
+/**
+ * Monty's containers, as the plain values a host function expects.
+ *
+ * A Python `dict` crosses the boundary as a **`Map`** — positionally, and nested inside a `list` even
+ * when the call itself is keyword-shaped — while the trailing kwargs object is a plain object. So
+ * `todos=[{"content": …, "status": …}]` reached a host as `[Map, Map]`, whose fields no `Object.entries`
+ * or property read can see: Magic Context's `todowrite` capture rejected it (its shape gate is right to
+ * reject what is not a todo) and a cell's call recorded nothing. Found by the live acceptance run in
+ * `zeroqn/pi`'s `.scratch/one-tool-surface/`, which is the only place it *could* be found — the unit
+ * tests built their arguments in JavaScript.
+ *
+ * Conversion is uniform and bounded: `Map` and `Set` become objects and arrays, arrays and plain objects
+ * are rebuilt, and anything else (a `Buffer`, a `Date`, a class instance) is passed through untouched so a
+ * host that wants those still gets them. Depth is capped, because a Python structure can be deeper than
+ * anything a host should be reasoning about and a recursive conversion must terminate.
+ */
+const PLAIN_ARG_DEPTH = 8;
+
+export function plainArg(value: unknown, depth = 0): unknown {
+	if (depth >= PLAIN_ARG_DEPTH) return value;
+	if (value instanceof Map) {
+		const mapped: Record<string, unknown> = {};
+		for (const [key, inner] of value.entries()) mapped[String(key)] = plainArg(inner, depth + 1);
+		return mapped;
+	}
+	if (value instanceof Set) return [...value].map((inner) => plainArg(inner, depth + 1));
+	if (Array.isArray(value)) return value.map((inner) => plainArg(inner, depth + 1));
+	if (value === null || typeof value !== "object") return value;
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null) return value;
+	const plain: Record<string, unknown> = {};
+	for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+		plain[key] = plainArg(inner, depth + 1);
+	}
+	return plain;
+}
+
+/**
+ * The same host surface, with every call's arguments converted once at the boundary.
+ *
+ * Outside `recordingHost` on purpose: the journal and the `python` result's trace record what a host
+ * function actually *received*, and recording monty's containers would have written `[{}, {}]` where the
+ * cell passed `[{"content": …}]`. Function `.name` is preserved, because monty identifies a host function
+ * by it after the sandbox has read the value (`recordingHost`'s note).
+ */
+export function plainArgs(host: HostFns): HostFns {
+	const wrapped: HostFns = {};
+	for (const [name, fn] of Object.entries(host)) {
+		const wrapper = async (...args: unknown[]) => fn(...args.map((arg) => plainArg(arg)));
+		Object.defineProperty(wrapper, "name", { value: name });
+		wrapped[name] = wrapper;
+	}
+	return wrapped;
+}
+
 export function bind(args: unknown[], names: string[], fn: string): Record<string, unknown> {
 	const list = [...args];
 	let kwargs: Record<string, unknown> = {};

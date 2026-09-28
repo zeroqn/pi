@@ -121,6 +121,28 @@ describe("a cell's trace of what it reached", () => {
 		expect(result.details?.cellCalls).toEqual([{ host: "tool", args: ["ctx_absent"] }]);
 	});
 
+	maybe("reads a Python dict, however monty carried it", async () => {
+		const handle = session();
+		const result = (await (handle.kernel as Kernel).execute(
+			{
+				code: [
+					'await tool("todowrite", todos=[{"content": "x", "status": "in_progress"}])',
+					'await tool({"name": "positional", "action": "read"}, 3)',
+					"",
+				].join("\n"),
+			},
+			undefined,
+			undefined,
+		)) as { details?: { cellCalls?: unknown } };
+
+		// A positional dict arrives as a `Map`, a dict nested in a list is one too, and the kwargs
+		// object arrives as a plain object — one cell can produce all three, so all three are read.
+		expect(result.details?.cellCalls).toEqual([
+			{ host: "tool", args: ["todowrite", { todos: [{ content: "x", status: "in_progress" }] }] },
+			{ host: "tool", args: [{ name: "positional", action: "read" }, 3] },
+		]);
+	});
+
 	maybe("keeps a huge argument out of the transcript line", async () => {
 		const handle = session();
 		const result = (await (handle.kernel as Kernel).execute(
