@@ -27,6 +27,7 @@
 			"packages/ask-user-question/index.ts",
 			"packages/host-bridge/index.ts",
 			"packages/magic-context/index.js",
+			"packages/pi-fff/index.js",
 			"packages/tool-bridge/index.ts"
 		]
 	}
