@@ -10,7 +10,11 @@
  * to `pattern` — the name the host function actually binds. Those are why the second
  * guideline test below pins a *whole-array* hash while the first pins the six as of the
  * monty-1.0 amendment, which corrected the description's capability and working-directory
- * clauses and guideline 5's "no generators, inheritance or decorators".
+ * clauses and guideline 5's "no generators, inheritance or decorators", and the
+ * background-handle amendment of 2026-09-29 — `h.poll()`, `h.output()` and `h.kill()` are host
+ * calls and return coroutines, so the description that showed them unawaited taught a model to
+ * print `<coroutine external_future(N)>` where a status belongs (measured live, `.scratch/mc-0441`
+ * check 14; the package's own `test/prelude.test.ts` always awaited them).
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -20,7 +24,7 @@ const sha = (text: string) => createHash("sha256").update(text, "utf8").digest("
 
 describe("the base surface (acceptance check 2)", () => {
 	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.0", () => {
-		expect(sha(BASE_DESCRIPTION)).toBe("f4d054cb8ddc70767735221ee8a37631acffa1b61a7542861ddc0868e5d9a179");
+		expect(sha(BASE_DESCRIPTION)).toBe("8533819093f8a55787fa1a0255dd825236d0c85a6198e79472e1b5c0b1f1c9b3");
 		expect(BASE_DESCRIPTION).not.toContain("rlm.spawn");
 		expect(BASE_DESCRIPTION).not.toContain("agent_message");
 	});
