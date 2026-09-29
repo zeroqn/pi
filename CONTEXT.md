@@ -94,6 +94,22 @@ A message the model receives about work it is not currently watching — a child
 handle reaching a terminal state.
 _Avoid_: alert, notification, event
 
+**Status read**:
+Asking what a child is doing — `rlm.poll`, `rlm.list`, or the moment a join resolves. It reports status
+and usage, never the answer, and it withdraws the completion notice of any child that is already
+terminal.
+_Avoid_: check, look (both too vague to set against the read below)
+
+**Result read**:
+Collecting a child's answer — what `rlm.wait` does. It is a status read *and* the answer: the text of the
+child's last assistant message, returned to the cell.
+_Avoid_: fetch, await (both already mean something in the kernel)
+
+**Message** (from a child):
+What a child sends its parent with `agent_message.send`. It is content, not status, and **nothing
+withdraws it** — not even reading the child that sent it.
+_Avoid_: notice (a notice is about state), reply (it need not answer anything)
+
 ## The tool bridge
 
 **Surface**:
