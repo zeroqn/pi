@@ -36,7 +36,7 @@
 	},
 	"builtFrom": {
 		"submodule": "vendor/magic-context",
-		"commit": "703f53665e5566c44c1885c2bacf01b751295d7b",
+		"commit": "3cb5c71c003459860fe35187e9bc08831c927967",
 		"pluginVersion": "0.44.1"
 	},
 	"scripts": {
