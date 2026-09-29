@@ -863,3 +863,77 @@ test("a second /readonly cancels the wait rather than asking again", async () =>
 	assert.equal(shells[0].status, "running");
 	assert.match(h.notifications.at(-1), /wait was cancelled/);
 });
+
+test("a kernel mounted before this extension contributed the guard is reported, and its cell refused", async () => {
+	// The bad order's observable: the seam composed this session's kernel, and this owner is not among
+	// the contributions that landed — so nothing ever asks the guard anything, and `cellLane` stays
+	// null, which is why nothing used to say so. `-e host-bridge` before `-e readonly-mode`.
+	const h = load();
+	recordSession(sessionKey(h.ctx), {
+		mounted: true,
+		owners: ["rlm", "pi-tool-bridge"],
+		installed: ["rlm_spawn"],
+		reaches: [],
+		promptTexts: [],
+		problems: [],
+	});
+	await toggleOn(h);
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+
+	assert.ok(
+		h.notifications.some((n) => /not enforced in this session/.test(n)),
+		"an unguarded kernel has to be reported",
+	);
+	assert.equal(
+		h.appended.filter((entry) => entry.type === "readonly-mode-unguarded").length,
+		1,
+		"and it is in the transcript, where a later reader can find it",
+	);
+	// Fail closed: the tool whose cell would run ungoverned is refused, with the same reason.
+	assert.match(
+		(await h.handlers.tool_call[0]({ toolName: "python", input: {} })).reason,
+		/not enforced in this session/,
+	);
+
+	// Once per session, like the inventory check.
+	const before = h.notifications.length;
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.equal(h.notifications.length, before);
+});
+
+test("a guarded kernel is not mistaken for an unguarded one", async () => {
+	const { h, key } = await cellLane();
+	recordSession(key, {
+		mounted: true,
+		owners: ["readonly-mode", "rlm"],
+		installed: ["rlm_spawn"],
+		reaches: [],
+		promptTexts: [],
+		problems: [],
+	});
+	await toggleOn(h);
+	const prompt = (await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx)).systemPrompt;
+	assert.match(prompt, /mounted read-only/);
+	assert.equal(h.notifications.filter((n) => /not enforced in this session/.test(n)).length, 0);
+	assert.equal(h.appended.filter((entry) => entry.type === "readonly-mode-unguarded").length, 0);
+});
+
+test("a kernel that mounted and refused this contribution is caught too", async () => {
+	// `mounted` alone is not the claim: what matters is whether *this* owner reached the kernel. A
+	// ledger that took the other contributions and dropped ours leaves the same hole as a late load.
+	const { h, key } = await cellLane();
+	recordSession(key, {
+		mounted: true,
+		owners: ["rlm"],
+		installed: ["rlm_spawn"],
+		reaches: [],
+		promptTexts: [],
+		problems: [],
+	});
+	await toggleOn(h);
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.match(
+		(await h.handlers.tool_call[0]({ toolName: "python", input: {} })).reason,
+		/not enforced in this session/,
+	);
+});

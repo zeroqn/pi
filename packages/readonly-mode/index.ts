@@ -349,6 +349,8 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	const roots = new Set<string>();
 	/** Sessions the inventory has already been checked for, so the notice is said once. */
 	const checked = new Set<string>();
+	/** Session keys whose missing guard has already been reported, so one broken session says so once. */
+	const guardReported = new Set<string>();
 
 	/** The policy for one session's kernel. Both answers are read live — this session's flag, or the
 	 *  floor a parent holds over it — so a toggle lands on the next cell with no rebuild. */
@@ -423,6 +425,43 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 		}
 		try {
 			pi.appendEntry("readonly-mode-inventory", { unlisted, stale });
+		} catch {
+			/* diagnostics only */
+		}
+	}
+
+	/**
+	 * The one failure the mode cannot survive in silence, and the one its own load order makes possible:
+	 * the session has a kernel, the mode is on, and this extension's guard never reached it.
+	 *
+	 * `registerForSession` publishes the guard as a **contributor**, and `pi-host-bridge` draws every
+	 * contributor that is registered when it composes the session's kernel. Which comes first is load
+	 * order, and the wrong order used to be silent: the session showed the read-only prompt, the status
+	 * line, and a kernel that refused nothing. Measured, `.scratch/mc-0441` check 12 — with
+	 * `-e pi-host-bridge` before `-e pi-readonly-mode`, a cell's `touch` succeeded under `--readonly`.
+	 *
+	 * The seam's own record is the observable: `mounted` says this session has a kernel, and `owners`
+	 * says whose contributions reached it (host-bridge writes both *after* the contributions land, never
+	 * before). A kernel with no `readonly-mode` among its owners, in a session whose mode is on, is a
+	 * cell that can write. The floor is the existing one — {@link unenforceable}, which refuses the
+	 * `python` tool — because an ungoverned cell is exactly what that state exists for.
+	 */
+	function checkGuardLanded(key: string, ctx: ExtensionContext): void {
+		if (unenforceable !== null || guardReported.has(key)) return;
+		const record = sessionRecord(key);
+		if (record?.mounted !== true || record.owners.includes(OWNER)) return;
+		guardReported.add(key);
+		unenforceable =
+			"Read-only mode is not enforced in this session: its kernel was mounted before this extension " +
+			"could contribute the guard, so a cell could write to the workspace. The python tool is refused " +
+			"while the mode is on; declare pi-readonly-mode before pi-host-bridge to fix it.";
+		try {
+			ctx.ui.notify(`readonly-mode: ${unenforceable}`, "warning");
+		} catch {
+			/* a warning must not fail a turn */
+		}
+		try {
+			pi.appendEntry("readonly-mode-unguarded", { sessionKey: key, owners: record.owners });
 		} catch {
 			/* diagnostics only */
 		}
@@ -708,6 +747,9 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 			checked.add(key);
 			checkInventory(key, ctx);
 		}
+		// Every turn, not once: the record is written when the kernel mounts, and a mount that happened
+		// before this extension was asked about anything is exactly the case being caught.
+		checkGuardLanded(key, ctx);
 		return { systemPrompt: `${event.systemPrompt}\n\n${READ_ONLY_PROMPT}${cell}` };
 	});
 
