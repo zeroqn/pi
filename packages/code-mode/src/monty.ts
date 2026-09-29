@@ -23,7 +23,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
  * bun workspace: the hoisted one (`<dir>/node_modules/@pydantic/monty-*`) and bun's store
  * (`<dir>/node_modules/.bun/@pydantic+monty-*\/node_modules/@pydantic/monty-*`).
  */
-export function findBinding(startDir: string): string | null {
+export function findBinding(startDir: string, want: string | null = clientVersion()): string | null {
 	const inScope = (scope: string): string | null => {
 		if (!existsSync(scope)) return null;
 		for (const entry of readdirSync(scope)) {
@@ -37,8 +37,17 @@ export function findBinding(startDir: string): string | null {
 	};
 	const inStore = (store: string): string | null => {
 		if (!existsSync(store)) return null;
-		for (const entry of readdirSync(store)) {
-			if (!entry.startsWith("@pydantic+monty-")) continue;
+		// bun keeps one directory per version, and upgrading leaves the old one behind. Picking
+		// the stale addon does not fail here — it fails later, as `unsupported protocol version
+		// N` from the worker — so the entry matching the installed client is tried first.
+		const entries = readdirSync(store).filter((entry) => entry.startsWith("@pydantic+monty-"));
+		const matching = want ? entries.filter((entry) => entry.endsWith(`@${want}`)) : [];
+		for (const entry of matching) {
+			const found = inScope(join(store, entry, "node_modules", "@pydantic"));
+			if (found) return found;
+		}
+		for (const entry of entries) {
+			if (matching.includes(entry)) continue;
 			const found = inScope(join(store, entry, "node_modules", "@pydantic"));
 			if (found) return found;
 		}

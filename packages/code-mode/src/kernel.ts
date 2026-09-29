@@ -8,6 +8,7 @@
  * stays is the sandbox and its durability — and two things the kernel *asks for* rather than
  * owns: the provenance rule (`provenance`) and a notice sink (`onNotice`).
  */
+import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -171,6 +172,32 @@ export type Kernel = KernelHandleCore & {
 export function sessionFilePath(ctx: any): string | undefined {
 	const file: string | undefined = ctx?.sessionManager?.getSessionFile?.();
 	return file ? resolve(file) : undefined;
+}
+
+/**
+ * Where a session's scratch lives — and, for a fork, where its source's does, which is why this is
+ * a pure function of the session file and the workspace root rather than a kernel local: both
+ * callers have to agree on the path.
+ *
+ * Beside the session file, unless that sits inside the workspace. monty 1.0 refuses two mounts
+ * whose host directories nest ("overlapping mounts cannot both be registered" —
+ * `limitations/filesystem.md`, because the stricter mount's mode could be bypassed through the
+ * other's spelling), and a session file inside the workspace puts a read-write scratch inside the
+ * workspace mount. The temp-dir fallback is keyed by the session file, not the process, so a
+ * resume finds the same one.
+ */
+export function scratchPathFor(sessionFile: string, root: string): string {
+	const beside = `${sessionFile}.scratch`;
+	if (!nestsWith(beside, root)) return beside;
+	const key = createHash("sha256").update(beside).digest("hex").slice(0, 16);
+	return join(tmpdir(), "pi-code-mode-scratch", key);
+}
+
+/** monty's own overlap rule: equal, or one host path inside the other — `/a/bc` is not inside `/a/b`. */
+function nestsWith(a: string, b: string): boolean {
+	const inside = (outer: string, inner: string) =>
+		inner === outer || inner.startsWith(outer.endsWith("/") ? outer : `${outer}/`);
+	return inside(a, b) || inside(b, a);
 }
 
 /**
@@ -396,11 +423,12 @@ export function createKernel(options: {
 	 * Scratch lives beside the session file so it survives a resume, and is mounted
 	 * read-write at its real host path so `bash` agrees on the path — in **every** mode: it sits
 	 * outside the workspace, and journal replay and output spill both read it back. It is never
-	 * deleted during the session.
+	 * deleted during the session. When the session file puts it inside the workspace anyway,
+	 * `scratchPathFor` moves it out of the way the mount rule requires.
 	 */
-	function scratchDirFor(ctx: any): string {
+	function scratchDirFor(ctx: any, root: string): string {
 		const sessionFile = sessionFilePath(ctx);
-		return sessionFile ? `${sessionFile}.scratch` : join(tmpdir(), `rlm-scratch-${process.pid}`);
+		return sessionFile ? scratchPathFor(sessionFile, root) : join(tmpdir(), `rlm-scratch-${process.pid}`);
 	}
 
 	/**
@@ -427,7 +455,7 @@ export function createKernel(options: {
 	async function startKernel(ctx: any) {
 		const monty = await loadMonty();
 		const cwd: string = ctx?.cwd ?? process.cwd();
-		scratch = scratchDirFor(ctx);
+		scratch = scratchDirFor(ctx, cwd);
 		mkdirSync(scratch, { recursive: true });
 		const started = await monty.Monty.create();
 		pool = started;
@@ -597,6 +625,16 @@ export function createKernel(options: {
 			// an exact landing point. Being a plain suspension is not enough either: a concurrent
 			// cell suspends on one task's host call while another promise is still outstanding,
 			// and the chain has to prove its driver holds none before this is safe.
+			//
+			// monty 1.0's eager await. A call it offers with `allowEagerAwait` is one the scheduler
+			// has no competing work for — the flag is `can_await_eagerly()`, which is
+			// `ready_queue.is_empty() && pending_externals.is_empty()` — so the client settles the
+			// promise *here* instead of registering it as a future (`answerAwaitedCall`), and no
+			// `resolveFutures` pass ever runs. The chain's proof therefore never fires on a
+			// sequential cell at all, and the reserve would blow past the budget instead of
+			// rotating. Nothing is outstanding there by monty's own definition, so the chain is
+			// cleared rather than merely left un-grown.
+			if (snap instanceof monty.FunctionSnapshot && snap.allowEagerAwait) hostChain.reset();
 			const pass = snap instanceof monty.FutureSnapshot ? hostChain.passStart(pendingCount(snap)) : null;
 			const rotatable = pass === null && hostChain.empty();
 			if (rotatable && suspensions >= rotateRetryAt) {
@@ -719,8 +757,10 @@ export function createKernel(options: {
 		let scratchNote: string | undefined;
 		if (seedFrom) {
 			// Seeding is one-shot: only a fork with no journal of its own needs the copy, and
-			// only then is the source's scratch the one its cells were written against.
-			const sourceScratch = `${seedFrom}.scratch`;
+			// only then is the source's scratch the one its cells were written against. A fork
+			// inherits its workspace, so its root is the source's root, which is the other half
+			// of the source's scratch path.
+			const sourceScratch = scratchPathFor(seedFrom, cwd);
 			if (existsSync(sourceScratch)) {
 				try {
 					cpSync(sourceScratch, scratch, { recursive: true });

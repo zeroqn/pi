@@ -17,7 +17,9 @@ way to run it; `packages/web-access` adds web host functions the same way.
   queue (pi runs a batch in parallel; one monty session cannot be fed twice at once).
 - **The workspace mounted read-write at its real path**, so `bash` output and sandbox paths agree.
 - **`SCRATCH`**: a second read-write mount at `<sessionFile>.scratch`, mirrored at its real host
-  path, created lazily, never deleted during a session (a journal replay re-reads it).
+  path, created lazily, never deleted during a session (a journal replay re-reads it). When the
+  session file is itself inside the workspace the two mounts would nest, which monty refuses, so
+  the scratch moves to the temp dir keyed by the session file.
 - **The prelude's base half**: `ROOT`/`SCRATCH` and the file helpers (`read_text`, `write_text`,
   `edit_text`, `walk`, `read_json`, `write_json`, `exists`, `mkdirp`, all sync), plus `BgHandle`
   and `bash`. The delegation half is contributed — see below.
@@ -108,7 +110,7 @@ publisher contract, and `.scratch/tool-bridge/` for the decisions.
 
 ```bash
 cd /workspace/pi
-MONTY_BIN=$(nix build --no-link --print-out-paths /workspace/pi/monty#monty-bin)/bin/monty \
+MONTY_BIN=$(nix build --no-link --print-out-paths /workspace/pi/shell#monty-bin)/bin/monty \
 pi -ne -e /workspace/pi/extensions/packages/code-mode/index.ts -nbt \
    --session-dir /tmp/cm-sessions -p "your task"
 ```
@@ -125,7 +127,8 @@ ignore rules (ripgrep and fd honour `.gitignore`, GNU grep and GNU find do not),
 reason to prefer ripgrep and fd. Host commands run in `$SHELL`, or `/bin/bash` when it is unset; a
 host with neither is a preflight problem, reported before the first cell. `MONTY_BIN` is only
 needed on a host without `/lib64/ld-linux-x86-64.so.2` — NixOS, musl; the flake's `.#monty-bin` is
-the published worker patched for Nix (do **not** use `.#monty`, the local checkout at protocol 3).
+the published worker patched for Nix (do **not** substitute the local checkout's `.#monty`, whose
+protocol is not the pinned client's).
 
 ## Tests
 

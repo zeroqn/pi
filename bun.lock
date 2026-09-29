@@ -40,7 +40,7 @@
       "name": "pi-code-mode",
       "version": "0.0.1",
       "dependencies": {
-        "@pydantic/monty": "0.0.23",
+        "@pydantic/monty": "1.0.0",
       },
       "devDependencies": {
         "@types/node": "^24.0.0",
@@ -115,6 +115,7 @@
       "name": "@rlm/pi-python-kernel",
       "version": "0.0.1",
       "devDependencies": {
+        "@pydantic/monty": "1.0.0",
         "@types/node": "^24.0.0",
         "typescript": "^5.8.0",
       },
@@ -138,7 +139,7 @@
       "name": "pi-skill-bridge",
       "version": "0.1.0",
       "devDependencies": {
-        "@pydantic/monty": "0.0.23",
+        "@pydantic/monty": "1.0.0",
         "@types/node": "^22.20.0",
         "typescript": "^5.8.0",
       },
@@ -442,17 +443,17 @@
 
     "@protobufjs/utf8": ["@protobufjs/utf8@1.1.2", "", {}, "sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug=="],
 
-    "@pydantic/monty": ["@pydantic/monty@0.0.23", "", { "dependencies": { "@bytecodealliance/preview2-shim": "^0.19.0", "@opentelemetry/api": "^1.9.1", "@opentelemetry/api-logs": "^0.222.0" }, "optionalDependencies": { "@pydantic/monty-darwin-arm64": "0.0.23", "@pydantic/monty-darwin-x64": "0.0.23", "@pydantic/monty-linux-arm64-gnu": "0.0.23", "@pydantic/monty-linux-x64-gnu": "0.0.23", "@pydantic/monty-win32-x64-msvc": "0.0.23" } }, "sha512-gl2pOn01Gno8eUcMlfFStgEV91JcVN9DQdQPT/Dp8ItQ+PfzPcn/pkc39ffqODhCsdmylOxGL1k4xpPMDGk/IA=="],
+    "@pydantic/monty": ["@pydantic/monty@1.0.0", "", { "dependencies": { "@bytecodealliance/preview2-shim": "^0.19.0", "@opentelemetry/api": "^1.9.1", "@opentelemetry/api-logs": "^0.222.0" }, "optionalDependencies": { "@pydantic/monty-darwin-arm64": "1.0.0", "@pydantic/monty-darwin-x64": "1.0.0", "@pydantic/monty-linux-arm64-gnu": "1.0.0", "@pydantic/monty-linux-x64-gnu": "1.0.0", "@pydantic/monty-win32-x64-msvc": "1.0.0" } }, "sha512-lrBwLE6d8LPvMqb8qz7R1migkRDapcYP5UBqCuAAQ6TPJSHPsBJ4unBdh1KhFMBT3cx6QQUfWtFpGL9WbAHgjA=="],
 
-    "@pydantic/monty-darwin-arm64": ["@pydantic/monty-darwin-arm64@0.0.23", "", { "os": "darwin", "cpu": "arm64" }, "sha512-SrYZQMyoSh1m8oPgGgzUCI4QYzeS9Bqg+cp7b1lZ1iNqW7O9fvJCH5MbNeWVkPZvEaRFmff/Ru8NkRJGyLfjVw=="],
+    "@pydantic/monty-darwin-arm64": ["@pydantic/monty-darwin-arm64@1.0.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-K+/lUiTXSfivieeO+oqmi/9c7y1ddoe38iCo481pnGOZUrpuK9PcVHif0uFnaWYcuxjeWUHEjuHSffakAY983g=="],
 
-    "@pydantic/monty-darwin-x64": ["@pydantic/monty-darwin-x64@0.0.23", "", { "os": "darwin", "cpu": "x64" }, "sha512-zrTEKa9N2vufpz57NN0w4ZCzR7oXwWwheXSOjTIz0hkVlO2MZbK7+cXi04VD0uIghcxQa+x7UWo3lJzrjFFv+A=="],
+    "@pydantic/monty-darwin-x64": ["@pydantic/monty-darwin-x64@1.0.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-OLZCNb/jt3H30tai/FyOBLZT7k3LGshdcMsDkWmqX33O5BY0LePqRF2uH4gDtyCRrAdvb1A1ZPnWczsHLzVwBg=="],
 
-    "@pydantic/monty-linux-arm64-gnu": ["@pydantic/monty-linux-arm64-gnu@0.0.23", "", { "os": "linux", "cpu": "arm64" }, "sha512-lpD0ojDvrR2WlEVkWMoQLzSIBky3ZKg6r/rmgfSBrwQkYclG6S0aw0itbYjuD87MWiBTfx3tXPXGllDQmvgWgQ=="],
+    "@pydantic/monty-linux-arm64-gnu": ["@pydantic/monty-linux-arm64-gnu@1.0.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-dsil8hO1fIJGkjQdGklMQsMtwUtVn3SBjNUkbkJDNVTjvboHQ4tL2glNvMWzo2BmKqcPBQ7KRgLjWKuPXGLu2A=="],
 
-    "@pydantic/monty-linux-x64-gnu": ["@pydantic/monty-linux-x64-gnu@0.0.23", "", { "os": "linux", "cpu": "x64" }, "sha512-4+Y4WYPLGixP2+2AFtY4IUGwAXRRPvhixjoV6H6b1lCypd+Af5BiZ0a0vOARTfqGVGXLDtbzqFatfU2fWmwkzg=="],
+    "@pydantic/monty-linux-x64-gnu": ["@pydantic/monty-linux-x64-gnu@1.0.0", "", { "os": "linux", "cpu": "x64" }, "sha512-CoNfUTNI9Msgew3XfPOQVHrYpqL81mQ6x4COfJo2nYoZs72q4IWG7gTbEbWqAlN8rMcBJb81geuWbV0a/9kJuA=="],
 
-    "@pydantic/monty-win32-x64-msvc": ["@pydantic/monty-win32-x64-msvc@0.0.23", "", { "os": "win32", "cpu": "x64" }, "sha512-nYMNnaoYLFqbFFvv1sluwI7lb6ZNcKxKRG9H2lhpwv9gFZjBybp9/mCTveYfaNhVkyyLkcW/BHlkPrdj/yogMA=="],
+    "@pydantic/monty-win32-x64-msvc": ["@pydantic/monty-win32-x64-msvc@1.0.0", "", { "os": "win32", "cpu": "x64" }, "sha512-uLxwOdzBsU1O1rxk+ynNE1Mm2iS8fw6MJe3nITlxlV3Uqopa9RK5l8jNaoDSfhDwK/obX2G+xSCmvURtHE8sLQ=="],
 
     "@rlm/pi-python-kernel": ["@rlm/pi-python-kernel@workspace:packages/rlm"],
 

@@ -20,7 +20,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BASE_HOST_FNS, createLedger } from "../src/contract";
-import { createKernel } from "../src/kernel";
+import { createKernel, scratchPathFor } from "../src/kernel";
 import { loadMonty } from "../src/monty";
 import { BASE_DESCRIPTION, BASE_GUIDELINES, BASE_SNIPPET } from "../src/surface";
 
@@ -157,14 +157,17 @@ describe.skipIf(!montyReady)("resume", () => {
 		const sessionFile = sessionFileIn(dir, "blocked");
 		try {
 			// A *file* where the kernel's scratch directory belongs: `mkdirSync` throws EEXIST, so
-			// `startKernel` fails for a reason that has nothing to do with the dump.
-			writeFileSync(`${sessionFile}.scratch`, "not a directory");
+			// `startKernel` fails for a reason that has nothing to do with the dump. The path is
+			// the kernel's own derivation — this session file is inside the workspace, so it is
+			// the temp fallback rather than the session file's sibling.
+			const scratch = scratchPathFor(sessionFile, dir);
+			writeFileSync(scratch, "not a directory");
 			const a = mountKernel(dir, sessionFile);
 			await a.kernel.startSession(a.ctx);
 			const blocked = await attempt(a.kernel, a.ctx, "1+1");
 			expect(blocked.threw).toBeDefined();
 
-			rmSync(`${sessionFile}.scratch`, { force: true });
+			rmSync(scratch, { force: true });
 			const retried = await attempt(a.kernel, a.ctx, "1+1");
 			expect(retried.threw).toBeUndefined();
 			expect(retried.text).toContain("# => 2");

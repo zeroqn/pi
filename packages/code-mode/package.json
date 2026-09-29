@@ -9,7 +9,7 @@
 		"extensions": ["./index.ts"]
 	},
 	"dependencies": {
-		"@pydantic/monty": "0.0.23"
+		"@pydantic/monty": "1.0.0"
 	},
 	"scripts": {
 		"test": "bun test",

@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@pydantic/monty": "1.0.0",
     "@types/node": "^24.0.0",
     "typescript": "^5.8.0"
   }

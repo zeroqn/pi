@@ -60,6 +60,17 @@ describe("finding the platform binding (the compiled-Bun hazard)", () => {
 		expect(findBinding(join(base, "src"))).toBe(expected);
 	});
 
+	it("prefers the store entry matching the installed client, not the stale one", () => {
+		const base = mkdtempSync(join(tmpdir(), "cm-binding-"));
+		// An upgrade leaves the previous version's directory in the store; loading its addon
+		// passes here and fails at the worker with `unsupported protocol version N`.
+		stored(base, "0.0.23");
+		const expected = stored(base, "1.0.0");
+		expect(findBinding(join(base, "src"), "1.0.0")).toBe(expected);
+		// With no version to match, the search still answers rather than giving up.
+		expect(findBinding(join(base, "src"), null)).toContain("monty.linux-x64-gnu.node");
+	});
+
 	it("returns null rather than guessing when neither layout is present", () => {
 		const base = mkdtempSync(join(tmpdir(), "cm-binding-"));
 		expect(findBinding(join(base, "src"))).toBeNull();
