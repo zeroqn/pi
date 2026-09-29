@@ -347,6 +347,7 @@ import {
   createPromptSurfaceRuntime,
   createPromptSurfaceGuidanceEpochCache,
   cellToolCalls,
+  cellReduceFilingName,
   SYNTH_USER_ID_PREFIX,
   resolvePiStableId,
   readPiSessionSnapshot,
@@ -480,7 +481,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-48be3h6a.js";
+} from "./index-q8z5a8bc.js";
 import {
   pushNotification2
 } from "./index-b3eqj1g6.js";
@@ -17870,6 +17871,16 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
   const skipPrefixInjection = options.skipPrefixInjection === true;
   const targets = new Map;
   const timing = options.onTiming ? { identity: 0, prefix: 0, targets: 0, tokenCounting: 0 } : undefined;
+  const filingToolNames = new Map;
+  for (const message of transcript.messages) {
+    for (const part of message.parts) {
+      const explicit = part.tagToolName;
+      if (typeof explicit === "string" && explicit.length > 0 && part.id) {
+        filingToolNames.set(part.id, explicit);
+      }
+    }
+  }
+  const filingToolNameFor = (part) => part.id === undefined ? undefined : filingToolNames.get(part.id);
   const toolAggregates = new Map;
   const openToolAggregateKeysByCallId = new Map;
   let activeToolResultRun;
@@ -17940,6 +17951,7 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
             targets,
             skipPrefixInjection,
             reuseIdentity,
+            filingToolName: filingToolNameFor(part),
             timing
           });
           continue;
@@ -18066,7 +18078,7 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
           const outputByteSize = part.kind === "tool_result" ? accounting.byteSize : 0;
           const outputTokenCount = part.kind === "tool_result" ? accounting.tokenCount : 0;
           const firstInputTokenCount = part.kind === "tool_use" ? accounting.inputTokenCount : 0;
-          const tagId = tagger.assignToolTag(sessionId, callId, messageId, outputByteSize, db, 0, accounting.toolName, accounting.inputByteSize, () => ({
+          const tagId = tagger.assignToolTag(sessionId, callId, messageId, outputByteSize, db, 0, filingToolNameFor(part) ?? accounting.toolName, accounting.inputByteSize, () => ({
             tokenCount: outputTokenCount,
             inputTokenCount: firstInputTokenCount,
             reasoningTokenCount: null
@@ -18079,7 +18091,7 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
             occurrences: [{ message, part, kind: part.kind }],
             maxByteSize: persistedAccounting?.byteSize ?? outputByteSize,
             maxTokenCount: persistedAccounting?.tokenCount ?? outputTokenCount,
-            toolName: accounting.toolName,
+            toolName: filingToolNameFor(part) ?? accounting.toolName,
             inputByteSize: persistedAccounting?.inputByteSize ?? (part.kind === "tool_use" ? accounting.inputByteSize : 0),
             inputTokenCount: persistedAccounting?.inputTokenCount ?? (part.kind === "tool_use" ? firstInputTokenCount : null),
             requiresToolArcSkeleton: messageHasNativeReasoning
@@ -18338,7 +18350,7 @@ function tagToolPart(args) {
   const toolTokenCount = getToolPartTokenCount(args.part, text);
   if (args.timing)
     args.timing.tokenCounting += performance.now() - tokenStart;
-  const tagId = args.tagger.assignToolTag(args.sessionId, contentId, contentId, toolByteSize, args.db, 0, meta.toolName ?? null, meta.inputByteSize, () => {
+  const tagId = args.tagger.assignToolTag(args.sessionId, contentId, contentId, toolByteSize, args.db, 0, args.filingToolName ?? meta.toolName ?? null, meta.inputByteSize, () => {
     const tokenStart = args.timing ? performance.now() : 0;
     const counts = {
       tokenCount: toolTokenCount,
@@ -21871,8 +21883,25 @@ function buildPiToolFingerprints(messages, resolveStableId) {
   }
   return fingerprints;
 }
+function collectCellReduceCallIds(messages) {
+  const ids = new Set;
+  for (const raw of messages) {
+    if (!raw || typeof raw !== "object")
+      continue;
+    const msg = raw;
+    if (msg.role !== "toolResult")
+      continue;
+    if (typeof msg.toolCallId !== "string" || msg.toolCallId.length === 0)
+      continue;
+    if (cellReduceFilingName(msg) === undefined)
+      continue;
+    ids.add(msg.toolCallId);
+  }
+  return ids;
+}
 function collectStaleReduceCallIds(messages, messageIdToMaxTag, ctxReduceTagNumbers, toolAgeCutoff, resolveStableId) {
   const reduceCalls = new Map;
+  const cellReduceCallIds = collectCellReduceCallIds(messages);
   for (let i = 0;i < messages.length; i++) {
     const raw = messages[i];
     if (!raw || typeof raw !== "object")
@@ -21890,9 +21919,9 @@ function collectStaleReduceCallIds(messages, messageIdToMaxTag, ctxReduceTagNumb
       const p = part;
       if (p.type !== "toolCall")
         continue;
-      if (p.name !== "ctx_reduce")
-        continue;
       if (typeof p.id !== "string" || p.id.length === 0)
+        continue;
+      if (p.name !== "ctx_reduce" && !cellReduceCallIds.has(p.id))
         continue;
       const composite = `${stableId}\x00${p.id}`;
       const maxTag = ctxReduceTagNumbers.get(composite) ?? ownerMaxTag;
@@ -27911,9 +27940,11 @@ function createPiAssistantPart(working, messageIndex, partIndex, markDirty) {
 function createPiToolResultPart(working, messageIndex, partIndex, markDirty) {
   const msg = working[messageIndex];
   const kind = "tool_result";
+  const tagToolName = cellReduceFilingName(msg);
   return {
     kind,
     id: msg.toolCallId,
+    ...tagToolName ? { tagToolName } : {},
     remove() {
       return markToolRemoval(working, messageIndex, partIndex);
     },
