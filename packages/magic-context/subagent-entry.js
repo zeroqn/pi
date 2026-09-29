@@ -1,14 +1,18 @@
 import {
   setHarness,
-  log,
-  resolveProjectIdentityForSession,
+  log
+} from "./index-59dmj4zs.js";
+import {
   setStoragePrivatePermissionEnforcement,
+  resolveProjectIdentityForSession,
   openDatabase,
   loadPiConfig,
   ensureProjectRegisteredFromPiDirectory,
   resolvePiHarnessKind,
   registerMagicContextTools
-} from "./index-q8z5a8bc.js";
+} from "./index-eynxwvxt.js";
+import"./index-x8ksa6kx.js";
+import"./index-97e5fzy3.js";
 
 // src/subagent-entry.ts
 var SUBAGENT_DREAMER_ACTIONS_FLAG = "magic-context-dreamer-actions";
@@ -41,11 +45,11 @@ function magicContextSubagentExtension(pi) {
         memoryToolEnabled: dreamerActionsEnabled,
         allowDreamerActions: dreamerActionsEnabled,
         sessionScopedToolsDisabled: true,
-        todowriteEnabled: cfg.todowrite.enabled !== false,
+        todowriteEnabled: cfg.todowrite.enabled,
         todowriteCommandEnabled: false,
         promptSurface: registrationPromptSurface
       });
-      log(`[pi-subagent] registered tools: ctx_search${dreamerActionsEnabled ? ", ctx_memory" : ""}${cfg.todowrite.enabled !== false ? ", todowrite" : ""}` + ` (ctx_note/ctx_expand omitted: --no-session child;` + ` memory=${cfg.memory.enabled}, embedding=${cfg.embedding.provider !== "off"},` + ` git_commits=${cfg.memory.git_commit_indexing.enabled}, dreamer_actions=${dreamerActionsEnabled})`);
+      log(`[pi-subagent] registered tools: ctx_search${dreamerActionsEnabled ? ", ctx_memory" : ""}${cfg.todowrite.enabled ? ", todowrite" : ""}` + ` (ctx_note/ctx_expand omitted: --no-session child;` + ` memory=${cfg.memory.enabled}, embedding=${cfg.embedding.provider !== "off"},` + ` git_commits=${cfg.memory.git_commit_indexing.enabled}, dreamer_actions=${dreamerActionsEnabled})`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log(`[pi-subagent] startup failed: ${message}`);
