@@ -663,3 +663,24 @@ export function refusal(reason: string): Error {
 	error.name = "PermissionError";
 	return error;
 }
+
+/**
+ * The exception an aborted turn becomes in the sandbox.
+ *
+ * `KeyboardInterrupt` on purpose, and again the **name** does the work rather than the type: monty
+ * maps a thrown JS error onto a Python exception by `.name` when that name is a known Python
+ * exception (`@pydantic/monty` `dist/session.js`, `jsErrorParts`, the same list `refusal` uses), and
+ * `KeyboardInterrupt` is a direct `BaseException` subclass — so a cell's `except Exception` cannot
+ * swallow an abort (`crates/monty-types/src/exceptions.rs:411`). That is the semantics the rlm-wait
+ * map chose (`.scratch/rlm-wait/issues/06-how-an-abort-reaches-a-host-call.md`): the abort ends the
+ * cell, and the only way to keep running is to catch a `BaseException`, which code mode refuses
+ * anyway by rejecting every later call. The journal records the name, so a replay raises the same
+ * exception rather than a `RuntimeError`.
+ */
+export function aborted(who: string, waited: boolean): Error {
+	const error = new Error(
+		waited ? `aborted while waiting for ${who}(...)` : `this cell was aborted; ${who}(...) was not run`,
+	);
+	error.name = "KeyboardInterrupt";
+	return error;
+}

@@ -96,13 +96,17 @@ function createInstance(pi: any, publishEntry: boolean) {
 				properties: { code: { type: "string", description: "Python to run in the persistent kernel" } },
 				required: ["code"],
 			},
-			async execute(_toolCallId: unknown, params: { code: string }, _signal: unknown, onUpdate: any, ctx: any) {
+			async execute(_toolCallId: unknown, params: { code: string }, signal: unknown, onUpdate: any, ctx: any) {
 				const kernel = kernelFor(ctx);
 				if (!kernel) {
 					const problems = await sessions.get(keys.of(ctx))?.problems().catch(() => []);
 					return { content: [{ type: "text", text: noKernelText(problems ?? []) }], details: { failed: true } };
 				}
-				return kernel.execute(params, onUpdate, ctx);
+				// pi's third tool argument is the run's `AbortSignal` (`tools/edit.ts` uses it the same
+				// way). It reached this call all along and was dropped; now it reaches the host surface,
+				// where an abort ends the cell with a `KeyboardInterrupt` naming the call it was waiting
+				// on (`src/host.ts`, `abortable`).
+				return kernel.execute(params, onUpdate, ctx, signal as AbortSignal | undefined);
 			},
 		});
 	}

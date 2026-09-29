@@ -41,6 +41,17 @@ export interface Notice {
 	cancelled?: () => boolean;
 }
 
+/**
+ * One child of a join (rlm-wait ticket 01): the handle a `poll` would have returned, plus the answer
+ * when there is one to return. `answer` is present for a `done` child and absent for every other
+ * status — a running child has not answered yet, and a failed one's offer is its `reason` and its
+ * session file.
+ */
+export type WaitedChild = ChildHandle & { answer?: string };
+
+/** A join's patience, in seconds: the default the guideline names (`rlm.wait(names, timeout=180)`). */
+export const WAIT_DEFAULT_SECONDS = 180;
+
 export interface ChildKernelContext {
 	id: string;
 	name: string;
@@ -54,6 +65,8 @@ export interface ChildKernelContext {
 	list: () => ChildHandle[];
 	remove: (selector: string) => Promise<ChildHandle>;
 	send: (selector: string, text: string) => Promise<ChildHandle>;
+	/** Join: block until every named child is terminal or the patience runs out (ticket 03). */
+	wait: (selectors: string[], timeoutSeconds: number) => Promise<WaitedChild[]>;
 	findModels: (query?: string, limit?: number) => Promise<Array<Record<string, unknown>>>;
 }
 
@@ -338,6 +351,35 @@ function addUsage(into: CostTotals, usage: any): void {
 	into.entries += 1;
 }
 
+/**
+ * The child's answer (rlm-wait ticket 01): the text parts of the last entry whose message role is
+ * `assistant`, concatenated in their order, with thinking and tool-call parts excluded; if that entry
+ * carries no text, the previous assistant entry with one is used.
+ *
+ * The last assistant message rather than anything the child *sent*: a live probe found the child's
+ * final answer (`CHILD-ANSWER-42`) in its own transcript and **nowhere** in its parent's, while what
+ * the child sends with `agent_message.send` is already the parent's. `undefined` when the child never
+ * said anything in prose.
+ */
+export function answerOf(session: any): string | undefined {
+	const entries = sessionEntries(session);
+	for (let index = entries.length - 1; index >= 0; index -= 1) {
+		const message = entries[index]?.message;
+		if (message?.role !== "assistant") continue;
+		const content: unknown[] = Array.isArray(message.content) ? message.content : [];
+		const text = content
+			.filter((part): part is { type: string; text: string } => {
+				const candidate = part as { type?: unknown; text?: unknown } | null;
+				return candidate?.type === "text" && typeof candidate.text === "string";
+			})
+			.map((part) => part.text)
+			.join("")
+			.trim();
+		if (text) return text;
+	}
+	return undefined;
+}
+
 function sessionEntries(session: any): any[] {
 	try {
 		const entries: any[] = session?.sessionManager?.getEntries?.() ?? [];
@@ -454,7 +496,7 @@ async function runChildTurn(
 			`[${record.child_id} "${record.name}"] finished: ${record.status}${spent}`,
 			record.reason ? `— ${record.reason}` : "",
 			record.session_file ? `\nsession: ${record.session_file}` : "",
-			`\nRead the result with await rlm.poll("${record.child_id}") or the stored transcript (the session file is outside the workspace mount, so read it through await bash("cat …")).`,
+			`\nRead the result from the stored transcript (the session file is outside the workspace mount, so read it through await bash("cat …")); rlm.poll("${record.child_id}") returns status and usage only.`,
 		]
 			.filter(Boolean)
 			.join(" ");
@@ -515,15 +557,30 @@ export function createChildManager(deps: ChildManagerDeps) {
 	let counter = 0;
 
 	/**
+	 * The joins currently waiting. A wait registers its own check here and is called on every
+	 * transition — the same signal the status line rides — so a join wakes on the state change that
+	 * matters instead of polling for it.
+	 */
+	const waiters = new Set<() => void>();
+
+	/**
 	 * Every transition that changes how many children are working is announced, so the status line's
 	 * count is live rather than as stale as the last turn boundary. A footer must never break a child,
-	 * so a throwing listener is swallowed.
+	 * so a throwing listener is swallowed — and so is a throwing waiter: a join that is woken too early
+	 * simply checks again.
 	 */
 	function changed(): void {
 		try {
 			deps.onChange?.();
 		} catch {
 			/* the status line is not worth a child's turn */
+		}
+		for (const waiter of [...waiters]) {
+			try {
+				waiter();
+			} catch {
+				/* a waiter's own bookkeeping must not fail the transition that woke it */
+			}
 		}
 	}
 
@@ -576,10 +633,14 @@ export function createChildManager(deps: ChildManagerDeps) {
 			name: request.name,
 			depth: request.depth,
 			onMessage: (text) => {
+				// A child's message is **content, not status**, so nothing withdraws it (rlm-wait ticket
+				// 02). It used to carry the same `noticeRead` predicate as its completion notice, which
+				// made any read of the child — a poll, a join — cancel whatever the child had sent and the
+				// parent had not yet seen. The completion notice still withdraws on a read; this one never
+				// does, which is why it has no `cancelled` at all.
 				request.ownerDispatch({
 					key: `msg:${id}:${Date.now()}`,
 					content: `[${id} "${request.name}"] ${text}`,
-					cancelled: () => records.get(id)?.noticeRead === true,
 				});
 			},
 			spawn: (inner) =>
@@ -599,6 +660,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 			list,
 			remove,
 			send,
+			wait,
 			findModels: async (query, limit) => findModels(await deps.runtime(), query, limit),
 		};
 
@@ -745,12 +807,57 @@ export function createChildManager(deps: ChildManagerDeps) {
 		return handleOf(record);
 	}
 
+	/**
+	 * Join: block until every named child is terminal, or `timeoutSeconds` passes (rlm-wait tickets
+	 * 01-03).
+	 *
+	 * An unknown selector **refuses the whole call** — `find` throws, and a typo has to be loud rather
+	 * than a silently shorter list. A timeout is not a failure: whatever is already terminal is
+	 * returned, a child still running comes back with its status and no answer, and its completion
+	 * notice is untouched because `markNoticeReadIfFinished` only reads what has finished. Which is
+	 * also the rule this join obeys: reading a child its completion notice, never the messages it sent.
+	 */
+	async function wait(selectors: string[], timeoutSeconds: number): Promise<WaitedChild[]> {
+		const targets = selectors.map((selector) => find(selector));
+		if (targets.some((record) => record.status === "running")) {
+			await new Promise<void>((resolve) => {
+				let settled = false;
+				const finish = () => {
+					if (settled) return;
+					settled = true;
+					waiters.delete(check);
+					clearTimeout(timer);
+					resolve();
+				};
+				const check = () => {
+					if (targets.every((record) => record.status !== "running")) finish();
+				};
+				const timer = setTimeout(finish, Math.max(0, timeoutSeconds) * 1000);
+				waiters.add(check);
+				check();
+			});
+		}
+		for (const record of targets) markNoticeReadIfFinished(record);
+		// The footer's tree total has just moved if anything finished while we waited.
+		changed();
+		return targets.map((record) => {
+			const usage = usageOfRecord(record);
+			const answer = record.status === "done" ? answerOf(record.session) : undefined;
+			return {
+				...handleOf(record),
+				...(usage ? { usage } : {}),
+				...(answer ? { answer } : {}),
+			};
+		});
+	}
+
 	return {
 		spawn,
 		poll,
 		list,
 		remove,
 		send,
+		wait,
 
 		/** v2 ticket 07: every descendant's tokens, walked in-process. */
 		treeCost: () => treeTokens(deps.ownSessionFile?.()),
@@ -836,15 +943,25 @@ export async function findModels(runtime: any, query?: string, limit = 20): Prom
 }
 
 /**
- * The footer line rlm writes (`ctx.ui.setStatus("rlm", …)`): the kernel's state, and how many
- * children are working when there are any.
+ * The footer line rlm writes (`ctx.ui.setStatus("rlm", …)`): the kernel's state, how many children
+ * are working when there are any, and what the tree has spent when it has spent anything.
  *
  * `live` is `liveCount()` — every running record in this session's manager, which for a root is every
  * live descendant, grandchildren included. Zero is left unsaid rather than shown as `0`, because the
  * line is read every turn. Print mode's UI is a no-op, so a child's own instance may call this
  * harmlessly.
  */
-export function statusLine(mounted: boolean, live: number): string {
+export function statusLine(mounted: boolean, live: number, tokens?: number): string {
 	const kernel = mounted ? "rlm: code-mode (monty)" : "rlm: kernel unavailable";
-	return live > 0 ? `${kernel} ch: ${live} running` : kernel;
+	// The kernel's state and the count keep the exact shape they had: this line is read every turn, and
+	// the token field is an addition, not a reformatting.
+	const base = live > 0 ? `${kernel} ch: ${live} running` : kernel;
+	// The tree's total is the same number `rlm.tree_cost()` reports (`treeTokens`, one definition, two
+	// readers). Zero and unknown are left unsaid, exactly as the live count is.
+	return typeof tokens === "number" && tokens > 0 ? `${base} · ${compactTokens(tokens)} tok` : base;
+}
+
+/** Below a thousand the exact number, above it whole thousands: this is a footer, not a receipt. */
+function compactTokens(tokens: number): string {
+	return tokens < 1000 ? String(tokens) : `${Math.round(tokens / 1000)}k`;
 }

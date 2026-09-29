@@ -23,6 +23,9 @@ export const PRELUDE_TAIL = `class _Rlm:
     def poll(self, selector):
         return rlm_poll(selector)
 
+    def wait(self, names, timeout=180):
+        return rlm_wait(names, timeout)
+
     def list(self):
         return rlm_list()
 

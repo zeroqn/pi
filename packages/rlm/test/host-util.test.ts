@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import { delegationHostFns } from "../src/delegation";
+import { WAIT_DEFAULT_SECONDS } from "../src/children";
 import { bind } from "../src/host-util";
 
 /** `bind` is synchronous, so a refusal is caught rather than awaited. */
@@ -42,6 +43,7 @@ describe("bind", () => {
 
 describe("rlm.spawn, whose keywords the child manager never sees when one is misspelled", () => {
 	const spawns: { name?: string; prompt?: string }[] = [];
+	const waits: { selectors: string[]; seconds: number }[] = [];
 	const host = delegationHostFns({
 		manager: {
 			spawn: async (request: { name?: string; prompt?: string }) => {
@@ -53,12 +55,29 @@ describe("rlm.spawn, whose keywords the child manager never sees when one is mis
 			remove: () => null,
 			send: () => null,
 			treeCost: () => 0,
+			wait: async (selectors: string[], seconds: number) => {
+				waits.push({ selectors, seconds });
+				return [{ child_id: selectors[0] ?? "", status: "done" }] as never;
+			},
 		},
 		childContext: null,
 		ownDepth: 0,
 		sessionFile: () => undefined,
 		currentCell: () => "cell-1",
 		ownSurface: () => ["python"],
+	});
+
+	it("joins one name or a list of them, and defaults the patience to the guideline's number", async () => {
+		await host.rlm_wait("child-1");
+		expect(waits.at(-1)).toEqual({ selectors: ["child-1"], seconds: WAIT_DEFAULT_SECONDS });
+		await host.rlm_wait(["child-1", "child-2"], 5);
+		expect(waits.at(-1)).toEqual({ selectors: ["child-1", "child-2"], seconds: 5 });
+		// A list with nothing usable in it is a call that cannot mean anything, so it is refused
+		// rather than answered with an empty join.
+		await expect(host.rlm_wait([])).rejects.toThrow(/at least one child/);
+		await expect(host.rlm_wait(["", "  "])).rejects.toThrow(/at least one child/);
+		// And the typo rule reaches this call too.
+		await expect(host.rlm_wait({ name: "child-1" })).rejects.toThrow(/rlm\.wait has no parameter "name"/);
 	});
 
 	it("refuses the typo before the manager is reached, and spawns on the right spelling", async () => {

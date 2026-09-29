@@ -19,6 +19,7 @@ import { run, spill, truncate } from "./output";
 import { SHELL } from "./shell";
 import { bool, num, str } from "./util";
 import {
+	aborted,
 	type FindQuery,
 	type GrepQuery,
 	type Guard,
@@ -304,6 +305,51 @@ export function guarded(host: HostFns, guard?: Guard): HostFns {
 	return wrapped;
 }
 
+/**
+ * The abort gate: the same surface, refused once the turn is cancelled.
+ *
+ * Two rules, one exception. A call offered **after** the abort never runs. A call already in flight
+ * is left to finish *in the host* but no longer holds the cell: the promise the sandbox is waiting on
+ * rejects with the abort, monty resumes that suspension with it, and the cell ends in a
+ * `KeyboardInterrupt` naming the call. The abandoned work is exactly that — abandoned, not cancelled
+ * (`bash` keeps running, a child keeps working); that is the tradeoff
+ * `.scratch/rlm-wait/issues/06-…` decided, and the reason the kernel survives it.
+ *
+ * With no signal the surface is returned **unchanged**, not copied: a session whose tool call
+ * carried none behaves exactly as it did before this existed. `.name` is preserved for the same
+ * reason `guarded` preserves it: monty identifies a host function by it, and a wrapper named
+ * `<anonymous>` binds as nothing.
+ */
+export function abortable(host: HostFns, signal?: AbortSignal): HostFns {
+	if (!signal) return host;
+	const wrapped: HostFns = {};
+	for (const [name, fn] of Object.entries(host)) {
+		const wrapper = (...args: unknown[]): Promise<unknown> => {
+			if (signal.aborted) return Promise.reject(aborted(name, false));
+			let rejectAbort: (error: unknown) => void = () => {};
+			const cancelled = new Promise<never>((_resolve, reject) => {
+				rejectAbort = reject;
+			});
+			const onAbort = () => rejectAbort(aborted(name, true));
+			signal.addEventListener("abort", onAbort, { once: true });
+			let work: Promise<unknown>;
+			try {
+				work = Promise.resolve(fn(...args));
+			} catch (error) {
+				signal.removeEventListener("abort", onAbort);
+				return Promise.reject(error);
+			}
+			// The loser of the race is not ours to report: a call abandoned at the abort must not
+			// surface later as an unhandled rejection.
+			work.catch(() => {});
+			return Promise.race([work, cancelled]).finally(() => signal.removeEventListener("abort", onAbort));
+		};
+		Object.defineProperty(wrapper, "name", { value: name });
+		wrapped[name] = wrapper;
+	}
+	return wrapped;
+}
+
 export function makeHost(options: {
 	root: string;
 	attachments: Attachment[];
@@ -316,8 +362,11 @@ export function makeHost(options: {
 	/** What answers `grep`/`find` before rg/fd, when the session declared an engine
 	 * (`fff-search` ticket 05). Absent is the ordinary state, and leaves both primitives as they were. */
 	engine?: SearchEngine;
+	/** pi's own signal for the tool call that is running this cell (`rlm-wait` ticket 06). Absent
+	 * when the host passed none, which leaves every function exactly as it was. */
+	signal?: AbortSignal;
 }): HostFns {
-	const { root, attachments, progress, extra, background: backgroundManager, guard, engine } = options;
+	const { root, attachments, progress, extra, background: backgroundManager, guard, engine, signal } = options;
 	const base: HostFns = {
 		async bash_host(...args: unknown[]) {
 			const { command, timeout, background } = bind(args, ["command", "timeout", "background"], "bash");
@@ -435,5 +484,7 @@ export function makeHost(options: {
 
 	};
 	// Contributed names win over base ones (ticket 01), and both halves are gated before they run.
-	return { ...guarded(base, guard), ...guarded(extra, guard) };
+	// The abort gate is outermost of the three: a cancelled turn is refused before the policy is even
+	// asked, which is the order `readonly-guard`'s question ("may this call run") implies.
+	return abortable({ ...guarded(base, guard), ...guarded(extra, guard) }, signal);
 }

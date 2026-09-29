@@ -28,6 +28,7 @@ describe("the delegation prelude", () => {
 		for (const name of [
 			"class _Rlm",
 			"def spawn",
+			"def wait",
 			"rlm = _Rlm()",
 			"class _AgentMessage",
 			"agent_message = _AgentMessage()",
@@ -81,6 +82,11 @@ describe.skipIf(!montyReady)("the delegation prelude in a real kernel", () => {
 
 			const listed = await run("len(await rlm.list())", { rlm_list: async () => [{ child_id: "child-1" }] });
 			expect(listed).toBe(1);
+
+			const joined = await run('rows = await rlm.wait(["child-1"], timeout=5)\nrows[0]["status"]', {
+				rlm_wait: async () => [{ child_id: "child-1", status: "done", answer: "did it" }],
+			});
+			expect(joined).toBe("done");
 
 			const sent = await run('m = await agent_message.send("hello", receiver_role="parent")\nm["to"]', {
 				agent_message_send: async () => ({ sent: true, to: "parent" }),

@@ -19,6 +19,17 @@ export const capturedSessionOptions: any[] = [];
 /** Every option bag given to `DefaultResourceLoader` — where a child's appended prompt is decided. */
 export const capturedLoaderOptions: any[] = [];
 
+/**
+ * What a spawned child's session reports as its entries. A child's *answer* is read from exactly this
+ * source (rlm-wait ticket 01), so a test that wants a join to find one seeds it here.
+ */
+export let childEntries: unknown[] = [];
+
+/** Seed the entries the next spawned child's session reports. */
+export function setChildEntries(entries: unknown[]): void {
+	childEntries = entries;
+}
+
 let releaseTurn: (() => void) | null = null;
 
 /** A turn that blocks until `releaseTurnNow()`, so "still running" is controllable. */
@@ -71,6 +82,7 @@ export function installFakePi(): void {
 				session: {
 					sessionFile: "/tmp/child.jsonl",
 					model: null,
+					sessionManager: { getEntries: () => childEntries },
 					bindExtensions: async () => {},
 					prompt: () => turnBehavior(),
 					followUp: async () => {},

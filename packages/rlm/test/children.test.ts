@@ -21,6 +21,7 @@ import {
 	holdTurn,
 	installFakePi,
 	releaseTurnNow,
+	setChildEntries,
 	setTurnBehavior,
 } from "./fake-pi";
 import {
@@ -32,6 +33,7 @@ import {
 	deriveDepth,
 	foldSessionCost,
 	forgetManagerViews,
+	answerOf,
 	markNoticeReadIfFinished,
 	readChildProvenance,
 	childPromptFor,
@@ -249,10 +251,16 @@ installFakePi();
 
 function managerHarness(onChange?: () => void) {
 	const notices: Notice[] = [];
+	// The child's own kernel context, captured as a spawn builds it: it is the channel the child's
+	// kernel reaches its parent through, `agent_message.send` included.
+	let childContext: any = null;
 	const manager = createChildManager({
 		cwd: () => "/tmp/work",
 		ownSessionFile: () => "/tmp/parent.jsonl",
-		kernelFactoryFor: () => () => {},
+		kernelFactoryFor: (child) => {
+			childContext = child;
+			return () => {};
+		},
 		runtime: async () => ({}),
 		maxDepth: 2,
 		maxLive: 8,
@@ -261,6 +269,7 @@ function managerHarness(onChange?: () => void) {
 	return {
 		manager,
 		notices,
+		child: () => childContext,
 		spawn: (name = "probe") =>
 			manager.spawn({
 				prompt: "go",
@@ -570,5 +579,149 @@ describe("disposing a child session", () => {
 		await disposeChildSession({ dispose: () => disposed.push("disposed") });
 		expect(disposed).toEqual(["disposed"]);
 		await disposeChildSession(undefined);
+	});
+});
+
+/* ------------------------------------------------------------------ *
+ * The join (rlm-wait tickets 01-04)
+ * ------------------------------------------------------------------ */
+
+describe("the answer a join reads (rlm-wait ticket 01)", () => {
+	const session = (entries: unknown[]) => ({ sessionManager: managerWithEntries(entries) });
+
+	it("takes the last assistant text, without its thinking or its tool calls", () => {
+		const found = answerOf(
+			session([
+				{ id: "a", type: "message", message: { role: "assistant", content: [{ type: "text", text: "first" }] } },
+				{ id: "b", type: "message", message: { role: "user", content: [{ type: "text", text: "again" }] } },
+				{
+					id: "c",
+					type: "message",
+					message: {
+						role: "assistant",
+						content: [
+							{ type: "thinking", thinking: "hmm" },
+							{ type: "toolCall", name: "bash", arguments: {} },
+							{ type: "text", text: "the " },
+							{ type: "text", text: "answer" },
+						],
+					},
+				},
+			]),
+		);
+		expect(found).toBe("the answer");
+	});
+
+	it("walks back past an assistant turn that said nothing", () => {
+		// A child can end a turn on a tool call with no prose; the answer is then whatever it said
+		// last, which is not the same as no answer.
+		expect(
+			answerOf(
+				session([
+					{ id: "a", type: "message", message: { role: "assistant", content: [{ type: "text", text: "spoke" }] } },
+					{ id: "b", type: "message", message: { role: "assistant", content: [{ type: "toolCall", name: "x" }] } },
+				]),
+			),
+		).toBe("spoke");
+	});
+
+	it("returns nothing when the child never spoke, or has no session", () => {
+		expect(answerOf(session([{ id: "a", type: "message", message: { role: "user", content: [{ type: "text", text: "hi" }] } }]))).toBeUndefined();
+		expect(answerOf(session([]))).toBeUndefined();
+		expect(answerOf(null)).toBeUndefined();
+	});
+});
+
+describe("the join (rlm-wait tickets 01-03)", () => {
+	beforeEach(() => {
+		holdTurn();
+		setChildEntries([]);
+	});
+
+	it("returns a finished child's answer, its usage and its status", async () => {
+		const h = managerHarness();
+		setChildEntries([
+			{
+				id: "a",
+				type: "message",
+				message: { role: "assistant", content: [{ type: "thinking", thinking: "…" }], usage: { input: 10, output: 5, total: 15 } },
+			},
+			{ id: "b", type: "message", message: { role: "assistant", content: [{ type: "text", text: "the answer" }] } },
+		]);
+		const handle = await h.spawn();
+		h.release();
+		await settle();
+
+		const records = await h.manager.wait([handle.child_id], 5);
+		expect(records).toHaveLength(1);
+		expect(records[0]!.child_id).toBe(handle.child_id);
+		expect(records[0]!.name).toBe("probe");
+		expect(records[0]!.status).toBe("done");
+		expect(records[0]!.answer).toBe("the answer");
+		expect(records[0]!.usage?.total_tokens).toBe(15);
+		// The join read the child, so the completion notice it would have sent is withdrawn...
+		expect(h.notices).toHaveLength(1);
+		expect(h.notices[0]!.cancelled?.()).toBe(true);
+	});
+
+	it("wakes on the transition, not on its deadline", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		const started = Date.now();
+		const waiting = h.manager.wait([handle.child_id], 30);
+		setTimeout(() => h.release(), 20);
+		const records = await waiting;
+		expect(records[0]!.status).toBe("done");
+		expect(Date.now() - started).toBeLessThan(5_000);
+	});
+
+	it("returns a running child with no answer when the patience runs out, and leaves its notice alone", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		const started = Date.now();
+		const records = await h.manager.wait([handle.child_id], 0.05);
+		expect(Date.now() - started).toBeGreaterThanOrEqual(40);
+		expect(records[0]!.status).toBe("running");
+		expect(records[0]!.answer).toBeUndefined();
+
+		// A timed-out join is a status read: the child that finishes afterwards still notifies.
+		h.release();
+		await settle();
+		expect(h.notices).toHaveLength(1);
+		expect(h.notices[0]!.cancelled?.()).toBe(false);
+	});
+
+	it("refuses the call when a selector matches nothing, rather than returning a shorter list", async () => {
+		const h = managerHarness();
+		await expect(h.manager.wait(["child-9"], 1)).rejects.toThrow(/no child matches "child-9"/);
+	});
+
+	it("never withdraws a child's own message, even after the child was read", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		h.child().onMessage("a progress note");
+		h.release();
+		await settle();
+		const message = h.notices.find((notice) => notice.key.startsWith("msg:"));
+		const completed = h.notices.find((notice) => notice.key.startsWith("done:"));
+		expect(message).toBeDefined();
+		expect(completed).toBeDefined();
+
+		// Reading the child — a poll or a join, the same flag either way — withdraws its *status*
+		// notice. What it sent is content, and content is never withdrawn (ticket 02).
+		h.manager.poll(handle.child_id);
+		expect(completed!.cancelled?.()).toBe(true);
+		expect(message!.cancelled).toBeUndefined();
+	});
+});
+
+describe("the footer's tree total (rlm-wait ticket 04)", () => {
+	it("appends the tokens when there are any, and leaves the line alone when there are none", () => {
+		expect(statusLine(true, 0, 0)).toBe("rlm: code-mode (monty)");
+		expect(statusLine(true, 0, undefined)).toBe("rlm: code-mode (monty)");
+		expect(statusLine(true, 2, 141_400)).toBe("rlm: code-mode (monty) ch: 2 running · 141k tok");
+		expect(statusLine(true, 0, 2_381)).toBe("rlm: code-mode (monty) · 2k tok");
+		expect(statusLine(true, 0, 999)).toBe("rlm: code-mode (monty) · 999 tok");
+		expect(statusLine(false, 1, 400)).toBe("rlm: kernel unavailable ch: 1 running · 400 tok");
 	});
 });

@@ -31,6 +31,7 @@ import {
 	readChildProvenance,
 	resolveOwnDepth,
 	statusLine,
+	treeTokens,
 } from "./src/children";
 import type { ChildKernelContext, Notice } from "./src/children";
 import { loadRlmConfig } from "./src/config";
@@ -159,7 +160,14 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 		try {
 			const record = sessionRecord(sessionKey(ctx));
 			if (!record) return;
-			ctx?.ui?.setStatus?.("rlm", statusLine(record.mounted, manager?.liveCount() ?? 0));
+			// The tree's total is `treeTokens`, the same function `rlm.tree_cost` answers with, so the
+			// footer and the tool can never disagree (rlm-wait ticket 04). A child has no manager of its
+			// own, so it reads the tree from its own session file — the registry is process-wide and the
+			// number is the same one its spawner's footer shows for this subtree.
+			const tokens = manager
+				? manager.treeCost()
+				: treeTokens(ctx?.sessionManager?.getSessionFile?.() ?? undefined);
+			ctx?.ui?.setStatus?.("rlm", statusLine(record.mounted, manager?.liveCount() ?? 0, tokens));
 		} catch {
 			/* no UI in this mode */
 		}

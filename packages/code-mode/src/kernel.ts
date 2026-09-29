@@ -164,8 +164,13 @@ type MontyPool = Awaited<ReturnType<typeof MontyModule.Monty.create>>;
 
 /** What the entry needs from a mounted kernel, beyond `KernelHandleCore`. */
 export type Kernel = KernelHandleCore & {
-	/** The tool body. `ctx` comes from the tool call, as it always did. */
-	execute: (params: { code: string }, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+	/** The tool body. `ctx` comes from the tool call, as it always did; `signal` too, when pi gave one. */
+	execute: (
+		params: { code: string },
+		onUpdate: unknown,
+		ctx: unknown,
+		signal?: AbortSignal,
+	) => Promise<unknown>;
 	/** The kernel's own `session_start` work: background records restored read-only, then
 	 * the preflight. Returns the problems, which the entry reports (ticket 03, C7). */
 	startSession: (ctx: unknown) => Promise<string[]>;
@@ -964,7 +969,12 @@ export function createKernel(options: {
 		return problemsPromise;
 	}
 
-	async function execute(params: { code: string }, onUpdate: any, ctx: any): Promise<unknown> {
+	/**
+	 * `signal` is pi's own for this tool call. It reaches the host surface and nowhere else: code mode
+	 * owns no cancellation of its own, and the abort is expressed as a host call that raises
+	 * (`abortable`, `host.ts`) — see `.scratch/rlm-wait/issues/06-how-an-abort-reaches-a-host-call.md`.
+	 */
+	async function execute(params: { code: string }, onUpdate: any, ctx: any, signal?: AbortSignal): Promise<unknown> {
 		attachments = [];
 		cellRunning = true;
 		try {
@@ -1012,6 +1022,8 @@ export function createKernel(options: {
 					// The session's engine, if any owner declared one: `grep`/`find` try it first and fall
 					// back to rg/fd (fff-search ticket 05).
 					engine: ledger.search(),
+					// This tool call's own signal, when pi passed one (rlm-wait ticket 06).
+					signal,
 				});
 				const feedOptions = {
 					mount: [resolved.mount, scratchMount],

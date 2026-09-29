@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { recordSession, type SessionRecord, sessionKey } from "../../host-bridge/src/convention";
 import { createRlm } from "../index";
 import type { RlmSessionDeps } from "../src/registration";
-import { holdTurn, installFakePi, releaseTurnNow } from "./fake-pi";
+import { holdTurn, installFakePi, releaseTurnNow, setChildEntries } from "./fake-pi";
 
 installFakePi();
 
@@ -104,6 +104,33 @@ describe("the footer line", () => {
 		await settle();
 		expect(statuses.at(-1)).toEqual(["rlm", "rlm: code-mode (monty)"]);
 
+		await pi.emit("session_shutdown", { reason: "quit" }, ctx);
+	});
+
+	it("surfaces the tree's tokens from the same function rlm.tree_cost answers with", async () => {
+		const statuses: Array<[string, string]> = [];
+		const ctx = fakeCtx(statuses, "/tmp/rlm-status-cost.jsonl");
+		record("/tmp/rlm-status-cost.jsonl", true);
+		setChildEntries([
+			{
+				id: "a",
+				type: "message",
+				message: { role: "assistant", content: [{ type: "text", text: "done" }], usage: { input: 141_000, output: 400, total: 141_400 } },
+			},
+		]);
+
+		const pi = fakePi();
+		createRlm(pi, null);
+		await pi.emit("session_start", { reason: "startup" }, ctx);
+		const deps = sessionDeps(ctx);
+		if (!deps?.manager) throw new Error("the session filed no manager");
+		await deps.manager.spawn({ prompt: "go", name: "probe", depth: 1, spawnCell: "", ownerDispatch: () => {} });
+		releaseTurnNow();
+		await settle();
+
+		expect(statuses.at(-1)).toEqual(["rlm", "rlm: code-mode (monty) · 141k tok"]);
+		// One function, two readers: the footer cannot disagree with `rlm.tree_cost()`.
+		expect(deps.manager.treeCost()).toBe(141_400);
 		await pi.emit("session_shutdown", { reason: "quit" }, ctx);
 	});
 

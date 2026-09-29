@@ -7,14 +7,23 @@
  * file adds is everything that routes to a child session, at the root (through the child
  * manager) or inside a child (through the `ChildKernelContext` its spawner handed it).
  */
-import { findModels, modelRuntime } from "./children";
+import { WAIT_DEFAULT_SECONDS, findModels, modelRuntime } from "./children";
 import type { ChildHandle, ChildKernelContext } from "./children";
 import { bind } from "./host-util";
 import { num, str } from "./util";
 
 export type DelegationDeps = {
 	/** The root's child manager, or null inside a child. */
-	manager: { spawn: (request: any) => Promise<ChildHandle>; poll: (selector: string) => any; list: () => any; remove: (selector: string) => any; send: (selector: string, text: string) => any; treeCost: () => number } | null;
+	manager: {
+		spawn: (request: any) => Promise<ChildHandle>;
+		poll: (selector: string) => any;
+		list: () => any;
+		remove: (selector: string) => any;
+		send: (selector: string, text: string) => any;
+		treeCost: () => number;
+		/** The join (rlm-wait ticket 01): resolve, then wait for terminal or for the patience to run out. */
+		wait: (selectors: string[], timeoutSeconds: number) => Promise<any[]>;
+	} | null;
 	/** Present inside a child: this is which parent the delegation calls reach. */
 	childContext: ChildKernelContext | null;
 	/** Absolute durable depth of this session, so a child spawns one level deeper. */
@@ -87,6 +96,25 @@ export function delegationHostFns(deps: DelegationDeps): Record<string, (...args
 			return deps.childContext
 				? deps.childContext.send(str(selector), str(text))
 				: deps.manager!.send(str(selector), str(text));
+		},
+		async rlm_wait(...args: unknown[]) {
+			const { names, timeout } = bind(args, ["names", "timeout"], "rlm.wait");
+			// One name or a list of them; a string is the ordinary case and a list is the fan-out. Names
+			// are trimmed the way `rlm.spawn` trims the label it creates, so a name that is only
+			// whitespace selects nothing rather than selecting something surprising.
+			const selectors = Array.isArray(names)
+				? names.map((name) => str(name).trim()).filter((name) => name.length > 0)
+				: str(names).trim()
+					? [str(names).trim()]
+					: [];
+			if (selectors.length === 0) throw new Error("rlm.wait needs at least one child id or name");
+			const seconds = timeout === null || timeout === undefined ? WAIT_DEFAULT_SECONDS : num(timeout, WAIT_DEFAULT_SECONDS);
+			// A child joins through the same manager its `poll` reads (rlm-wait ticket 01): selectors
+			// resolve in the manager the caller can see, so a root reaches any live descendant — a
+			// grandchild included, since the registry lives in the root.
+			return deps.childContext
+				? deps.childContext.wait(selectors, seconds)
+				: deps.manager!.wait(selectors, seconds);
 		},
 		async rlm_find_models(...args: unknown[]) {
 			const { query, limit } = bind(args, ["query", "limit"], "find_models");

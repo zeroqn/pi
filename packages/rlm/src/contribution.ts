@@ -22,9 +22,16 @@ import { PRELUDE_TAIL } from "./prelude-rlm";
 /** The snippet's last words, verbatim: code mode's half stops where these begin. */
 export const SNIPPET_CONNECTOR = " and delegation";
 
-/** Guideline 7 of the pre-split array, verbatim (see the baseline's hashes). */
+/**
+ * Guideline 7 of the pre-split array, plus the join sentence (amended 2026-09-29, `.scratch/rlm-wait`
+ * ticket 05: every promise in that last sentence is a decision that map made — it blocks the cell, it
+ * defaults to 180 seconds, it returns status/tokens/the final answer, and the children it read stop
+ * notifying). The base surface's own hashes do not move: this is rlm's contribution, and
+ * `test/surface.test.ts` pins the base's three. What moves is the composed rlm guideline hash in
+ * `.scratch/code-mode/acceptance-baseline.md`.
+ */
 export const RLM_GUIDELINE =
-	"Use await rlm.spawn(name=..., prompt=...) for work worth doing in parallel or in a cleaner context, then end the turn: the child's answer arrives as a message, and rlm.poll(id) reads its status. rlm.list() shows the children and their tokens; rlm.tree_cost() totals what the whole tree has spent.";
+	"Use await rlm.spawn(name=..., prompt=...) for work worth doing in parallel or in a cleaner context, then end the turn: the child's answer arrives as a message, and rlm.poll(id) reads its status. Use await rlm.wait(names, timeout=180) when the next step needs every child's answer before it can start: it blocks this cell until they are done (or the timeout fires) and returns each child's status, tokens and final answer, and those children stop notifying you. rlm.list() shows the children and their tokens; rlm.tree_cost() totals what the whole tree has spent.";
 
 export type ProvenanceInputs = {
 	startReason?: string;
