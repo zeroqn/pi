@@ -17,7 +17,11 @@
  * check 14; the package's own `test/prelude.test.ts` always awaited them). Then the data-plane amendment of 2026-09-29 — the description and the fifth guideline said reading many
  * files was *slow* through the kernel and to prefer `await bash("...")`, which was measured on monty 0.0.23
  * (48 ms/file) and is false on 1.0.0 (2.03 ms/file in-process, 2.08 ms/file live) — see
- * `.scratch/code-mode/datapath-1.0.md`.
+ * `.scratch/code-mode/datapath-1.0.md`. Then the os-subset amendment of 2026-09-29: the description
+ * advertises `os` and `pathlib` as present modules with no intra-module caveat, so a cell's first
+ * move on a tree is `os.path.isdir`/`os.walk` — both absent from monty's curated `os` (measured
+ * live) — and guideline 9 now names them and the replacements. That is a post-split line, so only
+ * the whole-array hash moved.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -46,7 +50,7 @@ describe("the base surface (acceptance check 2)", () => {
 	// because they are what the model reads -- a cell that never sees them reaches for bash.
 	it("carries the three added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(9);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("7e4915a8e768ca02aa288c545a45b25495cd755af9bf5e4b4445b892bf60d2c0");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("0db2a51a4da9e705a10ef03d47449fd2098123e7dd78b02690b437552b8d3917");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, list a directory with");
