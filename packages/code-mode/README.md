@@ -144,6 +144,10 @@ contract violations that must fail a test rather than reach a session.
 
 ## Known limitations
 
+- **A cell sleeps in the sandbox, and the sleep is honoured.** `time.sleep`/`asyncio.sleep` run as
+  monty system sleeps with `sleepSystemMax` lifted (`CHECKOUT_OS_POLICY`), so `time.sleep(15)` waits
+  15s rather than monty's silent 10s default. Each sleep is still one host round-trip — one
+  suspension against the budget — so a tight sleep-poll loop is a budget matter, not a free wait.
 - **A one-shot run cannot outlive a child it spawns.** Inherent to `pi -p`, not to the kernel.
 - **monty hands a Python dict back as a JS `Map`.** `JSON.stringify(new Map())` is `{}`, so the
   `# => ...` line is rendered by `src/render.ts`, which converts Maps, Sets and BigInts. Without it,

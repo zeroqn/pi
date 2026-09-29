@@ -55,6 +55,20 @@ export const ROTATE_BACKOFF = Math.max(1, Math.floor((MAX_SUSPENSIONS - ROTATE_A
 export const ROTATE_FAILURE_CAP = 3;
 /** Every checkout, so the limits are stated once. */
 export const CHECKOUT_LIMITS = { maxMemory: 1_000_000_000, maxSuspensions: MAX_SUSPENSIONS };
+/**
+ * monty 1.0's sleep policy, stated here for the reason the limits are: there is one fact.
+ *
+ * `time.sleep`/`asyncio.sleep` in a cell are **system** sleeps the pool worker performs, and
+ * monty's default `sleepSystemMax` is 10 seconds and *silently truncates*: measured against the
+ * pinned worker, `time.sleep(15)` returns in 10.0s with no error, which turns a wait the model
+ * asked for into a shorter one it cannot see. `Infinity` lifts the cap (monty's own encoding
+ * accepts it), so a cell waits as long as it asked.
+ *
+ * A sleep is still a host round trip, so each one is one suspension against
+ * {@link MAX_SUSPENSIONS} — the same cost as any other call, and the reason a tight
+ * `sleep`-poll loop is a budget matter rather than a free wait.
+ */
+export const CHECKOUT_OS_POLICY = { sleepSystemMax: Number.POSITIVE_INFINITY };
 const MAX_LIVE_BACKGROUND = 8;
 
 /**
@@ -263,6 +277,7 @@ export function createKernel(options: {
 	const { pi, ledger } = options;
 	const maxSuspensions = options.limits?.maxSuspensions ?? MAX_SUSPENSIONS;
 	const checkoutLimits = { maxMemory: options.limits?.maxMemory ?? CHECKOUT_LIMITS.maxMemory, maxSuspensions };
+	const checkoutOptions = { limits: checkoutLimits, osPolicy: CHECKOUT_OS_POLICY };
 	const rotateAt = rotateAtFor(maxSuspensions);
 	const rotateBackoff = Math.max(1, Math.floor((maxSuspensions - rotateAt) / 8));
 	let pool: MontyPool | null = null;
@@ -459,7 +474,7 @@ export function createKernel(options: {
 		mkdirSync(scratch, { recursive: true });
 		const started = await monty.Monty.create();
 		pool = started;
-		session = await started.checkout({ limits: checkoutLimits });
+		session = await started.checkout(checkoutOptions);
 		root = cwd;
 		scratchMount = new monty.MountDir({ hostPath: scratch, virtualPath: scratch, mode: "read-write" });
 		// The workspace's mode is the guard's answer, and a mount that cannot be made is a **start**
@@ -488,7 +503,7 @@ export function createKernel(options: {
 	 */
 	async function replaceSession(): Promise<void> {
 		const previous = session;
-		session = await pool!.checkout({ limits: checkoutLimits });
+		session = await pool!.checkout(checkoutOptions);
 		try {
 			await previous?.close();
 		} catch {
@@ -579,7 +594,7 @@ export function createKernel(options: {
 	 */
 	async function rotateKernel(snap: any, feedOptions: any): Promise<any> {
 		const bytes = await snap.dump();
-		const next = await pool!.checkout({ limits: checkoutLimits });
+		const next = await pool!.checkout(checkoutOptions);
 		let resumed: any;
 		try {
 			resumed = await next.loadSnapshot(bytes, feedOptions);
@@ -693,7 +708,7 @@ export function createKernel(options: {
 	async function recoverFromAbort(): Promise<string | null> {
 		try {
 			const bytes = await session!.dump();
-			const next = await pool!.checkout({ limits: checkoutLimits });
+			const next = await pool!.checkout(checkoutOptions);
 			await next.loadSession(bytes);
 			const previous = session;
 			session = next;
