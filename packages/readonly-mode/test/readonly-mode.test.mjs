@@ -937,3 +937,33 @@ test("a kernel that mounted and refused this contribution is caught too", async 
 		/not enforced in this session/,
 	);
 });
+
+test("the inventory waits for the record rather than spending its one chance on nothing", async () => {
+	// The record is written by another extension's `session_start`, so a turn boundary that arrives
+	// before it must not consume the once-per-session token: that would silence the list for the
+	// session's whole life, which is the shape of a check that never runs.
+	const h = load();
+	await toggleOn(h);
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.deepEqual(h.appended.filter((entry) => entry.type === "readonly-mode-inventory"), []);
+
+	recordSession(sessionKey(h.ctx), {
+		mounted: true,
+		owners: ["readonly-mode", "rlm"],
+		installed: ["rlm_spawn", "brand_new_thing"],
+		reaches: [],
+		promptTexts: [],
+		problems: [],
+	});
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.ok(
+		h.notifications.some((n) => /brand_new_thing is contributed/.test(n)),
+		"the record arriving late still gets the list asked about",
+	);
+	assert.equal(h.appended.filter((entry) => entry.type === "readonly-mode-inventory").length, 1);
+
+	// And having been asked, it is still once.
+	const before = h.notifications.length;
+	await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.equal(h.notifications.length, before);
+});

@@ -347,7 +347,7 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 	}
 	/** Sessions the seam told us are roots: the inventory check's stale half is only sound there. */
 	const roots = new Set<string>();
-	/** Sessions the inventory has already been checked for, so the notice is said once. */
+	/** Sessions the inventory has been *asked about* — a record that was not there yet does not count. */
 	const checked = new Set<string>();
 	/** Session keys whose missing guard has already been reported, so one broken session says so once. */
 	const guardReported = new Set<string>();
@@ -743,7 +743,11 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 		// Once per session, and only while the mode is on: the list matters exactly when it is being
 		// used, and a session that never turns the mode on is not the one paying for a notice.
 		const key = sessionKey(ctx);
-		if (!checked.has(key)) {
+		// Once per session, and only once there is a record to ask about. The seam writes a session's
+		// record when it composes the kernel — another extension's `session_start`, so before this
+		// boundary in every order observed — but a once-token spent before that would silence the
+		// inventory for the session's whole life, which is how a check turns into a formality.
+		if (!checked.has(key) && sessionRecord(key)?.mounted === true) {
 			checked.add(key);
 			checkInventory(key, ctx);
 		}
