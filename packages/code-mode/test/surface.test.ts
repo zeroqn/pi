@@ -14,7 +14,10 @@
  * background-handle amendment of 2026-09-29 — `h.poll()`, `h.output()` and `h.kill()` are host
  * calls and return coroutines, so the description that showed them unawaited taught a model to
  * print `<coroutine external_future(N)>` where a status belongs (measured live, `.scratch/mc-0441`
- * check 14; the package's own `test/prelude.test.ts` always awaited them).
+ * check 14; the package's own `test/prelude.test.ts` always awaited them). Then the data-plane amendment of 2026-09-29 — the description and the fifth guideline said reading many
+ * files was *slow* through the kernel and to prefer `await bash("...")`, which was measured on monty 0.0.23
+ * (48 ms/file) and is false on 1.0.0 (2.03 ms/file in-process, 2.08 ms/file live) — see
+ * `.scratch/code-mode/datapath-1.0.md`.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -24,7 +27,7 @@ const sha = (text: string) => createHash("sha256").update(text, "utf8").digest("
 
 describe("the base surface (acceptance check 2)", () => {
 	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.0", () => {
-		expect(sha(BASE_DESCRIPTION)).toBe("8533819093f8a55787fa1a0255dd825236d0c85a6198e79472e1b5c0b1f1c9b3");
+		expect(sha(BASE_DESCRIPTION)).toBe("c1c17e4b434e82c101250b8e45fa868cea91884b82f645215df68f7ca0a4c860");
 		expect(BASE_DESCRIPTION).not.toContain("rlm.spawn");
 		expect(BASE_DESCRIPTION).not.toContain("agent_message");
 	});
@@ -34,7 +37,7 @@ describe("the base surface (acceptance check 2)", () => {
 	});
 
 	it("keeps the first six guidelines, in order (as of the monty-1.0 amendment)", () => {
-		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("60b6fbfc45add00c0d1b9c0b8118203db74e1efc55c8e9ea6dd14ff4a3912085");
+		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("1a28fd779b188959175357a459bb8ef778d574b14f0e8e8e4763283bfded61f3");
 		expect(BASE_GUIDELINES[0]).toStartWith("Use python for work that is stateful");
 	});
 
@@ -43,7 +46,7 @@ describe("the base surface (acceptance check 2)", () => {
 	// because they are what the model reads -- a cell that never sees them reaches for bash.
 	it("carries the three added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(9);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("a724eb3229dcac244a45ceed3534afa2b0b45d23c4708e13435f20de2a371218");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("7e4915a8e768ca02aa288c545a45b25495cd755af9bf5e4b4445b892bf60d2c0");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, list a directory with");
