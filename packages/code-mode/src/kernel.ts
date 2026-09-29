@@ -10,7 +10,7 @@
  */
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type * as MontyModule from "@pydantic/monty/node";
 import { createBackgroundManager } from "./background";
@@ -197,14 +197,36 @@ export function sessionFilePath(ctx: any): string | undefined {
  * whose host directories nest ("overlapping mounts cannot both be registered" —
  * `limitations/filesystem.md`, because the stricter mount's mode could be bypassed through the
  * other's spelling), and a session file inside the workspace puts a read-write scratch inside the
- * workspace mount. The temp-dir fallback is keyed by the session file, not the process, so a
- * resume finds the same one.
+ * workspace mount. The fallback is keyed by the session file, not the process, so a resume finds
+ * the same one.
  */
 export function scratchPathFor(sessionFile: string, root: string): string {
 	const beside = `${sessionFile}.scratch`;
 	if (!nestsWith(beside, root)) return beside;
-	const key = createHash("sha256").update(beside).digest("hex").slice(0, 16);
-	return join(tmpdir(), "pi-code-mode-scratch", key);
+	return scratchOutside(createHash("sha256").update(beside).digest("hex").slice(0, 16), root);
+}
+
+/**
+ * A scratch directory outside `root`, under a name derived from `key`.
+ *
+ * The temp dir is the obvious home, but it is not necessarily outside the workspace: a repo-local
+ * `TMPDIR` — direnv, a container, a build shell, or a hand-set one — puts the escape hatch inside
+ * the very mount it is escaping, and then *both* mounts nest and no cell can run at all. Home is
+ * the next place that is normally outside a project; if even that nests, say so, because the fix is
+ * the caller's to make and monty's own message ("overlapping mounts cannot both be registered")
+ * does not name it.
+ */
+function scratchOutside(key: string, root: string): string {
+	const bases = [tmpdir(), join(homedir(), ".cache")];
+	for (const base of bases) {
+		const candidate = join(base, "pi-code-mode-scratch", key);
+		if (!nestsWith(candidate, root)) return candidate;
+	}
+	throw new Error(
+		`code mode cannot place a scratch directory outside the workspace ${root}: ` +
+			bases.map((base) => join(base, "pi-code-mode-scratch")).join(" and ") +
+			" both nest with it. Point TMPDIR (or HOME) at a directory outside the workspace.",
+	);
 }
 
 /** monty's own overlap rule: equal, or one host path inside the other — `/a/bc` is not inside `/a/b`. */
@@ -443,7 +465,9 @@ export function createKernel(options: {
 	 */
 	function scratchDirFor(ctx: any, root: string): string {
 		const sessionFile = sessionFilePath(ctx);
-		return sessionFile ? scratchPathFor(sessionFile, root) : join(tmpdir(), `rlm-scratch-${process.pid}`);
+		return sessionFile
+			? scratchPathFor(sessionFile, root)
+			: scratchOutside(`rlm-${process.pid}`, root);
 	}
 
 	/**
