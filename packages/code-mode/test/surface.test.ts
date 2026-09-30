@@ -30,7 +30,11 @@
  * hash move; the snippet does not. Then the pre-import amendment, also on 2026-09-30: the modules the
  * description lists are not bound in a cell until imported (the prelude imports only `os` and `json`),
  * so a description that listed them bare invited `pathlib.Path(ROOT)` and its `NameError` - the
- * description carries the caveat now, and only its hash moves.
+ * description carries the caveat now, and only its hash moves. Then the scratch-destination amendment,
+ * also on 2026-09-30: the description named SCRATCH but never told a cell to use it, so a cell that
+ * needed a temp path wrote `/tmp/cang-msg.txt` and met the PermissionError the surface never warned
+ * about. The clause joins the paragraph that introduces ROOT and SCRATCH, and only the description's
+ * hash and length move — guidelines and snippet keep both.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -40,7 +44,8 @@ const sha = (text: string) => createHash("sha256").update(text, "utf8").digest("
 
 describe("the base surface (acceptance check 2)", () => {
 	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.0", () => {
-		expect(sha(BASE_DESCRIPTION)).toBe("aecb6a950600bb7b0f5c9bf02cb2409148b9bf198ebb1f563cc66b03220d2e6c");
+		expect(sha(BASE_DESCRIPTION)).toBe("988015c5276cb58099b1d446ec5a89d97548c114192c08875e13020d2650e6c7");
+		expect(BASE_DESCRIPTION).toContain("put throwaway files there rather than under /tmp");
 		expect(BASE_DESCRIPTION).not.toContain("rlm.spawn");
 		expect(BASE_DESCRIPTION).not.toContain("agent_message");
 	});
