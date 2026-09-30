@@ -21,6 +21,7 @@ import type { CellRecord, HostCallRecord, HostFns, RestoreReport } from "./journ
 import { clientVersion, loadMonty } from "./monty";
 import { spill, truncate } from "./output";
 import { prelude } from "./prelude";
+import { remedyFor } from "./remedy";
 import { renderValue } from "./render";
 import { shellProblem } from "./shell";
 import { errorText } from "./util";
@@ -1079,6 +1080,13 @@ export function createKernel(options: {
 						failure = error.display("type-msg");
 					} else {
 						failure = errorText(error);
+					}
+					// A name the sandbox does not have is a fixed event, and the model is holding the
+					// traceback that names it: say what to use instead, here, rather than only in a
+					// guideline it read ten thousand tokens ago (`remedy.ts`).
+					if (error instanceof monty.MontyRuntimeError) {
+						const remedy = remedyFor(error.exception.typeName, error.exception.message);
+						if (remedy !== null) failure = failure === null ? remedy : `${failure}\n${remedy}`;
 					}
 				}
 
