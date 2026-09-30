@@ -43,7 +43,16 @@
  * compile time, and monty's own type checker computes that diagnostic and filters it out wholesale
  * (`crates/monty-type-checking/src/type_check.rs`, pending astral-sh/ty#2599). Guideline 5 gained
  * the rule — a helper that awaits a host function must be `async def` — so the first-six and
- * whole-array hashes move, and the description and snippet keep both.
+ * whole-array hashes move, and the description and snippet keep both. Then the tree-guidance
+ * amendment, also on 2026-09-30: the os-subset clause was there and a live session still wrote
+ * `for dp, dn, fn in os.walk('/workspace')` and reached for `bash("find ...")` when it failed, because
+ * the same guideline that named the missing `os.walk` called `walk(path)` "not for a large tree" and
+ * priced `bash("ls a b c d e")` as cheaper than five `os.listdir` calls -- the surface's own tree advice
+ * pointed at the shell. Guideline 9 now leads with `await find(...)` and `walk(path)` and their costs,
+ * names the idioms it replaces (`os.walk`'s loop, `os.path.join`/`isdir`/`getsize`) and keeps bash for
+ * what the mount cannot see; the description's list of what monty lacks gains `os.path` and `os.walk`.
+ * Guideline 9 is not among the first six, so the first-six hash holds; the description's and the
+ * whole-array hash move, and the snippet keeps both of its numbers.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -53,7 +62,7 @@ const sha = (text: string) => createHash("sha256").update(text, "utf8").digest("
 
 describe("the base surface (acceptance check 2)", () => {
 	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.0", () => {
-		expect(sha(BASE_DESCRIPTION)).toBe("988015c5276cb58099b1d446ec5a89d97548c114192c08875e13020d2650e6c7");
+		expect(sha(BASE_DESCRIPTION)).toBe("bf8b9bb2c47fb0c22d038c15dc7cd16011c7c249b7a54ea9bafc73379cd3de40");
 		expect(BASE_DESCRIPTION).toContain("put throwaway files there rather than under /tmp");
 		expect(BASE_DESCRIPTION).not.toContain("rlm.spawn");
 		expect(BASE_DESCRIPTION).not.toContain("agent_message");
@@ -73,9 +82,9 @@ describe("the base surface (acceptance check 2)", () => {
 	// because they are what the model reads -- a cell that never sees them reaches for bash.
 	it("carries the three added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(9);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("93d7e5c1141f27cb4aa3f781c447baeed07c3cf58bb58ed6dcc96c03c6f981d6");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("bd350d9af5ba1f2c07b9eb35feadaf69cedeaa907cadd093436147eae6e7c73d");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
-		expect(BASE_GUIDELINES[8]).toStartWith("In python, list a directory with");
+		expect(BASE_GUIDELINES[8]).toStartWith("In python, walk a tree inside the mount with");
 	});
 });
