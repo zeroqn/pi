@@ -27,7 +27,10 @@
  * `os.listdir`/`os.stat` are served by the workspace mount, which no journal records as a host call
  * — the same fact `rsi/src/journal.ts` states — so the surface now says *host function* for the
  * awaited family and mount read for the others. The description, the first six and the whole-array
- * hash move; the snippet does not.
+ * hash move; the snippet does not. Then the pre-import amendment, also on 2026-09-30: the modules the
+ * description lists are not bound in a cell until imported (the prelude imports only `os` and `json`),
+ * so a description that listed them bare invited `pathlib.Path(ROOT)` and its `NameError` - the
+ * description carries the caveat now, and only its hash moves.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -37,7 +40,7 @@ const sha = (text: string) => createHash("sha256").update(text, "utf8").digest("
 
 describe("the base surface (acceptance check 2)", () => {
 	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.0", () => {
-		expect(sha(BASE_DESCRIPTION)).toBe("077791417477abaac67635651202ba909538cac49a0d1930ca7bfc80ce2744a7");
+		expect(sha(BASE_DESCRIPTION)).toBe("aecb6a950600bb7b0f5c9bf02cb2409148b9bf198ebb1f563cc66b03220d2e6c");
 		expect(BASE_DESCRIPTION).not.toContain("rlm.spawn");
 		expect(BASE_DESCRIPTION).not.toContain("agent_message");
 	});
