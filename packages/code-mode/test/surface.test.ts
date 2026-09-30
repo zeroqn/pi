@@ -34,7 +34,16 @@
  * also on 2026-09-30: the description named SCRATCH but never told a cell to use it, so a cell that
  * needed a temp path wrote `/tmp/cang-msg.txt` and met the PermissionError the surface never warned
  * about. The clause joins the paragraph that introduces ROOT and SCRATCH, and only the description's
- * hash and length move — guidelines and snippet keep both.
+ * hash and length move — guidelines and snippet keep both. Then the await-in-a-plain-def amendment,
+ * also on 2026-09-30: a live session defined `def sh(cmd): out = await bash(cmd); return
+ * out["stdout"]` — accepted by monty, executed at call time, so the helper returned a `str` — and
+ * only the *next* cell failed, at its own caret, with `TypeError: 'str' object can't be awaited`
+ * where a model had aimed the `await`. Monty resolves `await` in any scope (a `lambda`, a
+ * comprehension and a class body do the same thing, measured), CPython rejects the source at
+ * compile time, and monty's own type checker computes that diagnostic and filters it out wholesale
+ * (`crates/monty-type-checking/src/type_check.rs`, pending astral-sh/ty#2599). Guideline 5 gained
+ * the rule — a helper that awaits a host function must be `async def` — so the first-six and
+ * whole-array hashes move, and the description and snippet keep both.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -54,8 +63,8 @@ describe("the base surface (acceptance check 2)", () => {
 		expect(BASE_SNIPPET).toBe("Run Python in a persistent kernel with host-bridged shell, search, image reads");
 	});
 
-	it("keeps the first six guidelines, in order (as of the await-terminology amendment)", () => {
-		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("e93fe903a1263e6099083db7802af72276d51078f73e50b92f2aa532ddfc5268");
+	it("keeps the first six guidelines, in order (as of the await-in-a-plain-def amendment)", () => {
+		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("c20d63bc26b42749e2cc588ffccfcd9a0e54a3dd64766541a670a13eefe02228");
 		expect(BASE_GUIDELINES[0]).toStartWith("Use python for work that is stateful");
 	});
 
@@ -64,7 +73,7 @@ describe("the base surface (acceptance check 2)", () => {
 	// because they are what the model reads -- a cell that never sees them reaches for bash.
 	it("carries the three added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(9);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("746dbedb1c546659e0fe360b9570ebc6b9f7f75309d3e720d905761fa7c26e15");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("93d7e5c1141f27cb4aa3f781c447baeed07c3cf58bb58ed6dcc96c03c6f981d6");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, list a directory with");
