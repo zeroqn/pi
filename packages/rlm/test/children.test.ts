@@ -358,6 +358,48 @@ describe("the manager's notices (ticket 06)", () => {
 	});
 });
 
+describe("a turn that ends unfinished (2026-09-30)", () => {
+	beforeEach(() => {
+		holdTurn();
+		setChildEntries([]);
+	});
+
+	it("reports an aborted turn as failed, not done", async () => {
+		const h = managerHarness();
+		// pi resolves `prompt()` on an abort instead of throwing, and the aborted assistant message
+		// is all the turn leaves behind — so the ending has to read the stop reason.
+		setChildEntries([
+			{
+				id: "a",
+				type: "message",
+				message: { role: "assistant", stopReason: "aborted", errorMessage: "Request aborted", content: [] },
+			},
+		]);
+		completeTurn();
+		const handle = await h.spawn();
+		await settle();
+
+		expect(h.manager.poll(handle.child_id).status).toBe("failed");
+		expect(h.notices).toHaveLength(1);
+		expect(h.notices[0]!.content).toContain("finished: failed");
+		expect(h.notices[0]!.content).toContain("aborted");
+	});
+
+	it("keeps a teardown's stopped ending against the turn's late resolution", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		expect(h.manager.poll(handle.child_id).status).toBe("running");
+
+		// The parent shuts down while the turn is in flight. The abort makes `prompt()` resolve
+		// afterwards, and that resolution must not rewrite the teardown's `stopped` as `done`.
+		await h.manager.shutdownAll();
+		h.release();
+		await settle();
+
+		expect(h.manager.poll(handle.child_id).status).toBe("stopped");
+	});
+});
+
 /* ------------------------------------------------------------------ *
  * The status line's count
  * ------------------------------------------------------------------ */

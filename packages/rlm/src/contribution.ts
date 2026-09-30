@@ -29,9 +29,14 @@ export const SNIPPET_CONNECTOR = " and delegation";
  * notifying). The base surface's own hashes do not move: this is rlm's contribution, and
  * `test/surface.test.ts` pins the base's three. What moves is the composed rlm guideline hash in
  * `.scratch/code-mode/acceptance-baseline.md`.
+ *
+ * A third sentence was added 2026-09-30 (same map, a live two-run probe: a resumed session has no
+ * children at all, so `rlm.wait` on an older child's name refuses — `.scratch/rlm-wait/answer-correctness.md`).
+ * It states the session scope and the transcript fallback rather than leaving the model to discover
+ * the refusal.
  */
 export const RLM_GUIDELINE =
-	"Use await rlm.spawn(name=..., prompt=...) for work worth doing in parallel or in a cleaner context, then end the turn: the child's answer arrives as a message, and rlm.poll(id) reads its status. Use await rlm.wait(names, timeout=180) when the next step needs every child's answer before it can start: it blocks this cell until they are done (or the timeout fires) and returns each child's status, tokens and final answer, and those children stop notifying you. rlm.list() shows the children and their tokens; rlm.tree_cost() totals what the whole tree has spent.";
+	"Use await rlm.spawn(name=..., prompt=...) for work worth doing in parallel or in a cleaner context, then end the turn: the child's answer arrives as a message, and rlm.poll(id) reads its status. Use await rlm.wait(names, timeout=180) when the next step needs every child's answer before it can start: it blocks this cell until they are done (or the timeout fires) and returns each child's status, tokens and final answer, and those children stop notifying you. rlm.list() shows the children and their tokens; rlm.tree_cost() totals what the whole tree has spent. Children belong to the session that spawned them, so a resumed or forked session has none: read an older child's answer from its stored transcript.";
 
 export type ProvenanceInputs = {
 	startReason?: string;

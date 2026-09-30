@@ -390,6 +390,26 @@ function sessionEntries(session: any): any[] {
 }
 
 /**
+ * The stop reason on the child's last assistant message, or `undefined` when it has none.
+ *
+ * pi's `prompt()` **resolves** when a generation is aborted — it does not reject — and the message it
+ * leaves carries `stopReason: "aborted"` (probed live 2026-09-30: a child cut off by its parent's
+ * teardown was reported `done` while its own transcript said `stopReason: "aborted"`,
+ * `errorMessage: "Request aborted"`; `.scratch/rlm-wait/answer-correctness.md`). `"error"` is the
+ * same shape for a provider that failed mid-stream. `ChildStatus` has no `aborted` of its own, so
+ * both endings read as `failed`: the turn did not complete.
+ */
+function lastAssistantStopReason(session: any): string | undefined {
+	const entries = sessionEntries(session);
+	for (let index = entries.length - 1; index >= 0; index -= 1) {
+		const message = entries[index]?.message;
+		if (message?.role !== "assistant") continue;
+		return typeof message.stopReason === "string" ? message.stopReason : undefined;
+	}
+	return undefined;
+}
+
+/**
  * Folds any not-yet-counted entries into `totals`. Entry ids are the watermark, so a
  * repeated call is incremental and a child that compacts keeps accumulating. Usage
  * lives on assistant messages and on compaction / branch-summary entries.
@@ -474,6 +494,12 @@ function usageOfRecord(record: ChildRecord): ChildHandle["usage"] | undefined {
  * Module-level so `spawn` and `send` share exactly one ending. A resumed child used to
  * reach a second `finally` that updated its status but dispatched nothing, so `send`ing a
  * finished child and ending the turn left the parent waiting for a notice that never came.
+ *
+ * The ending belongs to whoever gets there first. pi resolves `prompt()` when a generation is
+ * aborted instead of throwing, so the turn's own verdict is **not** applied over a status a
+ * teardown has already set — otherwise an aborting child's late resolution resurrects it as
+ * `done`. And the verdict itself reads the stop reason, so an aborted or errored turn is a
+ * failure rather than a completion.
  */
 async function runChildTurn(
 	record: ChildRecord,
@@ -481,13 +507,26 @@ async function runChildTurn(
 	/** The manager's change signal: this turn's ending is a change in how many children work. */
 	changed: () => void,
 ): Promise<void> {
+	let status: ChildStatus = "done";
+	let reason: string | undefined;
 	try {
 		await record.session?.prompt(prompt);
-		record.status = "done";
+		const stop = lastAssistantStopReason(record.session);
+		if (stop === "aborted" || stop === "error") {
+			status = "failed";
+			reason = stop;
+		}
 	} catch (error) {
-		record.status = "failed";
-		record.reason = error instanceof Error ? error.message : String(error);
+		status = "failed";
+		reason = error instanceof Error ? error.message : String(error);
 	} finally {
+		// A teardown that already stopped this child owns the ending (seen live 2026-09-30: the
+		// parent's shutdown aborted an in-flight child, whose resolved `prompt()` then rewrote
+		// `stopped` to `done` and notified the parent with no answer).
+		if (record.status === "running") {
+			record.status = status;
+			record.reason = reason;
+		}
 		record.ended_at = new Date().toISOString();
 		record.usage = usageOfRecord(record);
 		changed();
@@ -496,7 +535,7 @@ async function runChildTurn(
 			`[${record.child_id} "${record.name}"] finished: ${record.status}${spent}`,
 			record.reason ? `— ${record.reason}` : "",
 			record.session_file ? `\nsession: ${record.session_file}` : "",
-			`\nRead the result from the stored transcript (the session file is outside the workspace mount, so read it through await bash("cat …")); rlm.poll("${record.child_id}") returns status and usage only.`,
+			`\nRead the result from the stored transcript (the session file is outside the workspace mount, so read it through await bash("cat …")); rlm.poll("${record.child_id}") returns status and usage only, and only in the session that spawned the child — a resumed or forked session has no children.`,
 		]
 			.filter(Boolean)
 			.join(" ");
