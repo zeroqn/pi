@@ -52,7 +52,13 @@
  * names the idioms it replaces (`os.walk`'s loop, `os.path.join`/`isdir`/`getsize`) and keeps bash for
  * what the mount cannot see; the description's list of what monty lacks gains `os.path` and `os.walk`.
  * Guideline 9 is not among the first six, so the first-six hash holds; the description's and the
- * whole-array hash move, and the snippet keeps both of its numbers.
+ * whole-array hash move, and the snippet keeps both of its numbers. Then the same amendment's second iteration,
+ * also on 2026-09-30: that rewrite was measured and did not separate the arms (6/12 against 3/12, p = 0.40), and the
+ * name it did not stop was `os.path.isdir` -- which it answered with `os.stat(p).st_size` and `exists(path)`, the
+ * right facts in the wrong shape. `pathlib.Path` is the like-for-like monty already ships (`is_dir()`, `is_file()`,
+ * `exists()`, `.stat().st_size`, `iterdir()`, `/`; no `rglob`/`glob`/`parents`/`home()`), so guideline 9 leads with it
+ * and names what it cannot do. The description's clause carries the mapping too, so its hash and length and the
+ * whole-array hash move a second time; the first six and the snippet hold.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -62,7 +68,7 @@ const sha = (text: string) => createHash("sha256").update(text, "utf8").digest("
 
 describe("the base surface (acceptance check 2)", () => {
 	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.0", () => {
-		expect(sha(BASE_DESCRIPTION)).toBe("bf8b9bb2c47fb0c22d038c15dc7cd16011c7c249b7a54ea9bafc73379cd3de40");
+		expect(sha(BASE_DESCRIPTION)).toBe("acb8ff8d77b85137766be3264f3eb42ed74a4485f6a84ec2f80803c2441ea161");
 		expect(BASE_DESCRIPTION).toContain("put throwaway files there rather than under /tmp");
 		expect(BASE_DESCRIPTION).not.toContain("rlm.spawn");
 		expect(BASE_DESCRIPTION).not.toContain("agent_message");
@@ -82,9 +88,9 @@ describe("the base surface (acceptance check 2)", () => {
 	// because they are what the model reads -- a cell that never sees them reaches for bash.
 	it("carries the three added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(9);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("bd350d9af5ba1f2c07b9eb35feadaf69cedeaa907cadd093436147eae6e7c73d");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("5dbd2179babc2963922bb3aa4b0cd77675997df810c08db9b56faaaf9c3202e7");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
-		expect(BASE_GUIDELINES[8]).toStartWith("In python, walk a tree inside the mount with");
+		expect(BASE_GUIDELINES[8]).toStartWith("In python, path tests come from `pathlib`");
 	});
 });
