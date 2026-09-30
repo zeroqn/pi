@@ -21,7 +21,13 @@
  * advertises `os` and `pathlib` as present modules with no intra-module caveat, so a cell's first
  * move on a tree is `os.path.isdir`/`os.walk` — both absent from monty's curated `os` (measured
  * live) — and guideline 9 now names them and the replacements. That is a post-split line, so only
- * the whole-array hash moved.
+ * the whole-array hash moved. Then the await-terminology amendment of 2026-09-30: the description
+ * called a file read "one host call each", so a model wrote `await read_text(...)` and learned the
+ * truth from `TypeError: 'str' object can't be awaited` (measured live, this session). A read and
+ * `os.listdir`/`os.stat` are served by the workspace mount, which no journal records as a host call
+ * — the same fact `rsi/src/journal.ts` states — so the surface now says *host function* for the
+ * awaited family and mount read for the others. The description, the first six and the whole-array
+ * hash move; the snippet does not.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -31,7 +37,7 @@ const sha = (text: string) => createHash("sha256").update(text, "utf8").digest("
 
 describe("the base surface (acceptance check 2)", () => {
 	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.0", () => {
-		expect(sha(BASE_DESCRIPTION)).toBe("c1c17e4b434e82c101250b8e45fa868cea91884b82f645215df68f7ca0a4c860");
+		expect(sha(BASE_DESCRIPTION)).toBe("077791417477abaac67635651202ba909538cac49a0d1930ca7bfc80ce2744a7");
 		expect(BASE_DESCRIPTION).not.toContain("rlm.spawn");
 		expect(BASE_DESCRIPTION).not.toContain("agent_message");
 	});
@@ -40,8 +46,8 @@ describe("the base surface (acceptance check 2)", () => {
 		expect(BASE_SNIPPET).toBe("Run Python in a persistent kernel with host-bridged shell, search, image reads");
 	});
 
-	it("keeps the first six guidelines, in order (as of the monty-1.0 amendment)", () => {
-		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("1a28fd779b188959175357a459bb8ef778d574b14f0e8e8e4763283bfded61f3");
+	it("keeps the first six guidelines, in order (as of the await-terminology amendment)", () => {
+		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("e93fe903a1263e6099083db7802af72276d51078f73e50b92f2aa532ddfc5268");
 		expect(BASE_GUIDELINES[0]).toStartWith("Use python for work that is stateful");
 	});
 
@@ -50,7 +56,7 @@ describe("the base surface (acceptance check 2)", () => {
 	// because they are what the model reads -- a cell that never sees them reaches for bash.
 	it("carries the three added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(9);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("0db2a51a4da9e705a10ef03d47449fd2098123e7dd78b02690b437552b8d3917");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("746dbedb1c546659e0fe360b9570ebc6b9f7f75309d3e720d905761fa7c26e15");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, list a directory with");
