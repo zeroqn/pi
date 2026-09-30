@@ -41,6 +41,15 @@ describe("the name map", () => {
 		expect(remedyFor("AttributeError", "type object 'PosixPath' has no attribute 'home'")).toContain("walk(path)");
 	});
 
+	it("answers a replacement written without its import", () => {
+		expect(remedyFor("NameError", "name 'Path' is not defined")).toContain("import pathlib");
+		expect(remedyFor("NameError", "name 'pathlib' is not defined")).toContain("import pathlib");
+		// A typo'd variable is not this event.
+		expect(remedyFor("NameError", "name 'root' is not defined")).toBeNull();
+		expect(remedyFor("NameError", "cannot access local variable 'Path'")).toBeNull();
+		expect(remedyFor("AttributeError", "name 'Path' is not defined")).toBeNull();
+	});
+
 	it("stays quiet for anything else", () => {
 		// A name monty's `os` *does* have, a missing attribute on a non-module, a pathlib name that
 		// exists, another exception type, and a message in a shape this has not seen.
@@ -123,6 +132,15 @@ describe("a cell that names one of them", () => {
 		const fixed = textOf(await (handle.kernel as Kernel).execute({ code: "print(len(walk(ROOT)) > 0)" }, undefined, undefined));
 		expect(fixed).toContain("True");
 		expect(fixed).not.toContain("curated subset");
+	});
+
+	maybe("answers a replacement written without its import", async () => {
+		const handle = session();
+		const unbound = textOf(
+			await (handle.kernel as Kernel).execute({ code: "print(Path(ROOT).is_dir())\n" }, undefined, undefined),
+		);
+		expect(unbound).toContain("NameError");
+		expect(unbound).toContain("import pathlib");
 	});
 
 	maybe("carries pathlib's own hole with it, and says nothing for an ordinary error", async () => {

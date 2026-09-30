@@ -10,14 +10,20 @@
  * `AttributeError` whose message carries the attribute *and* the kind of object it was missing from — so
  * the remedy can arrive once, in the result the model is already reading.
  *
- * The names, and the message shapes, are measured against monty 1.0.0, not assumed. `os` has `mkdir`, `makedirs`, `rmdir`,
- * `remove`, `unlink`, `stat`, `getcwd`, `chdir`, `listdir`, `getenv`, `environ`, `rename`, `replace`,
- * `fspath`, `urandom` and the POSIX constants, and lacks `path`, `walk`, `getsize`, `isdir`, `isfile`,
- * `islink`, `scandir`, `symlink`, `readlink`, `lstat`, `chmod`, `utime`, `access`, `removedirs`,
- * `renames` and `pathsep`. `pathlib.Path` has `is_dir`, `is_file`, `exists`, `stat`, `iterdir`,
- * `joinpath`, `parent`, `name`, `as_posix`, `resolve`, `with_suffix`, `is_symlink`, `read_text` and
- * lacks `PurePath`, `home`, `rglob`, `glob`, `parents`, `relative_to`, `is_relative_to`, `lstat`,
- * `match` and `samefile`.
+ * The names, and the message shapes, are measured against monty 1.0.0, not assumed. `os` has `mkdir`,
+ * `makedirs`, `rmdir`, `remove`, `unlink`, `stat`, `getcwd`, `chdir`, `listdir`, `getenv`, `environ`,
+ * `rename`, `replace`, `fspath`, `urandom` and the POSIX constants, and lacks `path`, `walk`, `getsize`,
+ * `isdir`, `isfile`, `islink`, `scandir`, `symlink`, `readlink`, `lstat`, `chmod`, `utime`, `access`,
+ * `removedirs`, `renames` and `pathsep`. `pathlib.Path` has `is_dir`, `is_file`, `exists`, `stat`,
+ * `iterdir`, `joinpath`, `parent`, `name`, `as_posix`, `resolve`, `with_suffix`, `is_symlink`,
+ * `read_text` and lacks `PurePath`, `home`, `rglob`, `glob`, `parents`, `relative_to`, `is_relative_to`,
+ * `lstat`, `match` and `samefile`.
+ *
+ * The `NameError` case is the same event one step earlier — a cell that writes the replacement without
+ * importing it. Measured over the 48 runs of the two A/B pairs behind this file: 27 module/pathlib
+ * `AttributeError`s, every one on a name in the two sets below, and five `NameError: name 'Path' is not
+ * defined`, which those sets cannot see, because a name that was never bound has no object to be missing
+ * from.
  */
 
 /** Names monty's curated `os` does not have. */
@@ -53,6 +59,9 @@ const PATH_MISSING = new Set([
 	"samefile",
 ]);
 
+/** Names a cell reaches for without having imported where they come from. */
+const NEEDS_IMPORT = new Set(["Path", "pathlib"]);
+
 const OS_REMEDY =
 	"# monty's `os` is a curated subset — no `os.path`, no `os.walk`. A tree is `walk(path)` or\n" +
 	"# `await find(...)`; a path test is `Path(p).is_dir()` / `.is_file()` / `.stat().st_size` after\n" +
@@ -63,11 +72,20 @@ const PATH_REMEDY =
 	"# A tree is `walk(path)` or `await find(...)`, and a path relative to a root is a slice:\n" +
 	"# `p[len(root):].lstrip('/')`.";
 
+const IMPORT_REMEDY =
+	"# `Path` is `pathlib.Path`, and only `os` and `json` are pre-imported: `import pathlib` first\n" +
+	"# (then `Path(...)`, or write `pathlib.Path(...)`).";
+
 /**
- * The remedy for a failure, or `null` when the failure is not one of these names. Keyed on the kind of
+ * The remedy for a failure, or `null` when the failure is not one of these events. Keyed on the kind of
  * object as well as the name, because a `walk` missing from an unrelated module is not this event.
  */
 export function remedyFor(typeName: string, message: string): string | null {
+	if (typeName === "NameError") {
+		const unbound = /name '([A-Za-z_][A-Za-z0-9_]*)' is not defined/.exec(message);
+		if (unbound !== null && NEEDS_IMPORT.has(unbound[1] ?? "")) return IMPORT_REMEDY;
+		return null;
+	}
 	if (typeName !== "AttributeError") return null;
 	const missing = /no attribute '([A-Za-z_][A-Za-z0-9_]*)'/.exec(message);
 	if (missing === null) return null;
