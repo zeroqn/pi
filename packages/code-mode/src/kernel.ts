@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 import type * as MontyModule from "@pydantic/monty/node";
 import { createBackgroundManager } from "./background";
 import { BASE_HOST_FNS, type Ledger, type KernelHandleCore, type MountMode, type Notice, type Provenance } from "./contract";
-import { makeHost, bind, plainArgs, type Attachment, type CallDeclaration, type DeclarationSlot } from "./host";
+import { makeHost, bind, plainArgs, HOST_DECLARERS, type Attachment, type CallDeclaration, type HostDeclarer } from "./host";
 import { appendJournal, readJournal, readJournals, recordingHost, replayHost, restoredLine } from "./journal";
 import type { CellRecord, HostCallRecord, HostFns, RestoreReport } from "./journal";
 import { clientVersion, loadMonty } from "./monty";
@@ -148,25 +148,18 @@ type HostChain = ReturnType<typeof newHostChain>;
  * `async`: monty has to receive the very promise its driver registers as a future, and the settle
  * handler has to be attached before monty's own so the flag is never behind it.
  */
-function countHostCalls(host: HostFns, chain: HostChain, declaring: DeclarationSlot): HostFns {
+function countHostCalls(host: HostFns, chain: HostChain, declarers: Record<string, HostDeclarer> = HOST_DECLARERS): HostFns {
 	const wrapped: HostFns = {};
 	for (const [name, fn] of Object.entries(host)) {
 		const wrapper = (...args: unknown[]): Promise<unknown> => {
-			// The slot is held open across the **synchronous prologue** only, which is where a host
-			// function reads its own arguments and can say what it is about to do. `previous` makes a
-			// host function that calls another host function nest rather than clobber.
-			const previous = declaring.current;
-			const declared: CallDeclaration = {};
-			declaring.current = declared;
-			let returned: unknown;
-			try {
-				returned = fn(...args);
-			} finally {
-				declaring.current = previous;
-			}
+			// Read here, **synchronously and from the arguments**, before anything runs: the alternative —
+			// the callee writing into a slot the counter opened — silently loses its declaration the
+			// moment an `async` wrapper (a guard's) sits between the two (`.scratch/rlm-stop`, found live
+			// 2026-10-09). The declarer must be total, or a malformed call's own error would be replaced.
+			const declared = declarers[name]?.(args);
+			const returned = fn(...args);
 			// monty registers a future only for a thenable, so a sync return never reaches the
-			// driver's map and must not be counted — the count has to match that set exactly. A
-			// declaration made by a sync call goes with it: nothing is waiting on that call.
+			// driver's map and must not be counted — the count has to match that set exactly.
 			if (isThenable(returned)) {
 				const call = chain.answer(name, declared);
 				const settled = () => {
@@ -1050,9 +1043,6 @@ export function createKernel(options: {
 				cellRotateFailure = null;
 				cellAbort = null;
 				cellRebuild = null;
-				// Where a host function puts what it declares about itself while its prologue runs; the
-				// counter below holds it open and hands the declaration to the call it belongs to.
-				const declaring: DeclarationSlot = { current: null };
 				const hostFns = makeHost({
 					root,
 					attachments,
@@ -1065,12 +1055,6 @@ export function createKernel(options: {
 					engine: ledger.search(),
 					// This tool call's own signal, when pi passed one (rlm-wait ticket 06).
 					signal,
-					// Mutated in place, never replaced: the slot's object is the very one `countHostCalls`
-					// hands to `chain.answer` when the call becomes a future.
-					declareCall: (declaration) => {
-						const current = declaring.current;
-						if (current) Object.assign(current, declaration);
-					},
 				});
 				const feedOptions = {
 					mount: [resolved.mount, scratchMount],
@@ -1088,7 +1072,6 @@ export function createKernel(options: {
 							cellCalls.push(error ? { name, args, error } : { name, args, result });
 						})),
 						hostChain,
-						declaring,
 					),
 					os: (name: string) => {
 						if (/getenv|environ/i.test(name)) {

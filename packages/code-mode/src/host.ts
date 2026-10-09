@@ -351,12 +351,22 @@ export function abortable(host: HostFns, signal?: AbortSignal): HostFns {
 }
 
 /**
- * What a host call says about itself while its synchronous prologue runs (rlm-stop ticket 05).
+ * What a host call says about itself (rlm-stop ticket 05).
  *
- * Declared *during* the call, not before it, because that is the only window in which the call knows
- * its own arguments: the counter cannot read `bash_host`'s `timeout` without taking a dependency on
- * one function's schema — and a bound is the one fact that separates a call which is legitimately
- * long from a call that is stuck.
+ * Declared as a **pure function of the call's arguments**, read by the counter at call time — not by
+ * ambient state the callee writes into. That shape is forced by two facts, and the second was found
+ * live:
+ *
+ *  - the counter cannot guess `bash_host`'s `timeout` without a dependency on one function's schema, so
+ *    the function that *enforces* the bound is the one that states it;
+ *  - **anything asynchronous between the counter and the callee breaks an ambient slot.** A guard
+ *    wraps the whole surface in an `async` prologue (`guarded`, below), so with a guard present the
+ *    callee runs a microtask after the counter's prologue closed the slot, and the declaration landed
+ *    nowhere — measured 2026-10-09 in a manifest-loaded session (`waiting_on: "bash_host"` where the
+ *    trio it was built with said `waiting_on: "sleep 600"`).
+ *
+ * A declarer must be **total**: `bash_host`'s is read before the call runs, so a throw here would turn
+ * a malformed call's own error into a different one.
  */
 export type CallDeclaration = {
 	/** Seconds this call may take; `null` is unbounded, the default. */
@@ -365,8 +375,28 @@ export type CallDeclaration = {
 	detail?: string;
 };
 
-/** The one slot a declaration can land in: the call whose prologue is running. Never shared. */
-export type DeclarationSlot = { current: CallDeclaration | null };
+export type HostDeclarer = (args: unknown[]) => CallDeclaration | undefined;
+
+/**
+ * What each host function says about itself, keyed by the name the counter sees. One entry per
+ * function that knows something a reader wants: a bound it will enforce, and what it is doing.
+ */
+export const HOST_DECLARERS: Record<string, HostDeclarer> = {
+	bash_host: (args) => {
+		try {
+			const { command, timeout } = bind(args, ["command", "timeout", "background"], "bash");
+			// Unbounded is the default, deliberately kept (`None` waits forever), so a *declared* bound
+			// has to be published as one — an hour of silence inside a call that promised two minutes is
+			// not the same fact as an hour inside a call that promised nothing.
+			return {
+				timeout_s: timeout === null ? null : num(timeout, 0) || null,
+				detail: str(command).split("\n")[0]?.slice(0, 120),
+			};
+		} catch {
+			return undefined;
+		}
+	},
+};
 
 export function makeHost(options: {
 	root: string;
@@ -383,24 +413,14 @@ export function makeHost(options: {
 	/** pi's own signal for the tool call that is running this cell (`rlm-wait` ticket 06). Absent
 	 * when the host passed none, which leaves every function exactly as it was. */
 	signal?: AbortSignal;
-	/**
-	 * How a host function declares its own bound and its own label (rlm-stop ticket 05). Absent in
-	 * every context that has no chain behind it (a direct call in a test), which is why the call is
-	 * optional and the declaration is dropped silently.
-	 */
-	declareCall?: (declaration: CallDeclaration) => void;
 }): HostFns {
-	const { root, attachments, progress, extra, background: backgroundManager, guard, engine, signal, declareCall } = options;
+	const { root, attachments, progress, extra, background: backgroundManager, guard, engine, signal } = options;
 	const base: HostFns = {
 		async bash_host(...args: unknown[]) {
 			const { command, timeout, background } = bind(args, ["command", "timeout", "background"], "bash");
-			// Unbounded is the default, deliberately kept (`None` waits forever), so a *declared* bound
-			// has to be published as one — an hour of silence inside a call that promised two minutes is
-			// the case a reader must be able to tell from an hour inside a call that promised nothing.
-			declareCall?.({
-				timeout_s: timeout === null ? null : num(timeout, 0) || null,
-				detail: str(command).split("\n")[0]?.slice(0, 120),
-			});
+			// What this call is (its bound, its command) is published by `HOST_DECLARERS`, read from these
+			// same arguments by the counter before the call runs — deliberately not written here, because a
+			// guard's async prologue puts this body a microtask after the counter's slot closed.
 			if (background === true) {
 				return backgroundManager.start(str(command), timeout === null ? null : num(timeout, 0) || null);
 			}

@@ -38,7 +38,10 @@ function gate() {
 	return { held, open: () => open?.() };
 }
 
-async function harness(extra: Record<string, unknown> = {}) {
+/** Every call the guard was offered, in order: proof the guard's prologue is really in the path. */
+const guarded: string[] = [];
+
+async function harness(extra: Record<string, unknown> = {}, withGuard = false) {
 	const dir = mkdtempSync(join(tmpdir(), "cm-activity-"));
 	const sessionFile = join(dir, "activity.jsonl");
 	writeFileSync(sessionFile, `${JSON.stringify({ type: "session", version: 3, id: "x", timestamp: "", cwd: dir })}\n`);
@@ -49,6 +52,19 @@ async function harness(extra: Record<string, unknown> = {}) {
 		base: { description: BASE_DESCRIPTION, snippet: BASE_SNIPPET, guidelines: BASE_GUIDELINES },
 	});
 	ledger.accept({ owner: "probe", hostFns: { hold: () => gate().held, ...extra } as any });
+	if (withGuard) {
+		// A guard is what makes `makeHost` wrap the whole surface in an `async` prologue — the shape that
+		// silently lost a declaration written from inside the callee (rlm-stop, 2026-10-09).
+		ledger.accept({
+			owner: "guard-probe",
+			guard: {
+				before: async (call: { name: string }) => {
+					guarded.push(call.name);
+					return { allow: true };
+				},
+			},
+		} as any);
+	}
 	const kernel = createKernel({ pi, sessionKey: sessionFile, ledger });
 	// The mount is what makes ROOT/SCRATCH exist for the prelude; `execute` does it lazily.
 	await kernel.startSession(ctx);
@@ -134,6 +150,29 @@ describe.skipIf(!montyReady)("what the kernel is waiting on (rlm-stop ticket 05)
 			expect(during.calls.map((call) => call.name)).toEqual(["first", "second"]);
 			first.open();
 			second.open();
+			await cell;
+		} finally {
+			await kernel.shutdown();
+			cleanup();
+		}
+	});
+
+	it("keeps a declaration when a guard wraps the surface (rlm-stop, found live 2026-10-09)", async () => {
+		guarded.length = 0;
+		const { kernel, ctx, cleanup } = await harness({}, true);
+		try {
+			const cell = kernel.execute({ code: 'r = await bash("sleep 3; echo never", timeout=1)' }, undefined, ctx);
+			await Bun.sleep(300);
+			const during = kernel.activity();
+			const call = during.calls.find((entry) => entry.name === "bash_host");
+			expect(call).toBeDefined();
+			// The declaration is read from the call's own arguments by the counter, so an `async` prologue
+			// in between (the guard's) cannot swallow it. Before that change these were `null`/undefined,
+			// and only in a session with a guard — which is every manifest-loaded session.
+			expect(call!.timeout_s).toBe(1);
+			expect(call!.detail).toContain("sleep 3");
+			// And the guard really is in the path: without this the test would pass for the wrong reason.
+			expect(guarded).toContain("bash_host");
 			await cell;
 		} finally {
 			await kernel.shutdown();
