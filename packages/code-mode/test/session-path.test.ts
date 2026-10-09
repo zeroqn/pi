@@ -10,6 +10,19 @@ import { scratchPathFor, sessionFilePath } from "../src/kernel";
 
 const ctx = (file: string | undefined) => ({ sessionManager: { getSessionFile: () => file } });
 
+/**
+ * Put TMPDIR back the way it was found. `process.env.TMPDIR = undefined` does not unset it: Node and
+ * Bun both coerce, and the variable ends up holding the *string* "undefined", which `os.tmpdir()`
+ * then answers verbatim — a relative path, so every later `mkdtempSync(join(tmpdir(), …))` in the
+ * process dies with `ENOENT: mkdtemp 'undefined/…'`. That is what this file did on CI, where TMPDIR
+ * is simply absent, and it took `host.test.ts` down with it (see the note on the case below). A dev
+ * box has TMPDIR set and never saw it.
+ */
+function restoreTmp(saved: string | undefined): void {
+	if (saved === undefined) delete process.env.TMPDIR;
+	else process.env.TMPDIR = saved;
+}
+
 describe("the session file is resolved to an absolute path (ticket 12)", () => {
 	it("resolves a relative session file, which is what monty's mount needs", () => {
 		const file = sessionFilePath(ctx("sessions/2026-09-17T10-47-28-131Z_acc-probe.jsonl"));
@@ -44,7 +57,7 @@ describe("the session file is resolved to an absolute path (ticket 12)", () => {
 			// Home is the second base, and it is the one that answered here.
 			expect(scratch).toBe(join(homedir(), ".cache", "pi-code-mode-scratch", scratch.split("/").pop()!));
 		} finally {
-			process.env.TMPDIR = savedTmp;
+			restoreTmp(savedTmp);
 		}
 	});
 
@@ -60,7 +73,7 @@ describe("the session file is resolved to an absolute path (ticket 12)", () => {
 			process.env.TMPDIR = join(root, ".tmp");
 			expect(() => scratchPathFor(inside, root)).toThrow(/TMPDIR/);
 		} finally {
-			process.env.TMPDIR = savedTmp;
+			restoreTmp(savedTmp);
 		}
 	});
 
