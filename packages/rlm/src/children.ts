@@ -750,7 +750,7 @@ export function childPromptFor(
 	// child can act on. Inside the droppable set (`RLM_CHILD_PROMPT=none`), because v2's A/B criterion
 	// is that the added sentences do not change the artefact.
 	const declaring =
-		"Before a step that may take more than a few minutes — or a command that can hang — say so with rlm.note(text, expect_seconds=...), and pass a timeout to bash: a parent that hears nothing may decide you are stuck and stop you.";
+		"Before a step that may take more than a few minutes — or a command that can hang — say so with await rlm.note(text, expect_seconds=...), and pass a timeout to bash: a parent that hears nothing may decide you are stuck and stop you.";
 	if (allowEnvironmentOverride && process.env.RLM_CHILD_PROMPT === "none") return [identity, reporting];
 	return [
 		identity,

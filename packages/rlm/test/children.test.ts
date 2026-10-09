@@ -213,7 +213,7 @@ describe("the child prompt's shapes (v2 ticket 05)", () => {
 	it("tells a child to declare long work, and why (rlm-stop ticket 10)", () => {
 		delete process.env.RLM_CHILD_PROMPT;
 		const prompt = childPromptFor({ name: "c", depth: 1 }, 2).join(" ");
-		expect(prompt).toContain("rlm.note(text, expect_seconds=...)");
+		expect(prompt).toContain("await rlm.note(text, expect_seconds=...)");
 		expect(prompt).toContain("pass a timeout to bash");
 		// The consequence is the part a child can act on, and it has to be the true one.
 		expect(prompt).toContain("a parent that hears nothing may decide you are stuck and stop you");

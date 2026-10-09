@@ -40,8 +40,9 @@ export const PRELUDE_TAIL = `class _Rlm:
     def note(self, text, expect_seconds=None):
         """Say what you are doing, and how long you expect it to take.
 
-        Call this before a step that may run for minutes with nothing to show: a parent that hears
-        nothing for long enough may decide you are stuck and stop you (rlm.stop)."""
+        Every method here returns a host call's promise, so a cell awaits them all: await rlm.note(...).
+        Call this one before a step that may run for minutes with nothing to show: a parent that hears
+        nothing for long enough may decide you are stuck and stop you (await rlm.stop(...))."""
         return rlm_note(text, expect_seconds)
 
     def stop(self, selector, reason=None):
