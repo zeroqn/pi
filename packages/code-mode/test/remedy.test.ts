@@ -111,51 +111,58 @@ describe("a cell that names one of them", () => {
 		dir = mkdtempSync(join(tmpdir(), "code-mode-remedy-"));
 	});
 
+	/**
+	 * The handle *and* its ctx. `Kernel.execute` takes `ctx` as its third argument and reads
+	 * `ctx.cwd` for the sandbox's ROOT, so a cell run without one gets `process.cwd()` — and then the
+	 * `walk(ROOT)` below walks the entire checkout (16.5k directories here, 3k in a fresh clone),
+	 * which reads as a timeout rather than a wrong answer, and made this file pass only while the
+	 * tree happened to be small. Every other code-mode test passes its ctx.
+	 */
 	function session() {
 		const pi = fakePi();
 		codeMode(pi as never);
 		const entry = glob[REGISTRY_KEY] as RegistryEntry;
 		const ctx = { cwd: dir, sessionManager: { getSessionFile: () => sessionFileIn(dir, "remedy"), getEntries: () => [] } };
-		return entry.mount(pi as never, ctx);
+		return { handle: entry.mount(pi as never, ctx), ctx };
 	}
 
 	maybe("carries the remedy under the traceback, and the kernel survives it", async () => {
-		const handle = session();
+		const { handle, ctx } = session();
 		const failed = textOf(
-			await (handle.kernel as Kernel).execute({ code: "import os\nfor dp, dn, fn in os.walk(ROOT):\n    pass\n" }, undefined, undefined),
+			await (handle.kernel as Kernel).execute({ code: "import os\nfor dp, dn, fn in os.walk(ROOT):\n    pass\n" }, undefined, ctx),
 		);
 		expect(failed).toContain("AttributeError");
 		expect(failed).toContain("# monty's `os` is a curated subset");
 		expect(failed).toContain("walk(path)");
 
 		// The session is not poisoned: the next cell runs, and it is the fix the remedy named.
-		const fixed = textOf(await (handle.kernel as Kernel).execute({ code: "print(len(walk(ROOT)) > 0)" }, undefined, undefined));
+		const fixed = textOf(await (handle.kernel as Kernel).execute({ code: "print(len(walk(ROOT)) > 0)" }, undefined, ctx));
 		expect(fixed).toContain("True");
 		expect(fixed).not.toContain("curated subset");
 	});
 
 	maybe("answers a replacement written without its import", async () => {
-		const handle = session();
+		const { handle, ctx } = session();
 		const unbound = textOf(
-			await (handle.kernel as Kernel).execute({ code: "print(Path(ROOT).is_dir())\n" }, undefined, undefined),
+			await (handle.kernel as Kernel).execute({ code: "print(Path(ROOT).is_dir())\n" }, undefined, ctx),
 		);
 		expect(unbound).toContain("NameError");
 		expect(unbound).toContain("import pathlib");
 	});
 
 	maybe("carries pathlib's own hole with it, and says nothing for an ordinary error", async () => {
-		const handle = session();
+		const { handle, ctx } = session();
 		const relative = textOf(
 			await (handle.kernel as Kernel).execute(
 				{ code: "import pathlib\nrel = pathlib.Path(ROOT).relative_to('/workspace')\n" },
 				undefined,
-				undefined,
+				ctx,
 			),
 		);
 		expect(relative).toContain("AttributeError");
 		expect(relative).toContain("p[len(root):]");
 
-		const ordinary = textOf(await (handle.kernel as Kernel).execute({ code: "1 + 'a'\n" }, undefined, undefined));
+		const ordinary = textOf(await (handle.kernel as Kernel).execute({ code: "1 + 'a'\n" }, undefined, ctx));
 		expect(ordinary).toContain("TypeError");
 		expect(ordinary).not.toContain("# monty's");
 	});
