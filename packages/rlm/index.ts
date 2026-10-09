@@ -124,6 +124,9 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				// The footer's count is the manager's to announce, not something to poll for: a child
 				// spawned or finished mid-turn would otherwise go unsaid until the next turn boundary.
 				onChange: () => renderStatus(sessionCtx),
+				// A stop leaves one `rlm-stop` entry in *this* transcript (ticket 03 §5); the manager
+				// has no `pi` of its own, so the session that owns it supplies the writer.
+				appendEntry: (customType, data) => pi.appendEntry(customType, data),
 			});
 
 	/**

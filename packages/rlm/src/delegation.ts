@@ -18,6 +18,8 @@ export type DelegationDeps = {
 		spawn: (request: any) => Promise<ChildHandle>;
 		poll: (selector: string) => any;
 		list: () => any;
+		/** Ends a child and its own subtree (`.scratch/rlm-stop` tickets 03/04). */
+		stop: (selector: string, reason?: string) => any;
 		remove: (selector: string) => any;
 		send: (selector: string, text: string) => any;
 		treeCost: () => number;
@@ -79,6 +81,15 @@ export function delegationHostFns(deps: DelegationDeps): Record<string, (...args
 			// The depth is absolute: a session that is itself a child spawns one level deeper
 			// than its own durable depth, which is what enforces the cap with no root present.
 			return spawnHandle(deps.ownDepth + 1, args);
+		},
+		async rlm_stop(...args: unknown[]) {
+			const { selector, reason } = bind(args, ["selector", "reason"], "rlm.stop");
+			// A child's stop goes through its own context, which is what carries the asker's identity
+			// into the manager's authority check (ticket 04 §3).
+			const text = reason === undefined || reason === null ? undefined : str(reason);
+			return deps.childContext
+				? deps.childContext.stop(str(selector), text)
+				: deps.manager!.stop(str(selector), text);
 		},
 		async rlm_poll(...args: unknown[]) {
 			const { selector } = bind(args, ["selector"], "rlm.poll");

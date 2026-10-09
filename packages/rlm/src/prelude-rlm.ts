@@ -13,6 +13,11 @@
  * the first 697): `skill()`'s docstring changed when the call form moved to the bridge, and
  * `.scratch/skill-bridge` ticket 09 records the amendment. The ordering above is what still holds.
  *
+ * Amended again 2026-10-09 (`.scratch/rlm-stop` ticket 03): `_Rlm.stop(selector, reason=None)` was
+ * added beside `remove`, which is unchanged. The tail is not part of code mode's `BaseSurface`, so no
+ * base hash moves; the method's own pin is `test/prelude-tail.test.ts` and the composed hash in
+ * `.scratch/code-mode/acceptance-baseline.md`.
+ *
  * The host functions it names are contributed in the same call, so a cell can never see a name whose
  * host function was rejected.
  */
@@ -28,6 +33,9 @@ export const PRELUDE_TAIL = `class _Rlm:
 
     def list(self):
         return rlm_list()
+
+    def stop(self, selector, reason=None):
+        return rlm_stop(selector, reason)
 
     def remove(self, selector):
         return rlm_remove(selector)

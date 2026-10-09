@@ -63,6 +63,9 @@ export interface ChildKernelContext {
 	/** The registry lives in the root, so a child reads it through the manager. */
 	poll: (selector: string) => ChildHandle;
 	list: () => ChildHandle[];
+	/** Ends a child, and everything below it, when it is below this session (map `04`). */
+	stop: (selector: string, reason?: string) => Promise<ChildHandle>;
+	/** Ends it the same way, then forgets the record. */
 	remove: (selector: string) => Promise<ChildHandle>;
 	send: (selector: string, text: string) => Promise<ChildHandle>;
 	/** Join: block until every named child is terminal or the patience runs out (ticket 03). */
@@ -95,6 +98,13 @@ export interface SpawnRequest {
 }
 
 interface ChildRecord extends ChildHandle {
+	/**
+	 * Who spawned this child: its **direct** spawner's session file at every depth (`delegation.ts`
+	 * files the child's own file as *its* child's parent, so a grandchild points at its parent child,
+	 * never at the root). The tree the model builds is only real with this edge — a stop cascades down
+	 * it, and the authority check walks up it (`.scratch/rlm-stop` ticket 04).
+	 */
+	parent_session_file: string | null;
 	session?: any;
 	noticeRead: boolean;
 	deleted: boolean;
@@ -140,6 +150,13 @@ export interface ChildManagerDeps {
 	 * Optional: a caller that only delegates never sees it.
 	 */
 	onChange?: () => void;
+	/**
+	 * Appends a custom entry to **this** session's transcript. A stop leaves one (`rlm-stop`) and the
+	 * manager has no `pi` of its own, so the session that owns the manager supplies the writer (ticket
+	 * 03 §5). Optional: a caller that only delegates never sees it, and a missing writer costs the
+	 * record, never the stop.
+	 */
+	appendEntry?: (customType: string, data: unknown) => void;
 }
 
 let piModulePromise: Promise<any> | null = null;
@@ -474,6 +491,9 @@ function handleOf(record: ChildRecord): ChildHandle {
 		ownerDispatch: _ownerDispatch,
 		cost: _cost,
 		countedIds: _countedIds,
+		// The tree edge is the manager's, not the model's: no surface decided to publish it, and
+		// `handleOf` is structural, so an internal field would otherwise ride out on every read.
+		parent_session_file: _parentSessionFile,
 		...handle
 	} = record;
 	return { ...handle };
@@ -587,6 +607,16 @@ export function childPromptFor(
  * poll meant a parent that checked on a running child never heard it finish and had to be
  * prompted by hand — the bug this function exists to prevent.
  */
+/**
+ * The caller's stop reason, bounded the way the reference bounds model-authored text (ticket 03 §9):
+ * trimmed, capped at 200 characters, never parsed. Empty and non-strings mean "no reason given".
+ */
+export function cleanReason(text: string | undefined): string | undefined {
+	if (typeof text !== "string") return undefined;
+	const trimmed = text.trim();
+	return trimmed ? trimmed.slice(0, 200) : undefined;
+}
+
 export function markNoticeReadIfFinished(record: { status: ChildStatus; noticeRead: boolean }): void {
 	if (record.status !== "running") record.noticeRead = true;
 }
@@ -697,7 +727,10 @@ export function createChildManager(deps: ChildManagerDeps) {
 				}),
 			poll,
 			list,
-			remove,
+			// The context is built per child, so the asker is this child — which is what makes the
+			// authority check positional rather than an honour system (ticket 04 §3).
+			stop: (selector, reason) => stop(selector, reason, id),
+			remove: (selector) => remove(selector, id),
 			send,
 			wait,
 			findModels: async (query, limit) => findModels(await deps.runtime(), query, limit),
@@ -772,6 +805,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 			status: "running",
 			started_at: new Date().toISOString(),
 			ended_at: null,
+			parent_session_file: request.parentSessionFile ?? null,
 			session,
 			noticeRead: false,
 			deleted: false,
@@ -810,19 +844,114 @@ export function createChildManager(deps: ChildManagerDeps) {
 		return visible.map(handleOf);
 	}
 
-	/** Stops if running, tombstones the record, and never erases a transcript. */
-	async function remove(selector: string): Promise<ChildHandle> {
-		const record = find(selector);
-		if (record.status === "running") {
-			try {
-				await record.session?.abort();
-			} catch {
-				/* best effort */
-			}
-			record.status = "stopped";
-			record.ended_at = new Date().toISOString();
-			changed();
+	/** The records whose **direct** spawner is `file` — the tree edge, one level down. */
+	function childrenOfFile(file: string | null): ChildRecord[] {
+		if (!file) return [];
+		return [...records.values()].filter((record) => !record.deleted && record.parent_session_file === file);
+	}
+
+	/** A record and its descendants, depth-first in spawn order: what a stop ends (ticket 04 §2). */
+	function subtreeOf(record: ChildRecord): ChildRecord[] {
+		const out: ChildRecord[] = [record];
+		for (const child of childrenOfFile(record.session_file)) out.push(...subtreeOf(child));
+		return out;
+	}
+
+	/** The live record that owns a session file, or `undefined` when none does. */
+	function recordOwning(file: string): ChildRecord | undefined {
+		return [...records.values()].find((record) => !record.deleted && record.session_file === file);
+	}
+
+	/**
+	 * Is `record` below `askerFile`? The walk goes **up** the edge, so one rule answers both "may this
+	 * session end that one" and "what does the cascade include" (ticket 04 §3). Hop-bounded: the data is
+	 * ours, but a cycle must not be able to hang a stop.
+	 */
+	function belowFile(record: ChildRecord, askerFile: string, hops = 0): boolean {
+		if (hops > deps.maxDepth + 1) return false;
+		const parent = record.parent_session_file;
+		if (!parent) return false;
+		if (parent === askerFile) return true;
+		const owner = recordOwning(parent);
+		return owner ? belowFile(owner, askerFile, hops + 1) : false;
+	}
+
+	/**
+	 * Authority (ticket 04 §3): a session may end itself? **No** — the cascade would dispose the session
+	 * running the very cell that asked — or anything **below** it. The root passes no asker and so keeps
+	 * full reach, which is also what lets it clean up a grandchild it never spawned. Reads
+	 * (`poll`/`list`/`send`/`wait`) keep their flat reach; only these verbs are bounded.
+	 */
+	function mayStop(record: ChildRecord, askerId: string | undefined, verb: string): void {
+		if (!askerId) return;
+		if (record.child_id === askerId) throw new Error(`${verb}: a session cannot stop itself.`);
+		const askerFile = records.get(askerId)?.session_file ?? null;
+		if (!askerFile || !belowFile(record, askerFile)) {
+			throw new Error(`${verb}: ${record.child_id} is not below this session.`);
 		}
+	}
+
+	/**
+	 * Best effort and **detached**: tell each child's own extensions the session is gone, then dispose
+	 * (tickets 03 §3, 04 §2). The caller never awaits this, which is the point — `abort()` cannot resolve
+	 * at all on a cell that makes no host call (measured 2026-10-09: `remove` on such a child never
+	 * returned and took its caller's cell with it), so a stop that waited for the unwind would hang
+	 * exactly on the child it exists for.
+	 */
+	async function teardown(members: ChildRecord[]): Promise<void> {
+		for (const member of members) {
+			try {
+				await disposeChildSession(member.session);
+			} catch {
+				/* a stop is never allowed to fail */
+			}
+		}
+	}
+
+	/**
+	 * End a child, and everything below it, releasing the sessions while keeping the records (tickets 03
+	 * and 04). The record is marked and the handle returned **before** the teardown runs; every child the
+	 * cascade reached says who ended it, so "why did this grandchild die?" is answerable from its own
+	 * record. Stopping a child that already ended is a no-op on its own ending, but still cascades into
+	 * any of its descendants that are still running.
+	 */
+	async function stop(selector: string, reason?: string, askerId?: string): Promise<ChildHandle> {
+		const record = find(selector);
+		mayStop(record, askerId, "rlm.stop");
+		const toStop = subtreeOf(record).filter((member) => member.status === "running");
+		if (toStop.length === 0) return handleOf(record);
+		const stated = cleanReason(reason) ?? "stopped by parent";
+		const endedAt = new Date().toISOString();
+		for (const member of toStop) {
+			member.status = "stopped";
+			member.ended_at = endedAt;
+			member.reason = member === record ? stated : `stopped with ${record.child_id} (${stated})`;
+			// No notice: the model caused this ending, and a notice is for the endings it was not
+			// watching (ticket 03 §5).
+			member.noticeRead = true;
+		}
+		changed();
+		const handle = handleOf(record);
+		// The transcript's one mark (ticket 03 §5): the reason, and every id the cascade ended, in stop
+		// order — parent first, then depth-first.
+		try {
+			deps.appendEntry?.("rlm-stop", {
+				child_id: record.child_id,
+				reason: stated,
+				stopped_ids: toStop.map((member) => member.child_id),
+			});
+		} catch {
+			/* a transcript entry is never worth a stop */
+		}
+		void teardown(toStop);
+		return handle;
+	}
+
+	/** Stop what is running, then forget the named record — and only it (tickets 03 §8, 04 §6). */
+	async function remove(selector: string, askerId?: string): Promise<ChildHandle> {
+		const record = find(selector);
+		mayStop(record, askerId, "rlm.remove");
+		if (record.status === "running") await stop(selector, undefined, askerId);
 		record.deleted = true;
 		record.noticeRead = true;
 		return handleOf(record);
@@ -830,6 +959,14 @@ export function createChildManager(deps: ChildManagerDeps) {
 
 	async function send(selector: string, text: string): Promise<ChildHandle> {
 		const record = find(selector);
+		// A stopped child's session has been disposed, so there is nothing to resume — and the check is
+		// on the **status**, not on the disposal: a stop returns before its teardown runs, so a flag
+		// would let a `send` arriving in that gap resurrect the child the model just killed (ticket 03 §6).
+		if (record.status === "stopped") {
+			throw new Error(
+				`rlm.send: ${record.child_id} is not resumable (stopped${record.reason ? `: ${record.reason}` : ""}); spawn a new child instead of resuming it.`,
+			);
+		}
 		if (record.status === "running") {
 			await record.session?.followUp(text);
 		} else {
@@ -894,7 +1031,9 @@ export function createChildManager(deps: ChildManagerDeps) {
 		spawn,
 		poll,
 		list,
-		remove,
+		// The root's own verbs: no asker, so its reach is every live record in the tree (ticket 04 §3).
+		stop: (selector: string, reason?: string) => stop(selector, reason),
+		remove: (selector: string) => remove(selector),
 		send,
 		wait,
 
@@ -903,25 +1042,24 @@ export function createChildManager(deps: ChildManagerDeps) {
 
 		liveCount: () => [...records.values()].filter((record) => record.status === "running").length,
 
-		/** Ticket 06: parent teardown kills descendants and marks them terminal. */
+		/**
+		 * Ticket 06: the spawning session is going away, so every child ends with it.
+		 *
+		 * Now the **same** teardown a stop uses, and deliberately without the `await abort()` this used
+		 * to carry: `abort()` cannot resolve on a child wedged in a cell that makes no host call (ticket
+		 * 03's amendment, measured 2026-10-09), so awaiting it here could hang a shutdown on exactly the
+		 * child a shutdown needs to release.
+		 */
 		async shutdownAll(): Promise<void> {
-			let stoppedAny = false;
-			for (const record of records.values()) {
-				if (record.status !== "running") continue;
-				stoppedAny = true;
+			const running = [...records.values()].filter((record) => record.status === "running");
+			for (const record of running) {
 				record.status = "stopped";
+				record.reason = record.reason ?? "the spawning session is shutting down";
 				record.ended_at = new Date().toISOString();
-				try {
-					await record.session?.abort();
-				} catch {
-					/* best effort */
-				}
-				// Tells the child's own extensions the session is gone before the runner is invalidated
-				// (see `disposeChildSession`: disposing alone leaves their timers armed and their
-				// resources open).
-				await disposeChildSession(record.session);
+				record.noticeRead = true;
 			}
-			if (stoppedAny) changed();
+			if (running.length > 0) changed();
+			await teardown(running);
 		},
 	};
 }

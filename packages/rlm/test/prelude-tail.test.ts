@@ -29,6 +29,8 @@ describe("the delegation prelude", () => {
 			"class _Rlm",
 			"def spawn",
 			"def wait",
+			"def stop",
+			"def remove",
 			"rlm = _Rlm()",
 			"class _AgentMessage",
 			"agent_message = _AgentMessage()",

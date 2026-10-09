@@ -65,6 +65,36 @@ export function releaseTurnNow(): void {
 	releaseTurn = null;
 }
 
+/** Every child session `dispose()`d, by its session file — what a stop's teardown must reach. */
+export const disposedSessions: string[] = [];
+
+/** Every `session_shutdown` a disposed session emitted, by reason. */
+export const shutdownReasons: string[] = [];
+
+let shutdownBehavior: () => Promise<void> = async () => {};
+
+/**
+ * What a disposed session's `session_shutdown` emit does. A held emit is how a test proves a stop is
+ * **detached**: the teardown's only unbounded step is the child's own handler, and a stop must not wait
+ * for it (`.scratch/rlm-stop` ticket 03; a monty-spinning child never lets `abort()` resolve at all).
+ */
+export function setShutdownBehavior(behavior: () => Promise<void>): void {
+	shutdownBehavior = behavior;
+}
+
+let sessionCounter = 0;
+
+/**
+ * Each spawned child gets its own session file. The tree rlm now walks is made of these strings, so a
+ * constant would collapse every child onto one node (`parent_session_file`, ticket 04).
+ */
+export function resetFakeSessions(): void {
+	disposedSessions.length = 0;
+	shutdownReasons.length = 0;
+	sessionCounter = 0;
+	shutdownBehavior = async () => {};
+}
+
 export function installFakePi(): void {
 	mock.module("@earendil-works/pi-coding-agent", () => ({
 		SettingsManager: { create: () => ({}) },
@@ -78,16 +108,28 @@ export function installFakePi(): void {
 		SessionManager: { create: () => ({ appendCustomEntry() {} }) },
 		createAgentSession: async (options: any) => {
 			capturedSessionOptions.push(options);
+			const sessionFile = `/tmp/child-${++sessionCounter}.jsonl`;
 			return {
 				session: {
-					sessionFile: "/tmp/child.jsonl",
+					sessionFile,
 					model: null,
 					sessionManager: { getEntries: () => childEntries },
 					bindExtensions: async () => {},
 					prompt: () => turnBehavior(),
 					followUp: async () => {},
 					abort: async () => {},
-					dispose: () => {},
+					// `disposeChildSession` tells the child's own extensions first, through exactly this
+					// property (pi does not export the emitter).
+					extensionRunner: {
+						hasHandlers: () => true,
+						emit: async (event: any) => {
+							shutdownReasons.push(String(event?.reason));
+							await shutdownBehavior();
+						},
+					},
+					dispose: () => {
+						disposedSessions.push(sessionFile);
+					},
 				},
 			};
 		},

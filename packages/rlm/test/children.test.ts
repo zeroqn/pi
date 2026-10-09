@@ -22,7 +22,11 @@ import {
 	installFakePi,
 	releaseTurnNow,
 	setChildEntries,
+	setShutdownBehavior,
 	setTurnBehavior,
+	disposedSessions,
+	resetFakeSessions,
+	shutdownReasons,
 } from "./fake-pi";
 import {
 	CHILD_ENTRY_TYPE,
@@ -37,6 +41,7 @@ import {
 	markNoticeReadIfFinished,
 	readChildProvenance,
 	childPromptFor,
+	cleanReason,
 	registerManagerView,
 	resolveOwnDepth,
 	statusLine,
@@ -252,33 +257,48 @@ installFakePi();
 function managerHarness(onChange?: () => void) {
 	const notices: Notice[] = [];
 	// The child's own kernel context, captured as a spawn builds it: it is the channel the child's
-	// kernel reaches its parent through, `agent_message.send` included.
+	// kernel reaches its parent through — `agent_message.send`, and the stop/remove verbs, whose
+	// authority is the asker's own position in the tree (ticket 04).
 	let childContext: any = null;
+	const contexts = new Map<string, any>();
+	/** Every custom entry the manager wrote into this session's transcript (`rlm-stop`, ticket 03 §5). */
+	const entries: Array<{ customType: string; data: any }> = [];
 	const manager = createChildManager({
 		cwd: () => "/tmp/work",
 		ownSessionFile: () => "/tmp/parent.jsonl",
 		kernelFactoryFor: (child) => {
 			childContext = child;
+			contexts.set(child.id, child);
 			return () => {};
 		},
 		runtime: async () => ({}),
 		maxDepth: 2,
 		maxLive: 8,
 		onChange,
+		appendEntry: (customType, data) => entries.push({ customType, data }),
 	});
+	const spawn = (name = "probe") =>
+		manager.spawn({
+			prompt: "go",
+			name,
+			depth: 1,
+			spawnCell: "",
+			parentSessionFile: "/tmp/parent.jsonl",
+			ownerDispatch: (notice) => notices.push(notice),
+		});
 	return {
 		manager,
 		notices,
+		entries,
 		child: () => childContext,
-		spawn: (name = "probe") =>
-			manager.spawn({
-				prompt: "go",
-				name,
-				depth: 1,
-				spawnCell: "",
-				parentSessionFile: "/tmp/parent.jsonl",
-				ownerDispatch: (notice) => notices.push(notice),
-			}),
+		/** The context of one specific child, for the authority cases (a sibling, a grandchild). */
+		contextOf: (childId: string) => contexts.get(childId),
+		spawn,
+		/** Spawn a grandchild the way a child's own cell does: through its context, one level deeper. */
+		grandchild: (parentChildId: string, parentSessionFile: string, name = "grand") =>
+			contexts
+				.get(parentChildId)
+				.spawn({ prompt: "go", name, spawnCell: "", parentSessionFile, surface: ["python"] }),
 		release: () => {
 			releaseTurnNow();
 		},
@@ -754,6 +774,194 @@ describe("the join (rlm-wait tickets 01-03)", () => {
 		h.manager.poll(handle.child_id);
 		expect(completed!.cancelled?.()).toBe(true);
 		expect(message!.cancelled).toBeUndefined();
+	});
+});
+
+/* ------------------------------------------------------------------ *
+ * The stop verb, and the tree it walks (`.scratch/rlm-stop` tickets 03/04)
+ * ------------------------------------------------------------------ */
+
+describe("the stop verb (rlm-stop ticket 03)", () => {
+	beforeEach(() => {
+		holdTurn();
+		setChildEntries([]);
+		resetFakeSessions();
+	});
+
+	it("marks the record stopped, keeps it listed, and stops counting it as working", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		expect(h.manager.liveCount()).toBe(1);
+
+		const stopped = await h.manager.stop(handle.child_id);
+		expect(stopped.status).toBe("stopped");
+		expect(stopped.ended_at).toBeTruthy();
+		expect(stopped.reason).toBe("stopped by parent");
+		expect(h.manager.liveCount()).toBe(0);
+
+		// The evidence stays: a stopped record is still readable, and its name is still reserved.
+		expect(h.manager.list().map((child) => child.child_id)).toEqual([handle.child_id]);
+		expect(h.manager.poll(handle.child_id).status).toBe("stopped");
+	});
+
+	it("returns before the teardown, which then disposes the child's session", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		// The teardown's only unbounded step is the child's own `session_shutdown` handler — the shape a
+		// monty-spinning child never lets finish. A stop that waited for it would hang on exactly the
+		// child the verb exists for (ticket 03 §3), so hold it and assert the stop still returns.
+		let releaseShutdown: (() => void) | null = null;
+		setShutdownBehavior(() => new Promise<void>((resolve) => (releaseShutdown = resolve)));
+
+		const stopped = await h.manager.stop(handle.child_id, "no progress for 12m");
+		expect(stopped.status).toBe("stopped");
+		expect(disposedSessions).toHaveLength(0);
+
+		releaseShutdown!();
+		await settle();
+		expect(shutdownReasons).toEqual(["quit"]);
+		expect(disposedSessions).toEqual([handle.session_file!]);
+	});
+
+	it("writes one rlm-stop entry and sends no notice", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		await h.manager.stop(handle.child_id, "no progress for 12m");
+
+		expect(h.entries).toHaveLength(1);
+		expect(h.entries[0]!.customType).toBe("rlm-stop");
+		expect(h.entries[0]!.data).toEqual({
+			child_id: handle.child_id,
+			reason: "no progress for 12m",
+			stopped_ids: [handle.child_id],
+		});
+		// The model caused this ending: it is not told about it (ticket 03 §5).
+		await settle();
+		expect(h.notices).toHaveLength(0);
+	});
+
+	it("bounds and trims the reason, and defaults an empty one", async () => {
+		const h = managerHarness();
+		const first = await h.spawn("one");
+		await h.manager.stop(first.child_id, `  ${"x".repeat(300)}  `);
+		expect(h.entries[0]!.data.reason).toHaveLength(200);
+
+		const second = await h.spawn("two");
+		await h.manager.stop(second.child_id, "   ");
+		expect(h.entries[1]!.data.reason).toBe("stopped by parent");
+
+		expect(cleanReason(undefined)).toBeUndefined();
+		expect(cleanReason("  spaced  ")).toBe("spaced");
+	});
+
+	it("refuses send to a stopped child, and says what to do instead", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		await h.manager.stop(handle.child_id, "no progress for 12m");
+
+		await expect(h.manager.send(handle.child_id, "again")).rejects.toThrow(
+			/rlm\.send: child-1 is not resumable \(stopped: no progress for 12m\); spawn a new child instead of resuming it\./,
+		);
+		expect(h.manager.poll(handle.child_id).status).toBe("stopped");
+	});
+
+	it("keeps the stopped ending against the turn's late resolution", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		await h.manager.stop(handle.child_id);
+		// The child's own turn resolves afterwards (pi resolves `prompt()` on an abort); the ending
+		// belongs to whoever got there first (the rule `shutdownAll` already relied on).
+		h.release();
+		await settle();
+		expect(h.manager.poll(handle.child_id).status).toBe("stopped");
+	});
+
+	it("is idempotent on a child that already ended, and writes no entry for it", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		h.release();
+		await settle();
+		expect(h.manager.poll(handle.child_id).status).toBe("done");
+
+		const again = await h.manager.stop(handle.child_id);
+		expect(again.status).toBe("done");
+		expect(again.ended_at).toBeTruthy();
+		expect(h.entries).toHaveLength(0);
+	});
+});
+
+describe("the tree a stop walks (rlm-stop ticket 04)", () => {
+	beforeEach(() => {
+		holdTurn();
+		setChildEntries([]);
+		resetFakeSessions();
+	});
+
+	it("cascades into the child's own descendants, naming the author on each", async () => {
+		const h = managerHarness();
+		const child = await h.spawn("parent");
+		const grand = await h.grandchild(child.child_id, child.session_file!, "grand");
+		expect(grand.status).toBe("running");
+
+		await h.manager.stop(child.child_id, "no progress for 12m");
+
+		const records = h.manager.list();
+		expect(records.map((record) => record.status)).toEqual(["stopped", "stopped"]);
+		expect(h.manager.poll(child.child_id).reason).toBe("no progress for 12m");
+		expect(h.manager.poll(grand.child_id).reason).toBe(`stopped with ${child.child_id} (no progress for 12m)`);
+		// Parent first, then depth-first: the order the walk stopped them in.
+		expect(h.entries[0]!.data.stopped_ids).toEqual([child.child_id, grand.child_id]);
+
+		await settle();
+		expect(disposedSessions).toEqual([child.session_file, grand.session_file]);
+	});
+
+	it("still cascades when the named child had already finished", async () => {
+		const h = managerHarness();
+		const child = await h.spawn("parent");
+		h.release();
+		await settle();
+		expect(h.manager.poll(child.child_id).status).toBe("done");
+
+		// A grandchild spawned after its parent's turn ended is still running, and the line of work is
+		// what the model asked to end.
+		const grand = await h.grandchild(child.child_id, child.session_file!, "grand");
+		await h.manager.stop(child.child_id);
+
+		expect(h.manager.poll(child.child_id).status).toBe("done");
+		expect(h.manager.poll(grand.child_id).status).toBe("stopped");
+	});
+
+	it("bounds a child to itself and below: a sibling, a parent and itself are refused", async () => {
+		const h = managerHarness();
+		const first = await h.spawn("first");
+		const second = await h.spawn("second");
+		const grand = await h.grandchild(first.child_id, first.session_file!, "grand");
+
+		const context = h.contextOf(first.child_id);
+		// A sibling is not below it, and the refusal names the verb the caller used.
+		await expect(context.stop(second.child_id)).rejects.toThrow(/rlm\.stop: child-2 is not below this session\./);
+		await expect(context.remove(second.child_id)).rejects.toThrow(/rlm\.remove: child-2 is not below this session\./);
+		// Nor is itself: the cascade would dispose the session running the cell that asked.
+		await expect(context.stop(first.child_id)).rejects.toThrow(/rlm\.stop: a session cannot stop itself\./);
+		// What *is* below it works, and so does the root's own reach over anything.
+		await expect(context.stop(grand.child_id)).resolves.toMatchObject({ status: "stopped" });
+		expect(second.status).toBe("running");
+	});
+
+	it("remove stops first, then forgets the named record and only that one", async () => {
+		const h = managerHarness();
+		const child = await h.spawn("parent");
+		const grand = await h.grandchild(child.child_id, child.session_file!, "grand");
+
+		const forgotten = await h.manager.remove(child.child_id);
+		expect(forgotten.status).toBe("stopped");
+
+		// The named record is gone from every read; its descendant stays, with its reason.
+		expect(h.manager.list().map((record) => record.child_id)).toEqual([grand.child_id]);
+		// `poll` is synchronous, so its refusal is a throw rather than a rejection.
+		expect(() => h.manager.poll(child.child_id)).toThrow(/no child matches/);
+		expect(h.manager.poll(grand.child_id).status).toBe("stopped");
 	});
 });
 

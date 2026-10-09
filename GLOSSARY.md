@@ -105,6 +105,31 @@ Collecting a child's answer — what `rlm.wait` does. It is a status read *and* 
 child's last assistant message, returned to the cell.
 _Avoid_: fetch, await (both already mean something in the kernel)
 
+**Stale**:
+A running child that has made no progress for longer than the threshold. It is a report, not a state: the
+child is still running, nothing has ended it, and stopping it is the model's decision.
+_Avoid_: hung, dead, stuck, zombie
+
+**Progress**:
+Evidence that a child is working — a message it produced, or a call it is in the middle of. Its absence
+is what stale measures.
+_Avoid_: activity, heartbeat (a heartbeat is a promise to report; progress is what a reader can see)
+
+**Stop**:
+Ending a child that is still running. It stops being live from that moment on, and everything it did stays
+readable — its record, the reason it ended, its transcript.
+_Avoid_: kill (that names a process, not a session), terminate, cancel
+
+**Remove**:
+Forgetting a child that has ended: its record leaves the session's list and its name is free for another
+child. A remove erases nothing — the transcript and the session file stay.
+_Avoid_: delete, drop, clear
+
+**Resumable**:
+A child whose session is still open, so it can be given another turn with everything it has built up
+intact. Ending one deliberately closes its session; one that ended by itself leaves its session open.
+_Avoid_: restartable, reopenable, retryable
+
 **Message** (from a child):
 What a child sends its parent with `agent_message.send`. It is content, not status, and **nothing
 withdraws it** — not even reading the child that sent it.
