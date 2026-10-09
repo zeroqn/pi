@@ -13,10 +13,13 @@
  * the first 697): `skill()`'s docstring changed when the call form moved to the bridge, and
  * `.scratch/skill-bridge` ticket 09 records the amendment. The ordering above is what still holds.
  *
- * Amended again 2026-10-09 (`.scratch/rlm-stop` ticket 03): `_Rlm.stop(selector, reason=None)` was
- * added beside `remove`, which is unchanged. The tail is not part of code mode's `BaseSurface`, so no
- * base hash moves; the method's own pin is `test/prelude-tail.test.ts` and the composed hash in
- * `.scratch/code-mode/acceptance-baseline.md`.
+ * Amended again 2026-10-09 (`.scratch/rlm-stop`): `_Rlm.stop(selector, reason=None)` was added beside an
+ * unchanged `remove` (ticket 03), and `_Rlm.note(text, expect_seconds=None)` beside both (ticket 10),
+ * with a docstring that says why a child would call it. **This half is now 1 214 chars, sha256
+ * `3e282b96…`** — the capture above is 990 and covers the whole pre-split tail, so the two are no longer
+ * comparable beyond the fact that this half is a strict superset of what it was. The tail is not part of
+ * code mode's `BaseSurface`, so no base hash moves; the methods' own pin is `test/prelude-tail.test.ts`,
+ * which checks each name and both refusal strings rather than a length.
  *
  * The host functions it names are contributed in the same call, so a cell can never see a name whose
  * host function was rejected.
@@ -33,6 +36,13 @@ export const PRELUDE_TAIL = `class _Rlm:
 
     def list(self):
         return rlm_list()
+
+    def note(self, text, expect_seconds=None):
+        """Say what you are doing, and how long you expect it to take.
+
+        Call this before a step that may run for minutes with nothing to show: a parent that hears
+        nothing for long enough may decide you are stuck and stop you (rlm.stop)."""
+        return rlm_note(text, expect_seconds)
 
     def stop(self, selector, reason=None):
         return rlm_stop(selector, reason)

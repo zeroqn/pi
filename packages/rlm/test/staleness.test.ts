@@ -18,7 +18,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import { STALE_AFTER_DEFAULT_SECONDS } from "../src/config";
-import { staleness } from "../src/children";
+import { staleReason, staleness } from "../src/children";
 
 const MINUTE = 60_000;
 /** child-10's own transcript: the last message at 08:39:42Z, one unbounded `bash` from 08:39:43Z. */
@@ -180,6 +180,29 @@ describe("the staleness predicate (rlm-stop ticket 06)", () => {
 		expect(blind.stale).toBe(true);
 		expect(blind.phase).toBeUndefined();
 		expect(blind.waiting_on).toBeUndefined();
+	});
+
+	it("writes a reason that says what was known, for a stop that gave none", () => {
+		const stale = staleness(
+			{
+				status: "running",
+				lastMessageAt: 0,
+				startedMonotonic: 0,
+				activity: {
+					cell_running: true,
+					calls: [{ name: "bash_host", detail: "bash: cat /dev/dri/renderD128", started_at: new Date(0).toISOString(), age_ms: 0, timeout_s: null }],
+				},
+			},
+			{ wall: 12 * MINUTE, monotonic: 12 * MINUTE },
+			600,
+		);
+		expect(staleReason(stale)).toBe("stale: no progress for 12m (bash: cat /dev/dri/renderD128)");
+		// Not stale: no reason to invent, and the caller's words (or none) stand.
+		expect(staleReason({ stale: false, idle_seconds: 30 })).toBeUndefined();
+		expect(staleReason(null)).toBeUndefined();
+		// Nothing in flight: the parenthetical is simply absent.
+		const quiet = staleness({ status: "running", lastMessageAt: 0, startedMonotonic: 0 }, { wall: 11 * MINUTE, monotonic: 11 * MINUTE }, 600);
+		expect(staleReason(quiet)).toBe("stale: no progress for 11m");
 	});
 
 	it("treats a threshold of zero as never stale, and says nothing about a terminal child", () => {

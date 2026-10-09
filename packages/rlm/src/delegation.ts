@@ -28,6 +28,8 @@ export type DelegationDeps = {
 	} | null;
 	/** Present inside a child: this is which parent the delegation calls reach. */
 	childContext: ChildKernelContext | null;
+	/** Whether this session is a child at all — a root has no record to note on (ticket 10). */
+	isChild?: boolean;
 	/** Absolute durable depth of this session, so a child spawns one level deeper. */
 	ownDepth: number;
 	/** The child's own session file, recorded as its child's parent (provenance, not the root's). */
@@ -90,6 +92,17 @@ export function delegationHostFns(deps: DelegationDeps): Record<string, (...args
 			return deps.childContext
 				? deps.childContext.stop(str(selector), text)
 				: deps.manager!.stop(str(selector), text);
+		},
+		/**
+		 * The child's own declaration (ticket 10). A **root** has no record of its own to write on, so
+		 * the refusal is the same fact `rlm.note`'s absence would convey, said out loud.
+		 */
+		async rlm_note(...args: unknown[]) {
+			const { text, expect_seconds } = bind(args, ["text", "expect_seconds"], "rlm.note");
+			if (!deps.childContext) {
+				throw new Error("rlm.note: only a delegated child can note; this session has no record to note on");
+			}
+			return deps.childContext.note(str(text), expect_seconds === null ? null : num(expect_seconds, 0) || null);
 		},
 		async rlm_poll(...args: unknown[]) {
 			const { selector } = bind(args, ["selector"], "rlm.poll");

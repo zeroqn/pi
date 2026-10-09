@@ -29,6 +29,11 @@ describe("the delegation prelude", () => {
 			"class _Rlm",
 			"def spawn",
 			"def wait",
+			// The child's own declaration (rlm-stop ticket 10), with the docstring that says why a child
+			// would reach for it.
+			"def note",
+			"Say what you are doing",
+			"may decide you are stuck and stop you",
 			"def stop",
 			"def remove",
 			"rlm = _Rlm()",

@@ -66,6 +66,14 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	let reportedKernel = false;
 	/** Whether `rlm.json` lets the environment change this session's behavior (config.ts). */
 	let envOverridesAllowed = false;
+	/**
+	 * The footer's own cadence (rlm-stop ticket 07). The verdict is computed at read time, so a child
+	 * *becoming* stale has no event behind it — and nothing else in the session may wake: the tick is
+	 * armed with the first running child, disarmed with the last, and never armed without a UI.
+	 */
+	let statusTick: ReturnType<typeof setInterval> | null = null;
+	/** The last line written, so a tick that changes nothing writes nothing. */
+	let lastStatusLine = "";
 	/** The staleness threshold this session runs under, resolved with the rest of `rlm.json` below. */
 	let staleAfterSeconds = 600;
 	const notices: Notice[] = [];
@@ -127,7 +135,10 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				staleAfterSeconds: () => staleAfterSeconds,
 				// The footer's count is the manager's to announce, not something to poll for: a child
 				// spawned or finished mid-turn would otherwise go unsaid until the next turn boundary.
-				onChange: () => renderStatus(sessionCtx),
+				onChange: () => {
+					renderStatus(sessionCtx);
+					syncStatusTick(sessionCtx);
+				},
 				// A stop leaves one `rlm-stop` entry in *this* transcript (ticket 03 §5); the manager
 				// has no `pi` of its own, so the session that owns it supplies the writer.
 				appendEntry: (customType, data) => pi.appendEntry(customType, data),
@@ -156,6 +167,26 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 		}
 	}
 
+	/** How often the footer re-reads the verdict while children are running (ticket 07 §2). */
+	const STATUS_TICK_MS = 30_000;
+
+	/**
+	 * Arms the footer's tick only while it can matter (ticket 07 §2).
+	 *
+	 * Called from the manager's `changed()` — the signal that fires on exactly the transitions which
+	 * change whether anything is running — so deciding *whether* to poll needs no polling of its own.
+	 * The tick calls `renderStatus` **directly** rather than `changed()`: no transition happened, and
+	 * waking every waiter in the session to repaint a line would be the tail wagging the dog.
+	 */
+	function syncStatusTick(ctx: any) {
+		const wants = Boolean(ctx?.ui) && (manager?.liveCount() ?? 0) > 0;
+		if (wants && !statusTick) statusTick = setInterval(() => renderStatus(ctx), STATUS_TICK_MS);
+		if (!wants && statusTick) {
+			clearInterval(statusTick);
+			statusTick = null;
+		}
+	}
+
 	/**
 	 * The footer line: the kernel's state, and how many children are working right now. Written at the
 	 * turn boundary — by which time the composition root's record, the seam's own `session_start`, has
@@ -174,7 +205,11 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			const tokens = manager
 				? manager.treeCost()
 				: treeTokens(ctx?.sessionManager?.getSessionFile?.() ?? undefined);
-			ctx?.ui?.setStatus?.("rlm", statusLine(record.mounted, manager?.liveCount() ?? 0, tokens));
+			const stale = manager?.staleChildren() ?? [];
+			const line = statusLine(record.mounted, manager?.liveCount() ?? 0, tokens, stale[0] ? { count: stale.length, name: stale[0].name, idle_seconds: stale[0].idle_seconds } : undefined);
+			if (line === lastStatusLine) return;
+			lastStatusLine = line;
+			ctx?.ui?.setStatus?.("rlm", line);
 		} catch {
 			/* no UI in this mode */
 		}
@@ -371,6 +406,11 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	 * (ticket 01 §6).
 	 */
 	pi.on("session_shutdown", async (_event: any, ctx: any) => {
+		// The footer's tick dies with the session, or it would keep painting a session that is gone.
+		if (statusTick) {
+			clearInterval(statusTick);
+			statusTick = null;
+		}
 		await manager?.shutdownAll();
 		notices.length = 0;
 		try {

@@ -47,6 +47,8 @@ export interface ChildHandle {
 	waiting_on?: string;
 	/** Declared patience still running: seconds before a step the child or its call promised expires. */
 	expectation_seconds?: number;
+	/** The child's own last word on what it is doing (ticket 10), verbatim and newest-wins. */
+	progress_note?: { text: string; at: string; expect_seconds: number | null };
 }
 
 export interface Notice {
@@ -75,6 +77,12 @@ export interface ChildKernelContext {
 	depth: number;
 	/** Sends a message to the session that spawned this kernel. */
 	onMessage: (text: string) => void;
+	/**
+	 * Says what this child is doing, and optionally how long it expects to be quiet (ticket 10). A
+	 * **declaration**, never a query: the parent reads it off the handle, and it is the only thing that
+	 * can buy patience for work with no host call in flight.
+	 */
+	note: (text: string, expectSeconds?: number | null) => { ok: true; at: string; expect_seconds: number | null };
 	/** Spawns a grandchild through the same manager, one level deeper. */
 	spawn: (request: Omit<SpawnRequest, "depth" | "ownerDispatch">) => Promise<ChildHandle>;
 	/** The registry lives in the root, so a child reads it through the manager. */
@@ -122,6 +130,13 @@ interface ChildRecord extends ChildHandle {
 	 * it, and the authority check walks up it (`.scratch/rlm-stop` ticket 04).
 	 */
 	parent_session_file: string | null;
+	/**
+	 * What the child last said it was doing, and how long it said the wait would be (ticket 10). This is
+	 * **state on a record**, not a notice (nothing withdraws it, nothing dispatches it) and not a message
+	 * (no turn is triggered): it rides the handle every read returns, which is how a parent sees it
+	 * without reaching into the child's kernel.
+	 */
+	progress_note?: { text: string; at: string; expect_seconds: number | null };
 	/**
 	 * The monotonic reading taken when the child was created. Silence is judged as the **minimum** of
 	 * the wall-clock silence and this elapsed monotonic time, so a host that slept cannot manufacture
@@ -731,12 +746,18 @@ export function childPromptFor(
 ): string[] {
 	const identity = `You are "${request.name}", a delegated child session (depth ${request.depth}). Work the task and answer it.`;
 	const reporting = "Use agent_message.send(text) to send anything your parent needs before you finish.";
+	// Ticket 10: the discipline that keeps a child from being stopped for silence, with the reason a
+	// child can act on. Inside the droppable set (`RLM_CHILD_PROMPT=none`), because v2's A/B criterion
+	// is that the added sentences do not change the artefact.
+	const declaring =
+		"Before a step that may take more than a few minutes — or a command that can hang — say so with rlm.note(text, expect_seconds=...), and pass a timeout to bash: a parent that hears nothing may decide you are stuck and stop you.";
 	if (allowEnvironmentOverride && process.env.RLM_CHILD_PROMPT === "none") return [identity, reporting];
 	return [
 		identity,
 		request.depth < maxDepth
 			? "You have a persistent Python kernel. You may delegate with rlm.spawn(name=..., prompt=...); results arrive as messages, never as the call's return value."
 			: "You have a persistent Python kernel. You are at the delegation limit, so rlm.spawn will be refused — answer the task yourself.",
+		declaring,
 		reporting,
 	];
 }
@@ -803,6 +824,38 @@ export function createChildManager(deps: ChildManagerDeps) {
 			.map((record) => ({ session_file: record.session_file, tokens: foldSessionCost(record.session, record.cost, record.countedIds).total }));
 	}
 
+	/**
+	 * A child's own declaration (ticket 10), written onto its record.
+	 *
+	 * The text is truncated rather than refused (a long note is not a typo) while a malformed
+	 * `expect_seconds` **is** refused, because that is a value nothing can be inferred from. The
+	 * `changed()` fanout — waiters, the footer — is throttled to one note-driven wake per ten seconds:
+	 * the newest text always lands, but a chattering child must not make the parent's session churn.
+	 */
+	function noteFrom(record: ChildRecord, text: string, expectSeconds?: number | null) {
+		const trimmed = String(text ?? "").trim();
+		if (!trimmed) throw new Error("rlm.note requires some text");
+		let expectation: number | null = null;
+		if (expectSeconds !== undefined && expectSeconds !== null) {
+			if (typeof expectSeconds !== "number" || !Number.isFinite(expectSeconds) || expectSeconds <= 0) {
+				throw new Error("rlm.note: expect_seconds must be a positive number of seconds");
+			}
+			expectation = Math.floor(expectSeconds);
+		}
+		const at = new Date().toISOString();
+		record.progress_note = { text: trimmed.slice(0, 512), at, expect_seconds: expectation };
+		const now = Date.now();
+		if (now - lastNoteSignalAt >= NOTE_SIGNAL_INTERVAL_MS) {
+			lastNoteSignalAt = now;
+			changed();
+		}
+		return { ok: true as const, at, expect_seconds: expectation };
+	}
+
+	/** How often a note may wake the waiters and repaint the footer (ticket 10; the reference's 10 s). */
+	const NOTE_SIGNAL_INTERVAL_MS = 10_000;
+	let lastNoteSignalAt = 0;
+
 	/** The verdict for one record, read at call time so no stored flag can drift (ticket 06). */
 	function stallOf(record: ChildRecord): StallFields | null {
 		return staleness(
@@ -811,6 +864,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 				lastMessageAt: lastMessageAt(record.session),
 				startedMonotonic: record.startedMonotonic,
 				activity: activityOf(record.session),
+				note: record.progress_note ?? null,
 			},
 			{ wall: Date.now(), monotonic: performance.now() },
 			deps.staleAfterSeconds?.() ?? STALE_AFTER_DEFAULT_SECONDS,
@@ -876,6 +930,14 @@ export function createChildManager(deps: ChildManagerDeps) {
 					key: `msg:${id}:${Date.now()}`,
 					content: `[${id} "${request.name}"] ${text}`,
 				});
+			},
+			// The context is per child, so a note lands on *this* child's record — a grandchild's note
+			// needs no walk and no kernel lookup (ticket 10). The record is built below, after pi answers
+			// with the session, so the closure reads it through `recordRef`; a note before that (the child
+			// cannot run a cell that early) is refused rather than dropped.
+			note: (text, expectSeconds) => {
+				if (!recordRef.current) throw new Error("rlm.note: this child has no record yet");
+				return noteFrom(recordRef.current, text, expectSeconds);
 			},
 			spawn: (inner) =>
 				spawn({
@@ -943,6 +1005,8 @@ export function createChildManager(deps: ChildManagerDeps) {
 			: undefined;
 		if (resolved?.error) throw new Error(resolved.error);
 
+		/** Filled once the record exists, which is after pi answers with the session (below). */
+		const recordRef: { current: ChildRecord | null } = { current: null };
 		const { session } = await piModule.createAgentSession({
 			cwd,
 			agentDir: directory,
@@ -979,6 +1043,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 			cost: { input: 0, output: 0, total: 0, entries: 0 },
 			countedIds: new Set<string>(),
 		};
+		recordRef.current = record;
 		records.set(id, record);
 		changed();
 
@@ -1088,7 +1153,9 @@ export function createChildManager(deps: ChildManagerDeps) {
 		if (toStop.length === 0) return handleOf(record);
 		// A stop's own return value keeps the record's plain shape: the child ends with this call, so a
 		// verdict computed a moment ago would describe a state that no longer exists.
-		const stated = cleanReason(reason) ?? "stopped by parent";
+		// The verdict is read *before* the ending is written, because it describes the child as it was
+		// (ticket 06 §6): a stale child's default reason says what was true at the moment of the stop.
+		const stated = cleanReason(reason) ?? staleReason(stallOf(record)) ?? "stopped by parent";
 		const endedAt = new Date().toISOString();
 		for (const member of toStop) {
 			member.status = "stopped";
@@ -1308,17 +1375,57 @@ export async function findModels(runtime: any, query?: string, limit = 20): Prom
  * line is read every turn. Print mode's UI is a no-op, so a child's own instance may call this
  * harmlessly.
  */
-export function statusLine(mounted: boolean, live: number, tokens?: number): string {
+export function statusLine(mounted: boolean, live: number, tokens?: number, stale?: StaleSummary): string {
 	const kernel = mounted ? "rlm: code-mode (monty)" : "rlm: kernel unavailable";
 	// The kernel's state and the count keep the exact shape they had: this line is read every turn, and
 	// the token field is an addition, not a reformatting.
 	const base = live > 0 ? `${kernel} ch: ${live} running` : kernel;
+	// The stale clause names the **worst** child (`staleChildren()` sorts by idle time) and counts the
+	// rest, so a session with thirty children never grows a list — and a healthy session's line is
+	// byte-identical to the one it showed before this existed (ticket 07 §1).
+	const staleClause = stale && stale.count > 0
+		? ` · ${stale.count} stale: ${shortName(stale.name)} ${ageText(stale.idle_seconds)}${stale.count > 1 ? ` (+${stale.count - 1} more)` : ""}`
+		: "";
 	// The tree's total is the same number `rlm.tree_cost()` reports (`treeTokens`, one definition, two
 	// readers). Zero and unknown are left unsaid, exactly as the live count is.
-	return typeof tokens === "number" && tokens > 0 ? `${base} · ${compactTokens(tokens)} tok` : base;
+	const tokensClause = typeof tokens === "number" && tokens > 0 ? ` · ${compactTokens(tokens)} tok` : "";
+	return `${base}${staleClause}${tokensClause}`;
+}
+
+/** A model-chosen name, short enough for a footer: the line is read every turn. */
+function shortName(name: string): string {
+	return name.length > 24 ? name.slice(0, 24) : name;
 }
 
 /** Below a thousand the exact number, above it whole thousands: this is a footer, not a receipt. */
 function compactTokens(tokens: number): string {
 	return tokens < 1000 ? String(tokens) : `${Math.round(tokens / 1000)}k`;
+}
+
+/**
+ * An age, as the footer and a stop's default reason both print it (ticket 07 §1): `45s`, `12m`, `19h`.
+ *
+ * **One definition, two readers** — the same rule `treeTokens` follows for the tree's total, and the
+ * reason it matters: a footer that said `19h` while the transcript's reason said `1140m` would be the
+ * same fact reported twice, differently.
+ */
+export function ageText(seconds: number): string {
+	const value = Math.max(0, Math.round(seconds));
+	if (value < 60) return `${value}s`;
+	if (value < 3600) return `${Math.round(value / 60)}m`;
+	return `${Math.round(value / 3600)}h`;
+}
+
+/** What the footer says about the stale children, when there are any (ticket 07 §1). */
+export type StaleSummary = { count: number; name: string; idle_seconds: number };
+
+/**
+ * The default reason a stop records when the caller gave none and the child was stale (ticket 06 §6):
+ * the age, and what it was waiting on, so a human reading the transcript a day later learns both facts.
+ * `undefined` when the child was not stale — the caller's own words or `stopped by parent` then.
+ */
+export function staleReason(stall: StallFields | null): string | undefined {
+	if (!stall?.stale) return undefined;
+	const waiting = stall.waiting_on ? ` (${stall.waiting_on})` : "";
+	return cleanReason(`stale: no progress for ${ageText(stall.idle_seconds)}${waiting}`);
 }

@@ -44,6 +44,8 @@ import {
 	cleanReason,
 	registerManagerView,
 	resolveOwnDepth,
+	ageText,
+	staleReason,
 	statusLine,
 	treeTokens,
 } from "../src/children";
@@ -208,11 +210,21 @@ describe("the child prompt's shapes (v2 ticket 05)", () => {
 		expect(below).not.toContain("your own children");
 	});
 
+	it("tells a child to declare long work, and why (rlm-stop ticket 10)", () => {
+		delete process.env.RLM_CHILD_PROMPT;
+		const prompt = childPromptFor({ name: "c", depth: 1 }, 2).join(" ");
+		expect(prompt).toContain("rlm.note(text, expect_seconds=...)");
+		expect(prompt).toContain("pass a timeout to bash");
+		// The consequence is the part a child can act on, and it has to be the true one.
+		expect(prompt).toContain("a parent that hears nothing may decide you are stuck and stop you");
+	});
+
 	it("drops the added sentences under the A/B control, when rlm.json allows it", () => {
 		process.env.RLM_CHILD_PROMPT = "none";
 		try {
 			const control = childPromptFor({ name: "c", depth: 1 }, 2, true).join(" ");
 			expect(control).not.toContain("persistent Python kernel");
+			expect(control).not.toContain("rlm.note");
 			expect(control).toContain('You are "c", a delegated child session (depth 1)');
 			expect(control).toContain("agent_message.send");
 		} finally {
@@ -458,6 +470,21 @@ describe("the verdict a read carries (rlm-stop ticket 06)", () => {
 		expect(stopped.idle_seconds).toBeUndefined();
 	});
 
+	it("gives a stale child's stop the reason that says what was known", async () => {
+		const h = managerHarness(undefined, 0.05);
+		const stale = await h.spawn("quiet-one");
+		await new Promise((resolve) => setTimeout(resolve, 120));
+		const stopped = await h.manager.stop(stale.child_id);
+		expect(stopped.reason).toMatch(/^stale: no progress for \d+s$/);
+		expect(h.entries.map((entry) => entry.data.reason)).toEqual([stopped.reason]);
+
+		// A child the model stopped for its own reasons keeps those words.
+		const healthy = managerHarness(undefined, 600);
+		const child = await healthy.spawn("busy-one");
+		expect((await healthy.manager.stop(child.child_id, "the task went away")).reason).toBe("the task went away");
+		expect((await healthy.manager.stop(child.child_id)).reason).toBe("the task went away");
+	});
+
 	it("leaves a working child alone, and lists the stale ones worst first", async () => {
 		const h = managerHarness(undefined, 0.05);
 		const first = await h.spawn("first");
@@ -481,6 +508,99 @@ describe("the verdict a read carries (rlm-stop ticket 06)", () => {
 		await new Promise((resolve) => setTimeout(resolve, 60));
 		expect(never.manager.poll(child.child_id).stale).toBe(false);
 		expect(never.manager.staleChildren()).toEqual([]);
+	});
+});
+
+/* ------------------------------------------------------------------ *
+ * The child's own declaration (`.scratch/rlm-stop` ticket 10)
+ * ------------------------------------------------------------------ */
+
+describe("what a child may declare about itself (rlm-stop ticket 10)", () => {
+	beforeEach(() => {
+		holdTurn();
+		setChildEntries([]);
+		resetFakeSessions();
+	});
+
+	it("lands on the child's own record and rides every read, as a declaration and not a notice", async () => {
+		const changes: number[] = [];
+		const h = managerHarness(() => changes.push(Date.now()));
+		const child = await h.spawn();
+		const before = changes.length;
+
+		const receipt = (h.child() as any).note("fitting the model on 40k rows", 1800);
+		expect(receipt.ok).toBe(true);
+		expect(receipt.expect_seconds).toBe(1800);
+		// Nothing was dispatched: state is not a message and not a notice (the ticket's own test).
+		expect(h.notices).toHaveLength(0);
+
+		const polled = h.manager.poll(child.child_id);
+		expect(polled.progress_note?.text).toBe("fitting the model on 40k rows");
+		expect(polled.progress_note?.expect_seconds).toBe(1800);
+		expect(h.manager.list()[0]!.progress_note?.text).toBe("fitting the model on 40k rows");
+		// And it woke the fanout once, which is what the footer and any waiter ride.
+		expect(changes.length).toBe(before + 1);
+		// It is not an answer and not a status: the record is still `running`.
+		expect(polled.status).toBe("running");
+	});
+
+	it("buys patience for work with no host call in flight, and stops once it expires", async () => {
+		const h = managerHarness(undefined, 0.05);
+		const child = await h.spawn();
+		(h.child() as any).note("compiling, honestly", 1800);
+		await new Promise((resolve) => setTimeout(resolve, 120));
+		const declared = h.manager.poll(child.child_id);
+		expect(declared.stale).toBe(false);
+		expect(declared.expectation_seconds).toBeGreaterThan(1700);
+
+		// The same declaration, an instant from expiry: nothing has moved, so now it is stale — and the
+		// expectation is gone from the report, which is how a reader sees patience run out.
+		(h.child() as any).note("compiling, honestly", 0.01);
+		await new Promise((resolve) => setTimeout(resolve, 120));
+		const expired = h.manager.poll(child.child_id);
+		expect(expired.stale).toBe(true);
+		expect(expired.expectation_seconds).toBeUndefined();
+	});
+
+	it("keeps the newest note, truncates a long one, and refuses a value nothing can be inferred from", async () => {
+		const h = managerHarness();
+		const child = await h.spawn();
+		const note = (text: string, expectSeconds?: number) => (h.child() as any).note(text, expectSeconds);
+		note("first");
+		note("second");
+		expect(h.manager.poll(child.child_id).progress_note?.text).toBe("second");
+		expect(h.manager.poll(child.child_id).progress_note?.expect_seconds).toBeNull();
+
+		note("x".repeat(1000));
+		expect(h.manager.poll(child.child_id).progress_note?.text).toHaveLength(512);
+
+		expect(() => note("bad", -1)).toThrow(/expect_seconds must be a positive number/);
+		expect(() => note("   ")).toThrow(/requires some text/);
+		// A refusal changes nothing: the previous note stands.
+		expect(h.manager.poll(child.child_id).progress_note?.text).toHaveLength(512);
+	});
+
+	it("puts a grandchild's note on the grandchild's own record", async () => {
+		const h = managerHarness();
+		const child = await h.spawn("parent-child");
+		const grand = await h.grandchild(child.child_id, "/tmp/child-1.jsonl", "grand");
+		(h.contextOf(grand.child_id) as any).note("deep in the tree", 60);
+
+		const seen = h.manager.list();
+		expect(seen.map((record) => record.name)).toEqual(["parent-child", "grand"]);
+		expect(seen.find((record) => record.name === "grand")?.progress_note?.text).toBe("deep in the tree");
+		expect(seen.find((record) => record.name === "parent-child")?.progress_note).toBeUndefined();
+	});
+
+	it("throttles the fanout a chatty child causes, while keeping the newest text", async () => {
+		const changes: number[] = [];
+		const h = managerHarness(() => changes.push(1));
+		const child = await h.spawn();
+		const before = changes.length;
+		for (let index = 0; index < 5; index += 1) (h.child() as any).note(`step ${index}`);
+		// Five notes, one wake: the text is current, the parent's session did not churn.
+		expect(changes.length).toBe(before + 1);
+		expect(h.manager.poll(child.child_id).progress_note?.text).toBe("step 4");
 	});
 });
 
@@ -1037,5 +1157,37 @@ describe("the footer's tree total (rlm-wait ticket 04)", () => {
 		expect(statusLine(true, 0, 2_381)).toBe("rlm: code-mode (monty) · 2k tok");
 		expect(statusLine(true, 0, 999)).toBe("rlm: code-mode (monty) · 999 tok");
 		expect(statusLine(false, 1, 400)).toBe("rlm: kernel unavailable ch: 1 running · 400 tok");
+	});
+
+	it("appends the stale clause only when there is one (rlm-stop ticket 07)", () => {
+		// The regression guard this ticket was written around: a healthy line must not move a byte.
+		expect(statusLine(true, 2, 141_400, undefined)).toBe("rlm: code-mode (monty) ch: 2 running · 141k tok");
+		expect(statusLine(true, 2, undefined, { count: 0, name: "x", idle_seconds: 60 })).toBe(
+			"rlm: code-mode (monty) ch: 2 running",
+		);
+		// One stale child, named, with the age the stop's own reason would print.
+		expect(statusLine(true, 2, 141_400, { count: 1, name: "ship-mesa-verify", idle_seconds: 68_400 })).toBe(
+			"rlm: code-mode (monty) ch: 2 running · 1 stale: ship-mesa-verify 19h · 141k tok",
+		);
+		// More than one: the worst is named (the list is sorted worst-first) and the rest counted.
+		expect(statusLine(true, 3, undefined, { count: 2, name: "worst", idle_seconds: 720 })).toBe(
+			"rlm: code-mode (monty) ch: 3 running · 2 stale: worst 12m (+1 more)",
+		);
+		// A model-chosen name is bounded: the line is read every turn.
+		expect(statusLine(true, 1, undefined, { count: 1, name: "a".repeat(40), idle_seconds: 45 })).toBe(
+			`rlm: code-mode (monty) ch: 1 running · 1 stale: ${"a".repeat(24)} 45s`,
+		);
+	});
+
+	it("prints every age the same way the stop reason does (one formatter)", () => {
+		expect(ageText(0)).toBe("0s");
+		expect(ageText(45)).toBe("45s");
+		expect(ageText(59)).toBe("59s");
+		expect(ageText(60)).toBe("1m");
+		expect(ageText(720)).toBe("12m");
+		expect(ageText(3599)).toBe("60m");
+		expect(ageText(3600)).toBe("1h");
+		expect(ageText(68_400)).toBe("19h");
+		expect(ageText(-5)).toBe("0s");
 	});
 });
