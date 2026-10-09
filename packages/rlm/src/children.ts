@@ -16,6 +16,9 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { findKernel, type KernelActivity } from "../../host-bridge/src/client";
+import { STALE_AFTER_DEFAULT_SECONDS } from "./config";
+import { sessionKey } from "../../host-bridge/src/convention";
 
 export type ChildStatus = "running" | "done" | "failed" | "stopped";
 
@@ -30,6 +33,20 @@ export interface ChildHandle {
 	ended_at: string | null;
 	reason?: string;
 	usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
+	/**
+	 * The verdict, on a **running** child only (`.scratch/rlm-stop` ticket 06). A terminal record has no
+	 * clock to read, so these are absent rather than false — and a reader that treats absent as healthy
+	 * is reading a stopped child, which is not the question staleness answers.
+	 */
+	stale?: boolean;
+	/** How long the child has been quiet: the age of the newest evidence of progress, in seconds. */
+	idle_seconds?: number;
+	/** What the kernel is doing, when this process can reach the child's kernel: absent means unknown. */
+	phase?: "waiting" | "computing" | "idle";
+	/** The call it is waiting on, named the way that call names itself — `bash: <command>` for a shell. */
+	waiting_on?: string;
+	/** Declared patience still running: seconds before a step the child or its call promised expires. */
+	expectation_seconds?: number;
 }
 
 export interface Notice {
@@ -105,6 +122,12 @@ interface ChildRecord extends ChildHandle {
 	 * it, and the authority check walks up it (`.scratch/rlm-stop` ticket 04).
 	 */
 	parent_session_file: string | null;
+	/**
+	 * The monotonic reading taken when the child was created. Silence is judged as the **minimum** of
+	 * the wall-clock silence and this elapsed monotonic time, so a host that slept cannot manufacture
+	 * silence while a real silence still counts (ticket 06, from prime-agent's rule).
+	 */
+	startedMonotonic: number;
 	session?: any;
 	noticeRead: boolean;
 	deleted: boolean;
@@ -150,6 +173,11 @@ export interface ChildManagerDeps {
 	 * Optional: a caller that only delegates never sees it.
 	 */
 	onChange?: () => void;
+	/**
+	 * The staleness threshold, in seconds, read at each verdict rather than at construction: the config
+	 * is resolved at session start, after this manager exists (ticket 06). Absent means the default.
+	 */
+	staleAfterSeconds?: () => number;
 	/**
 	 * Appends a custom entry to **this** session's transcript. A stop leaves one (`rlm-stop`) and the
 	 * manager has no `pi` of its own, so the session that owns the manager supplies the writer (ticket
@@ -483,6 +511,120 @@ export function forgetManagerViews(): void {
 	managerChildren.clear();
 }
 
+/** The staleness fields a read reports about a running child; `null` for one that has ended. */
+export type StallFields = {
+	stale: boolean;
+	idle_seconds: number;
+	phase?: "waiting" | "computing" | "idle";
+	waiting_on?: string;
+	expectation_seconds?: number;
+};
+
+/** pi's messages carry **epoch milliseconds** (the entry's `timestamp` is the ISO one). */
+function lastMessageAt(session: unknown): number | null {
+	const messages: any[] = Array.isArray((session as { messages?: unknown })?.messages)
+		? ((session as { messages: any[] }).messages ?? [])
+		: [];
+	for (let index = messages.length - 1; index >= 0; index -= 1) {
+		const stamp = messages[index]?.timestamp;
+		if (typeof stamp === "number" && Number.isFinite(stamp)) return stamp;
+		if (typeof stamp === "string") {
+			const parsed = Date.parse(stamp);
+			if (Number.isFinite(parsed)) return parsed;
+		}
+	}
+	return null;
+}
+
+/**
+ * What the child's kernel is waiting on, read through host-bridge's view of the registry (ticket 05).
+ *
+ * `undefined` means **unknown**, never idle: no kernel mounted for that session, an older code mode
+ * that publishes no reader, a rotated kernel, or a throwing one. A caller that conflated the two would
+ * report a wedged child as a healthy one — which is exactly the defect this exists to remove.
+ */
+function activityOf(session: unknown): KernelActivity | undefined {
+	if (!session) return undefined;
+	try {
+		const lookup = findKernel();
+		if (lookup.status !== "found") return undefined;
+		// The registry key is the session key, and there is one derivation of it (host-bridge's).
+		return lookup.entry.sessions.get(sessionKey(session))?.activity?.();
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Is this child stale — a **pure** function of what a read can see, so the child-10 case is a fixture
+ * rather than a memory (ticket 06).
+ *
+ * ```
+ * evidence = the newest of: its newest model message, its note, its oldest in-flight call's start
+ * silence  = min(now − evidence, monotonic-now − the child's start)   // a host sleep is not silence
+ * patience = the remaining declared bound of that oldest call, or of the note
+ * stale    = silence ≥ threshold and patience ≤ 0
+ * ```
+ *
+ * Three decisions are in those four lines. The floor is the child's **model messages**, not its session
+ * entries: kernel bookkeeping is written *by* a wedged child's own machinery, so counting entries would
+ * let a stuck child look busy (the child-10 case: its kernel wrote an `rlm-bg` entry and raised a notice
+ * while its cell was frozen). The oldest in-flight call is the clock *inside* a cell, and a cell that
+ * makes calls steadily always has a young oldest call. Declarations **push the verdict out** and are
+ * never asked for: a child blocked in a call cannot answer a query, so it is only ever what the child
+ * said *before* it went quiet that counts. `thresholdSeconds <= 0` means never stale.
+ */
+export function staleness(
+	input: {
+		status: ChildStatus;
+		lastMessageAt: number | null;
+		startedMonotonic: number;
+		activity?: KernelActivity | null;
+		note?: { at: string; expect_seconds: number | null } | null;
+	},
+	now: { wall: number; monotonic: number },
+	thresholdSeconds: number,
+): StallFields | null {
+	if (input.status !== "running") return null;
+	const calls = input.activity?.calls ?? [];
+	const oldest = calls[0];
+	const candidates: number[] = [];
+	if (typeof input.lastMessageAt === "number") candidates.push(input.lastMessageAt);
+	const oldestAt = oldest ? Date.parse(oldest.started_at) : Number.NaN;
+	if (Number.isFinite(oldestAt)) candidates.push(oldestAt);
+	const noteAt = input.note ? Date.parse(input.note.at) : Number.NaN;
+	if (Number.isFinite(noteAt)) candidates.push(noteAt);
+	// No evidence at all (a session whose messages this process cannot read) is not *freshness*: the
+	// honest reading is "nothing has moved since the child started", which is what `monotonic` says.
+	const wall = candidates.length > 0 ? Math.max(0, now.wall - Math.max(...candidates)) : Number.POSITIVE_INFINITY;
+	const monotonic = Math.max(0, now.monotonic - input.startedMonotonic);
+	// The verdict compares **unrounded** milliseconds while the report rounds to seconds: a threshold in
+	// a fraction of a second (a test, or an operator who wants one) must not be reported as "stale" with
+	// an `idle_seconds` that reads below it.
+	const silenceMs = Math.min(wall, monotonic);
+	const idleSeconds = Math.round(silenceMs / 1000);
+
+	const expiries: number[] = [];
+	if (oldest && typeof oldest.timeout_s === "number" && Number.isFinite(oldestAt)) {
+		expiries.push(oldestAt + oldest.timeout_s * 1000);
+	}
+	if (input.note && typeof input.note.expect_seconds === "number" && Number.isFinite(noteAt)) {
+		expiries.push(noteAt + input.note.expect_seconds * 1000);
+	}
+	const patience = expiries.length > 0 ? Math.max(0, Math.max(...expiries) - now.wall) : 0;
+
+	const fields: StallFields = {
+		stale: thresholdSeconds > 0 && silenceMs >= thresholdSeconds * 1000 && patience <= 0,
+		idle_seconds: idleSeconds,
+	};
+	if (input.activity) {
+		fields.phase = oldest ? "waiting" : input.activity.cell_running ? "computing" : "idle";
+		if (oldest) fields.waiting_on = oldest.detail ?? oldest.name;
+	}
+	if (patience > 0) fields.expectation_seconds = Math.ceil(patience / 1000);
+	return fields;
+}
+
 function handleOf(record: ChildRecord): ChildHandle {
 	const {
 		session: _session,
@@ -494,6 +636,7 @@ function handleOf(record: ChildRecord): ChildHandle {
 		// The tree edge is the manager's, not the model's: no surface decided to publish it, and
 		// `handleOf` is structural, so an internal field would otherwise ride out on every read.
 		parent_session_file: _parentSessionFile,
+		startedMonotonic: _startedMonotonic,
 		...handle
 	} = record;
 	return { ...handle };
@@ -660,6 +803,28 @@ export function createChildManager(deps: ChildManagerDeps) {
 			.map((record) => ({ session_file: record.session_file, tokens: foldSessionCost(record.session, record.cost, record.countedIds).total }));
 	}
 
+	/** The verdict for one record, read at call time so no stored flag can drift (ticket 06). */
+	function stallOf(record: ChildRecord): StallFields | null {
+		return staleness(
+			{
+				status: record.status,
+				lastMessageAt: lastMessageAt(record.session),
+				startedMonotonic: record.startedMonotonic,
+				activity: activityOf(record.session),
+			},
+			{ wall: Date.now(), monotonic: performance.now() },
+			deps.staleAfterSeconds?.() ?? STALE_AFTER_DEFAULT_SECONDS,
+		);
+	}
+
+	/**
+	 * The handle a read returns: what the record is, plus the verdict when the child is still running.
+	 * One function so `poll`, `list`, `wait` and a stop's return value cannot disagree about a child.
+	 */
+	function handleNow(record: ChildRecord): ChildHandle {
+		return { ...handleOf(record), ...(stallOf(record) ?? {}) };
+	}
+
 	function find(selector: string): ChildRecord {
 		const direct = records.get(selector);
 		if (direct && !direct.deleted) return direct;
@@ -806,6 +971,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 			started_at: new Date().toISOString(),
 			ended_at: null,
 			parent_session_file: request.parentSessionFile ?? null,
+			startedMonotonic: performance.now(),
 			session,
 			noticeRead: false,
 			deleted: false,
@@ -831,7 +997,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 		const record = find(selector);
 		markNoticeReadIfFinished(record);
 		record.usage = usageOfRecord(record) ?? record.usage;
-		return handleOf(record);
+		return handleNow(record);
 	}
 
 	function list(): ChildHandle[] {
@@ -841,7 +1007,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 			record.usage = usageOfRecord(record) ?? record.usage;
 			markNoticeReadIfFinished(record);
 		}
-		return visible.map(handleOf);
+		return visible.map(handleNow);
 	}
 
 	/** The records whose **direct** spawner is `file` — the tree edge, one level down. */
@@ -920,6 +1086,8 @@ export function createChildManager(deps: ChildManagerDeps) {
 		mayStop(record, askerId, "rlm.stop");
 		const toStop = subtreeOf(record).filter((member) => member.status === "running");
 		if (toStop.length === 0) return handleOf(record);
+		// A stop's own return value keeps the record's plain shape: the child ends with this call, so a
+		// verdict computed a moment ago would describe a state that no longer exists.
 		const stated = cleanReason(reason) ?? "stopped by parent";
 		const endedAt = new Date().toISOString();
 		for (const member of toStop) {
@@ -1020,7 +1188,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 			const usage = usageOfRecord(record);
 			const answer = record.status === "done" ? answerOf(record.session) : undefined;
 			return {
-				...handleOf(record),
+				...handleNow(record),
 				...(usage ? { usage } : {}),
 				...(answer ? { answer } : {}),
 			};
@@ -1041,6 +1209,18 @@ export function createChildManager(deps: ChildManagerDeps) {
 		treeCost: () => treeTokens(deps.ownSessionFile?.()),
 
 		liveCount: () => [...records.values()].filter((record) => record.status === "running").length,
+
+		/**
+		 * The running children that have gone quiet, worst first (ticket 07): one predicate, and this is
+		 * the read the footer's line rides without asking for a full `list()`.
+		 */
+		staleChildren: () =>
+			[...records.values()]
+				.filter((record) => !record.deleted && record.status === "running")
+				.map((record) => ({ record, stall: stallOf(record) }))
+				.filter((entry) => entry.stall?.stale === true)
+				.sort((left, right) => (right.stall?.idle_seconds ?? 0) - (left.stall?.idle_seconds ?? 0))
+				.map((entry) => ({ name: entry.record.name, idle_seconds: entry.stall?.idle_seconds ?? 0 })),
 
 		/**
 		 * Ticket 06: the spawning session is going away, so every child ends with it.

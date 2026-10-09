@@ -109,9 +109,14 @@ export function installFakePi(): void {
 		createAgentSession: async (options: any) => {
 			capturedSessionOptions.push(options);
 			const sessionFile = `/tmp/child-${++sessionCounter}.jsonl`;
+			// pi's `AgentSession.messages` is a live array of the child's **model** messages, each with an
+			// epoch-ms `timestamp` — what the staleness floor reads. A spawned child always has at least
+			// its prompt, and a held turn adds nothing.
+			const messages: Array<Record<string, unknown>> = [{ role: "user", timestamp: Date.now() }];
 			return {
 				session: {
 					sessionFile,
+					messages,
 					model: null,
 					sessionManager: { getEntries: () => childEntries },
 					bindExtensions: async () => {},

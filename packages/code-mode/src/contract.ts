@@ -198,6 +198,39 @@ export type BackgroundInfo = {
 	started_at: string;
 };
 
+/** One host call a session is waiting on, as another session can see it (rlm-stop ticket 05). */
+export type KernelCall = {
+	/** The host function's name — `bash_host`, `rlm_wait`, … */
+	name: string;
+	/** What it is doing in a few words, when it can say: `bash` reports its command's first line. */
+	detail?: string;
+	/** When it started, for a reader that wants to print it (`age_ms` is the number to judge by). */
+	started_at: string;
+	/**
+	 * Its age, from the **kernel's own monotonic reference**: a wall-clock jump (a host that slept)
+	 * must not make an honest call look minutes old, so a reader never compares two clocks across a
+	 * process boundary (rlm-stop ticket 06's measured rule).
+	 */
+	age_ms: number;
+	/** The bound the call declared for itself, in seconds. `null` is unbounded, and is the default. */
+	timeout_s: number | null;
+};
+
+/**
+ * What a kernel is waiting on right now.
+ *
+ * The point of publishing this rather than leaving a reader to infer it: a child session that is
+ * quiet in its transcript may be computing, waiting on one long call, or wedged, and only the kernel
+ * knows which. `age_ms` is how a caller separates "a call is in flight" from "a call has been in
+ * flight for an hour".
+ */
+export type KernelActivity = {
+	/** True only while monty is **executing** a cell — not while a cell is queued, and not between cells. */
+	cell_running: boolean;
+	/** Every outstanding call, oldest first. Empty between cells, after a rotation and after shutdown. */
+	calls: KernelCall[];
+};
+
 /** What a kernel must provide for the mounter to wrap it into a handle. */
 export type KernelHandleCore = {
 	currentCell: () => string;
@@ -220,6 +253,16 @@ export type KernelHandleCore = {
 	backgrounds?: () => BackgroundInfo[];
 	/** Kill the running ones — all of them, or exactly `ids` — answering with what it killed. */
 	killBackgrounds?: (ids?: string[]) => Promise<string[]>;
+	/**
+	 * What this kernel is waiting on *right now* (rlm-stop ticket 05), computed at read time from the
+	 * driver's own future map and the per-call bounds the host functions declared.
+	 *
+	 * Optional, so an older code mode is served exactly as it was — and **absent means *unknown*, never
+	 * *idle***: a reader that cannot tell those apart would report a wedged child as a healthy one. No
+	 * apiVersion bump: `versionProblem`'s rule is that the shape is the guard, and an added optional
+	 * member is a shape every reader already tolerates.
+	 */
+	activity?: () => KernelActivity;
 	contribute: (contribution: Contribution) => Receipt;
 };
 

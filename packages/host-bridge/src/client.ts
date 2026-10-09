@@ -147,6 +147,29 @@ export type KernelHandle = {
 	/** The background shells this kernel is holding, and how to stop the running ones. */
 	backgrounds?: () => KernelBackground[];
 	killBackgrounds?: (ids?: string[]) => Promise<string[]>;
+	/**
+	 * What the kernel is waiting on right now (rlm-stop ticket 05) — the calls monty's driver still
+	 * holds futures for, oldest first, each with the bound it declared, plus whether monty is
+	 * executing at all.
+	 *
+	 * Optional and mirrored structurally rather than imported, like everything else in this view: a
+	 * consumer must tolerate an older code mode, and **absent means unknown, never idle**.
+	 */
+	activity?: () => KernelActivity;
+};
+
+/** Mirrors code mode's `KernelCall`/`KernelActivity` (the view type's rule: a consumer reads a shape). */
+export type KernelCall = {
+	name: string;
+	detail?: string;
+	started_at: string;
+	age_ms: number;
+	timeout_s: number | null;
+};
+
+export type KernelActivity = {
+	cell_running: boolean;
+	calls: KernelCall[];
 };
 
 export type KernelEntry = {

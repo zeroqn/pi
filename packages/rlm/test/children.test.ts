@@ -254,7 +254,7 @@ describe("the read rule (ticket 06)", () => {
 
 installFakePi();
 
-function managerHarness(onChange?: () => void) {
+function managerHarness(onChange?: () => void, staleAfterSeconds = 600) {
 	const notices: Notice[] = [];
 	// The child's own kernel context, captured as a spawn builds it: it is the channel the child's
 	// kernel reaches its parent through — `agent_message.send`, and the stop/remove verbs, whose
@@ -275,6 +275,7 @@ function managerHarness(onChange?: () => void) {
 		maxDepth: 2,
 		maxLive: 8,
 		onChange,
+		staleAfterSeconds: () => staleAfterSeconds,
 		appendEntry: (customType, data) => entries.push({ customType, data }),
 	});
 	const spawn = (name = "probe") =>
@@ -417,6 +418,69 @@ describe("a turn that ends unfinished (2026-09-30)", () => {
 		await settle();
 
 		expect(h.manager.poll(handle.child_id).status).toBe("stopped");
+	});
+});
+
+/* ------------------------------------------------------------------ *
+ * The verdict on a read (`.scratch/rlm-stop` ticket 06)
+ * ------------------------------------------------------------------ */
+
+describe("the verdict a read carries (rlm-stop ticket 06)", () => {
+	beforeEach(() => {
+		holdTurn();
+		setChildEntries([]);
+		resetFakeSessions();
+	});
+
+	it("marks a quiet running child on every read, and stops marking it once it ends", async () => {
+		const h = managerHarness(undefined, 0.05);
+		const handle = await h.spawn();
+		await new Promise((resolve) => setTimeout(resolve, 120));
+
+		const polled = h.manager.poll(handle.child_id);
+		expect(polled.stale).toBe(true);
+		expect(polled.idle_seconds).toBeGreaterThanOrEqual(0);
+		// No kernel reader is reachable for this child (the fake mounts none), which means *unknown*:
+		// the floor decides alone and the phase is absent rather than guessed (ticket 06).
+		expect(polled.phase).toBeUndefined();
+
+		const listed = h.manager.list()[0]!;
+		expect(listed.stale).toBe(true);
+		const joined = await h.manager.wait([handle.child_id], 0.05);
+		expect(joined[0]!.stale).toBe(true);
+		expect(joined[0]!.status).toBe("running");
+
+		// A terminal child has no clock to read: the fields are absent, not `false`.
+		await h.manager.stop(handle.child_id);
+		const stopped = h.manager.poll(handle.child_id);
+		expect(stopped.status).toBe("stopped");
+		expect(stopped.stale).toBeUndefined();
+		expect(stopped.idle_seconds).toBeUndefined();
+	});
+
+	it("leaves a working child alone, and lists the stale ones worst first", async () => {
+		const h = managerHarness(undefined, 0.05);
+		const first = await h.spawn("first");
+		await new Promise((resolve) => setTimeout(resolve, 120));
+		const second = await h.spawn("second");
+		// A child that was spawned a moment ago is not stale yet: the threshold applies to it too.
+		expect(h.manager.staleChildren().map((child) => child.name)).toEqual(["first"]);
+		await new Promise((resolve) => setTimeout(resolve, 120));
+
+		// Both are quiet now, and `first` has been quiet for longer, so it comes first.
+		const stale = h.manager.staleChildren();
+		expect(stale.map((child) => child.name)).toEqual(["first", "second"]);
+		expect(stale[0]!.idle_seconds).toBeGreaterThanOrEqual(stale[1]!.idle_seconds);
+		expect(h.manager.list().map((child) => child.stale)).toEqual([true, true]);
+		expect(first.status).toBe("running");
+	});
+
+	it("agrees with the handle a stop returns, and with a threshold of zero", async () => {
+		const never = managerHarness(undefined, 0);
+		const child = await never.spawn();
+		await new Promise((resolve) => setTimeout(resolve, 60));
+		expect(never.manager.poll(child.child_id).stale).toBe(false);
+		expect(never.manager.staleChildren()).toEqual([]);
 	});
 });
 

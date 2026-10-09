@@ -66,6 +66,8 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	let reportedKernel = false;
 	/** Whether `rlm.json` lets the environment change this session's behavior (config.ts). */
 	let envOverridesAllowed = false;
+	/** The staleness threshold this session runs under, resolved with the rest of `rlm.json` below. */
+	let staleAfterSeconds = 600;
 	const notices: Notice[] = [];
 	let parentBusy = false;
 
@@ -121,6 +123,8 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				maxLive: MAX_LIVE_CHILDREN,
 				// Read at spawn time: the config is resolved at *this* session's start (config.ts).
 				allowEnvOverrides: () => envOverridesAllowed,
+				// Read at verdict time, so a session that never reads it pays nothing for it.
+				staleAfterSeconds: () => staleAfterSeconds,
 				// The footer's count is the manager's to announce, not something to poll for: a child
 				// spawned or finished mid-turn would otherwise go unsaid until the next turn boundary.
 				onChange: () => renderStatus(sessionCtx),
@@ -309,10 +313,12 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 		// sentences, which is exactly the switch nobody notices is on. Resolved once per session — a
 		// child's spawn reads it through the manager's thunk, and it is the *spawner's* answer that
 		// shapes the child's prompt.
-		envOverridesAllowed = loadRlmConfig({
+		const config = loadRlmConfig({
 			cwd: root,
 			projectTrusted: ctx?.isProjectTrusted?.() === true,
-		}).allowEnvironmentOverrides;
+		});
+		envOverridesAllowed = config.allowEnvironmentOverrides;
+		staleAfterSeconds = config.staleAfterSeconds;
 		reportEnvironmentOverride(ctx, isChild);
 
 		// This session's contribution is filed for the composition root, which asks every contributor in

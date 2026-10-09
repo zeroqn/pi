@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 import type * as MontyModule from "@pydantic/monty/node";
 import { createBackgroundManager } from "./background";
 import { BASE_HOST_FNS, type Ledger, type KernelHandleCore, type MountMode, type Notice, type Provenance } from "./contract";
-import { makeHost, bind, plainArgs, type Attachment } from "./host";
+import { makeHost, bind, plainArgs, type Attachment, type CallDeclaration, type DeclarationSlot } from "./host";
 import { appendJournal, readJournal, readJournals, recordingHost, replayHost, restoredLine } from "./journal";
 import type { CellRecord, HostCallRecord, HostFns, RestoreReport } from "./journal";
 import { clientVersion, loadMonty } from "./monty";
@@ -95,13 +95,31 @@ const MAX_LIVE_BACKGROUND = 8;
  * certainly delivered. Over-counting only defers a rotation; under-counting breaks the cell.
  */
 function newHostChain() {
-	const pending: Array<{ settled: boolean }> = [];
+	const pending: Array<{
+		settled: boolean;
+		name: string;
+		startedAt: number;
+		startedMonotonic: number;
+		timeout_s: number | null;
+		detail?: string;
+	}> = [];
 	return {
-		/** Every host call, before its promise reaches monty. */
-		answer(): { settled: boolean } {
-			const call = { settled: false };
+		/** Every host call, before its promise reaches monty — with the declaration it made. */
+		answer(name: string, declared?: CallDeclaration | null): (typeof pending)[number] {
+			const call = {
+				settled: false,
+				name,
+				startedAt: Date.now(),
+				startedMonotonic: performance.now(),
+				timeout_s: declared?.timeout_s ?? null,
+				...(declared?.detail ? { detail: declared.detail } : {}),
+			};
 			pending.push(call);
 			return call;
+		},
+		/** Everything still in flight, oldest first: what a reader wants to know it is waiting on. */
+		outstanding(): Array<(typeof pending)[number]> {
+			return pending.filter((call) => !call.settled);
 		},
 		/** True only when nothing is outstanding, so a dump of this chain can be reloaded. */
 		empty(): boolean {
@@ -130,21 +148,33 @@ type HostChain = ReturnType<typeof newHostChain>;
  * `async`: monty has to receive the very promise its driver registers as a future, and the settle
  * handler has to be attached before monty's own so the flag is never behind it.
  */
-function countHostCalls(host: HostFns, chain: HostChain): HostFns {
+function countHostCalls(host: HostFns, chain: HostChain, declaring: DeclarationSlot): HostFns {
 	const wrapped: HostFns = {};
 	for (const [name, fn] of Object.entries(host)) {
 		const wrapper = (...args: unknown[]): Promise<unknown> => {
-			const returned = fn(...args);
+			// The slot is held open across the **synchronous prologue** only, which is where a host
+			// function reads its own arguments and can say what it is about to do. `previous` makes a
+			// host function that calls another host function nest rather than clobber.
+			const previous = declaring.current;
+			const declared: CallDeclaration = {};
+			declaring.current = declared;
+			let returned: unknown;
+			try {
+				returned = fn(...args);
+			} finally {
+				declaring.current = previous;
+			}
 			// monty registers a future only for a thenable, so a sync return never reaches the
-			// driver's map and must not be counted — the count has to match that set exactly.
+			// driver's map and must not be counted — the count has to match that set exactly. A
+			// declaration made by a sync call goes with it: nothing is waiting on that call.
 			if (isThenable(returned)) {
-				const call = chain.answer();
+				const call = chain.answer(name, declared);
 				const settled = () => {
 					call.settled = true;
 				};
 				returned.then(settled, settled);
 			}
-			return returned;
+			return returned as Promise<unknown>;
 		};
 		Object.defineProperty(wrapper, "name", { value: name });
 		wrapped[name] = wrapper;
@@ -379,6 +409,12 @@ export function createKernel(options: {
 	 */
 	const ownNotices: Notice[] = [];
 	let cellRunning = false;
+	/**
+	 * Whether **monty is executing** — set around the drive itself, not around the queued cell, which is
+	 * the distinction a staleness reader needs (`cellRunning` is true while a cell waits its turn, which
+	 * is not work in progress). rlm-stop ticket 05.
+	 */
+	let cellDriving = false;
 	function raiseNotice(notice: Notice) {
 		if (ledger.notify(notice)) return;
 		ownNotices.push(notice);
@@ -766,6 +802,7 @@ export function createKernel(options: {
 	async function dropKernel(): Promise<void> {
 		const doomedSession = session;
 		const doomedPool = pool;
+		cellDriving = false;
 		session = null;
 		pool = null;
 		starting = null;
@@ -1013,6 +1050,9 @@ export function createKernel(options: {
 				cellRotateFailure = null;
 				cellAbort = null;
 				cellRebuild = null;
+				// Where a host function puts what it declares about itself while its prologue runs; the
+				// counter below holds it open and hands the declaration to the call it belongs to.
+				const declaring: DeclarationSlot = { current: null };
 				const hostFns = makeHost({
 					root,
 					attachments,
@@ -1025,6 +1065,12 @@ export function createKernel(options: {
 					engine: ledger.search(),
 					// This tool call's own signal, when pi passed one (rlm-wait ticket 06).
 					signal,
+					// Mutated in place, never replaced: the slot's object is the very one `countHostCalls`
+					// hands to `chain.answer` when the call becomes a future.
+					declareCall: (declaration) => {
+						const current = declaring.current;
+						if (current) Object.assign(current, declaration);
+					},
 				});
 				const feedOptions = {
 					mount: [resolved.mount, scratchMount],
@@ -1042,6 +1088,7 @@ export function createKernel(options: {
 							cellCalls.push(error ? { name, args, error } : { name, args, result });
 						})),
 						hostChain,
+						declaring,
 					),
 					os: (name: string) => {
 						if (/getenv|environ/i.test(name)) {
@@ -1054,6 +1101,7 @@ export function createKernel(options: {
 						return monty.NOT_HANDLED;
 					},
 				};
+				cellDriving = true;
 				try {
 					value = await driveCell(params.code, feedOptions);
 				} catch (error) {
@@ -1163,6 +1211,7 @@ export function createKernel(options: {
 			});
 		} finally {
 			cellRunning = false;
+			cellDriving = false;
 			flushOwnNotices();
 		}
 	}
@@ -1233,6 +1282,26 @@ export function createKernel(options: {
 		root: () => root,
 		scratch: () => scratch,
 		progress: () => currentProgress,
+		/**
+		 * What this kernel is waiting on right now (rlm-stop tickets 05/06): the calls monty's driver
+		 * still holds futures for, oldest first, each with the bound it declared, plus whether monty is
+		 * executing at all. Computed at read time from the chain, so there is no stored state to drift —
+		 * and empty between cells, after a rotation and after `shutdown()`, deliberately unlike the
+		 * sticky `currentCell`/`progress` above.
+		 */
+		activity: () => {
+			const now = performance.now();
+			return {
+				cell_running: cellDriving,
+				calls: hostChain.outstanding().map((call) => ({
+					name: call.name,
+					...(call.detail ? { detail: call.detail } : {}),
+					started_at: new Date(call.startedAt).toISOString(),
+					age_ms: Math.max(0, Math.round(now - call.startedMonotonic)),
+					timeout_s: call.timeout_s,
+				})),
+			};
+		},
 		problems: () => ensurePreflight(),
 		contribute: (contribution) => ledger.accept(contribution),
 		/** What a policy needs in order to name the shells it would stop (readonly-limits ticket 03). */

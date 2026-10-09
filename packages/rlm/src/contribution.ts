@@ -34,9 +34,16 @@ export const SNIPPET_CONNECTOR = " and delegation";
  * children at all, so `rlm.wait` on an older child's name refuses — `.scratch/rlm-wait/answer-correctness.md`).
  * It states the session scope and the transcript fallback rather than leaving the model to discover
  * the refusal.
+ *
+ * Two sentences were added 2026-10-09 (`.scratch/rlm-stop`), and they are ticket 08's decided pair: the
+ * staleness report, whose fields the kernel must actually publish (tickets 05 and 06) before the sentence
+ * promises them, and the stop verb (tickets 03 and 04). Each landed in the build slice that made it true,
+ * so no sentence here ever names a field or a verb the session does not have. The authority rule ("only a
+ * child below this session can be stopped") is deliberately left to the refusal text, which is where a
+ * model meets it — the guideline is read by a root, which has no such bound.
  */
 export const RLM_GUIDELINE =
-	"Use await rlm.spawn(name=..., prompt=...) for work worth doing in parallel or in a cleaner context, then end the turn: the child's answer arrives as a message, and rlm.poll(id) reads its status. Use await rlm.wait(names, timeout=180) when the next step needs every child's answer before it can start: it blocks this cell until they are done (or the timeout fires) and returns each child's status, tokens and final answer, and those children stop notifying you. rlm.list() shows the children and their tokens; rlm.tree_cost() totals what the whole tree has spent. Children belong to the session that spawned them, so a resumed or forked session has none: read an older child's answer from its stored transcript. rlm.stop(id, reason=...) ends an unwanted child and everything below it, releasing the session and keeping its record and transcript; rlm.remove(id) forgets the record.";
+	"Use await rlm.spawn(name=..., prompt=...) for work worth doing in parallel or in a cleaner context, then end the turn: the child's answer arrives as a message, and rlm.poll(id) reads its status. Use await rlm.wait(names, timeout=180) when the next step needs every child's answer before it can start: it blocks this cell until they are done (or the timeout fires) and returns each child's status, tokens and final answer, and those children stop notifying you. rlm.list() shows the children and their tokens; rlm.tree_cost() totals what the whole tree has spent. Children belong to the session that spawned them, so a resumed or forked session has none: read an older child's answer from its stored transcript. A child that stops making progress is reported stale, with how long it has been quiet and what it is waiting on — unless it declared how long its work would take. rlm.stop(id, reason=...) ends an unwanted child and everything below it, releasing the session and keeping its record and transcript; rlm.remove(id) forgets the record.";
 
 export type ProvenanceInputs = {
 	startReason?: string;

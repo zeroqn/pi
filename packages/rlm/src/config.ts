@@ -5,7 +5,11 @@
  * child is *told* (see `childPromptFor`). An environment variable is inherited by whatever launched
  * pi and leaves no trace in a transcript, so it is honored only when a config file says so:
  *
- *   { "allowEnvironmentOverrides": true }
+ *   { "allowEnvironmentOverrides": true, "staleAfterSeconds": 600 }
+ *
+ * `staleAfterSeconds` is the other key (`.scratch/rlm-stop` ticket 06): how long a running child may be
+ * quiet before a read reports it stale. `0` is the off switch, and the file's purpose is wider than its
+ * first key's — this is the operator's settings, not only the environment's permissions.
  *
  * Anything else — no file, no key, a non-boolean, `false` — means **off**, which is the default. An
  * override that is off is announced at session start rather than silently ignored, and its value is
@@ -31,9 +35,18 @@ export const RLM_CONFIG_FILE = "rlm.json";
 /** pi's project-local config directory — the SDK's `CONFIG_DIR_NAME`. */
 const PROJECT_CONFIG_DIR = ".pi";
 
+/** The staleness threshold's default, in seconds: ten minutes of silence with nothing declared. */
+export const STALE_AFTER_DEFAULT_SECONDS = 600;
+
 export type RlmConfig = {
 	/** When true, the environment may change rlm's behavior: `RLM_CHILD_PROMPT` takes effect. */
 	allowEnvironmentOverrides: boolean;
+	/**
+	 * Seconds without progress before a running child is reported stale (`rlm-stop` ticket 06).
+	 * `0` means **never** — a deliberate off switch, so a session can take the verdict away without a
+	 * code change. Any unusable value costs the default, never the session.
+	 */
+	staleAfterSeconds: number;
 };
 
 /** pi's agent directory: the environment override first, then pi's own default. Never throws. */
@@ -42,8 +55,11 @@ export function agentDir(): string {
 	return override || join(homedir(), ".pi", "agent");
 }
 
-/** What one file says, or `undefined` when it says nothing usable — a missing file is not a problem. */
-function allowFromFile(path: string): boolean | undefined {
+/**
+ * What one file says under one key, or `undefined` when it says nothing usable — a missing file is not
+ * a problem, and neither is a key it does not carry.
+ */
+function valueFromFile(path: string, key: string): unknown {
 	let raw: string;
 	try {
 		raw = readFileSync(path, "utf8");
@@ -53,12 +69,20 @@ function allowFromFile(path: string): boolean | undefined {
 	try {
 		const parsed: unknown = JSON.parse(raw);
 		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
-		const value = (parsed as Record<string, unknown>)["allowEnvironmentOverrides"];
-		return typeof value === "boolean" ? value : undefined;
+		return (parsed as Record<string, unknown>)[key];
 	} catch {
 		// A stray comma costs the default, never a session.
 		return undefined;
 	}
+}
+
+function booleanValue(raw: unknown): boolean | undefined {
+	return typeof raw === "boolean" ? raw : undefined;
+}
+
+/** A whole number of seconds, zero included (`0` is the off switch); anything else is unusable. */
+function secondsValue(raw: unknown): number | undefined {
+	return typeof raw === "number" && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : undefined;
 }
 
 /**
@@ -66,8 +90,12 @@ function allowFromFile(path: string): boolean | undefined {
  * global one, else off.
  */
 export function loadRlmConfig(input: { cwd?: string; agentDir?: string; projectTrusted?: boolean } = {}): RlmConfig {
-	const global = allowFromFile(join(input.agentDir ?? agentDir(), RLM_CONFIG_FILE));
-	const project =
-		input.projectTrusted && input.cwd ? allowFromFile(join(input.cwd, PROJECT_CONFIG_DIR, RLM_CONFIG_FILE)) : undefined;
-	return { allowEnvironmentOverrides: project ?? global ?? false };
+	const globalPath = join(input.agentDir ?? agentDir(), RLM_CONFIG_FILE);
+	const projectPath =
+		input.projectTrusted && input.cwd ? join(input.cwd, PROJECT_CONFIG_DIR, RLM_CONFIG_FILE) : undefined;
+	const read = (key: string): unknown => (projectPath ? valueFromFile(projectPath, key) : undefined) ?? valueFromFile(globalPath, key);
+	return {
+		allowEnvironmentOverrides: booleanValue(read("allowEnvironmentOverrides")) ?? false,
+		staleAfterSeconds: secondsValue(read("staleAfterSeconds")) ?? STALE_AFTER_DEFAULT_SECONDS,
+	};
 }
