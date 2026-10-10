@@ -58,7 +58,16 @@
  * right facts in the wrong shape. `pathlib.Path` is the like-for-like monty already ships (`is_dir()`, `is_file()`,
  * `exists()`, `.stat().st_size`, `iterdir()`, `/`; no `rglob`/`glob`/`parents`/`home()`), so guideline 9 leads with it
  * and names what it cannot do. The description's clause carries the mapping too, so its hash and length and the
- * whole-array hash move a second time; the first six and the snippet hold.
+ * whole-array hash move a second time; the first six and the snippet hold. Then the bound amendment of
+ * 2026-10-10 -- the tenth guideline, decided in `.scratch/long-work/issues/02-what-the-model-is-told.md`
+ * and amended there by 03: a foreground `bash` waits forever unless a `timeout=` is passed, an
+ * interrupted turn kills the call's process group, and work whose duration cannot be stated belongs in
+ * the background (where `h.poll()` reports `age_ms` against `timeout_s`). It is the one clause on this
+ * surface that describes what the *kernel* does rather than what a cell should write, which is why it
+ * had to land after the abort's kill did (01) -- a surface sentence describing behaviour the kernel
+ * does not have is a lie the model acts on, and this file has that failure in its history
+ * (`<coroutine external_future(N)>`, the background-handle amendment of 2026-09-29). Only the
+ * whole-array hash and the length move; the first six, the description and the snippet keep theirs.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -83,14 +92,17 @@ describe("the base surface (acceptance check 2)", () => {
 		expect(BASE_GUIDELINES[0]).toStartWith("Use python for work that is stateful");
 	});
 
-	// The three deliberate additions since the split: search, then find, then list. They are here
-	// rather than in a contribution because they route what code mode owns, and they are pinned
-	// because they are what the model reads -- a cell that never sees them reaches for bash.
-	it("carries the three added guidelines, the only lines since the split", () => {
-		expect(BASE_GUIDELINES.length).toBe(9);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("5dbd2179babc2963922bb3aa4b0cd77675997df810c08db9b56faaaf9c3202e7");
+	// The four deliberate additions since the split: search, find, list, and -- since
+	// `.scratch/long-work` -- bounding what you cannot predict. They are here rather than in a
+	// contribution because they route what code mode owns, and they are pinned because they are what
+	// the model reads: a cell that never sees them reaches for bash, or waits forever for a command
+	// that had no business being in the foreground.
+	it("carries the four added guidelines, the only lines since the split", () => {
+		expect(BASE_GUIDELINES.length).toBe(10);
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("3b5019c574894bfc40e56239ca2ee40b290efa3eb6d3ed9cc50267d2f683545b");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, path tests come from `pathlib`");
+		expect(BASE_GUIDELINES[9]).toStartWith("In python, bound what you cannot predict");
 	});
 });
