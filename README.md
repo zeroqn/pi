@@ -49,6 +49,13 @@ export MONTY_BIN=/path/to/monty/bin/monty           # code-mode's worker
   not the npm dependency of the same name. Without it the kernel cannot start.
 - `zvec-grep` needs the `zg` CLI on `PATH` (or `ZVEC_GREP_BIN` pointing at it).
 
+`bun run test` (or `bun run check`) is the test command — it gives each package its own working
+directory, which they need: their `mock.module` fakes are process-global. A bare `bun test` at this
+root is a different thing, and not a safe one: it collects every `*.test.*` under the working
+directory, which includes `vendor/magic-context`'s suite, and a nested `bunfig.toml` is never read
+from above, so those tests would run without the preload that keeps them off the live database.
+`bunfig.toml` scopes a stray bare run to `packages/`.
+
 Install one at a time, or the whole set from the root manifest:
 
 ```bash

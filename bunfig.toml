@@ -1,0 +1,16 @@
+# Discovery root for a bare `bun test` run from this repo root.
+#
+# `bun test` collects every `*.test.*` under the working directory. It honours neither `.gitignore`
+# nor a nested `bunfig.toml` (both measured, bun 1.4.2), so from here it would also collect
+# `vendor/magic-context`'s 1,432 test files — and run them without that submodule's `[test] preload`,
+# the guard its own bunfig.toml exists to provide and whose absence is how the live context database
+# was migrated (2026-06-01, per that file's comment). On 2026-10-09 a bare run from this root held a
+# session's cell for 19 minutes at 4.7 GB before it was interrupted.
+#
+# Scoping discovery to `packages/` keeps that from happening. It does NOT make a bare root run equal
+# to `bun run test`: one process cannot give each package its own working directory, and the
+# packages' `mock.module` fakes are process-global, so a single-process run of all of them fails by
+# construction (measured: 10 failures, all "Unhandled error between tests — Export named X not found
+# in module '@earendil-works/pi-coding-agent'"). `bun run test` is the command to use.
+[test]
+root = "./packages"
