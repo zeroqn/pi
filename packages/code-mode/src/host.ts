@@ -308,12 +308,19 @@ export function guarded(host: HostFns, guard?: Guard): HostFns {
 /**
  * The abort gate: the same surface, refused once the turn is cancelled.
  *
- * Two rules, one exception. A call offered **after** the abort never runs. A call already in flight
- * is left to finish *in the host* but no longer holds the cell: the promise the sandbox is waiting on
- * rejects with the abort, monty resumes that suspension with it, and the cell ends in a
- * `KeyboardInterrupt` naming the call. The abandoned work is exactly that — abandoned, not cancelled
- * (`bash` keeps running, a child keeps working); that is the tradeoff
- * `.scratch/rlm-wait/issues/06-…` decided, and the reason the kernel survives it.
+ * Two rules, one exception, and — since `.scratch/long-work/issues/01-the-aborts-kill.md` — one split.
+ * A call offered **after** the abort never runs. A call already in flight stops holding the cell: the
+ * promise the sandbox is waiting on rejects with the abort, monty resumes that suspension with it, and
+ * the cell ends in a `KeyboardInterrupt` naming the call.
+ *
+ * What happens to the *work* then depends on what the call was:
+ *
+ *  - a **spawning** call (`bash`, `find`, `grep`) is **killed, group and all** — its process is
+ *    turn-owned, and nothing of it outlives the cell. `run()` performs that kill, because it is the
+ *    only thing holding a pid; this wrapper deliberately knows nothing about processes.
+ *  - a **promise** — a join, a child, a background handle — is still **abandoned, not cancelled**
+ *    (`bash` in the background keeps running, a child keeps working), the tradeoff
+ *    `.scratch/rlm-wait/issues/06-…` decided and the reason the kernel survives either way.
  *
  * With no signal the surface is returned **unchanged**, not copied: a session whose tool call
  * carried none behaves exactly as it did before this existed. `.name` is preserved for the same
@@ -429,6 +436,9 @@ export function makeHost(options: {
 			const result = await run(SHELL, ["-lc", str(command)], {
 				cwd: root,
 				timeoutSeconds: timeout === null ? null : num(timeout, 0) || null,
+				// The abort kills this call's group (01). A `background=True` call never reaches here,
+				// which is what keeps a handle session-owned.
+				signal,
 			});
 			progress?.(`bash: exit ${result.exitCode ?? "?"} after ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
 			const combined = result.stdout + (result.stderr ? `\n${result.stderr}` : "");
@@ -437,7 +447,11 @@ export function makeHost(options: {
 				stdout: result.stdout,
 				stderr: result.stderr,
 				exit_code: result.exitCode,
-				truncated: cut.truncated || result.killed,
+				truncated: cut.truncated,
+				// Separate from `truncated` on purpose: a call killed at its bound (or by the abort) and a
+				// call whose output was merely long are different facts, and folding them together left
+				// the model unable to tell which had happened (01).
+				killed: result.killed,
 				full_output_path: cut.truncated ? spill(combined, "bash") : null,
 			};
 		},
@@ -464,7 +478,7 @@ export function makeHost(options: {
 					/* the fallback is the rule, not a failure path */
 				}
 			}
-			const result = await run(FIND, findArgv(FIND_KIND, query), { cwd: root });
+			const result = await run(FIND, findArgv(FIND_KIND, query), { cwd: root, signal });
 			if (result.exitCode !== 0 && !result.stdout.trim()) {
 				throw new Error(`find failed: ${result.stderr.trim() || `exit ${result.exitCode}`}`);
 			}
@@ -514,7 +528,7 @@ export function makeHost(options: {
 					/* the fallback is the rule, not a failure path */
 				}
 			}
-			const result = await run(GREP, grepArgv(GREP_KIND, query), { cwd: root });
+			const result = await run(GREP, grepArgv(GREP_KIND, query), { cwd: root, signal });
 			const matches = parseGrepOutput(result.stdout);
 			if (matches.length > 0) return matches.slice(0, limit);
 			// Both engines answer exit 1 with nothing on stdout when the pattern is simply not

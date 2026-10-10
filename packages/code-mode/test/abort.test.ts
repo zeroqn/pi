@@ -7,6 +7,11 @@
  * `BaseException`, a namespace that survives, and a journal that does not record the aborted cell —
  * is only true if monty really raises it.
  *
+ * `.scratch/long-work/issues/01-the-aborts-kill.md` split the old single rule in two, and this file
+ * carries both halves: a **spawning** call (`bash`, `find`, `grep`) is killed, group and all — which is
+ * `run()`'s own business, so it is tested against `run()` directly, by pid — while a **promise** (a
+ * join, a child, a background handle) is still *abandoned, not cancelled*, exactly as before.
+ *
  *   MONTY_BIN=$(nix build --no-link --print-out-paths /workspace/pi/monty#monty-bin)/bin/monty bun test
  */
 import { describe, expect, it } from "bun:test";
@@ -17,6 +22,7 @@ import { spawnSync } from "node:child_process";
 import { BASE_HOST_FNS, REGISTRY_KEY, type RegistryEntry, createLedger } from "../src/contract";
 import codeMode from "../index";
 import { abortable } from "../src/host";
+import { run } from "../src/output";
 import { createKernel } from "../src/kernel";
 import { BASE_DESCRIPTION, BASE_GUIDELINES, BASE_SNIPPET } from "../src/surface";
 
@@ -45,7 +51,7 @@ describe("abortable", () => {
 		expect(error?.message).toContain("ping");
 	});
 
-	it("rejects a call already in flight, and leaves the abandoned work abandoned", async () => {
+	it("rejects a call already in flight, and leaves a promise-shaped call abandoned — not cancelled", async () => {
 		const controller = new AbortController();
 		let finished = false;
 		const host = abortable(
@@ -67,7 +73,8 @@ describe("abortable", () => {
 		);
 		expect(error?.name).toBe("KeyboardInterrupt");
 		expect(error?.message).toBe("aborted while waiting for slow(...)");
-		// The host call itself is not cancelled: it runs to its end, unwatched.
+		// A *promise* keeps the old rule (rlm-wait ticket 06): it is abandoned, not cancelled, and runs
+		// to its end unwatched. Only a call that spawns a process is killed — the half below.
 		await sleep(80);
 		expect(finished).toBe(true);
 	});
@@ -250,5 +257,103 @@ describe.skipIf(!montyReady)("the python tool's own wiring", () => {
 			else glob[REGISTRY_KEY] = saved;
 			rmSync(dir, { recursive: true, force: true });
 		}
+	});
+});
+
+
+/**
+ * The other half of the split (`.scratch/long-work/issues/01-the-aborts-kill.md`): a foreground call
+ * that *spawns* is turn-owned, and the run's abort kills its process group. Driven against `run()`
+ * rather than through a cell, because the kill is a property of the process — and measured by pid,
+ * because a record that says the work ended while the process lives is not a pass.
+ */
+describe("run() and the run's signal", () => {
+	const alive = (pid: number) => {
+		try {
+			process.kill(pid, 0);
+			return true;
+		} catch {
+			return false;
+		}
+	};
+	async function pidFrom(file: string): Promise<number> {
+		for (let waited = 0; waited < 300; waited += 10) {
+			try {
+				const pid = Number(readFileSync(file, "utf8").trim());
+				if (Number.isFinite(pid) && pid > 0) return pid;
+			} catch {
+				/* not written yet */
+			}
+			await sleep(10);
+		}
+		return 0;
+	}
+
+	it("kills the shell and its child at the abort, and reports killed", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "cm-run-kill-"));
+		const pidFile = join(dir, "pids");
+		try {
+			const controller = new AbortController();
+			// The shell records its own pid and its background child's, then waits: two processes in
+			// one group, which is the shape the incident left behind.
+			const running = run("bash", ["-lc", `echo $$ >> ${pidFile}; sleep 30 & echo $! >> ${pidFile}; wait`], {
+				signal: controller.signal,
+			});
+			// Wait for both lines: the shell's pid, then its child's.
+			let lines: string[] = [];
+			for (let waited = 0; waited < 300; waited += 10) {
+				try {
+					lines = readFileSync(pidFile, "utf8").trim().split("\n");
+				} catch {
+					lines = [];
+				}
+				if (lines.length >= 2) break;
+				await sleep(10);
+			}
+			const pids = lines.map(Number).filter((n) => n > 0);
+			expect(pids.length).toBeGreaterThanOrEqual(2);
+			for (const pid of pids) expect(alive(pid)).toBe(true);
+
+			controller.abort();
+			const result = await running;
+			expect(result.killed).toBe(true);
+			// The kill is a signal, so the group is reaped a moment after it is sent.
+			await sleep(100);
+			for (const pid of pids) expect(alive(pid)).toBe(false);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("does not wait for a descendant that inherited the pipe", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "cm-run-pipe-"));
+		const pidFile = join(dir, "gr");
+		try {
+			const started = Date.now();
+			// The shell exits at once and leaves its child holding stdout. Without the exit-then-idle
+			// rule the promise would wait for that pipe to close (`close` never fires) — the same hang
+			// the abort exists to end.
+			const result = await run("bash", ["-lc", `sleep 5 & echo $! >> ${pidFile}; echo started`]);
+			expect(result.stdout).toContain("started");
+			expect(Date.now() - started).toBeLessThan(2000);
+			// Tidy the descendant the fixture deliberately left running.
+			const pid = await pidFrom(pidFile);
+			if (pid > 0) {
+				try {
+					process.kill(pid, "SIGKILL");
+				} catch {
+					/* already gone */
+				}
+			}
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("never spawns for a signal that was already aborted", async () => {
+		const controller = new AbortController();
+		controller.abort();
+		const result = await run("bash", ["-lc", "echo should-not-run"], { signal: controller.signal });
+		expect(result).toEqual({ stdout: "", stderr: "", exitCode: null, killed: true });
 	});
 });
