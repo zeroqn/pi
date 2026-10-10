@@ -37,8 +37,22 @@ export type KernelNotice = {
 /** Which journals a session replays, and which scratch to seed from. rlm owns the rule. */
 export type KernelProvenance = { journals: string[]; seedScratchFrom?: string };
 
-/** One background shell, as a consumer of the handle needs to see it — code mode's shape, mirrored. */
-export type KernelBackground = { id: string; command: string; status: string; started_at: string };
+/**
+ * One background shell, as a consumer of the handle needs to see it — code mode's shape, mirrored.
+ *
+ * `age_ms` and `timeout_s` are the footer's own fields (`.scratch/long-work` ticket 04), computed in the
+ * kernel at read time and **not** by the painter: a reader that subtracted two clocks of its own would
+ * make an honest five-minute shell look an hour old after the host slept. `null` for `age_ms` means
+ * *this process cannot say* — a finished handle, or one restored from an earlier session — never "young".
+ */
+export type KernelBackground = {
+	id: string;
+	command: string;
+	status: string;
+	started_at: string;
+	age_ms: number | null;
+	timeout_s: number | null;
+};
 
 /** One host call, as the kernel is about to make it. Code mode's own shape, mirrored. */
 export type KernelHostCall = { name: string; args: unknown[] };
@@ -170,6 +184,10 @@ export type KernelCall = {
 export type KernelActivity = {
 	cell_running: boolean;
 	calls: KernelCall[];
+	/** How long the driving cell has been executing — `null` when none is (09: `calls` cannot say this). */
+	cell_age_ms: number | null;
+	/** The feed budget in seconds the kernel enforces, so a reader's denominator cannot drift (07, 09). */
+	cell_budget_s: number;
 };
 
 export type KernelEntry = {
