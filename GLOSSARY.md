@@ -35,6 +35,17 @@ Replacing a kernel with a fresh one in the middle of a cell, when the suspension
 ceiling.
 _Avoid_: restart, recycle, reset
 
+**Turn-owned work**:
+Work a cell started in the foreground — a `bash`, `find` or `grep` call — whose process the run owns:
+aborting the run kills its process group, and nothing of it outlives the cell. The escape hatch is
+`background=True`.
+_Avoid_: foreground work (that names the syntax, not the ownership)
+
+**Session-owned work**:
+Work that outlives the turn that started it — a background handle, a child — and ends only when someone
+ends it (`bg_kill`, `rlm.stop`) or its own bound fires.
+_Avoid_: detached work, async work
+
 ## The seam between packages
 
 **Contribution**:
