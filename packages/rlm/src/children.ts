@@ -571,6 +571,44 @@ function activityOf(session: unknown): KernelActivity | undefined {
 }
 
 /**
+ * What this session's **own** kernel is doing, for the footer (`.scratch/long-work` tickets 04 and 09).
+ *
+ * Read through host-bridge's view of the registry — the same lookup `activityOf` performs for a child,
+ * with this session's own key — because the record host-bridge keeps says *whether* a kernel is mounted,
+ * not what it is doing. Both readers are optional (an older code mode publishes neither), and a missing
+ * one contributes **no clause**: unknown is not idle, the rule `activityOf` already states.
+ *
+ * The three shapes are mutually informative rather than redundant: `call` is the session's oldest call in
+ * flight, `cell` is a cell driving with **nothing to name** (the shape a spin has), and `backgrounds` are
+ * shells the cell is not waiting on. `call` and `cell` cannot both appear — while a call is in flight the
+ * cell's age says almost the same thing, and two numbers that agree do not deserve two clauses.
+ */
+export function flightOf(session: unknown): Flight | undefined {
+	if (!session) return undefined;
+	try {
+		const lookup = findKernel();
+		if (lookup.status !== "found") return undefined;
+		const handle = lookup.entry.sessions.get(sessionKey(session));
+		if (!handle) return undefined;
+		const activity = handle.activity?.();
+		const running = (handle.backgrounds?.() ?? []).filter((shell) => shell.status === "running");
+		const call = activity?.calls?.[0];
+		const cell =
+			activity?.cell_running === true && (activity.calls?.length ?? 0) === 0 && typeof activity.cell_age_ms === "number"
+				? { age_ms: activity.cell_age_ms, budget_s: activity.cell_budget_s }
+				: undefined;
+		const flight: Flight = {
+			...(call ? { call: { detail: call.detail, age_ms: call.age_ms, timeout_s: call.timeout_s } } : {}),
+			...(running.length > 0 ? { backgrounds: running } : {}),
+			...(cell ? { cell } : {}),
+		};
+		return Object.keys(flight).length > 0 ? flight : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
  * Is this child stale — a **pure** function of what a read can see, so the child-10 case is a fixture
  * rather than a memory (ticket 06).
  *
@@ -1392,11 +1430,15 @@ export async function findModels(runtime: any, query?: string, limit = 20): Prom
  * line is read every turn. Print mode's UI is a no-op, so a child's own instance may call this
  * harmlessly.
  */
-export function statusLine(mounted: boolean, live: number, tokens?: number, stale?: StaleSummary): string {
+export function statusLine(mounted: boolean, live: number, tokens?: number, stale?: StaleSummary, flight?: Flight): string {
 	const kernel = mounted ? "rlm: code-mode (monty)" : "rlm: kernel unavailable";
 	// The kernel's state and the count keep the exact shape they had: this line is read every turn, and
 	// the token field is an addition, not a reformatting.
 	const base = live > 0 ? `${kernel} ch: ${live} running` : kernel;
+	// What the session *itself* is doing, as opposed to what its children are (long-work 04/09). Each
+	// clause is absent when it has nothing to say, so a session with nothing in flight keeps the exact
+	// line it showed before this existed.
+	const flightClause = flightClauses(flight);
 	// The stale clause names the **worst** child (`staleChildren()` sorts by idle time) and counts the
 	// rest, so a session with thirty children never grows a list — and a healthy session's line is
 	// byte-identical to the one it showed before this existed (ticket 07 §1).
@@ -1406,7 +1448,52 @@ export function statusLine(mounted: boolean, live: number, tokens?: number, stal
 	// The tree's total is the same number `rlm.tree_cost()` reports (`treeTokens`, one definition, two
 	// readers). Zero and unknown are left unsaid, exactly as the live count is.
 	const tokensClause = typeof tokens === "number" && tokens > 0 ? ` · ${compactTokens(tokens)} tok` : "";
-	return `${base}${staleClause}${tokensClause}`;
+	return `${base}${flightClause}${staleClause}${tokensClause}`;
+}
+
+/**
+ * What a session's own work-in-flight looks like in the footer, when there is any.
+ *
+ * - `run:` — the session's own call, with its age and, when it declared one, **the bound it will be
+ *   killed at** (`run: bun test 4m/10m`). Without that denominator an age says only *old*; with it, it
+ *   says *nearly out of time*.
+ * - `cell:` — a cell driving with no call to name, against the kernel's own feed budget. This is the
+ *   spin, the shape `calls` cannot see (09).
+ * - `bg:` — shells the cell is not waiting on. One names itself; several name the **worst** and count
+ *   the rest, the same shape the stale clause uses so a session with eight of them keeps one line.
+ *
+ * A shell with no age (`null` — restarted, or finished elsewhere) prints without one rather than as `0s`.
+ */
+function flightClauses(flight?: Flight): string {
+	if (!flight) return "";
+	const bound = (seconds: number | null | undefined) =>
+		typeof seconds === "number" && seconds > 0 ? `/${ageText(seconds)}` : "";
+	const clauses: string[] = [];
+	if (flight.call) {
+		clauses.push(`run: ${shortCommand(flight.call.detail)} ${ageText(flight.call.age_ms / 1000)}${bound(flight.call.timeout_s)}`);
+	}
+	if (flight.cell) {
+		clauses.push(`cell: ${ageText(flight.cell.age_ms / 1000)}/${ageText(flight.cell.budget_s)}`);
+	}
+	const shells = flight.backgrounds ?? [];
+	if (shells.length === 1) {
+		const only = shells[0]!;
+		clauses.push(`bg: ${shortCommand(only.command)}${only.age_ms === null ? "" : ` ${ageText(only.age_ms / 1000)}`}${bound(only.timeout_s)}`);
+	} else if (shells.length > 1) {
+		// The oldest first: an age is only useful as *how long*, so the worst is the largest one.
+		const worst = [...shells].sort((a, b) => (b.age_ms ?? -1) - (a.age_ms ?? -1))[0]!;
+		clauses.push(
+			`bg: ${shells.length} running · worst ${shortCommand(worst.command)}${worst.age_ms === null ? "" : ` ${ageText(worst.age_ms / 1000)}`}${bound(worst.timeout_s)}`,
+		);
+	}
+	return clauses.length > 0 ? ` · ${clauses.join(" · ")}` : "";
+}
+
+/** A command as the footer shows it: its first line, short enough to leave the rest of the line readable. */
+function shortCommand(text: string | undefined): string {
+	const first = (text ?? "").split("\n")[0]!.trim();
+	if (first === "") return "?";
+	return first.length > 32 ? `${first.slice(0, 32)}…` : first;
 }
 
 /** A model-chosen name, short enough for a footer: the line is read every turn. */
@@ -1435,6 +1522,22 @@ export function ageText(seconds: number): string {
 
 /** What the footer says about the stale children, when there are any (ticket 07 §1). */
 export type StaleSummary = { count: number; name: string; idle_seconds: number };
+
+/**
+ * What the session's **own** kernel is doing, as the footer needs it (`.scratch/long-work` 04 and 09).
+ *
+ * Every member is absent when it has nothing to say, and the whole value is `undefined` for a session
+ * whose kernel publishes no reader — a footer that invented an idle-looking line for an unreadable
+ * kernel would be worse than a silent one.
+ */
+export type Flight = {
+	/** The session's oldest call in flight: what it is doing, how long, and the bound it declared. */
+	call?: { detail?: string; age_ms: number; timeout_s: number | null };
+	/** Shells the session is holding that are still running. */
+	backgrounds?: Array<{ command: string; age_ms: number | null; timeout_s: number | null }>;
+	/** A cell driving with no call to name — the shape a spin has. */
+	cell?: { age_ms: number; budget_s: number };
+};
 
 /**
  * The default reason a stop records when the caller gave none and the child was stale (ticket 06 §6):

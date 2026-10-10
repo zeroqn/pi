@@ -45,10 +45,12 @@ import {
 	registerManagerView,
 	resolveOwnDepth,
 	ageText,
+	flightOf,
 	staleReason,
 	statusLine,
 	treeTokens,
 } from "../src/children";
+import { sessionKey } from "../../host-bridge/src/convention";
 
 function scratch(): string {
 	return mkdtempSync(join(tmpdir(), "rlm-children-"));
@@ -1206,5 +1208,141 @@ describe("the footer's tree total (rlm-wait ticket 04)", () => {
 		expect(ageText(3600)).toBe("1h");
 		expect(ageText(68_400)).toBe("19h");
 		expect(ageText(-5)).toBe("0s");
+	});
+});
+
+
+describe("the footer's own work in flight (long-work tickets 04 and 09)", () => {
+	it("adds a clause per thing in flight, and adds nothing when there is nothing", () => {
+		// Nothing in flight — and no reader — leaves the line exactly as it was.
+		expect(statusLine(true, 1, 141_400, undefined, undefined)).toBe("rlm: code-mode (monty) ch: 1 running · 141k tok");
+		expect(statusLine(true, 0, undefined, undefined, {})).toBe("rlm: code-mode (monty)");
+
+		// The session's own call, with the bound it will be killed at — the denominator is the point:
+		// "4m" is only an age, "4m/10m" is nearly out of time.
+		expect(statusLine(true, 0, undefined, undefined, { call: { detail: "bun test", age_ms: 240_000, timeout_s: 600 } })).toBe(
+			"rlm: code-mode (monty) · run: bun test 4m/10m",
+		);
+		// Unbounded is the default, so it prints no denominator.
+		expect(statusLine(true, 0, undefined, undefined, { call: { detail: "bun test", age_ms: 240_000, timeout_s: null } })).toBe(
+			"rlm: code-mode (monty) · run: bun test 4m",
+		);
+
+		// A cell with nothing to name: the spin, which `calls` cannot see (09).
+		expect(statusLine(true, 0, undefined, undefined, { cell: { age_ms: 3_060_000, budget_s: 3600 } })).toBe(
+			"rlm: code-mode (monty) · cell: 51m/1h",
+		);
+
+		// One shell names itself; several name the worst and count the rest, like the stale clause.
+		expect(
+			statusLine(true, 0, undefined, undefined, { backgrounds: [{ command: "bun test", age_ms: 1_140_000, timeout_s: null }] }),
+		).toBe("rlm: code-mode (monty) · bg: bun test 19m");
+		expect(
+			statusLine(true, 0, undefined, undefined, {
+				backgrounds: [
+					{ command: "fast", age_ms: 60_000, timeout_s: null },
+					{ command: "slow", age_ms: 1_140_000, timeout_s: null },
+					{ command: "mid", age_ms: 300_000, timeout_s: null },
+				],
+			}),
+		).toBe("rlm: code-mode (monty) · bg: 3 running · worst slow 19m");
+		// A shell whose age this process cannot vouch for (a restore, or a handle that ended elsewhere)
+		// prints without one rather than as `0s`, which would be a false answer.
+		expect(statusLine(true, 0, undefined, undefined, { backgrounds: [{ command: "restored", age_ms: null, timeout_s: null }] })).toBe(
+			"rlm: code-mode (monty) · bg: restored",
+		);
+	});
+
+	it("keeps one order, and a long command short", () => {
+		const line = statusLine(true, 2, 141_400, { count: 1, name: "worst", idle_seconds: 68_400 }, {
+			cell: { age_ms: 120_000, budget_s: 3600 },
+			backgrounds: [{ command: "b".repeat(50), age_ms: 3_600_000, timeout_s: 7200 }],
+		});
+		expect(line).toBe(
+			`rlm: code-mode (monty) ch: 2 running · cell: 2m/1h · bg: ${"b".repeat(32)}… 1h/2h · 1 stale: worst 19h · 141k tok`,
+		);
+	});
+});
+
+describe("reading the session's own kernel for the footer (long-work ticket 04)", () => {
+	const REGISTRY = Symbol.for("pi-code-mode:registry");
+	const ctx = { sessionManager: { getSessionFile: () => "/tmp/long-work/footer.jsonl" } };
+
+	/** Put a kernel entry where `findKernel` looks, and hand back the undo. */
+	function withKernel(handle: unknown | null): () => void {
+		const glob = globalThis as Record<symbol, unknown>;
+		const saved = glob[REGISTRY];
+		if (handle !== null) {
+			glob[REGISTRY] = {
+				publisher: "pi-code-mode",
+				apiVersion: 1,
+				sessions: new Map([[sessionKey(ctx), handle]]),
+				mount: () => {},
+			};
+		} else {
+			delete glob[REGISTRY];
+		}
+		return () => {
+			if (saved === undefined) delete glob[REGISTRY];
+			else glob[REGISTRY] = saved;
+		};
+	}
+
+	it("answers nothing at all without a kernel, and nothing that reads as idle", () => {
+		const restore = withKernel(null);
+		try {
+			expect(flightOf(ctx)).toBeUndefined();
+		} finally {
+			restore();
+		}
+		// A kernel that publishes no readers (an older code mode): still nothing, never a fake idle line.
+		// A kernel that publishes no readers (an older code mode): still nothing, never a fake idle line.
+		const restore2 = withKernel({ sessionKey: sessionKey(ctx), problems: () => [] });
+		try {
+			expect(flightOf(ctx)).toBeUndefined();
+		} finally {
+			restore2();
+		}
+	});
+
+	it("reads a call in flight, a cell with none, and only the shells still running", () => {
+		const activity = {
+			cell_running: true,
+			calls: [{ name: "bash_host", detail: "bun test", started_at: "2026-10-10T00:00:00.000Z", age_ms: 240_000, timeout_s: 600 }],
+			cell_age_ms: 300_000,
+			cell_budget_s: 3600,
+		};
+		const restore = withKernel({
+			sessionKey: sessionKey(ctx),
+			problems: () => [],
+			activity: () => activity,
+			backgrounds: () => [
+				{ id: "bg-1", command: "bun test", status: "running", started_at: "", age_ms: 1_140_000, timeout_s: null },
+				{ id: "bg-2", command: "done already", status: "done", started_at: "", age_ms: null, timeout_s: null },
+			],
+		});
+		try {
+			expect(flightOf(ctx)).toEqual({
+				call: { detail: "bun test", age_ms: 240_000, timeout_s: 600 },
+				backgrounds: [{ id: "bg-1", command: "bun test", status: "running", started_at: "", age_ms: 1_140_000, timeout_s: null }],
+			});
+			// With a call to name, the cell's own age adds nothing: `call` and `cell` do not both appear.
+			expect(flightOf(ctx)?.cell).toBeUndefined();
+		} finally {
+			restore();
+		}
+	});
+
+	it("names the cell when it has no call to name, which is the shape a spin has", () => {
+		const restore = withKernel({
+			sessionKey: sessionKey(ctx),
+			problems: () => [],
+			activity: () => ({ cell_running: true, calls: [], cell_age_ms: 5_000, cell_budget_s: 3600 }),
+		});
+		try {
+			expect(flightOf(ctx)).toEqual({ cell: { age_ms: 5_000, budget_s: 3600 } });
+		} finally {
+			restore();
+		}
 	});
 });

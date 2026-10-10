@@ -26,6 +26,7 @@ import {
 } from "../host-bridge/src/convention";
 import {
 	createChildManager,
+	flightOf,
 	headerParentSession,
 	modelRuntime,
 	readChildProvenance,
@@ -171,15 +172,23 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	const STATUS_TICK_MS = 30_000;
 
 	/**
-	 * Arms the footer's tick only while it can matter (ticket 07 §2).
+	 * Arms the footer's tick while a UI exists — a **heartbeat**, and a deliberate supersession of
+	 * `rlm-stop` ticket 07's arm-on-transition rule (`.scratch/long-work` ticket 04).
 	 *
-	 * Called from the manager's `changed()` — the signal that fires on exactly the transitions which
-	 * change whether anything is running — so deciding *whether* to poll needs no polling of its own.
+	 * That rule fit children: the manager's `changed()` is exactly the signal that something about them
+	 * changed. The session's **own** work has no such signal — a background shell starting mid-cell, or a
+	 * cell that runs nineteen minutes, produces no transition this instance can see (pi's
+	 * `tool_execution` events are the blind spot this repo has already measured) — so a footer armed on
+	 * transitions would never arm for the case it was built for. What keeps a heartbeat cheap is not
+	 * arming it less often but the repaint rule in `renderStatus`: the line is written only when it
+	 * changes, so a healthy session shows the same bytes and pays one function call and one registry read
+	 * per tick.
+	 *
 	 * The tick calls `renderStatus` **directly** rather than `changed()`: no transition happened, and
 	 * waking every waiter in the session to repaint a line would be the tail wagging the dog.
 	 */
 	function syncStatusTick(ctx: any) {
-		const wants = Boolean(ctx?.ui) && (manager?.liveCount() ?? 0) > 0;
+		const wants = Boolean(ctx?.ui);
 		if (wants && !statusTick) statusTick = setInterval(() => renderStatus(ctx), STATUS_TICK_MS);
 		if (!wants && statusTick) {
 			clearInterval(statusTick);
@@ -188,11 +197,12 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	}
 
 	/**
-	 * The footer line: the kernel's state, and how many children are working right now. Written at the
-	 * turn boundary — by which time the composition root's record, the seam's own `session_start`, has
-	 * landed — and from the manager's change signal (spawn, completion, resume, remove, teardown), so
-	 * the count is live mid-turn rather than as stale as the last boundary. A session with no UI
-	 * (print mode, a headless child) simply shows nothing.
+	 * The footer line: the kernel's state, how many children are working right now, and what this session
+	 * is itself in the middle of. Written at the turn boundary — by which time the composition root's
+	 * record, the seam's own `session_start`, has landed — from the manager's change signal (spawn,
+	 * completion, resume, remove, teardown), and from the heartbeat above, which is the only one that
+	 * repaints during a long cell. A session with no UI (print mode, a headless child) simply shows
+	 * nothing.
 	 */
 	function renderStatus(ctx: any) {
 		try {
@@ -206,7 +216,16 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				? manager.treeCost()
 				: treeTokens(ctx?.sessionManager?.getSessionFile?.() ?? undefined);
 			const stale = manager?.staleChildren() ?? [];
-			const line = statusLine(record.mounted, manager?.liveCount() ?? 0, tokens, stale[0] ? { count: stale.length, name: stale[0].name, idle_seconds: stale[0].idle_seconds } : undefined);
+			// The session's own work in flight (04/09): read from its own kernel through the registry, and
+			// `undefined` — no clause — when that kernel publishes no reader, because unknown is not idle.
+			const flight = flightOf(ctx);
+			const line = statusLine(
+				record.mounted,
+				manager?.liveCount() ?? 0,
+				tokens,
+				stale[0] ? { count: stale.length, name: stale[0].name, idle_seconds: stale[0].idle_seconds } : undefined,
+				flight,
+			);
 			if (line === lastStatusLine) return;
 			lastStatusLine = line;
 			ctx?.ui?.setStatus?.("rlm", line);
