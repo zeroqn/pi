@@ -54,8 +54,52 @@ export const ROTATE_AT = rotateAtFor(MAX_SUSPENSIONS);
 export const ROTATE_BACKOFF = Math.max(1, Math.floor((MAX_SUSPENSIONS - ROTATE_AT) / 8));
 /** Consecutive failed rotations after which rotation stops until the next turn. */
 export const ROTATE_FAILURE_CAP = 3;
+/**
+ * How long one **feed** — one cell — may execute before monty stops it. An hour.
+ *
+ * `.scratch/long-work/issues/07-what-ends-a-cell.md`. A cell that makes no host call is invisible to
+ * everything else the kernel owns: {@link MAX_SUSPENSIONS} counts suspensions (a spin makes none),
+ * rotation needs a suspension to snapshot at, and `activity()` can only report `cell_running`. On
+ * 2026-10-09 a `bun test` that looked like thirty seconds held a cell for nineteen minutes at 39.8 %
+ * CPU and 4.78 GB; a spin is that shape with nothing to name.
+ *
+ * monty's own doctrine is the two-layer one. `maxFeedDurationSecs` is the **in-sandbox** limit, and
+ * its expiry raises a *catchable* `TimeoutError` in the cell while the kernel survives
+ * (`@pydantic/monty` `dist/pool.d.ts:96-118`). The pool's `feedDurationLimitGrace` — left at its
+ * **default of one second**, deliberately, so there is one number to tune — is the host backstop that
+ * kills the worker when the in-sandbox check cannot fire (it only runs at interpreter checkpoints,
+ * `pool.d.ts:25-34`); that surfaces as `MontyCrashedError{timedOut: true}` and takes the kernel's
+ * existing crash path. `requestTimeout` stays **off**: it is the vendor's backstop for code that wedges
+ * the interpreter itself, which is a different failure from a long cell.
+ *
+ * The clock runs only while sandboxed code executes, so a `time.sleep` loop is **not** bounded by this
+ * — deliberately. `maxTotalSleepSecs` would catch it, cumulatively and uncatchably, and would end a
+ * long-lived kernel's honest patience with it. A sleeper's problem is visibility, not a kill.
+ *
+ * An hour because the longest legitimate cell on record in this repo is 30.1 minutes (`rlm-stop`'s
+ * acceptance run), so thirty would have killed honest work. And it is a *cell's* budget, not a call's:
+ * a call's bound is `timeout=`, which the model declares for itself.
+ */
+export const MAX_FEED_SECONDS = 3600;
+/**
+ * What the model is told when a cell's kernel had to be dropped mid-cell — two causes, two sentences.
+ *
+ * A protocol error is a bug's shape; a **timed-out** worker is a cell that ran past its feed budget
+ * (`long-work` ticket 07). A model told the wrong one draws the wrong lesson, which is also why the
+ * abort path says the process group was killed rather than abandoned.
+ */
+export function rebuildNote(timedOut: boolean): string {
+	return timedOut
+		? "# the cell ran past its feed budget and the kernel has been dropped; this cell's work is lost.\n# The next cell rebuilds it from the journal and the scratch.\n"
+		: "# the kernel died with a monty protocol error and has been dropped; this cell's work is lost.\n# The next cell rebuilds it from the journal and the scratch.\n";
+}
+
 /** Every checkout, so the limits are stated once. */
-export const CHECKOUT_LIMITS = { maxMemory: 1_000_000_000, maxSuspensions: MAX_SUSPENSIONS };
+export const CHECKOUT_LIMITS = {
+	maxMemory: 1_000_000_000,
+	maxSuspensions: MAX_SUSPENSIONS,
+	maxFeedDurationSecs: MAX_FEED_SECONDS,
+};
 /**
  * monty 1.0's sleep policy, stated here for the reason the limits are: there is one fact.
  *
@@ -322,12 +366,18 @@ export function createKernel(options: {
 	ledger: Ledger;
 	/** Test seam, and only that: production passes nothing and gets the constants above. A
 	 * small `maxSuspensions` lets a test cross the reserve in seconds, which is the difference
-	 * between asserting the rotation's *outcomes* and waiting twenty minutes for them. */
-	limits?: { maxMemory?: number; maxSuspensions?: number };
+	 * between asserting the rotation's *outcomes* and waiting twenty minutes for them; a small
+	 * `maxFeedDurationSecs` is the same trick for the feed budget, which is otherwise an hour long. */
+	limits?: { maxMemory?: number; maxSuspensions?: number; maxFeedDurationSecs?: number };
 }): Kernel {
 	const { pi, ledger } = options;
 	const maxSuspensions = options.limits?.maxSuspensions ?? MAX_SUSPENSIONS;
-	const checkoutLimits = { maxMemory: options.limits?.maxMemory ?? CHECKOUT_LIMITS.maxMemory, maxSuspensions };
+	const maxFeedDurationSecs = options.limits?.maxFeedDurationSecs ?? MAX_FEED_SECONDS;
+	const checkoutLimits = {
+		maxMemory: options.limits?.maxMemory ?? CHECKOUT_LIMITS.maxMemory,
+		maxSuspensions,
+		maxFeedDurationSecs,
+	};
 	const checkoutOptions = { limits: checkoutLimits, osPolicy: CHECKOUT_OS_POLICY };
 	const rotateAt = rotateAtFor(maxSuspensions);
 	const rotateBackoff = Math.max(1, Math.floor((maxSuspensions - rotateAt) / 8));
@@ -1094,8 +1144,7 @@ export function createKernel(options: {
 					// otherwise wedge every later cell in the session.
 					if (error instanceof monty.ProtocolError || error instanceof monty.MontyCrashedError) {
 						await dropKernel();
-						cellRebuild =
-							"# the kernel died with a monty protocol error and has been dropped; this cell's work is lost.\n# The next cell rebuilds it from the journal and the scratch.\n";
+						cellRebuild = rebuildNote(error instanceof monty.MontyCrashedError && error.timedOut === true);
 					}
 					if (isSuspensionAbort(error)) {
 						const reason = await recoverFromAbort();
