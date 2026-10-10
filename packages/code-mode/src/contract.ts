@@ -186,16 +186,26 @@ export type Rejection = { name: string; reason: string };
 export type Receipt = { owner: string; accepted: string[]; rejected: Rejection[] };
 
 /**
- * One background shell, as a consumer of the handle needs to see it: enough to name it to a human.
+ * One background shell, as a consumer of the handle needs to see it: enough to name it to a human, and
+ * enough for that human to judge whether it is worth stopping.
  *
  * Deliberately a projection rather than the handle's whole record — a caller deciding whether to stop a
- * shell needs to say *which* shell and *what it is doing*, and nothing else.
+ * shell needs to say *which* shell and *what it is doing*, and nothing else. `age_ms` and `timeout_s`
+ * joined it for the footer (`.scratch/long-work` ticket 04): *what it is doing* includes how long it has
+ * been at it, and against what bound. Both are computed **in the kernel, at read time** — a painter
+ * subtracting two timestamps of its own would make an honest five-minute shell look an hour old after the
+ * host slept, which is the rule `rlm-stop` ticket 06 measured.
+ *
+ * `null` for `age_ms` means *this process cannot say* — a finished handle, or one restored from an
+ * earlier session — never "young".
  */
 export type BackgroundInfo = {
 	id: string;
 	command: string;
 	status: string;
 	started_at: string;
+	age_ms: number | null;
+	timeout_s: number | null;
 };
 
 /** One host call a session is waiting on, as another session can see it (rlm-stop ticket 05). */
@@ -229,6 +239,21 @@ export type KernelActivity = {
 	cell_running: boolean;
 	/** Every outstanding call, oldest first. Empty between cells, after a rotation and after shutdown. */
 	calls: KernelCall[];
+	/**
+	 * How long the running cell has been executing, from the kernel's own monotonic reference.
+	 *
+	 * `calls` cannot answer this for a cell that makes **no host call** — a pure spin has an empty list —
+	 * and that is the shape a human most needs to see (`long-work` ticket 09). `null` means no cell is
+	 * driving: the same emptiness rule `calls` obeys, and the same *absent is not idle* rule `activity`
+	 * itself keeps.
+	 */
+	cell_age_ms: number | null;
+	/**
+	 * The feed budget this kernel enforces, in seconds, so a reader's denominator is the limit that will
+	 * actually kill the cell rather than a second copy of the constant that can drift
+	 * (`long-work` ticket 07 decided it; 09 published it here).
+	 */
+	cell_budget_s: number;
 };
 
 /** What a kernel must provide for the mounter to wrap it into a handle. */

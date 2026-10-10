@@ -10,7 +10,10 @@
  *     so counting one would claim a wait the sandbox is not having);
  *   - concurrent calls come back oldest first, because the oldest is the one that may be stuck;
  *   - `cell_running` is about monty **executing**, not about a cell existing;
- *   - the list is empty — and honest — between cells and after shutdown.
+ *   - the list is empty — and honest — between cells and after shutdown;
+ *   - `cell_age_ms` exists at all because `calls` cannot answer for a cell that makes **no** host call
+ *     (`.scratch/long-work` ticket 09 — a spin), and `cell_budget_s` is published beside it so a
+ *     reader's denominator is the limit that will actually kill the cell.
  *
  * Needs a worker: set `MONTY_BIN` (see README.md).
  */
@@ -20,7 +23,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BASE_HOST_FNS, createLedger } from "../src/contract";
-import { createKernel } from "../src/kernel";
+import { MAX_FEED_SECONDS, createKernel } from "../src/kernel";
 import { BASE_DESCRIPTION, BASE_GUIDELINES, BASE_SNIPPET } from "../src/surface";
 
 const workerPath = process.env.MONTY_BIN ?? null;
@@ -75,7 +78,7 @@ describe.skipIf(!montyReady)("what the kernel is waiting on (rlm-stop ticket 05)
 	it("reports nothing, and no cell running, before a cell", async () => {
 		const { kernel, cleanup } = await harness();
 		try {
-			expect(kernel.activity()).toEqual({ cell_running: false, calls: [] });
+			expect(kernel.activity()).toEqual({ cell_running: false, calls: [], cell_age_ms: null, cell_budget_s: MAX_FEED_SECONDS });
 		} finally {
 			await kernel.shutdown();
 			cleanup();
@@ -97,7 +100,7 @@ describe.skipIf(!montyReady)("what the kernel is waiting on (rlm-stop ticket 05)
 
 			held.open();
 			await cell;
-			expect(kernel.activity()).toEqual({ cell_running: false, calls: [] });
+			expect(kernel.activity()).toEqual({ cell_running: false, calls: [], cell_age_ms: null, cell_budget_s: MAX_FEED_SECONDS });
 		} finally {
 			await kernel.shutdown();
 			cleanup();
@@ -180,11 +183,34 @@ describe.skipIf(!montyReady)("what the kernel is waiting on (rlm-stop ticket 05)
 		}
 	});
 
+	it("sees a cell that makes no host call at all, through its own age", async () => {
+		const { kernel, ctx, cleanup } = await harness();
+		try {
+			// A pure spin: no host call, no sleep — the shape neither `calls` nor the suspension budget
+			// can see (05 measured it burning 99.8 % CPU while `activity()` said nothing).
+			const code = ["import time", "t = time.time()", "x = 0", "while time.time() - t < 1.5:", "    x += 1", 'print("spun")'].join(
+				"\n",
+			);
+			const cell = kernel.execute({ code }, undefined, ctx);
+			await new Promise((resolve) => setTimeout(resolve, 400));
+			const during = kernel.activity();
+			expect(during.cell_running).toBe(true);
+			expect(during.calls).toEqual([]);
+			expect(during.cell_age_ms ?? 0).toBeGreaterThan(100);
+			expect(during.cell_budget_s).toBe(MAX_FEED_SECONDS);
+			await cell;
+			// Between cells and after shutdown it is `null`, like the call list: absent is not idle.
+			expect(kernel.activity().cell_age_ms).toBeNull();
+		} finally {
+			await cleanup();
+		}
+	});
+
 	it("is empty again after shutdown, and does not throw", async () => {
 		const { kernel, cleanup } = await harness();
 		try {
 			await kernel.shutdown();
-			expect(kernel.activity()).toEqual({ cell_running: false, calls: [] });
+			expect(kernel.activity()).toEqual({ cell_running: false, calls: [], cell_age_ms: null, cell_budget_s: MAX_FEED_SECONDS });
 		} finally {
 			cleanup();
 		}

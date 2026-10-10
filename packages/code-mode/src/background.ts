@@ -28,13 +28,35 @@ export interface BgHandleInfo {
 	started_at: string;
 	ended_at: string | null;
 	log_path: string | null;
+	/**
+	 * How long it has been going, measured against the kernel's own monotonic reference — and `null`
+	 * unless the process is running **here**: a finished handle, or one restored from a previous
+	 * session, has no duration this process can vouch for (`.scratch/long-work` ticket 03).
+	 *
+	 * It answers one question — *should I end this?* — which only a running shell poses. Whether a run
+	 * has **finished** is what the completion notice is for.
+	 */
+	age_ms: number | null;
+	/**
+	 * The bound the caller declared, or `null` for unbounded. A shell is the one thing in a cell that
+	 * knows its own expected duration, so this is the only field an age can be read *against*.
+	 */
+	timeout_s: number | null;
+	/**
+	 * Bytes of output seen **in this process** — a monotonic counter, not a read of `output`, which is
+	 * trimmed to its last 64 KB once it grows. A restored handle counts from zero, and says so.
+	 */
+	bytes_out: number;
 }
 
-interface BgRecord extends BgHandleInfo {
+interface BgRecord extends Omit<BgHandleInfo, "age_ms" | "timeout_s" | "bytes_out"> {
 	child?: ReturnType<typeof spawn>;
 	output: string;
 	timeoutSeconds: number | null;
 	timer?: ReturnType<typeof setTimeout>;
+	/** `null` for a restored record: the process it describes did not run here. */
+	startedMonotonic: number | null;
+	bytesOut: number;
 }
 
 const MAX_MEMORY_OUTPUT = 64 * 1024;
@@ -53,8 +75,30 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 	let counter = 0;
 
 	function info(record: BgRecord): BgHandleInfo {
-		const { child: _child, output: _output, timeoutSeconds: _timeout, timer: _timer, ...rest } = record;
-		return { ...rest };
+		const {
+			child: _child,
+			output: _output,
+			timeoutSeconds,
+			timer: _timer,
+			startedMonotonic,
+			bytesOut,
+			// A restored record was spread from a previous session's info, so the computed fields may
+			// already be sitting on it. They are recomputed here rather than inherited: what a *previous*
+			// process saw is not what this one can vouch for.
+			age_ms: _staleAge,
+			timeout_s: _staleTimeout,
+			bytes_out: _staleBytes,
+			...rest
+		} = record as BgRecord & Partial<BgHandleInfo>;
+		return {
+			...(rest as Omit<BgHandleInfo, "age_ms" | "timeout_s" | "bytes_out">),
+			age_ms:
+				record.status === "running" && startedMonotonic !== null
+					? Math.max(0, Math.round(performance.now() - startedMonotonic))
+					: null,
+			timeout_s: timeoutSeconds,
+			bytes_out: bytesOut,
+		};
 	}
 
 	function find(id: string): BgRecord {
@@ -108,8 +152,11 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 			child,
 			output: "",
 			timeoutSeconds,
+			startedMonotonic: performance.now(),
+			bytesOut: 0,
 		};
 		const append = (chunk: Buffer) => {
+			record.bytesOut += chunk.length;
 			record.output += chunk.toString();
 			// Keep memory bounded; the full text is written when the handle finishes.
 			if (record.output.length > MAX_MEMORY_OUTPUT * 2) {
@@ -212,6 +259,9 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 					reason: record.status === "running" ? "the process did not survive the session that started it" : record.reason,
 					output: "",
 					timeoutSeconds: null,
+					// Nothing here ran in this process: no duration to report, and no bytes watched.
+					startedMonotonic: null,
+					bytesOut: 0,
 				});
 			}
 		},

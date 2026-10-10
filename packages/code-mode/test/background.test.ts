@@ -154,3 +154,50 @@ describe("restoring after a resume", () => {
 		}
 	});
 });
+
+describe("what a handle says about progress (long-work ticket 03)", () => {
+	it("reports an age that grows, the bytes it has seen, and the bound that was declared", async () => {
+		const h = harness();
+		try {
+			// Slow enough to be read twice, and printing so the byte counter has something to count.
+			const handle = h.manager.start("printf one; sleep 1; printf two; sleep 5", 60);
+			expect(handle.timeout_s).toBe(60);
+			expect(handle.age_ms ?? -1).toBeGreaterThanOrEqual(0);
+			const first = h.manager.poll(handle.id);
+			await new Promise((resolve) => setTimeout(resolve, 400));
+			const second = h.manager.poll(handle.id);
+			// Both are read-time facts: an age the *reader* would otherwise have to derive from two clocks.
+			expect(second.age_ms ?? 0).toBeGreaterThan(first.age_ms ?? 0);
+			expect(second.bytes_out).toBeGreaterThanOrEqual(3);
+			// Only `running` work has progress to measure: once it ends there is no age to report.
+			h.manager.kill(handle.id);
+			const ended = h.manager.poll(handle.id);
+			expect(ended.status).toBe("killed");
+			expect(ended.age_ms).toBeNull();
+		} finally {
+			await h.manager.shutdownAll();
+			h.done();
+		}
+	});
+
+	it("reads an unbounded handle as unbounded, and a silent one as silent — never as a verdict", async () => {
+		const h = harness();
+		try {
+			// A command that emits nothing for its whole life: `bytes_out` stays 0 and the age grows.
+			const handle = h.manager.start("sleep 5", null);
+			expect(handle.timeout_s).toBeNull();
+			await new Promise((resolve) => setTimeout(resolve, 300));
+			const during = h.manager.poll(handle.id);
+			expect(during.bytes_out).toBe(0);
+			expect(during.age_ms ?? 0).toBeGreaterThan(0);
+			// There is no `stale`, and no `last_output_at`: the fields are facts, and a piped command
+			// produces no output until it ends, so a verdict built on silence would call a healthy run
+			// stuck (the case this effort started from).
+			expect(Object.keys(during).includes("stale")).toBe(false);
+			expect(Object.keys(during).includes("last_output_at")).toBe(false);
+		} finally {
+			await h.manager.shutdownAll();
+			h.done();
+		}
+	});
+});

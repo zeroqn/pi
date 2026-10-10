@@ -458,6 +458,13 @@ export function createKernel(options: {
 	 * is not work in progress). rlm-stop ticket 05.
 	 */
 	let cellDriving = false;
+	/**
+	 * When the driving cell started, against the same monotonic reference the call chain uses — so a
+	 * reader gets an age rather than a chance to subtract two clocks. `null` between cells, and it
+	 * lives on the kernel closure rather than the monty session because a **rotation swaps the session
+	 * while the cell continues**: an age that restarted there would report a cell's life as seconds.
+	 */
+	let cellStartedMonotonic: number | null = null;
 	function raiseNotice(notice: Notice) {
 		if (ledger.notify(notice)) return;
 		ownNotices.push(notice);
@@ -846,6 +853,7 @@ export function createKernel(options: {
 		const doomedSession = session;
 		const doomedPool = pool;
 		cellDriving = false;
+		cellStartedMonotonic = null;
 		session = null;
 		pool = null;
 		starting = null;
@@ -1135,6 +1143,7 @@ export function createKernel(options: {
 					},
 				};
 				cellDriving = true;
+				cellStartedMonotonic = performance.now();
 				try {
 					value = await driveCell(params.code, feedOptions);
 				} catch (error) {
@@ -1244,6 +1253,7 @@ export function createKernel(options: {
 		} finally {
 			cellRunning = false;
 			cellDriving = false;
+			cellStartedMonotonic = null;
 			flushOwnNotices();
 		}
 	}
@@ -1332,6 +1342,12 @@ export function createKernel(options: {
 					age_ms: Math.max(0, Math.round(now - call.startedMonotonic)),
 					timeout_s: call.timeout_s,
 				})),
+				// `calls` is empty for a cell that makes no host call, so the cell's own age is the only
+				// thing a reader can show for it (09) — and the budget it is read against is published
+				// here rather than duplicated in the footer (04).
+				cell_age_ms:
+					cellDriving && cellStartedMonotonic !== null ? Math.max(0, Math.round(now - cellStartedMonotonic)) : null,
+				cell_budget_s: maxFeedDurationSecs,
 			};
 		},
 		problems: () => ensurePreflight(),
@@ -1343,6 +1359,10 @@ export function createKernel(options: {
 				command: handle.command,
 				status: handle.status,
 				started_at: handle.started_at,
+				// Straight from the record, computed there: this is the same fact the model's own
+				// `bg_poll` reads, and one clock produced it (04).
+				age_ms: handle.age_ms,
+				timeout_s: handle.timeout_s,
 			})),
 		killBackgrounds: async (ids?: string[]) => {
 			const wanted = ids && ids.length > 0 ? new Set(ids.map(String)) : null;

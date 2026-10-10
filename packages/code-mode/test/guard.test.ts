@@ -512,8 +512,9 @@ describe("a mode change and the shells the mount cannot reach", () => {
 		const kernel = handle.kernel as Kernel;
 		const running = kernel.backgrounds?.().filter((entry) => entry.status === "running") ?? [];
 		expect(running).toHaveLength(2);
-		// Enough to name one to a human, and nothing more.
-		expect(Object.keys(running[0] ?? {}).sort()).toEqual(["command", "id", "started_at", "status"]);
+		// Enough to name one to a human — which since `.scratch/long-work` ticket 04 includes how long it
+		// has been going and against what bound — and still a bounded projection, not the whole record.
+		expect(Object.keys(running[0] ?? {}).sort()).toEqual(["age_ms", "command", "id", "started_at", "status", "timeout_s"]);
 		expect(running[0]?.command).toContain("sleep 2");
 
 		const first = running[0]?.id ?? "";
