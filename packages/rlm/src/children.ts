@@ -678,6 +678,13 @@ function usageOfRecord(record: ChildRecord): ChildHandle["usage"] | undefined {
  * teardown has already set — otherwise an aborting child's late resolution resurrects it as
  * `done`. And the verdict itself reads the stop reason, so an aborted or errored turn is a
  * failure rather than a completion.
+ *
+ * The notice names the **join** as the way to read the answer (2026-10-10): `wait` returns the
+ * child's last assistant text and does not block on a child that has already finished, so the
+ * answer arrives in the kernel rather than the transcript. The stored transcript is the fallback,
+ * for a session that did not spawn the child — `cat` of a session file is truncated at 50 KB, a
+ * quarter of a root's context in one message, against the 160-249 KB child transcripts the
+ * delegation A/B measured.
  */
 async function runChildTurn(
 	record: ChildRecord,
@@ -709,11 +716,21 @@ async function runChildTurn(
 		record.usage = usageOfRecord(record);
 		changed();
 		const spent = record.usage?.total_tokens ? ` ${record.usage.total_tokens} tokens` : "";
+		// Where the answer is read from (2026-10-10). The join is the primary read: `wait` returns the
+		// child's last assistant text and does not block on a child that has already finished, so the
+		// answer lands in the kernel rather than the transcript. The notice used to name only the stored
+		// transcript, read through `cat` — and a child's session file is 160-249 KB in the delegation
+		// A/B, which `bash` truncates at 50 KB, a quarter of a root's context in one message. It survives
+		// as the fallback for the one session `wait` cannot reach: a resumed or forked session has no
+		// children at all.
+		const fallback = record.session_file
+			? ` and only the stored transcript above holds the answer, outside the workspace mount (await bash("cat …"))`
+			: "";
 		const detail = [
 			`[${record.child_id} "${record.name}"] finished: ${record.status}${spent}`,
 			record.reason ? `— ${record.reason}` : "",
 			record.session_file ? `\nsession: ${record.session_file}` : "",
-			`\nRead the result from the stored transcript (the session file is outside the workspace mount, so read it through await bash("cat …")); rlm.poll("${record.child_id}") returns status and usage only, and only in the session that spawned the child — a resumed or forked session has no children.`,
+			`\nRead the answer with await rlm.wait(["${record.child_id}"]): it returns the child's last assistant text, keeps it in the kernel rather than the transcript, and does not block on a child that has already finished. rlm.poll("${record.child_id}") returns status and usage only, and only in the session that spawned the child — a resumed or forked session has no children, so there wait cannot find it${fallback}.`,
 		]
 			.filter(Boolean)
 			.join(" ");

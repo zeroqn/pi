@@ -353,6 +353,23 @@ describe("the manager's notices (ticket 06)", () => {
 		expect(h.notices[0]!.cancelled?.()).toBe(true);
 	});
 
+	it("names the join as the read, and the stored transcript only as its fallback", async () => {
+		const h = managerHarness();
+		const handle = await h.spawn();
+		h.release();
+		await settle();
+
+		// The read the kernel can make (rlm-wait ticket 01) is the primary one, and it keeps the answer
+		// out of the transcript. Measured 2026-10-10: this sentence used to name only the stored
+		// transcript, read through `cat` — and a child's session file is 160-249 KB in the delegation
+		// A/B, which `bash` truncates at 50 KB, a quarter of a root's context in one message.
+		const content = h.notices[0]!.content;
+		expect(content).toContain(`await rlm.wait(["${handle.child_id}"])`);
+		expect(content).toContain("does not block on a child that has already finished");
+		expect(content).toContain("status and usage only");
+		expect(content.indexOf("await rlm.wait(")).toBeLessThan(content.indexOf('await bash("cat'));
+	});
+
 	it("notifies again when a finished child is resumed with send", async () => {
 		const h = managerHarness();
 		const handle = await h.spawn();
