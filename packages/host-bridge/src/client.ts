@@ -170,6 +170,12 @@ export type KernelHandle = {
 	 * consumer must tolerate an older code mode, and **absent means unknown, never idle**.
 	 */
 	activity?: () => KernelActivity;
+	/**
+	 * The signal of the run driving a cell right now, or `undefined` between cells — code mode's shape,
+	 * mirrored (`.scratch/long-work` ticket 08). A contributor that spawns its own process reads it from
+	 * the handle it already holds (`SessionInput.handle`) to honour the run's abort.
+	 */
+	runSignal?: () => AbortSignal | undefined;
 };
 
 /** Mirrors code mode's `KernelCall`/`KernelActivity` (the view type's rule: a consumer reads a shape). */
