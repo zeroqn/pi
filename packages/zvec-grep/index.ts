@@ -104,6 +104,9 @@ export function zvecGrepAnswer(input: SessionInput): ContributorAnswer {
 			hostFns: createZvecGrepHost({
 				cwd: input.cwd,
 				progress: input.progress,
+				// The run's abort, read through the handle this session was handed (long-work ticket 08):
+				// a `zg` search is foreground work, and an aborted turn must not leave one running.
+				signal: () => input.handle.runSignal?.(),
 			}),
 			description: ZVEC_GREP_DESCRIPTION,
 			guidelines: ZVEC_GREP_GUIDELINES,

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RG_TIMEOUT_MS, SEARCH_TIMEOUT_MS, type Exec, createZgCli } from "../src/cli.ts";
+import { RG_TIMEOUT_MS, SEARCH_TIMEOUT_MS, type Exec, createZgCli, spawnExec } from "../src/cli.ts";
 import { createZvecGrepHost } from "../src/host.ts";
 
 /**
@@ -35,17 +35,29 @@ afterEach(() => {
 
 type Reply = { stdout?: string; stderr?: string; code?: number };
 
-function harness(options: { style?: "legacy" | "modern"; reply?: Reply; perRoot?: Record<string, Reply> } = {}) {
-	const calls: Array<{ args: string[]; cwd: string; timeout: number }> = [];
+function harness(
+	options: {
+		style?: "legacy" | "modern";
+		reply?: Reply;
+		perRoot?: Record<string, Reply>;
+		signal?: () => AbortSignal | undefined;
+	} = {},
+) {
+	const calls: Array<{ args: string[]; cwd: string; timeout: number; signal?: AbortSignal }> = [];
 	const exec: Exec = async (_command, args, execOptions) => {
 		if (args[0] === "--version") return { stdout: "zvec-grep 0.2.0", stderr: "", code: 0 };
-		calls.push({ args, cwd: execOptions.cwd, timeout: execOptions.timeout });
+		calls.push({ args, cwd: execOptions.cwd, timeout: execOptions.timeout, signal: execOptions.signal });
 		const reply = options.perRoot?.[execOptions.cwd] ?? options.reply ?? {};
 		return { stdout: reply.stdout ?? "", stderr: reply.stderr ?? "", code: reply.code ?? 0 };
 	};
 	const cli = createZgCli({ exec, env: { ZVEC_GREP_CLI_STYLE: options.style ?? "legacy" } });
 	const progress: string[] = [];
-	const host = createZvecGrepHost({ cwd: "/session/dir", cli, progress: (text) => progress.push(text) });
+	const host = createZvecGrepHost({
+		cwd: "/session/dir",
+		cli,
+		progress: (text) => progress.push(text),
+		...(options.signal ? { signal: options.signal } : {}),
+	});
 	return { calls, host, progress };
 }
 
@@ -229,5 +241,62 @@ describe("what the boundary refuses", () => {
 		expect(error.name).toBe("ValueError");
 		expect(error.message).toContain("at least one of query, queries, fts or vector");
 		expect(calls).toHaveLength(0);
+	});
+});
+
+
+describe("the run's signal (long-work ticket 08)", () => {
+	test("hands the executor the run's signal, and nothing when the kernel publishes none", async () => {
+		// The kernel's reader, as a session's handle answers it. `undefined` is the honest answer between
+		// cells, and a contributor must not read it as "never aborted".
+		const controller = new AbortController();
+		const withSignal = harness({ signal: () => controller.signal, reply: { stdout: "hit" } });
+		await withSignal.host.zvec_grep_rg({ command: "rg -n -F hit" });
+		expect(withSignal.calls[0]?.signal).toBe(controller.signal);
+
+		const without = harness({ reply: { stdout: "hit" } });
+		await without.host.zvec_grep_rg({ command: "rg -n -F hit" });
+		expect(without.calls[0]?.signal).toBeUndefined();
+	});
+
+	test("the executor the extension ships kills the process group at the abort", async () => {
+		// `spawnExec` is the extension's own executor — the call `pi.exec` makes, without pi — so this is
+		// the real thing rather than a fake: a shell that would outlive the turn, killed by the signal a
+		// handler hands it. `timeout: 0` is the unbounded case, so the abort is the only thing that can
+		// kill it.
+		const dir = mkdtempSync(join(tmpdir(), "zvec-sig-"));
+		dirs.push(dir);
+		const pidFile = join(dir, "pid");
+		const controller = new AbortController();
+		const running = spawnExec("bash", ["-lc", `echo $$ >> ${pidFile}; sleep 60`], {
+			cwd: dir,
+			timeout: 0,
+			signal: controller.signal,
+		});
+		let pid = 0;
+		for (let waited = 0; waited < 300 && pid === 0; waited += 10) {
+			try {
+				pid = Number(readFileSync(pidFile, "utf8").trim().split("\n")[0]);
+			} catch {
+				/* not written yet */
+			}
+			if (!Number.isFinite(pid)) pid = 0;
+			await new Promise((resolve) => setTimeout(resolve, 10));
+		}
+		expect(pid).toBeGreaterThan(0);
+		controller.abort();
+		await running;
+		// The kill is a signal (SIGTERM, escalating to SIGKILL after five seconds), so the process is
+		// reaped a moment after it is sent.
+		const alive = () => {
+			try {
+				process.kill(pid, 0);
+				return true;
+			} catch {
+				return false;
+			}
+		};
+		for (let waited = 0; waited < 3000 && alive(); waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(alive()).toBe(false);
 	});
 });

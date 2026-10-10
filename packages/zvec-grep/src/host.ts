@@ -43,6 +43,20 @@ export type ZvecGrepHostContext = {
 	progress?: (text: string) => void;
 	/** Test seam: the CLI, with an injected executor. */
 	cli?: ZgCli;
+	/**
+	 * The **run's** own signal, read at call time from the session's kernel handle
+	 * (`.scratch/long-work` ticket 08).
+	 *
+	 * A `zg` search is a foreground process the model is waiting on, so it is the run's work: when the
+	 * turn is aborted, the executor kills the process group rather than leaving a search running for a
+	 * cell nobody is watching. `spawnExec` has honoured a signal since it was written — it just had no
+	 * way to be handed one: a contributor's host function is given no `pi`, which is why this package
+	 * spawns for itself (`index.ts`).
+	 *
+	 * A thunk rather than a value because the signal belongs to the *call*, not to the session: the
+	 * handle answers `undefined` between cells.
+	 */
+	signal?: () => AbortSignal | undefined;
 };
 
 type Kind = "string" | "strings" | "boolean" | "number" | "one-of";
@@ -191,7 +205,9 @@ export function createZvecGrepHost(context: ZvecGrepHostContext): {
 		const style = await cli.style(context.cwd);
 		const argv = buildSearchArgs(style, params);
 		context.progress?.(roots.length > 1 ? `Searching ${roots.length} workspaces…` : "Searching the indexed workspace…");
-		const outcomes = await runAcrossRoots(cli, roots, argv, undefined, SEARCH_TIMEOUT_MS);
+		// The bound is this host function's own; the signal is the run's, and killing the group is
+		// `spawnExec`'s job (it escalates SIGTERM to SIGKILL after five seconds, as pi's exec does).
+		const outcomes = await runAcrossRoots(cli, roots, argv, context.signal?.(), SEARCH_TIMEOUT_MS);
 		const { text, failed } = formatRootResults("zvec-grep search", outcomes, { header: roots.length > 1 });
 		if (failed === outcomes.length) throw fail("RuntimeError", text);
 		return text;
@@ -205,7 +221,7 @@ export function createZvecGrepHost(context: ZvecGrepHostContext): {
 		const roots = resolveTargetRoots(context.cwd, bound.roots as string[] | undefined, bound.root as string | undefined);
 		const style = await cli.style(context.cwd);
 		const argv = buildRgArgs(style, rgArgs);
-		const outcomes = await runAcrossRoots(cli, roots, argv, undefined, RG_TIMEOUT_MS);
+		const outcomes = await runAcrossRoots(cli, roots, argv, context.signal?.(), RG_TIMEOUT_MS);
 		const { text, failed } = formatRootResults("zvec-grep rg", outcomes, { header: roots.length > 1, head });
 		if (failed === outcomes.length) throw fail("RuntimeError", text);
 		return text;
