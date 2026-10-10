@@ -79,6 +79,35 @@ describe("abortable", () => {
 		expect(finished).toBe(true);
 	});
 
+	it("says a spawning call's group was killed, and says nothing of the sort for a promise", async () => {
+		// `abortable` and `run()` are two mechanisms with two jobs, and this is where they meet: the
+		// rejection names the call, and — for the three names that own a process — that the process died
+		// with the turn (long-work ticket 01). A promise is still abandoned, not cancelled.
+		const controller = new AbortController();
+		const shell = run("bash", ["-lc", "sleep 30"], { signal: controller.signal });
+		const host = abortable({ bash_host: async () => shell }, controller.signal);
+		const call = host.bash_host!();
+		await sleep(5);
+		controller.abort();
+		const error = await call.then(
+			() => null,
+			(thrown: Error) => thrown,
+		);
+		expect(error?.message).toBe("aborted while waiting for bash_host(...); its process group was killed");
+		await shell;
+
+		const other = new AbortController();
+		const promise = abortable({ rlm_wait: async () => sleep(50) }, other.signal);
+		const waiting = promise.rlm_wait!();
+		await sleep(5);
+		other.abort();
+		const plain = await waiting.then(
+			() => null,
+			(thrown: Error) => thrown,
+		);
+		expect(plain?.message).toBe("aborted while waiting for rlm_wait(...)");
+	});
+
 	it("keeps every function's name, because monty binds by it", () => {
 		const host = abortable({ ping: async () => 1, grep: async () => 2 }, new AbortController().signal);
 		expect(Object.keys(host).sort()).toEqual(["grep", "ping"]);

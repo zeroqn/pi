@@ -65,6 +65,17 @@ const MIME: Record<string, string> = {
 	".bmp": "image/bmp",
 };
 
+/**
+ * The host functions whose calls own a **process**, so an abort that abandons one *kills* it
+ * (`.scratch/long-work/issues/01-the-aborts-kill.md`). The sibling of {@link HOST_DECLARERS}: a
+ * per-function fact held outside `abortable`, which stays generic about promises.
+ *
+ * Code mode's own three, because they are the three `run()` serves — a contributor's spawn is not in
+ * this set and cannot be: code mode owns no handle to a process it did not start. What reaches a
+ * contributor instead is the run's signal (`KernelHandleCore.runSignal`, ticket 08).
+ */
+const SPAWNING: ReadonlySet<string> = new Set(["bash_host", "find", "grep"]);
+
 export type TextPart = { type: "text"; text: string };
 export type ImagePart = { type: "image"; data: string; mimeType: string };
 export type Attachment = ImagePart & { path: string };
@@ -318,6 +329,8 @@ export function guarded(host: HostFns, guard?: Guard): HostFns {
  *  - a **spawning** call (`bash`, `find`, `grep`) is **killed, group and all** — its process is
  *    turn-owned, and nothing of it outlives the cell. `run()` performs that kill, because it is the
  *    only thing holding a pid; this wrapper deliberately knows nothing about processes.
+ *  - and the message says which, because the model is holding that message and nothing else: a
+ *    spawning call's abort reports *that its process group was killed*.
  *  - a **promise** — a join, a child, a background handle — is still **abandoned, not cancelled**
  *    (`bash` in the background keeps running, a child keeps working), the tradeoff
  *    `.scratch/rlm-wait/issues/06-…` decided and the reason the kernel survives either way.
@@ -337,7 +350,7 @@ export function abortable(host: HostFns, signal?: AbortSignal): HostFns {
 			const cancelled = new Promise<never>((_resolve, reject) => {
 				rejectAbort = reject;
 			});
-			const onAbort = () => rejectAbort(aborted(name, true));
+			const onAbort = () => rejectAbort(aborted(name, true, SPAWNING.has(name)));
 			signal.addEventListener("abort", onAbort, { once: true });
 			let work: Promise<unknown>;
 			try {

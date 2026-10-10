@@ -764,10 +764,18 @@ export function refusal(reason: string): Error {
  * cell, and the only way to keep running is to catch a `BaseException`, which code mode refuses
  * anyway by rejecting every later call. The journal records the name, so a replay raises the same
  * exception rather than a `RuntimeError`.
+ *
+ * `killedProcess` is the half `.scratch/long-work/issues/01-the-aborts-kill.md` added, and it exists
+ * because *abandoned* and *killed* are now different outcomes: a foreground shell is turn-owned and its
+ * process group dies with the turn, while a promise — a join, a child, a background handle — is still
+ * abandoned, not cancelled. The model is holding this message and nothing else, so it has to say which
+ * one happened.
  */
-export function aborted(who: string, waited: boolean): Error {
+export function aborted(who: string, waited: boolean, killedProcess = false): Error {
 	const error = new Error(
-		waited ? `aborted while waiting for ${who}(...)` : `this cell was aborted; ${who}(...) was not run`,
+		waited
+			? `aborted while waiting for ${who}(...)${killedProcess ? "; its process group was killed" : ""}`
+			: `this cell was aborted; ${who}(...) was not run`,
 	);
 	error.name = "KeyboardInterrupt";
 	return error;
