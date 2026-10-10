@@ -10,7 +10,7 @@
  * other way: `setStatus` is interactive-only, and print mode's UI (what a headless run and a child
  * get) is a no-op.
  */
-import { beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { recordSession, type SessionRecord, sessionKey } from "../../host-bridge/src/convention";
 import { createRlm } from "../index";
 import type { RlmSessionDeps } from "../src/registration";
@@ -132,6 +132,53 @@ describe("the footer line", () => {
 		// One function, two readers: the footer cannot disagree with `rlm.tree_cost()`.
 		expect(deps.manager.treeCost()).toBe(141_400);
 		await pi.emit("session_shutdown", { reason: "quit" }, ctx);
+	});
+
+	it("arms the heartbeat at the turn boundary, because the root's own work gives no other signal", async () => {
+		// The live defect this pins (`.scratch/long-work` ticket 04, found by E1 on 2026-10-10): the tick
+		// was armed only from the manager's change signal, so a session that spawns no child never armed
+		// it — and the tick is the only thing that repaints a footer *during* a cell, which is exactly
+		// when the new clauses exist. The E1 run showed `rlm: code-mode (monty)` through a foreground call
+		// of a minute, not one clause.
+		const statuses: Array<[string, string]> = [];
+		const ctx = fakeCtx(statuses, "/tmp/rlm-status-tick.jsonl");
+		record("/tmp/rlm-status-tick.jsonl", true);
+		const spy = spyOn(globalThis, "setInterval");
+		const pi = fakePi();
+		createRlm(pi, null);
+		try {
+			await pi.emit("session_start", { reason: "startup" }, ctx);
+			// Nothing in flight yet, and the count already repaints on every turn boundary — so arming
+			// waits for the boundary rather than happening at session start.
+			expect(spy).not.toHaveBeenCalled();
+			await pi.emit("before_agent_start", { systemPrompt: "" }, ctx);
+			expect(spy).toHaveBeenCalledTimes(1);
+			expect(spy.mock.calls[0]?.[1]).toBe(30_000);
+			// A second boundary does not arm a second interval.
+			await pi.emit("before_agent_start", { systemPrompt: "" }, ctx);
+			expect(spy).toHaveBeenCalledTimes(1);
+			await pi.emit("session_shutdown", { reason: "quit" }, ctx);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	it("arms nothing at all without a UI, where a repaint is a no-op anyway", async () => {
+		const statuses: Array<[string, string]> = [];
+		const ctx = fakeCtx(statuses, "/tmp/rlm-status-headless.jsonl");
+		delete (ctx as { ui?: unknown }).ui;
+		record("/tmp/rlm-status-headless.jsonl", true);
+		const spy = spyOn(globalThis, "setInterval");
+		const pi = fakePi();
+		createRlm(pi, null);
+		try {
+			await pi.emit("session_start", { reason: "startup" }, ctx);
+			await pi.emit("before_agent_start", { systemPrompt: "" }, ctx);
+			expect(spy).not.toHaveBeenCalled();
+			await pi.emit("session_shutdown", { reason: "quit" }, ctx);
+		} finally {
+			spy.mockRestore();
+		}
 	});
 
 	it("says so when there is no kernel, and nothing at all when there is no record", async () => {

@@ -186,6 +186,13 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	 *
 	 * The tick calls `renderStatus` **directly** rather than `changed()`: no transition happened, and
 	 * waking every waiter in the session to repaint a line would be the tail wagging the dog.
+	 *
+	 * It is armed from two places, and needs both: the manager's change signal (a child's arrival or
+	 * ending, which is what `rlm-stop` 07 armed it from) and the **turn boundary** — because the root's
+	 * own work produces no change signal at all, and a session that spawns no child would otherwise
+	 * never arm the tick. That second call site was missing when this first shipped, and the live E1
+	 * check found it: a session with a UI showed `rlm: code-mode (monty)` through a nineteen-minute-shaped
+	 * cell, never a clause.
 	 */
 	function syncStatusTick(ctx: any) {
 		const wants = Boolean(ctx?.ui);
@@ -315,6 +322,12 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 				}
 			}
 			renderStatus(ctx);
+			// Arm the heartbeat here, at the turn boundary, and not only from the manager's change signal
+			// (`.scratch/long-work` ticket 04, found live 2026-10-10). `onChange` fires on *child*
+			// transitions, so a session that spawns no child never armed the tick at all — and the tick is
+			// the only thing that repaints during a cell, which is exactly when the footer's new clauses
+			// exist. One line, and the paused case is a session with no UI.
+			syncStatusTick(ctx);
 			if (record.mounted || toldModel) return undefined;
 			toldModel = true;
 			const why = record.problems[0] ?? "the kernel could not be mounted";
