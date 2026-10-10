@@ -340,6 +340,20 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 		}
 	});
 
+	/**
+	 * The last repaint of a turn (`.scratch/long-work` ticket 04, amended after the live E1 run): the
+	 * heartbeat's 30 s granularity meant a stale `run: … 20s` outlived an Esc by up to a tick — the cell
+	 * was gone and the line still named it. The end of the run is the moment the line can be made true
+	 * without polling any faster, and `renderStatus` is repaint-on-change, so a session whose state did
+	 * not move repaints nothing at all.
+	 *
+	 * `agent_end` rather than `agent_before_settle`/`agent_settled`: those two are about what pi will do
+	 * next, and this is only about what the footer says about what has already happened.
+	 */
+	pi.on("agent_end", (_event: any, ctx: any) => {
+		renderStatus(ctx);
+	});
+
 	pi.on("session_start", async (event: any, ctx: any) => {
 		startReason = event?.reason ?? "startup";
 		previousSessionFile = event?.previousSessionFile ? str(event.previousSessionFile) : undefined;

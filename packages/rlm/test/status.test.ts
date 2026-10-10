@@ -134,6 +134,31 @@ describe("the footer line", () => {
 		await pi.emit("session_shutdown", { reason: "quit" }, ctx);
 	});
 
+	it("repaints when a run ends, so a stale clause does not outlive the cell by a tick", async () => {
+		// The live E1 run measured this gap (`.scratch/long-work` ticket 04): six seconds after Esc the
+		// line still read `run: bash -c 'echo $$ …' 20s`, because nothing repainted at the *end* of a cell
+		// — only on the next 30 s tick. `agent_end` is that moment.
+		const statuses: Array<[string, string]> = [];
+		const ctx = fakeCtx(statuses, "/tmp/rlm-status-end.jsonl");
+		record("/tmp/rlm-status-end.jsonl", true);
+		const pi = fakePi();
+		createRlm(pi, null);
+		await pi.emit("session_start", { reason: "startup" }, ctx);
+		await pi.emit("before_agent_start", { systemPrompt: "" }, ctx);
+		expect(statuses.at(-1)).toEqual(["rlm", "rlm: code-mode (monty)"]);
+
+		// A run ends with nothing changed: repaint-on-change means no write at all.
+		const before = statuses.length;
+		await pi.emit("agent_end", {}, ctx);
+		expect(statuses.length).toBe(before);
+
+		// The state did move during the run: the end of it is when the line catches up.
+		record("/tmp/rlm-status-end.jsonl", false, ["monty has gone"]);
+		await pi.emit("agent_end", {}, ctx);
+		expect(statuses.at(-1)).toEqual(["rlm", "rlm: kernel unavailable"]);
+		await pi.emit("session_shutdown", { reason: "quit" }, ctx);
+	});
+
 	it("arms the heartbeat at the turn boundary, because the root's own work gives no other signal", async () => {
 		// The live defect this pins (`.scratch/long-work` ticket 04, found by E1 on 2026-10-10): the tick
 		// was armed only from the manager's change signal, so a session that spawns no child never armed
