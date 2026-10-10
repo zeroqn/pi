@@ -10,8 +10,11 @@
  * a call returns; it may not show a call that cannot be made.
  */
 import { describe, expect, it } from "bun:test";
-import { RLM_GUIDELINE } from "../src/contribution";
+import { RLM_GUIDELINES } from "../src/contribution";
 import { PRELUDE_TAIL } from "../src/prelude-rlm";
+
+// The guideline is one bullet per decision now; the checks below read the rendered list.
+const RLM_GUIDELINE = RLM_GUIDELINES.join("\n");
 
 describe("the guideline's calls (rlm-stop, live acceptance 2026-10-09)", () => {
 	it("awaits every rlm method it names", () => {

@@ -47,9 +47,25 @@ export const SNIPPET_CONNECTOR = " and delegation";
  * so no sentence here ever names a field or a verb the session does not have. The authority rule ("only a
  * child below this session can be stopped") is deliberately left to the refusal text, which is where a
  * model meets it — the guideline is read by a root, which has no such bound.
+ *
+ * **Split into three bullets (the delegation-usage amendment).** As one paragraph it had become a
+ * reference card: it described every verb and never said when to delegate, so a root spawned only
+ * when a skill told it to. Bullets 1 and 2 are the mandate and the join loop prime-agent carries in
+ * its mandatory rules; bullet 3 is the mechanics, unchanged in substance and still holding ticket
+ * 08's staleness-then-stop pair in order.
  */
-export const RLM_GUIDELINE =
-	"Use await rlm.spawn(name=..., prompt=...) for work worth doing in parallel or in a cleaner context, then end the turn: the child's answer arrives as a message, and await rlm.poll(id) reads its status. Use await rlm.wait(names, timeout=180) when the next step needs every child's answer before it can start: it blocks this cell until they are done (or the timeout fires) and returns each child's status, tokens and final answer, and those children stop notifying you. await rlm.list() shows the children and their tokens; await rlm.tree_cost() totals what the whole tree has spent. Children belong to the session that spawned them, so a resumed or forked session has none: read an older child's answer from its stored transcript. A child that stops making progress is reported stale, with how long it has been quiet and what it is waiting on — unless it declared how long its work would take. await rlm.stop(id, reason=...) ends an unwanted child and everything below it, releasing the session and keeping its record and transcript; await rlm.remove(id) forgets the record.";
+export const RLM_GUIDELINES: string[] = [
+	// The mandate and the trigger (the delegation-usage amendment): the guideline used to describe the
+	// surface and never say when to reach for it, so a root delegated only when something outside the
+	// prompt — a skill — told it to. This bullet is that instruction.
+	"You are the root of an agent tree: work that is independent and substantial belongs in a child, not in your context. Delegate by default when a sub-task is a multi-file investigation, a second implementation to compare, an independent verification, or anything whose reading would otherwise fill your own context — `await rlm.spawn(name=..., prompt=...)` admits it and returns immediately, and the child runs in its own session and kernel. Do a single known lookup, edit, or command inline; delegate what you can state as a task.",
+	// The loop and the fan-in tactic (prime-agent's mandatory rules: "start independent workers without
+	// waiting for each other sequentially" and "have children write files and read those files").
+	"Reach for delegation without being asked, and fan out: spawn every independent piece before awaiting any of them, end the turn, then join with `await rlm.wait(names, timeout=180)` when the next step needs all the answers — it blocks this cell until they are done (or the timeout fires) and returns each child's status, tokens and final answer, and those children stop notifying you. Have children write their result to a file and read that file, so the detail stays out of your context.",
+	// The mechanics. Ticket 08's staleness-then-stop pair is preserved verbatim and in order
+	// (`test/guideline.test.ts`), and every `rlm.<method>(` stays preceded by `await`.
+	"`await rlm.poll(id)` reads one child's status; `await rlm.list()` shows the children and their tokens; `await rlm.tree_cost()` totals what the whole tree has spent. Children belong to the session that spawned them, so a resumed or forked session has none: read an older child's answer from its stored transcript. A child that stops making progress is reported stale, with how long it has been quiet and what it is waiting on — unless it declared how long its work would take. `await rlm.stop(id, reason=...)` ends an unwanted child and everything below it, releasing the session and keeping its record and transcript; `await rlm.remove(id)` forgets the record.",
+];
 
 export type ProvenanceInputs = {
 	startReason?: string;
@@ -74,7 +90,7 @@ export function rlmContribution(options: {
 		hostFns: options.hostFns,
 		prelude: PRELUDE_TAIL,
 		snippet: SNIPPET_CONNECTOR,
-		guidelines: [RLM_GUIDELINE],
+		guidelines: RLM_GUIDELINES,
 		onNotice: options.onNotice,
 		provenance: (_ctx: unknown, own: { sessionFile?: string; firstIndex?: number }) => {
 			const source = journalSourceOf({
