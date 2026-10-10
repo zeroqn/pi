@@ -465,6 +465,12 @@ export function createKernel(options: {
 	 * while the cell continues**: an age that restarted there would report a cell's life as seconds.
 	 */
 	let cellStartedMonotonic: number | null = null;
+	/**
+	 * The signal of the tool call driving a cell right now, so a contributor's host function can reach
+	 * the run's abort for a process it spawns itself (`long-work` ticket 08). Set where the drive begins
+	 * and cleared with it: between cells it is `undefined`, the same emptiness rule `activity()` keeps.
+	 */
+	let currentRunSignal: AbortSignal | undefined;
 	function raiseNotice(notice: Notice) {
 		if (ledger.notify(notice)) return;
 		ownNotices.push(notice);
@@ -1144,6 +1150,7 @@ export function createKernel(options: {
 				};
 				cellDriving = true;
 				cellStartedMonotonic = performance.now();
+				currentRunSignal = signal;
 				try {
 					value = await driveCell(params.code, feedOptions);
 				} catch (error) {
@@ -1254,6 +1261,7 @@ export function createKernel(options: {
 			cellRunning = false;
 			cellDriving = false;
 			cellStartedMonotonic = null;
+			currentRunSignal = undefined;
 			flushOwnNotices();
 		}
 	}
@@ -1331,6 +1339,7 @@ export function createKernel(options: {
 		 * and empty between cells, after a rotation and after `shutdown()`, deliberately unlike the
 		 * sticky `currentCell`/`progress` above.
 		 */
+		runSignal: () => currentRunSignal,
 		activity: () => {
 			const now = performance.now();
 			return {

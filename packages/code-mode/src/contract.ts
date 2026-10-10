@@ -288,6 +288,26 @@ export type KernelHandleCore = {
 	 * member is a shape every reader already tolerates.
 	 */
 	activity?: () => KernelActivity;
+	/**
+	 * The signal of the run driving a cell **right now**, or `undefined` between cells
+	 * (`.scratch/long-work` ticket 08).
+	 *
+	 * A contributor's host function that spawns its own process cannot see the run's abort otherwise —
+	 * `abortable` wraps the *call*, and a spawn inside a contributor happens outside `run()`. The one
+	 * real instance found the gap itself: `zvec-grep`'s executor is already signal-aware (it kills the
+	 * process group on abort, SIGTERM then SIGKILL) and passed a literal `undefined`, because a
+	 * contributor's host function is handed no `pi` and had no way to reach the run.
+	 *
+	 * The reader answers the signal of the *current* call rather than a session-level one, since pi owns
+	 * one `AbortController` per run and the signal that reaches a cell is that run's. Optional, unbumped:
+	 * an added optional member is a shape every reader already tolerates.
+	 *
+	 * **Whose work the process is** decides whether to honour it. A process producing output for the
+	 * model does; a process the *human* is typing into — `ask-user-question`'s editor — does not, and
+	 * that is a decision rather than an omission: their buffer survives the aborted turn, and the cell
+	 * that would have read the file back is gone.
+	 */
+	runSignal?: () => AbortSignal | undefined;
 	contribute: (contribution: Contribution) => Receipt;
 };
 
