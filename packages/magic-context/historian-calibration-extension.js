@@ -1,4 +1,12 @@
+import"./index-0h2mkab2.js";
+import"./index-f956htf3.js";
+import {
+  promptFingerprint,
+  readHostSystemPrompt
+} from "./index-w76x3af7.js";
+
 // src/historian-calibration-extension.ts
+import { readFileSync } from "node:fs";
 var HISTORIAN_TEMPERATURE_ENV = "MAGIC_CONTEXT_HISTORIAN_TEMPERATURE";
 var HISTORIAN_MAX_OUTPUT_TOKENS_ENV = "MAGIC_CONTEXT_HISTORIAN_MAX_OUTPUT_TOKENS";
 function finiteNumber(value) {
@@ -48,6 +56,19 @@ function calibrateHistorianProviderPayload(payload, temperature, maxOutputTokens
   return calibrated;
 }
 function historianCalibrationExtension(pi) {
+  const intendedPath = process.env.MAGIC_CONTEXT_SUBAGENT_PROMPT_FILE;
+  if (intendedPath) {
+    const intended = readFileSync(intendedPath, "utf8");
+    pi.on("context", (_event, ctx) => {
+      const effective = readHostSystemPrompt(ctx);
+      if (effective === undefined)
+        return;
+      process.stdout.write(`${JSON.stringify({ type: "mc_system_prompt", ...promptFingerprint(effective), containsIntended: effective.includes(intended) })}
+`);
+    });
+  }
+  if (process.env.MAGIC_CONTEXT_SUBAGENT_PROVENANCE_ONLY === "1")
+    return;
   const temperature = finiteNumber(process.env[HISTORIAN_TEMPERATURE_ENV]);
   const maxOutputTokens = finiteNumber(process.env[HISTORIAN_MAX_OUTPUT_TOKENS_ENV]);
   if (temperature === undefined && maxOutputTokens === undefined)
