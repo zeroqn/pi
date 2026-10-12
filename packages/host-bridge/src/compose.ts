@@ -9,10 +9,13 @@
  *    cell cannot run before pi finishes awaiting this emission, so this is provably in time. It asks
  *    with the *session's own* `ctx`, because the tools a contributor builds resolve their session
  *    from it.
- *  - **`before_agent_start` — append the prompt text.** A contributor's text is not a kernel field
- *    (code mode's contract is not touched, standing preference 2); it is appended here, once per
- *    session, deduped by text, exactly as web-access's guard rule is today. A child loads no ambient
- *    extension, so this package is the only thing that can append it there.
+ *  - **`before_agent_start` — write the prompt text.** A contributor's text is not a kernel field
+ *    (code mode's contract is not touched, standing preference 2); it is written here, once per
+ *    session, deduped, exactly as web-access's guard rule is today. When the host has structured
+ *    prompt sections the text goes into `systemPromptOptions.sections[name]` — so no forced prompt
+ *    replaces the whole prompt and every other section (Magic Context's included) still reaches the
+ *    provider — and when it does not (an older host) the old `{ systemPrompt: append… }` form is kept.
+ *    A child loads no ambient extension, so this package is the only thing that can write it there.
  *  - **`session_shutdown` — forget the record.** `globalThis` outlives `/new`, resume and fork, so a
  *    session that ends must take its record with it. A *child* never reaches a shutdown hook, which is
  *    why the record is keyed by the session's file and prunable rather than merely tidy.
@@ -135,7 +138,7 @@ export async function composeSession(input: {
 
 	const problems: string[] = [];
 	const answers: ContributorAnswer[] = [];
-	const promptTexts: string[] = [];
+	const promptTexts: { name: string; text: string }[] = [];
 	for (const registration of registered) {
 		if (!registration.session) continue;
 		let answer: ContributorAnswer | null = null;
@@ -151,7 +154,11 @@ export async function composeSession(input: {
 			if (typeof problem === "string" && problem.length > 0) problems.push(problem);
 		}
 		const text = answer.systemPrompt;
-		if (typeof text === "string" && text.trim().length > 0) promptTexts.push(text);
+		if (typeof text === "string" && text.trim().length > 0) {
+			// The default tag is the registration's key, so a contributor that declares nothing still
+			// gets a section; an illegal key falls back to the appended form at write time.
+			promptTexts.push({ name: answer.systemPromptSection ?? registration.key, text });
+		}
 	}
 
 	const report = contributeAll(
@@ -182,6 +189,14 @@ export async function composeSession(input: {
 }
 
 /**
+ * Whether pi will accept a section tag: its own rule, so a bad name is caught here rather than
+ * throwing `Invalid system prompt section name` and failing the whole turn.
+ */
+export function isSectionName(name: string): boolean {
+	return /^[a-z][a-z0-9_-]*$/.test(name) && name !== "preamble";
+}
+
+/**
  * `prompt` with every text appended once.
  *
  * Deduped by text rather than by contributor, because two appenders are real: a contributor's own
@@ -199,7 +214,7 @@ export function appendPromptTexts(prompt: string, texts: readonly string[]): str
 }
 
 /** Where a session's prompt texts are read from on the turn that needs them. */
-function promptTextsFor(ctx: unknown): string[] {
+function promptTextsFor(ctx: unknown): { name: string; text: string }[] {
 	try {
 		return sessionRecord(sessionKey(ctx))?.promptTexts ?? [];
 	} catch {
@@ -227,8 +242,19 @@ export function installHandlers(pi: BridgeSurface, options: { child?: boolean } 
 	});
 
 	pi.on("before_agent_start", async (event: any, ctx: unknown) => {
+		const entries = promptTextsFor(ctx);
+		if (entries.length === 0) return undefined;
+		const sections = event?.systemPromptOptions?.sections;
+		// The structured path: every name must be legal *before* anything is written, because pi
+		// throws on a bad one and that would fail the turn. One illegal name degrades the whole write
+		// to the appended form — the forced path drops the sections anyway, so appending all of them is
+		// the only way none of the text is lost.
+		if (sections && typeof sections === "object" && entries.every((entry) => isSectionName(entry.name))) {
+			for (const entry of entries) sections[entry.name] = entry.text.trim();
+			return undefined;
+		}
 		const prompt = typeof event?.systemPrompt === "string" ? event.systemPrompt : "";
-		const appended = appendPromptTexts(prompt, promptTextsFor(ctx));
+		const appended = appendPromptTexts(prompt, entries.map((entry) => entry.text));
 		if (appended === prompt) return undefined;
 		return { systemPrompt: appended };
 	});

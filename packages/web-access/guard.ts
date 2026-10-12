@@ -60,12 +60,19 @@ export function fenceText(text: string): string {
 }
 
 /**
+ * The section tag both appenders write the rule under.
+ *
+ * This package's extension entry (`installGuard`) and `pi-host-bridge`'s seam (which reads the
+ * contributor's `systemPromptSection`) must agree, so the two meet by key instead of by text matching.
+ */
+export const UNTRUSTED_EXTERNAL_CONTENT_SECTION = "untrusted_external_content";
+
+/**
  * Append the rule to a system prompt unless it already carries it.
  *
- * One text, two appenders: this package's extension entry (a session that has it installed) and
- * `pi-host-bridge`'s seam, which appends the contributor's `systemPrompt` — the only appender in a
- * spawned child, where no ambient extension loads. `before_agent_start` handlers chain in load
- * order, so whichever runs first appends and the other sees the text and leaves it alone.
+ * The fallback for a host without structured sections: `installGuard` writes
+ * {@link UNTRUSTED_EXTERNAL_CONTENT_SECTION} into `systemPromptOptions.sections` when pi offers them,
+ * and only reaches for this when it does not. Kept byte-identical to the text the section carries.
  */
 export function withGuardSection(systemPrompt: string): string {
 	return systemPrompt.includes(SYSTEM_PROMPT_SECTION)
@@ -76,7 +83,11 @@ export function withGuardSection(systemPrompt: string): string {
 type TextPart = { type: "text"; text: string };
 type ContentPart = { type: string; [key: string]: unknown };
 type ToolResultEvent = { toolName: string; content: ContentPart[] };
-type BeforeAgentStartEvent = { systemPrompt: string };
+type BeforeAgentStartEvent = {
+	systemPrompt: string;
+	/** Absent on hosts older than the structured-section API (pi < 0.87 / Oh My Pi). */
+	systemPromptOptions?: { sections?: Record<string, string> };
+};
 
 /** What this guard needs from pi's extension api — the two events it registers. Typed structurally,
  *  like `tool-bridge`, so this package takes no dependency on pi. */
@@ -91,10 +102,17 @@ export type GuardPi = {
  */
 export function installGuard(pi: GuardPi): void {
 	// Layer 1: the system-prompt rule, rebuilt fresh each run (the runner starts from the base prompt
-	// every run, so this never accumulates).
-	pi.on("before_agent_start", async (event) => ({
-		systemPrompt: withGuardSection(event.systemPrompt),
-	}));
+	// every run, so this never accumulates). A structured host gets the rule as a section — writing it
+	// here is what keeps every other section (Magic Context's included) on the wire — and a host
+	// without sections keeps the appended form, which is what pi < 0.87 / Oh My Pi see.
+	pi.on("before_agent_start", async (event) => {
+		const sections = event.systemPromptOptions?.sections;
+		if (sections && typeof sections === "object") {
+			sections[UNTRUSTED_EXTERNAL_CONTENT_SECTION] = SYSTEM_PROMPT_SECTION.trim();
+			return undefined;
+		}
+		return { systemPrompt: withGuardSection(event.systemPrompt) };
+	});
 
 	// Layer 2: fence guarded pi-tool results. Returns a partial patch; details, isError and usage
 	// pass through untouched. Error results are wrapped too: upstream provider error bodies are

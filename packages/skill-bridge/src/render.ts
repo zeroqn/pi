@@ -79,10 +79,19 @@ export function isCodeMode(activeTools: readonly string[]): boolean {
 	return !activeTools.includes("read") && !activeTools.includes("bash");
 }
 
+/**
+ * The section tag the block is written under when pi has structured sections.
+ *
+ * `skills` is pi's own name for exactly this content (`formatSkillsForPrompt(...).trim()`), and a
+ * custom section overrides pi's section of the same name, so a code-mode session that uses the gate
+ * still shows its skills.
+ */
+export const SKILLS_SECTION = "skills";
+
 /** What the event's options carry that this module needs, without importing pi's types. */
 export interface PromptEventLike {
 	systemPrompt: string;
-	systemPromptOptions?: { skills?: unknown; selectedTools?: unknown };
+	systemPromptOptions?: { skills?: unknown; selectedTools?: unknown; sections?: unknown };
 }
 
 /** The session's current active tool set, as the event reports it. */
@@ -167,6 +176,12 @@ export async function blockFor(input: {
  * narrower fact — the call form is in that kernel — and it decides only which sentence is written.
  * Returning `undefined` in every other session is deliberate: the bridge must not alter a prompt it
  * has nothing to add to.
+ *
+ * When pi offers structured sections the block goes into {@link SKILLS_SECTION} — pi's own name for
+ * this content — and `undefined` is returned so no forced prompt replaces the whole prompt (the move
+ * that lets Magic Context's own section reach the provider). The leading `\n\n` the appended form
+ * needs is dropped, matching pi's own `formatSkillsForPrompt(...).trim()`. A host without sections
+ * keeps the appended form unchanged.
  */
 export async function beforeAgentStartResult(
 	event: PromptEventLike,
@@ -180,5 +195,10 @@ export async function beforeAgentStartResult(
 		contributed: input.contributed,
 	});
 	if (!block) return undefined;
+	const sections = event.systemPromptOptions?.sections;
+	if (sections && typeof sections === "object") {
+		(sections as Record<string, string>)[SKILLS_SECTION] = block.trim();
+		return undefined;
+	}
 	return { systemPrompt: `${event.systemPrompt}${block}` };
 }

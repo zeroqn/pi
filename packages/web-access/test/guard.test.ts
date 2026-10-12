@@ -6,6 +6,7 @@ import {
 	OPEN_MARKER,
 	PREAMBLE,
 	SYSTEM_PROMPT_SECTION,
+	UNTRUSTED_EXTERNAL_CONTENT_SECTION,
 	withGuardSection,
 } from "../guard";
 
@@ -34,6 +35,18 @@ describe("the system-prompt rule (layer 1)", () => {
 		};
 		expect(result.systemPrompt.startsWith("You are a coding agent.\n\n## Untrusted External Content")).toBe(true);
 		expect(result.systemPrompt).toContain(SYSTEM_PROMPT_SECTION);
+	});
+
+	it("writes the rule into the structured section when the host has one", async () => {
+		const handlers = load();
+		const sections: Record<string, string> = {};
+		const result = await handlers.before_agent_start[0]({
+			systemPrompt: "You are a coding agent.",
+			systemPromptOptions: { sections },
+		});
+		// No forced prompt, so Magic Context's own section survives to the provider.
+		expect(result).toBeUndefined();
+		expect(sections[UNTRUSTED_EXTERNAL_CONTENT_SECTION]).toBe(SYSTEM_PROMPT_SECTION);
 	});
 
 	it("names the kernel route as well as the four pi tools", () => {

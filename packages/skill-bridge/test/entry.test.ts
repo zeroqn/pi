@@ -245,6 +245,24 @@ describe("before_agent_start", () => {
 		expect(result.systemPrompt).toContain("await skill(name)");
 	});
 
+	it("writes the block as the `skills` section when the host has sections, forcing nothing", async () => {
+		const h = harness();
+		await h.compose();
+		h.loaded.skills = [humanSkill("tdd", skillFile("tdd"))];
+		registerProvider({ sessionKey: sessionKey(h.ctx), provider: rsiProvider() });
+
+		const sections: Record<string, string> = {};
+		const result = await h.fire("before_agent_start", {
+			systemPrompt: "base",
+			systemPromptOptions: { selectedTools: ["python"], skills: h.loaded.skills, sections },
+		});
+
+		expect(result).toBeUndefined();
+		expect(sections.skills).toContain("<name>tdd</name>");
+		expect(sections.skills).toContain("<name>learned-one</name>");
+		expect(sections.skills).toContain("await skill(name)");
+	});
+
 	it("falls back to pi's bash sentence when the contribution was refused", async () => {
 		const h = harness({
 			receipt: (contribution) => ({

@@ -544,6 +544,30 @@ test("the prompt describes the cell only where there is a governed kernel to des
 	assert.equal(await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx), undefined);
 });
 
+test("writes the prompt as the `read_only_mode` section when the host has sections", async () => {
+	const { h, guard } = await cellLane();
+	assert.ok(guard, "expected the guard to have been contributed");
+	await toggleOn(h);
+	const sections = {};
+	const result = await h.handlers.before_agent_start[0](
+		{ systemPrompt: "BASE", systemPromptOptions: { sections } },
+		h.ctx,
+	);
+	// No forced prompt: Magic Context's own section still reaches the provider.
+	assert.equal(result, undefined);
+	assert.match(sections.read_only_mode, /## Read-only mode \(active\)/);
+	assert.match(sections.read_only_mode, /workspace is mounted read-only/);
+	assert.ok(!sections.read_only_mode.endsWith("\n"), "the section text is trimmed");
+	await h.commands.readonly.handler("", h.ctx);
+});
+
+test("keeps the appended form when the host has no sections (Oh My Pi / pi < 0.87)", async () => {
+	const h = load();
+	await toggleOn(h);
+	const result = await h.handlers.before_agent_start[0]({ systemPrompt: "BASE" }, h.ctx);
+	assert.match(result.systemPrompt, /^BASE\n\n## Read-only mode \(active\)/);
+});
+
 test("a session whose kernel cannot be governed is not told it is", async () => {
 	const { h } = await cellLane({ handleApiVersion: 1 });
 	await toggleOn(h);

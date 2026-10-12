@@ -248,4 +248,34 @@ describe("the before_agent_start result", () => {
 			await beforeAgentStartResult({ systemPrompt: "base" }, { mounted: true, contributed: true, answers: [] }),
 		).toBeUndefined();
 	});
+
+	it("writes the block into pi's own `skills` section when the host has sections", async () => {
+		const sections: Record<string, string> = {};
+		const result = await beforeAgentStartResult(
+			{
+				systemPrompt: "base prompt",
+				systemPromptOptions: { selectedTools: ["python"], skills: [humanSkill("tdd")], sections },
+			},
+			{ mounted: true, contributed: true, answers: [] },
+		);
+		// No forced prompt: every other section (Magic Context's included) still reaches the provider.
+		expect(result).toBeUndefined();
+		// `skills` is pi's own name for this content, and pi renders it as `formatSkillsForPrompt(...).trim()`
+		// — so the leading blank lines the appended form carries are gone.
+		expect(sections.skills?.startsWith("The following skills")).toBe(true);
+		expect(sections.skills?.startsWith("\n")).toBe(false);
+		expect(sections.skills?.endsWith("</available_skills>")).toBe(true);
+		expect(sections.skills).toContain("<name>tdd</name>");
+		expect(sections.skills).toContain("await skill(name)");
+	});
+
+	it("keeps the appended form when the host has no sections (Oh My Pi / pi < 0.87)", async () => {
+		// A `sections`-less options object, exactly as an older host emits: the fallback must still fire.
+		const result = await beforeAgentStartResult(
+			{ systemPrompt: "base prompt", systemPromptOptions: { selectedTools: ["python"], skills: [humanSkill("tdd")] } },
+			{ mounted: true, contributed: true, answers: [] },
+		);
+		expect(result?.systemPrompt.startsWith("base prompt\n\n")).toBe(true);
+		expect(result?.systemPrompt).toContain("<name>tdd</name>");
+	});
 });

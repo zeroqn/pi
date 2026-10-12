@@ -19,14 +19,17 @@
  *   session: ({ handle, sessionFile, progress }) => ({
  *     contribution: { owner: "web-access", hostFns: createHost({ cwd, sessionFile, progress }), ... },
  *     systemPrompt: WEB_SYSTEM_PROMPT,
+ *     systemPromptSection: "untrusted_external_content",
  *   }),
  * })
  * ```
  *
  * - **`session(input)` answers for one session**: what to contribute to this kernel, and what system
- *   prompt text this session needs (appended once, deduped by text — a child loads no ambient
- *   extension, so the contributor's own entry is not there to append it). `null` means "I serve no
- *   such session", which is a normal answer rather than a failure.
+ *   prompt text this session needs (written once, deduped — a child loads no ambient extension, so the
+ *   contributor's own entry is not there to write it). `systemPromptSection` names the section tag the
+ *   text is written under when pi has structured sections, and defaults to this registration's `key`;
+ *   a child loads no ambient extension there either. `null` means "I serve no such session", which is a
+ *   normal answer rather than a failure.
  * - **The contribution is code mode's shape, not a wider one.** This package must not widen the
  *   publisher's contract (map Notes, standing preference 2); what registration adds is the *when*
  *   (per session, root and child) and the prompt text, not new kernel fields.
@@ -77,8 +80,16 @@ export type SessionInput = {
 /** What a contributor answers for one session. An empty answer is a contributor with nothing to add. */
 export type ContributorAnswer = {
 	contribution?: KernelContribution;
-	/** Appended to this session's system prompt once; host-bridge dedupes by text. */
+	/** Written once into this session's system prompt; host-bridge dedupes by name and text. */
 	systemPrompt?: string;
+	/**
+	 * The section tag {@link systemPrompt} is written under when pi has structured sections.
+	 *
+	 * Defaults to the registration's `key`. A tag must match `/^[a-z][a-z0-9_-]*$/` and must not be
+	 * `"preamble"`; an illegal one falls back to the appended form for that text rather than failing
+	 * the turn (`compose.ts` validates every name before writing it).
+	 */
+	systemPromptSection?: string;
 	/**
 	 * What the contributor itself dropped while answering, one line each, for the session's record.
 	 *
@@ -189,13 +200,15 @@ export type SessionRecord = {
 	/** pi tool names a cell can reach in this session, from the contributions that landed (ticket 04). */
 	reaches: string[];
 	/**
-	 * System-prompt text the contributors asked for, in contributor order (ticket 03).
+	 * System-prompt text the contributors asked for, in contributor order, each with the section tag
+	 * it is written under (ticket 03).
 	 *
 	 * It rides in the record rather than in the entry's closure because a `/reload` re-imports the
-	 * entry: the instance that appends the text on `before_agent_start` is regularly *not* the instance
-	 * that composed the session, and the record is the one thing both can see.
+	 * entry: the instance that writes the text on `before_agent_start` is regularly *not* the instance
+	 * that composed the session, and the record is the one thing both can see. The pair shape keeps
+	 * the composition root's section writes and its appended fallback the same data.
 	 */
-	promptTexts: string[];
+	promptTexts: { name: string; text: string }[];
 	/** Why the session has no kernel, or why a contribution did not land. */
 	problems: string[];
 };
@@ -369,14 +382,37 @@ function absolute(file: string): string {
 	}
 }
 
-/** Records what host-bridge did for a session. Deduped, so a reader sees names once. */
+/**
+ * Normalise the prompt-text pairs: drop blank text, and keep each `{name, text}` once.
+ *
+ * Deduped by the pair rather than by name, because two contributors may legitimately write the same
+ * tag with different words — the last one then wins in the sections map, and both are appended in the
+ * fallback — while a reader must not see one contributor's text twice.
+ */
+function dedupePromptTexts(
+	entries: readonly { name: string; text: string }[],
+): { name: string; text: string }[] {
+	const seen = new Set<string>();
+	const out: { name: string; text: string }[] = [];
+	for (const entry of entries) {
+		if (!entry || typeof entry.name !== "string" || typeof entry.text !== "string") continue;
+		if (entry.text.trim().length === 0) continue;
+		const id = `${entry.name}\u0000${entry.text}`;
+		if (seen.has(id)) continue;
+		seen.add(id);
+		out.push({ name: entry.name, text: entry.text });
+	}
+	return out;
+}
+
+/** Records what host-bridge did for a session. Deduped, so a reader sees each prompt-text pair once. */
 export function recordSession(key: string, record: SessionRecord): void {
 	sessionsSlot().set(key, {
 		mounted: record.mounted === true,
 		owners: [...new Set(record.owners)],
 		installed: [...new Set(record.installed)],
 		reaches: [...new Set(record.reaches ?? [])],
-		promptTexts: [...new Set((record.promptTexts ?? []).filter((text) => text.trim().length > 0))],
+		promptTexts: dedupePromptTexts(record.promptTexts ?? []),
 		problems: [...record.problems],
 	});
 }

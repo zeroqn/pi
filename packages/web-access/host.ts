@@ -28,7 +28,13 @@ import { fetchContent, type FetchEnvelope, type FetchMode } from "./fetch";
 import { searchAnySearch } from "./providers/anysearch";
 import { searchDuckDuckGo } from "./providers/duckduckgo";
 import type { SearchResult } from "./providers/types";
-import { fenceText, installGuard, SYSTEM_PROMPT_SECTION, type GuardPi } from "./guard";
+import {
+	fenceText,
+	installGuard,
+	SYSTEM_PROMPT_SECTION,
+	UNTRUSTED_EXTERNAL_CONTENT_SECTION,
+	type GuardPi,
+} from "./guard";
 
 import {
 	API_VERSION as HOST_API_VERSION,
@@ -317,9 +323,11 @@ export function webAccessAnswer(input: SessionInput): ContributorAnswer {
 			description: WEB_ACCESS_DESCRIPTION,
 			guidelines: WEB_ACCESS_GUIDELINES,
 		},
-		// Appended once per session by the seam, deduped by text — in a spawned child, where this
-		// package's own entry never runs, the seam is the only appender.
+		// Written once per session by the seam, deduped — in a spawned child, where this package's own
+		// entry never runs, the seam is the only writer. Under the same tag `installGuard` writes, so
+		// the two appenders meet by key.
 		systemPrompt: WEB_SYSTEM_PROMPT,
+		systemPromptSection: UNTRUSTED_EXTERNAL_CONTENT_SECTION,
 	};
 }
 

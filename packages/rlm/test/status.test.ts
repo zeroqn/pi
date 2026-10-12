@@ -206,6 +206,23 @@ describe("the footer line", () => {
 		}
 	});
 
+	it("writes the code-mode-unavailable notice into a section, forcing no prompt", async () => {
+		// Ordered before the test below on purpose: `toldModel` is a module-level once-per-process flag
+		// (there is no reset seam), and this is the branch that reads it.
+		const statuses: Array<[string, string]> = [];
+		const ctx = fakeCtx(statuses, "/tmp/rlm-status-section.jsonl");
+		record("/tmp/rlm-status-section.jsonl", false, ["monty did not load"]);
+
+		const pi = fakePi();
+		createRlm(pi, null);
+		const sections: Record<string, string> = {};
+		await pi.emit("before_agent_start", { systemPrompt: "", systemPromptOptions: { sections } }, ctx);
+
+		expect(sections.code_mode_unavailable).toContain("## Code mode is unavailable");
+		expect(sections.code_mode_unavailable).toContain("monty did not load");
+		expect(sections.code_mode_unavailable?.endsWith("session.")).toBe(true);
+	});
+
 	it("says so when there is no kernel, and nothing at all when there is no record", async () => {
 		const statuses: Array<[string, string]> = [];
 		const ctx = fakeCtx(statuses, "/tmp/rlm-status-nokernel.jsonl");

@@ -18,6 +18,7 @@ import {
 	childStatus,
 	composeSession,
 	installHandlers,
+	isSectionName,
 } from "../src/compose";
 import {
 	__resetHostBridgeForTests,
@@ -158,7 +159,7 @@ describe("composing a session", () => {
 			owners: ["rlm", "web-access"],
 			installed: ["rlm_spawn", "web_search"],
 			reaches: [],
-			promptTexts: [RULE],
+			promptTexts: [{ name: "pi-web-access@1", text: RULE }],
 			problems: [],
 		});
 		expect(entries).toHaveLength(1);
@@ -279,7 +280,9 @@ describe("the handlers", () => {
 
 		await emit("session_start", {}, sessionCtx());
 		expect(entries.map((e) => e.type)).toEqual(["host-bridge"]);
-		expect(sessionRecord(sessionKey(sessionCtx()))?.promptTexts).toEqual([RULE]);
+		expect(sessionRecord(sessionKey(sessionCtx()))?.promptTexts).toEqual([
+			{ name: "pi-web-access@1", text: RULE },
+		]);
 
 		const first = (await emit("before_agent_start", { systemPrompt: "BASE" }, sessionCtx()))[0] as
 			| { systemPrompt?: string }
@@ -292,6 +295,63 @@ describe("the handlers", () => {
 
 		await emit("session_shutdown", {}, sessionCtx());
 		expect(sessionRecord(sessionKey(sessionCtx()))).toBeUndefined();
+	});
+
+	test("writes the text into the structured sections instead of forcing a prompt", async () => {
+		const { handle } = fakeKernel();
+		installRegistry(handle);
+		registerContributor({
+			key: "pi-web-access",
+			owner: "web-access",
+			apiVersion: 1,
+			session: () => ({ systemPrompt: RULE, systemPromptSection: "untrusted_external_content" }),
+		});
+		const { pi, emit } = fakePi();
+		installHandlers(pi);
+		await emit("session_start", {}, sessionCtx());
+
+		const sections: Record<string, string> = {};
+		const result = (
+			await emit("before_agent_start", { systemPrompt: "BASE", systemPromptOptions: { sections } }, sessionCtx())
+		)[0];
+		// No forced prompt: the whole point is that every other section still reaches the provider.
+		expect(result).toBeUndefined();
+		expect(sections).toEqual({ untrusted_external_content: RULE });
+	});
+
+	test("falls back to the appended form when a section name is illegal, rather than throwing", async () => {
+		const { handle } = fakeKernel();
+		installRegistry(handle);
+		registerContributor({
+			key: "pi-web-access@1",
+			owner: "web-access",
+			apiVersion: 1,
+			session: () => ({ systemPrompt: RULE }),
+		});
+		const { pi, emit } = fakePi();
+		installHandlers(pi);
+		await emit("session_start", {}, sessionCtx());
+
+		const sections: Record<string, string> = {};
+		const result = (
+			await emit("before_agent_start", { systemPrompt: "BASE", systemPromptOptions: { sections } }, sessionCtx())
+		)[0] as { systemPrompt?: string } | undefined;
+		// `@` is illegal, so nothing is written and the text is appended — never a thrown turn.
+		expect(sections).toEqual({});
+		expect(result?.systemPrompt).toBe(`BASE\n\n${RULE}`);
+	});
+});
+
+describe("isSectionName", () => {
+	test("accepts pi's rule and refuses preamble and anything pi would throw on", () => {
+		expect(isSectionName("skills")).toBe(true);
+		expect(isSectionName("read_only_mode")).toBe(true);
+		expect(isSectionName("code_mode-unavailable")).toBe(true);
+		expect(isSectionName("preamble")).toBe(false);
+		expect(isSectionName("Magic Context")).toBe(false);
+		expect(isSectionName("pi-web-access@1")).toBe(false);
+		expect(isSectionName("1leading")).toBe(false);
+		expect(isSectionName("")).toBe(false);
 	});
 });
 

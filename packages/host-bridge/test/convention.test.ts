@@ -136,18 +136,26 @@ describe("session records", () => {
 		owners: ["rlm", "rlm", "web-access"],
 		installed: ["web_search", "web_search"],
 		reaches: ["ctx_search", "ctx_search"],
-		promptTexts: ["be careful", "be careful", "   "],
+		promptTexts: [
+			{ name: "one", text: "be careful" },
+			{ name: "one", text: "be careful" },
+			{ name: "two", text: "   " },
+			{ name: "two", text: "read first" },
+		],
 		problems: [],
 	};
 
-	test("normalises names so a reader sees each once, and reads back by key", () => {
+	test("normalises names so a reader sees each prompt-text pair once, and reads back by key", () => {
 		recordSession("a", record);
 		expect(sessionRecord("a")).toEqual({
 			mounted: true,
 			owners: ["rlm", "web-access"],
 			installed: ["web_search"],
 			reaches: ["ctx_search"],
-			promptTexts: ["be careful"],
+			promptTexts: [
+				{ name: "one", text: "be careful" },
+				{ name: "two", text: "read first" },
+			],
 			problems: [],
 		});
 		expect(sessionRecord("b")).toBeUndefined();

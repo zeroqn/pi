@@ -239,6 +239,9 @@ const READ_ONLY_CELL_PROMPT = `- In a code-mode session your Python runs in one 
 - A few extension capabilities stay available inside a cell — delegation, web reads, the context store — because they do not write the workspace. That is a declared exception, not a licence: anything else is refused by name, and if you need a capability that is refused, say which one and stop rather than looking for another route.
 - \`await zvec_grep_search(...)\` (ranked; needs an index) and \`await zvec_grep_rg(command)\` (exact; needs nothing) are the search to use here, and both are exempt. The second writes nothing at all. The first is *not* itself read-only: every indexed query writes a lock and a last-accessed stamp inside the workspace's \`.zvec-grep/\` directory, and with the shared daemon up a stale index is refreshed in the background. That directory is the index's own and never your sources — it is the one write this mode allows.`;
 
+/** The section tag the ambient read-only prompt is written under when pi has structured sections. */
+const READ_ONLY_SECTION = "read_only_mode";
+
 interface ReadOnlyState {
 	enabled: boolean;
 	toolsBefore?: string[];
@@ -754,7 +757,15 @@ export default function readonlyModeExtension(pi: ExtensionAPI): void {
 		// Every turn, not once: the record is written when the kernel mounts, and a mount that happened
 		// before this extension was asked about anything is exactly the case being caught.
 		checkGuardLanded(key, ctx);
-		return { systemPrompt: `${event.systemPrompt}\n\n${READ_ONLY_PROMPT}${cell}` };
+		const text = `${READ_ONLY_PROMPT}${cell}`;
+		// A structured host gets the prompt as a section, so no forced prompt drops Magic Context's own
+		// section; an older host keeps the appended form.
+		const sections = (event as { systemPromptOptions?: { sections?: unknown } }).systemPromptOptions?.sections;
+		if (sections && typeof sections === "object") {
+			(sections as Record<string, string>)[READ_ONLY_SECTION] = text.trim();
+			return undefined;
+		}
+		return { systemPrompt: `${event.systemPrompt}\n\n${text}` };
 	});
 
 	pi.on("session_start", async (_event, ctx) => {

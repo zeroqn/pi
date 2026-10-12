@@ -282,18 +282,7 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	}
 
 	/**
-	 * Two things appended to the turn's system prompt: the one-line "code mode is unavailable"
-	 * notice (once, when there is no kernel at all), and the web hook's untrusted-content rule
-	 * (whenever this session's kernel got the web host functions — the route a spawned child has,
-	 * since a child loads no ambient extensions). The skills block is RSI's own handler now.
-	 *
-	 * It **appends to `event.systemPrompt`** rather than replacing it, and that is the invariant the
-	 * two extensions depend on: `before_agent_start` handlers chain, each seeing the previous one's
-	 * result, so rlm's text (load order 2) and RSI's block (load order 3) both survive. A handler
-	 * that returned a bare string would silently drop the other's text.
-	 */
-	/**
-	 * One thing appended to the turn's system prompt: the "code mode is unavailable" notice, once per
+	 * One thing written into the turn's system prompt: the "code mode is unavailable" notice, once per
 	 * session, read from the composition root's **record** (`.scratch/host-bridge` ticket 06).
 	 *
 	 * rlm no longer mounts, so a mount result is not something it has: the record is written in the
@@ -301,11 +290,17 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	 * kernel's own preflight problems land there too, which is why the human notice is raised here
 	 * rather than in `session_start`.
 	 *
-	 * It **appends to `event.systemPrompt`** rather than replacing it, and that is the invariant every
-	 * other contributor depends on: `before_agent_start` handlers chain, each seeing the previous one's
-	 * result, so rlm's text (load order 2), the seam's appended prompt text and skill-bridge's block all
-	 * survive. A handler that returned a bare string would silently drop the others' text.
+	 * It writes into `systemPromptOptions.sections` when the host has them, so it never forces a prompt
+	 * that would drop another contributor's section; a host without sections gets the appended form. That
+	 * matters because `before_agent_start` handlers chain — a handler that replaced the prompt wholesale
+	 * would silently drop the seam's text and skill-bridge's block, which is what forced prompts did.
 	 */
+	/**
+	 * The section tag the "code mode is unavailable" notice is written under when pi has structured
+	 * sections. `code_mode_unavailable` is legal (`/^[a-z][a-z0-9_-]*$/`), so there is no throw path.
+	 */
+	const CODE_MODE_UNAVAILABLE_SECTION = "code_mode_unavailable";
+
 	pi.on("before_agent_start", async (event: any, ctx: any) => {
 		try {
 			const record = sessionRecord(sessionKey(ctx));
@@ -331,9 +326,14 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			if (record.mounted || toldModel) return undefined;
 			toldModel = true;
 			const why = record.problems[0] ?? "the kernel could not be mounted";
-			return {
-				systemPrompt: `${event.systemPrompt}\n\n## Code mode is unavailable\n${why}\nThere is no \`python\` tool in this session.\n`,
-			};
+			const text = `## Code mode is unavailable\n${why}\nThere is no \`python\` tool in this session.\n`;
+			// A structured host gets the notice as a section; an older host keeps the appended form.
+			const sections = event?.systemPromptOptions?.sections;
+			if (sections && typeof sections === "object") {
+				sections[CODE_MODE_UNAVAILABLE_SECTION] = text.trim();
+				return undefined;
+			}
+			return { systemPrompt: `${event.systemPrompt}\n\n${text}` };
 		} catch {
 			// A prompt we cannot build must never take a turn down.
 			return undefined;
