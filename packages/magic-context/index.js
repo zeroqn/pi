@@ -412,7 +412,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-eynxwvxt.js";
+} from "./index-tah0x7jj.js";
 import {
   CTX_REDUCE_KEEP,
   newestCtxReduceTagNumbers,
@@ -36563,13 +36563,13 @@ import {
 } from "node:fs";
 import { homedir as homedir3 } from "node:os";
 import { dirname as dirname4, isAbsolute as isAbsolute2, join as join11 } from "node:path";
-var PI_NATIVE_PATH = join11(homedir3(), ".pi", "agent", "extension-configs", "magic-context", "magic-context.jsonc");
 function homeDir() {
   if (process.platform === "win32") {
     return process.env.USERPROFILE || process.env.HOME || homedir3();
   }
   return process.env.HOME || homedir3();
 }
+var PI_NATIVE_PATH = join11(homeDir(), ".pi", "agent", "extension-configs", "magic-context", "magic-context.jsonc");
 function configHome() {
   const xdg = process.env.XDG_CONFIG_HOME;
   return xdg && isAbsolute2(xdg) ? xdg : join11(homeDir(), ".config");
@@ -36813,7 +36813,14 @@ function observePiToolCallStart(args) {
   try {
     if (args.name === "todowrite") {
       const todos = args.args?.todos;
-      const sessionMeta = Array.isArray(todos) ? getOrCreateSessionMeta(args.db, args.sessionId) : null;
+      let sessionMeta = null;
+      if (Array.isArray(todos)) {
+        try {
+          sessionMeta = getOrCreateSessionMeta(args.db, args.sessionId);
+        } catch (err) {
+          warn("observePiToolCallStart(todowrite): session meta unavailable:", err);
+        }
+      }
       capturePiTodowriteArgsIfCompatible({
         db: args.db,
         sessionId: args.sessionId,
@@ -37562,7 +37569,14 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
       signalPendingMarker: signalPiDeferredCompactionMarkerDrain
     });
   });
-  const readLastTodoState = (sessionId) => getOrCreateSessionMeta(db, sessionId).lastTodoState;
+  const readLastTodoState = (sessionId) => {
+    try {
+      return getOrCreateSessionMeta(db, sessionId).lastTodoState ?? null;
+    } catch (err) {
+      warn("session_start: last todo state unavailable:", err);
+      return null;
+    }
+  };
   const todoOverlay = registerConfiguredTodoLifecycle(pi, {
     configured: todowriteEnabled,
     overlay: bootProjectDeps.config.todowrite.overlay,
@@ -38034,9 +38048,14 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
           }
         }
       });
+      let sessionMetaIsSubagent = false;
       try {
-        const sessionMetaForTodo = getOrCreateSessionMeta(db, sessionId);
-        if (!sessionMetaForTodo.isSubagent) {
+        sessionMetaIsSubagent = getOrCreateSessionMeta(db, sessionId).isSubagent;
+      } catch (err) {
+        warn("message_end: session meta unavailable for todowrite capture:", err);
+      }
+      try {
+        if (!sessionMetaIsSubagent) {
           capturePiTodowriteMessageIfCompatible({
             db,
             sessionId,

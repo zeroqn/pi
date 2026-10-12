@@ -10,7 +10,7 @@ import {
   ensureProjectRegisteredFromPiDirectory,
   resolvePiHarnessKind,
   registerMagicContextTools
-} from "./index-eynxwvxt.js";
+} from "./index-tah0x7jj.js";
 import"./index-x8ksa6kx.js";
 import"./index-97e5fzy3.js";
 
