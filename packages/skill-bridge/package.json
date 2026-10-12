@@ -21,7 +21,7 @@
 		]
 	},
 	"devDependencies": {
-		"@pydantic/monty": "1.0.0",
+		"@pydantic/monty": "1.1.0",
 		"@types/node": "^22.20.0",
 		"typescript": "^5.8.0"
 	}
