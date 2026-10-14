@@ -52,7 +52,11 @@ const ALLOWED_COMMANDS = new Set([
 	"npm", "pnpm", "yarn",
 	// git, read subcommands only (see GIT_READ_SUBCOMMANDS and GIT_RULES).
 	"git",
-	// Plain GET to stdout only (see the curl gate).
+	// Plain GET to stdout only (see the curl gate). This gate answers the *disk* question; whether
+	// the network may be reached at all is a different question with a different owner — the
+	// session's `egress` policy (pi-web-access), which refuses a fetch command even where this gate
+	// admits it and steers to `fetch_content`, whose `via="shell"` route reaches the pages its
+	// guarded route cannot. Admitting curl here does not lift that, and does not mean to.
 	"curl",
 ]);
 
