@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	configuredEmbedding,
 	configuredRoots,
 	configuredWorkspaceRoot,
+	discardSeededManifest,
 	ensureNestedRepoInclude,
 	loadExtensionConfig,
 	parseRootList,
+	readIndexedWorkspace,
 	resolveTargetRoots,
+	workspaceManifestPath,
 } from "../src/config.ts";
 
 const ENV_KEYS = ["ZVEC_GREP_PI_ROOTS", "ZVEC_GREP_PI_WORKSPACE", "ZVEC_GREP_EMBEDDING"] as const;
@@ -162,5 +165,109 @@ describe("ensureNestedRepoInclude", () => {
 		const { cwd } = scratch();
 		ensureNestedRepoInclude(join(cwd, "nope"));
 		expect(() => readFileSync(join(cwd, "nope", ".zvec-grep", "manifest.json"))).toThrow();
+	});
+});
+
+describe("discardSeededManifest", () => {
+	test("removes the unbuilt seed, so an engine that refuses it can write its own", () => {
+		const { cwd } = scratch();
+		ensureNestedRepoInclude(cwd);
+		expect(existsSync(workspaceManifestPath(cwd))).toBe(true);
+		expect(discardSeededManifest(cwd)).toBe(true);
+		expect(existsSync(workspaceManifestPath(cwd))).toBe(false);
+	});
+
+	test("a manifest with an index version behind it is never removed", () => {
+		// Both generations set `indexVersion` once something has been indexed through the manifest, so
+		// this is the line between "the seed" and "a built index".
+		const { cwd } = scratch();
+		ensureNestedRepoInclude(cwd);
+		const manifest = JSON.parse(readFileSync(workspaceManifestPath(cwd), "utf8"));
+		manifest.indexVersion = 1;
+		writeFileSync(workspaceManifestPath(cwd), JSON.stringify(manifest));
+		expect(discardSeededManifest(cwd)).toBe(false);
+		expect(existsSync(workspaceManifestPath(cwd))).toBe(true);
+	});
+
+	test("a Rust manifest, an unreadable one, and no manifest at all are all left alone", () => {
+		const { cwd } = scratch();
+		mkdirSync(join(cwd, ".zvec-grep"), { recursive: true });
+		// The shape the Rust zg writes (measured): no `manifestVersion`, and a storage generation.
+		writeFileSync(
+			workspaceManifestPath(cwd),
+			JSON.stringify({ name: "rust-ws", root: cwd, indexPolicy: "enabled", indexVersion: 2, storageGeneration: "g" }),
+		);
+		expect(discardSeededManifest(cwd)).toBe(false);
+		writeFileSync(workspaceManifestPath(cwd), "{ not json");
+		expect(discardSeededManifest(cwd)).toBe(false);
+		expect(existsSync(workspaceManifestPath(cwd))).toBe(true);
+		expect(discardSeededManifest(join(cwd, "nowhere"))).toBe(false);
+	});
+});
+
+describe("readIndexedWorkspace", () => {
+	test("the node generation's manifest, whose model is `embedding.model`", () => {
+		const { cwd } = scratch();
+		mkdirSync(join(cwd, ".zvec-grep"), { recursive: true });
+		writeFileSync(
+			workspaceManifestPath(cwd),
+			JSON.stringify({
+				manifestVersion: 1,
+				name: "node-ws",
+				updatedTime: 42,
+				embedding: { provider: "local", model: "potion-code-16m-v2", dimension: 256, metric: "cosine" },
+			}),
+		);
+		expect(readIndexedWorkspace(cwd)).toEqual({
+			root: cwd,
+			name: "node-ws",
+			updatedTime: 42,
+			embedding: "potion-code-16m-v2",
+		});
+	});
+
+	test("the Rust manifest, whose model is `embeddings[0].model.name`", () => {
+		// The exact shape `zg --index` (Rust, 0.2.3) writes — no `manifestVersion`, no `embedding`.
+		const { cwd } = scratch();
+		mkdirSync(join(cwd, ".zvec-grep"), { recursive: true });
+		writeFileSync(
+			workspaceManifestPath(cwd),
+			JSON.stringify({
+				name: "rust-ws",
+				root: cwd,
+				indexPolicy: "enabled",
+				indexVersion: 2,
+				updatedTime: 43,
+				embeddings: [{ model: { provider: "local", name: "potion-code-16m-v2", endpoint: null }, dimension: 256 }],
+				embeddingRoutes: { text: "local/potion-code-16m-v2" },
+			}),
+		);
+		expect(readIndexedWorkspace(cwd)).toEqual({
+			root: cwd,
+			name: "rust-ws",
+			updatedTime: 43,
+			embedding: "potion-code-16m-v2",
+		});
+	});
+
+	test("a routed Rust manifest with no model entry still names its route", () => {
+		const { cwd } = scratch();
+		mkdirSync(join(cwd, ".zvec-grep"), { recursive: true });
+		writeFileSync(
+			workspaceManifestPath(cwd),
+			JSON.stringify({ name: "routed", indexVersion: 2, embeddingRoutes: { text: "local/minilm" } }),
+		);
+		expect(readIndexedWorkspace(cwd)?.embedding).toBe("local/minilm");
+	});
+
+	test("no manifest is no workspace, and a name-less one falls back to the directory", () => {
+		const { cwd } = scratch();
+		expect(readIndexedWorkspace(cwd)).toBeUndefined();
+		mkdirSync(join(cwd, ".zvec-grep"), { recursive: true });
+		writeFileSync(workspaceManifestPath(cwd), JSON.stringify({ indexVersion: 2 }));
+		const summary = readIndexedWorkspace(cwd);
+		expect(summary?.name).toBe(cwd.split("/").pop());
+		expect(summary?.updatedTime).toBe(0);
+		expect(summary?.embedding).toBeUndefined();
 	});
 });

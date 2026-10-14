@@ -4,12 +4,17 @@
  * Moved out of `index.ts` unchanged (`.scratch/zvec-grep` ticket 03): the root precedence rule is what
  * `resolveTargetRoots` is for, and it is the piece a test has to be able to reach without booting pi.
  *
+ * It also owns the workspace manifest: seeding one (a `rootPaths` include, so nested repositories are
+ * indexed), dropping that seed again when a `zg` refuses it, and reading one back for `/zg-status-all`.
+ * The two CLI generations keep *different* manifests, which is what the seed/discard pair is about — see
+ * `ensureNestedRepoInclude` and `discardSeededManifest`.
+ *
  * `home` is a parameter rather than a call to `homedir()` inside each function because the global
  * config source lives under it, and a test that had to mutate `HOME` to reach that tier would not work:
  * node caches the first `os.homedir()` lookup for the life of the process (measured).
  */
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
@@ -122,6 +127,11 @@ export function resolveTargetRoots(
 	return [cwd];
 }
 
+/** `<root>/.zvec-grep/manifest.json` — the workspace record both `zg` generations keep. */
+export function workspaceManifestPath(root: string): string {
+	return join(root, ".zvec-grep", "manifest.json");
+}
+
 /**
  * Ensure a workspace index covers nested git repositories.
  *
@@ -137,7 +147,7 @@ export function ensureNestedRepoInclude(root: string): void {
 		return;
 	}
 	const home = join(root, ".zvec-grep");
-	const manifestPath = join(home, "manifest.json");
+	const manifestPath = workspaceManifestPath(root);
 	if (!existsSync(manifestPath)) {
 		const now = Date.now();
 		const manifest = {
@@ -187,4 +197,94 @@ export function ensureNestedRepoInclude(root: string): void {
 	} catch {
 		// Invalid manifest: leave it for zg to report.
 	}
+}
+
+/**
+ * Remove the manifest `ensureNestedRepoInclude` pre-seeded, once an engine has refused to read it.
+ *
+ * The seed is the *node* CLI's manifest shape, and the Rust `zg` will not read a manifest it did not
+ * write: it answers `unsupported index version ... rebuild the index with ...` and refuses to index or
+ * search until it is gone. Nothing is indexed behind an unbuilt manifest, so dropping it costs nothing —
+ * but only that shape is dropped. A manifest carrying an `indexVersion` (either generation's, once
+ * something has been indexed through it) or a Rust `storageGeneration` is left exactly as it is, so an
+ * index can never be discarded here by accident.
+ *
+ * Returns whether a manifest was removed.
+ */
+export function discardSeededManifest(root: string): boolean {
+	const manifestPath = workspaceManifestPath(root);
+	if (!existsSync(manifestPath)) return false;
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(readFileSync(manifestPath, "utf8"));
+	} catch {
+		// An unreadable manifest is not this extension's seed; leave it for the CLI to report.
+		return false;
+	}
+	if (!parsed || typeof parsed !== "object") return false;
+	const manifest = parsed as { manifestVersion?: unknown; indexVersion?: unknown; storageGeneration?: unknown };
+	const unbuiltNodeSeed =
+		manifest.manifestVersion === 1 && manifest.indexVersion == null && manifest.storageGeneration == null;
+	if (!unbuiltNodeSeed) return false;
+	try {
+		rmSync(manifestPath);
+	} catch {
+		return false;
+	}
+	return true;
+}
+
+export type IndexedWorkspace = {
+	root: string;
+	name: string;
+	updatedTime: number;
+	embedding?: string;
+};
+
+/**
+ * Read `<root>/.zvec-grep/manifest.json` and describe the indexed workspace, if any.
+ *
+ * Both generations are read, because `/zg-status-all` lists whichever one a workspace was indexed with:
+ * the node manifest keeps the model at `embedding.model`, the Rust one at `embeddings[0].model.name`
+ * (and, when it was routed, with the routed spelling in `embeddingRoutes.text`). `updatedTime` is
+ * epoch milliseconds in both.
+ */
+export function readIndexedWorkspace(root: string): IndexedWorkspace | undefined {
+	const manifestPath = workspaceManifestPath(root);
+	if (!existsSync(manifestPath)) return undefined;
+	try {
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+			name?: unknown;
+			updatedTime?: unknown;
+			embedding?: { model?: unknown } | null;
+			embeddings?: Array<{ model?: { name?: unknown } | null }> | null;
+			embeddingRoutes?: Record<string, unknown> | null;
+		};
+		return {
+			root,
+			name:
+				typeof manifest.name === "string" && manifest.name.trim()
+					? manifest.name.trim()
+					: basename(root),
+			updatedTime: typeof manifest.updatedTime === "number" ? manifest.updatedTime : 0,
+			embedding: embeddingModelOf(manifest),
+		};
+	} catch {
+		return undefined;
+	}
+}
+
+/** The model name as either manifest spells it, or `undefined` when neither does. */
+function embeddingModelOf(manifest: {
+	embedding?: { model?: unknown } | null;
+	embeddings?: Array<{ model?: { name?: unknown } | null }> | null;
+	embeddingRoutes?: Record<string, unknown> | null;
+}): string | undefined {
+	const nodeModel = manifest.embedding?.model;
+	if (typeof nodeModel === "string" && nodeModel.trim()) return nodeModel.trim();
+	const rustModel = manifest.embeddings?.[0]?.model?.name;
+	if (typeof rustModel === "string" && rustModel.trim()) return rustModel.trim();
+	const routed = manifest.embeddingRoutes?.text;
+	if (typeof routed === "string" && routed.trim()) return routed.trim();
+	return undefined;
 }

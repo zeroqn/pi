@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RG_TIMEOUT_MS, SEARCH_TIMEOUT_MS, type Exec, createZgCli, spawnExec } from "../src/cli.ts";
 import { createZvecGrepHost } from "../src/host.ts";
+import { ZVEC_GREP_GUIDELINES } from "../index.ts";
 
 /**
  * `ZVEC_GREP_PI_WORKSPACE` is pinned for every test in this file: the default-root cases then resolve
@@ -168,6 +169,25 @@ describe("zvec_grep_search", () => {
 	test("an empty success comes back as text, not as an error", async () => {
 		const { host } = harness({ reply: { stdout: "" } });
 		expect(await host.zvec_grep_search({ query: "x" } as never)).toBe("(no results)");
+	});
+
+	test("an engine that cannot filter excluded types says so, instead of echoing its SQL", async () => {
+		// Measured against the Rust zg: `-T ts` fails in the storage engine, which cannot parse the NOT
+		// LIKE filter the CLI builds for it. The parameter is not dropped silently — the caller is told
+		// what to pass instead, and so is the model, through the guideline that names the same route.
+		const { host } = harness({
+			reply: {
+				code: 1,
+				stderr:
+					"[ERROR 2026-10-14 15:10:00 138656762556672 sqlengine_impl.cc:297] parse filter failed. reason:[syntax error [1 354 no viable alternative at input 'file_nameNOTLIKE']]",
+			},
+		});
+		const error = await raised(() =>
+			host.zvec_grep_search({ query: "x", excluded_file_types: ["ts"] } as never),
+		);
+		expect(error.name).toBe("RuntimeError");
+		expect(error.message).toContain('globs=["!*.ts"]');
+		expect(ZVEC_GREP_GUIDELINES.join(" ")).toContain('globs=["!*.ts"]');
 	});
 });
 

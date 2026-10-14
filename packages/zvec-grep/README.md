@@ -33,6 +33,12 @@ to `zg`, whose defaults differ per mode — in server mode a stale index is refr
   per root when more than one ran.
 - **A partial failure is text** that names the roots that failed, with their exit codes. Only when
   **every** root fails does the call raise `RuntimeError`.
+- **`excluded_file_types` needs a filter the Rust `zg` cannot build.** The pinned zvec release — the
+  storage engine both generations ship — rejects the `NOT LIKE` clause the CLI derives from `-T`, which
+  upstream's own test states as a fact (`zg-engine/src/storage/fragments/tests.rs`,
+  `the pinned zvec release does not parse NOT LIKE`). A search carrying it fails on the Rust binary, and
+  the failure says so instead of echoing the storage engine's SQL: pass the exclusion as a negated glob,
+  `globs=["!*.ts"]`, which that engine does support. The `0.2.0` node CLI's `-T` works as it always did.
 - The names the cell sees are exactly `zvec_grep_search` and `zvec_grep_rg`: the functions are
   contributed to the kernel by name, and monty binds by `.name`.
 
@@ -72,8 +78,20 @@ probe.
 | `ZVEC_GREP_PI_STATUS` | `0` disables the footer status. |
 
 A config file may carry the same three settings: `~/.pi/agent/zvec-grep.json` first, then
-`<cwd>/.pi/zvec-grep.json`, the project's scalars winning. A nested git repository is only indexed if
-its workspace manifest carries `include: ["**"]`, which this extension seeds before the first index.
+`<cwd>/.pi/zvec-grep.json`, the project's scalars winning.
+
+A nested git repository is only indexed if the workspace manifest carries `include: ["**"]`, which this
+extension seeds before the first index — that generation skips nested repositories without it.
+
+The seed is the **node** generation's manifest shape, and the two generations do not read each other's:
+the Rust `zg` answers `unsupported index version … rebuild the index with …` and then refuses both to
+index and to search. So `/zg-index`, `/zg-index-all` and `/zg-enable` run through `indexWorkspace`
+(`src/cli.ts`), which hears that refusal, drops the seed — nothing is indexed behind an unbuilt manifest,
+and a manifest that carries an `indexVersion` or a Rust `storageGeneration` is never touched — and runs
+the index again. The Rust engine needs no seed at all: it indexes nested repositories by default.
+
+`/zg-status-all` reads whichever manifest it finds for the workspace name, the last-index time and the
+embedding model (`embedding.model` on the node manifest, `embeddings[0].model.name` on the Rust one).
 
 ## Read-only mode
 
@@ -91,8 +109,8 @@ content. Measured, not assumed — `.scratch/zvec-grep/tools/zg-writes/`.
 | | |
 | --- | --- |
 | `index.ts` | The entry: the host-bridge registration and the contribution's prose, the six commands, the footer. |
-| `src/cli.ts` | The spawned process, the CLI generation, argv, the command tokenizer, output bounding, the per-root fan-out. |
-| `src/config.ts` | Roots and the workspace root, the manifest seeding. |
+| `src/cli.ts` | The spawned process, the CLI generation, argv, the command tokenizer, output bounding, the per-root fan-out, the index retry. |
+| `src/config.ts` | Roots and the workspace root, the workspace manifest (seeded, dropped again, read back for `/zg-status-all`). |
 | `src/host.ts` | The two host functions and their boundary. |
 
 `createZgCli` takes its executor as a parameter, so the whole call path is drivable with no `zg`

@@ -35,15 +35,20 @@
  *   ZVEC_GREP_EMBEDDING  Embedding model for a new index
  *
  * Two CLI generations are auto-detected (`src/cli.ts`): modern (zg >= 0.2.1) and legacy
- * (zg <= 0.2.0, which this host has).
+ * (zg <= 0.2.0, which this host has). They differ in more than argv — the argv is what the detection is
+ * for, but `/zg-index` also has to cope with the two keeping *different workspace manifests*. The
+ * nested-repo seed this extension writes is the node generation's shape, which the Rust `zg` refuses
+ * outright, so the index runs through `indexWorkspace`: on that refusal the seed is dropped and the
+ * command re-run. Searching needs no such care — the flags are the same, with two exceptions the
+ * guidelines above state (`excluded_file_types`, which the Rust engine's zvec release cannot filter).
  *
  * Registration happens at module load, not from the factory: pi loads each extension entry through its
  * own jiti instance, so the factory may never run in the process that composes a session, while the
  * process-global slot host-bridge reads is written either way.
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 
 import {
 	API_VERSION,
@@ -55,6 +60,7 @@ import {
 	INDEX_TIMEOUT_MS,
 	STATUS_TIMEOUT_MS,
 	createZgCli,
+	indexWorkspace,
 	lastNonEmptyLine,
 	parseIndexArgs,
 	serverAction,
@@ -64,7 +70,10 @@ import {
 	configuredEmbedding,
 	configuredRoots,
 	configuredWorkspaceRoot,
+	discardSeededManifest,
 	ensureNestedRepoInclude,
+	readIndexedWorkspace,
+	type IndexedWorkspace,
 } from "./src/config.ts";
 import { createZvecGrepHost } from "./src/host.ts";
 
@@ -94,6 +103,7 @@ export const ZVEC_GREP_GUIDELINES = [
 	"Do not use zvec_grep_search for open-world knowledge or external facts unrelated to the local workspace — that is await web_search(...).",
 	"Use await zvec_grep_rg(command) for exhaustive exact, literal or regex search when ranked indexed results are not appropriate; scope it with a path, -g/--glob or -t/--type, and append `| head -N` to bound the output.",
 	"Its arguments are snake_case (file_types, excluded_file_types, symbol_type, prefer_symbol, modified_after, modified_before); the old camelCase spellings still bind. An unknown parameter raises ValueError and nothing runs, on purpose — a misspelled argument is meant to be loud.",
+	"excluded_file_types needs a filter the Rust zg's storage engine cannot parse; express an exclusion as a negated glob instead, e.g. globs=[\"!*.ts\"].",
 ];
 
 /** What this package contributes to one session. It does not branch on `isChild`: a delegated coding task wants search as much as its spawner does, and there is no UI to gate on. */
@@ -126,41 +136,6 @@ registerContributor(zvecGrepRegistration);
 function statusEnabled(): boolean {
 	const value = process.env.ZVEC_GREP_PI_STATUS?.trim().toLowerCase();
 	return value !== "0" && value !== "false" && value !== "off";
-}
-
-type IndexedWorkspace = {
-	root: string;
-	name: string;
-	updatedTime: number;
-	embedding?: string;
-};
-
-/** Read `<root>/.zvec-grep/manifest.json` and describe the indexed workspace, if any. */
-function readIndexedWorkspace(root: string): IndexedWorkspace | undefined {
-	const manifestPath = join(root, ".zvec-grep", "manifest.json");
-	if (!existsSync(manifestPath)) return undefined;
-	try {
-		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
-			name?: unknown;
-			updatedTime?: unknown;
-			embedding?: { model?: unknown } | null;
-		};
-		const model =
-			manifest.embedding && typeof manifest.embedding.model === "string"
-				? manifest.embedding.model
-				: undefined;
-		return {
-			root,
-			name:
-				typeof manifest.name === "string" && manifest.name.trim()
-					? manifest.name.trim()
-					: basename(root),
-			updatedTime: typeof manifest.updatedTime === "number" ? manifest.updatedTime : 0,
-			embedding: model,
-		};
-	} catch {
-		return undefined;
-	}
 }
 
 /**
@@ -257,9 +232,10 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 			const indexArgs = style === "legacy" ? ["index"] : ["--index"];
 			if (model) indexArgs.push("--embedding", model);
 			if (parsed.rebuild) indexArgs.push("--rebuild");
-			const indexResult = await cli.run(indexArgs, {
+			const indexResult = await indexWorkspace(cli, indexArgs, {
 				cwd: targetRoot,
 				timeout: INDEX_TIMEOUT_MS,
+				discardSeed: () => discardSeededManifest(targetRoot),
 			});
 			const indexOk = indexResult.code === 0;
 
@@ -321,9 +297,10 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 
 			ctx.ui.setStatus("zvec-grep", status(drop ? "dropping index…" : `indexing ${targetRoot}…`));
 			try {
-				const result = await cli.run(cliArgs, {
+				const result = await indexWorkspace(cli, cliArgs, {
 					cwd: targetRoot,
 					timeout: INDEX_TIMEOUT_MS,
+					discardSeed: () => discardSeededManifest(targetRoot),
 				});
 				if (result.code !== 0) {
 					ctx.ui.notify(
@@ -370,9 +347,10 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 				const cliArgs = style === "legacy" ? ["index"] : ["--index"];
 				if (model) cliArgs.push("--embedding", model);
 				if (rebuild) cliArgs.push("--rebuild");
-				const result = await cli.run(cliArgs, {
+				const result = await indexWorkspace(cli, cliArgs, {
 					cwd: root,
 					timeout: INDEX_TIMEOUT_MS,
+					discardSeed: () => discardSeededManifest(root),
 				});
 				if (result.code !== 0) {
 					failures += 1;

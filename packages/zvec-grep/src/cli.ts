@@ -300,6 +300,27 @@ export async function runAcrossRoots(
 	);
 }
 
+/**
+ * A failure's detail, in the caller's terms when the CLI cannot say it usefully itself.
+ *
+ * `excluded_file_types` becomes a `NOT LIKE` filter, and the pinned zvec release — the storage engine
+ * both `zg` generations ship — cannot parse one. That is not a guess: it is upstream's own test
+ * (`zg-engine/src/storage/fragments/tests.rs`, `the pinned zvec release does not parse NOT LIKE`), and
+ * the CLI's answer is the storage engine's SQL error with no results, which says nothing a caller can
+ * act on. A negated glob does the same job and *is* supported (measured against the Rust `zg`: `-g
+ * '!*.ts'` and `--iglob '!*.ts'` each drop the excluded format), so the detail is rewritten to say so
+ * and keeps the engine's own line, bounded, for diagnosis.
+ */
+export function explainFailure(detail: string): string {
+	if (!/parse filter failed/i.test(detail) || !/NOT ?LIKE/i.test(detail)) return detail;
+	const said = (detail.split("\n").find((line) => line.trim()) ?? "").trim().slice(0, 200);
+	return [
+		"excluded_file_types needs a filter this zg's storage engine cannot parse: the pinned zvec release rejects the NOT LIKE clause the CLI builds for it.",
+		'Pass the exclusion as a negated glob instead — globs=["!*.ts"] — which that engine does support.',
+		`zg said: ${said}`,
+	].join("\n");
+}
+
 export function formatRootResults(
 	label: string,
 	outcomes: readonly RootRun[],
@@ -310,13 +331,39 @@ export function formatRootResults(
 		const prefix = options.header ? `### ${root}\n` : "";
 		if (result.code !== 0) {
 			failed += 1;
-			const detail = (result.stderr || result.stdout).trim() || "no output";
+			const detail = explainFailure((result.stderr || result.stdout).trim() || "no output");
 			return `${prefix}${label} failed (exit ${result.code}).\n${detail}`;
 		}
 		const body = boundOutput((result.stdout || result.stderr).trim() || "(no results)", options.head);
 		return `${prefix}${body}`;
 	});
 	return { text: sections.join("\n\n"), failed };
+}
+
+/**
+ * Run an index command, healing the one failure this extension's own pre-seed can cause.
+ *
+ * `ensureNestedRepoInclude` (src/config.ts) writes the *node* CLI's manifest into a workspace that has
+ * none, because that generation skips nested git repositories without it. A `zg` that does not read that
+ * shape refuses the whole command, so the seed is dropped and the command runs again — that generation
+ * needs no seed at all. The caller owns the filesystem and passes `discardSeed`, so this stays a module
+ * about argv and `spawn`; it is consulted only for the manifest refusal, never for an ordinary failure,
+ * and answers whether it removed the seed.
+ */
+export async function indexWorkspace(
+	cli: ZgCli,
+	args: readonly string[],
+	options: ExecOptions & { discardSeed?: () => boolean },
+): Promise<ExecResult> {
+	const { discardSeed, ...runOptions } = options;
+	const first = await cli.run([...args], runOptions);
+	if (first.code === 0 || !discardSeed) return first;
+	// `rebuild_required` in the engine's manifest reader is the only place this sentence comes from, and
+	// every reason it fires — an index version it does not support, the node manifest's unknown fields,
+	// unreadable JSON — is a manifest it will not use.
+	if (!`${first.stderr}\n${first.stdout}`.includes("rebuild the index with")) return first;
+	if (!discardSeed()) return first;
+	return cli.run([...args], runOptions);
 }
 
 /** Parse `/zg-index [--rebuild] [--drop] [--root <path>] [embedding-model]`. */

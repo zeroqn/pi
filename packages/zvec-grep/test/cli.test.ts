@@ -8,7 +8,9 @@ import {
 	buildRgArgs,
 	buildSearchArgs,
 	createZgCli,
+	explainFailure,
 	formatRootResults,
+	indexWorkspace,
 	lastNonEmptyLine,
 	parseIndexArgs,
 	runAcrossRoots,
@@ -265,5 +267,109 @@ describe("spawnExec", () => {
 	test("the search and rg timeouts are the ones the old tools used", () => {
 		expect(SEARCH_TIMEOUT_MS).toBe(10 * 60 * 1000);
 		expect(RG_TIMEOUT_MS).toBe(2 * 60 * 1000);
+	});
+});
+
+/** The storage engine's refusal, as the Rust zg prints it: one SQL line, no carriage control. */
+const NOT_LIKE_REFUSAL =
+	"[ERROR 2026-10-14 15:10:00 138656762556672 sqlengine_impl.cc:297] parse filter failed. reason:[syntax error [1 354 no viable alternative at input 'file_nameNOTLIKE']] filter:[((file_name NOT LIKE '%.cts' OR file_name = '.cts') AND (file_name NOT LIKE '%.mts' OR file_name = '.mts'))]";
+
+/** The manifest refusal, as the Rust zg prints it (zg-engine's `rebuild_required`). */
+const MANIFEST_REFUSAL =
+	"error[ZG.ENGINE.STORAGE_FAILURE]: unsupported index version missing; expected 2; rebuild the index with `zg --index --rebuild`";
+
+describe("indexWorkspace", () => {
+	test("drops the seed and re-runs, but only when the engine refused the manifest", async () => {
+		const runs: string[][] = [];
+		const exec: Exec = async (_command, args) => {
+			runs.push(args);
+			return runs.length === 1
+				? { stdout: "", stderr: MANIFEST_REFUSAL, code: 1 }
+				: { stdout: "Workspace index", stderr: "", code: 0 };
+		};
+		const cli = createZgCli({ exec, env: { ZVEC_GREP_CLI_STYLE: "modern" } });
+		let discards = 0;
+		const result = await indexWorkspace(cli, ["--index"], {
+			cwd: "/w",
+			timeout: 5000,
+			discardSeed: () => {
+				discards += 1;
+				return true;
+			},
+		});
+		expect(result).toEqual({ stdout: "Workspace index", stderr: "", code: 0 });
+		expect(runs).toEqual([["--index"], ["--index"]]);
+		expect(discards).toBe(1);
+	});
+
+	test("an ordinary index failure is reported as it is, with the seed untouched", async () => {
+		const { exec, runs } = fakeZg({ stderr: "no space left on device", code: 1 });
+		const cli = createZgCli({ exec, env: { ZVEC_GREP_CLI_STYLE: "modern" } });
+		let discards = 0;
+		const result = await indexWorkspace(cli, ["--index"], {
+			cwd: "/w",
+			timeout: 5000,
+			discardSeed: () => {
+				discards += 1;
+				return true;
+			},
+		});
+		expect(result.stderr).toBe("no space left on device");
+		expect(runs()).toHaveLength(1);
+		expect(discards).toBe(0);
+	});
+
+	test("a refusal with no seed to drop stays a failure, and without a callback nothing is retried", async () => {
+		const { exec, runs } = fakeZg({ stderr: MANIFEST_REFUSAL, code: 1 });
+		const cli = createZgCli({ exec, env: { ZVEC_GREP_CLI_STYLE: "modern" } });
+		const kept = await indexWorkspace(cli, ["--index"], { cwd: "/w", timeout: 5000, discardSeed: () => false });
+		expect(kept.code).toBe(1);
+		const bare = await indexWorkspace(cli, ["--index"], { cwd: "/w", timeout: 5000 });
+		expect(bare.code).toBe(1);
+		expect(runs()).toHaveLength(2);
+	});
+
+	test("a success is not inspected at all", async () => {
+		const { exec, runs } = fakeZg({ stdout: "indexed", code: 0 });
+		const cli = createZgCli({ exec, env: { ZVEC_GREP_CLI_STYLE: "modern" } });
+		let discards = 0;
+		const result = await indexWorkspace(cli, ["--index"], {
+			cwd: "/w",
+			timeout: 5000,
+			discardSeed: () => {
+				discards += 1;
+				return true;
+			},
+		});
+		expect(result.stdout).toBe("indexed");
+		expect(runs()).toHaveLength(1);
+		expect(discards).toBe(0);
+	});
+});
+
+describe("explainFailure", () => {
+	test("the engine's filter refusal becomes the negated-glob route, with its own line bounded", () => {
+		const explained = explainFailure(NOT_LIKE_REFUSAL);
+		expect(explained).toContain("excluded_file_types");
+		expect(explained).toContain('globs=["!*.ts"]');
+		expect(explained).toContain("zg said: [ERROR");
+		const last = explained.split("\n").pop()!;
+		expect(last.length).toBeLessThanOrEqual("zg said: ".length + 200);
+	});
+
+	test("anything else is handed back unchanged", () => {
+		expect(explainFailure("no index")).toBe("no index");
+		expect(explainFailure("parse filter failed")).toBe("parse filter failed");
+	});
+
+	test("a search failure carrying it is explained through formatRootResults too", () => {
+		const { text } = formatRootResults(
+			"zvec-grep search",
+			[{ root: "/a", result: { stdout: "", stderr: NOT_LIKE_REFUSAL, code: 1 } }],
+			{ header: false },
+		);
+		expect(text).toContain('globs=["!*.ts"]');
+		// Only the engine's own line, and only its head: the SQL tail never reaches the cell.
+		expect(text).not.toContain("OR file_name = '.mts'");
 	});
 });
