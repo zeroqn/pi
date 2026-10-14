@@ -1114,6 +1114,9 @@ export function createKernel(options: {
 					extra: { ...backgroundHostFns(), ...ledger.hostFns() },
 					background,
 					guard: ledger.guard(),
+					// The session's egress policy, if any owner declared one: web-access refuses a shell
+					// command whose purpose is to leave the host, so the fence it owns stays the only route.
+					egress: ledger.egress(),
 					// The session's engine, if any owner declared one: `grep`/`find` try it first and fall
 					// back to rg/fd (fff-search ticket 05).
 					engine: ledger.search(),

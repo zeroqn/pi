@@ -60,7 +60,7 @@ Published **at module load**, first publisher wins:
 // globalThis[Symbol.for("pi-code-mode:registry")]
 {
   publisher: "pi-code-mode",
-  apiVersion: 3,                       // the contract's version, not the package's
+  apiVersion: 4,                       // the contract's version, not the package's
   sessions: Map<string, KernelHandle>, // one kernel per session key
   mount(pi, ctx): KernelHandle,        // idempotent by session key
 }
@@ -71,7 +71,7 @@ Published **at module load**, first publisher wins:
   word, so the rule lives here and this is its observable. The session key is the absolute session
   file, or — for an unpersisted session — the session manager's identity.
 - **`handle.contribute({ owner, hostFns, prelude, description, snippet, guidelines, onNotice,
-  provenance, guard, search })`** returns `{ owner, accepted, rejected }`, and validation is
+  provenance, guard, egress, search })`** returns `{ owner, accepted, rejected }`, and validation is
   **all-or-nothing**: one rejected name means nothing from that call is applied, because a prelude
   line whose host function was rejected is a `NameError` at call time. A contribution is idempotent
   per owner, and the tool's description, snippet and guidelines are recomposed — by re-registering
@@ -90,9 +90,15 @@ Published **at module load**, first publisher wins:
 - **`search = { grep(query), find(query) }`** answers the two search primitives before rg/fd, in the
   primitives' own normalized shapes (`GrepQuery`/`FindQuery` in, `Match[]`/`string[]` out). Absent, or
   throwing, leaves them on the host's own engines; the sort and the cut stay code mode's, except behind
-  an explicit `fuzzy=True`. **One owner only**, and the reason the contract is version 3 —
+  an explicit `fuzzy=True`. **One owner only**, and the reason the contract reached version 3 —
   `docs/adr/0006-an-engine-slot-for-a-sessions-search.md` records why it is a slot rather than two new
   names.
+- **`guard = { before(call), mountMode() }`** and **`egress = { before(call) }`** are the session's two
+  policies, asked before every host call in that order and each **one owner only**. They are two slots
+  rather than one because they ask different questions — *may this call run* and *may it leave the
+  network* — and a session holds both: read-only mode owns the first, web-access the second, and neither
+  package can be obeyed through a slot the other holds. `egress` is the reason the contract reached
+  version 4 — `docs/adr/0007-an-egress-slot-for-a-sessions-network-policy.md`.
 - **`apiVersion` is the only version signal there is.** pi exposes no extension enumeration and no
   version query, so a consumer cannot tell *absent* from *old* from *inert* any other way.
 

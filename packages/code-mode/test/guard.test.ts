@@ -19,6 +19,7 @@ import {
 	REGISTRY_KEY,
 	createLedger,
 	refusal,
+	type Egress,
 	type Guard,
 	type RegistryEntry,
 } from "../src/contract";
@@ -88,6 +89,70 @@ describe("the guard slot on a contribution", () => {
 	});
 });
 
+describe("the egress slot on a contribution", () => {
+	it("is accepted, and readable back off the ledger", () => {
+		const l = ledger();
+		const egress: Egress = { before: () => undefined };
+		const receipt = l.accept({ owner: "web-access", egress });
+		expect(receipt.rejected).toEqual([]);
+		expect(receipt.accepted).toContain("egress");
+		expect(l.egress()).toBe(egress);
+	});
+
+	it("is absent, not undefined-and-throwing, when nobody declares one", () => {
+		expect(ledger().egress()).toBeUndefined();
+	});
+
+	it("is its own slot: a guard and an egress policy coexist, and neither is the other", () => {
+		const l = ledger();
+		const guard: Guard = { before: () => undefined };
+		const egress: Egress = { before: () => undefined };
+		expect(l.accept({ owner: "readonly-mode", guard }).rejected).toEqual([]);
+		expect(l.accept({ owner: "web-access", egress }).rejected).toEqual([]);
+		expect(l.guard()).toBe(guard);
+		expect(l.egress()).toBe(egress);
+	});
+
+	it("refuses a second declarer whole, in the same shape as the other single-owner slots", () => {
+		const l = ledger();
+		l.accept({ owner: "first", egress: { before: () => undefined } });
+		const receipt = l.accept({ owner: "second", egress: { before: () => undefined } });
+		expect(receipt.accepted).toEqual([]);
+		expect(receipt.rejected).toEqual([{ name: "egress", reason: "already declared by first" }]);
+		expect(l.owners()).toEqual(["first"]);
+	});
+
+	it("lets an owner replace its own, so a second session_start costs nothing", () => {
+		const l = ledger();
+		const first: Egress = { before: () => undefined };
+		const second: Egress = { before: () => ({ allow: true }) };
+		l.accept({ owner: "web-access", egress: first });
+		expect(l.accept({ owner: "web-access", egress: second }).rejected).toEqual([]);
+		expect(l.egress()).toBe(second);
+	});
+
+	it("refuses one that is not an object, and a `before` that is not a function", () => {
+		for (const [egress, name, reason] of [
+			["network", "egress", "not an object"],
+			[[], "egress", "not an object"],
+			[{ before: "yes" }, "egress.before", "not a function"],
+		] as const) {
+			const receipt = ledger().accept({ owner: "o", egress: egress as never });
+			expect(receipt.rejected).toContainEqual({ name, reason });
+		}
+	});
+
+	it("does not take a mount mode: that half belongs to the guard alone, and the copy-paste is loud", () => {
+		const receipt = ledger().accept({ owner: "web-access", egress: { mountMode: () => "read-only" } as never });
+		expect(receipt.rejected).toEqual([{ name: "egress.mountMode", reason: "not a field of this slot" }]);
+	});
+
+	it("refuses an unknown key on the guard too, so neither policy slot can be typo'd silently", () => {
+		const receipt = ledger().accept({ owner: "readonly-mode", guard: { before: () => undefined, mounts: 2 } as never });
+		expect(receipt.rejected).toEqual([{ name: "guard.mounts", reason: "not a field of this slot" }]);
+	});
+});
+
 // ---------------------------------------------------------------------------
 // The refusal, and the round trip that makes a replay raise it.
 // ---------------------------------------------------------------------------
@@ -146,6 +211,30 @@ describe("the guard's gate", () => {
 		expect(gated.find?.name).toBe("find");
 	});
 
+	it("asks guard then egress, and either refusal stops the call before the callee runs", async () => {
+		let ran = 0;
+		const seen: string[] = [];
+		const gated = guarded(
+			{ echoed: async () => (ran += 1) },
+			{ before: () => { seen.push("guard"); return undefined; } },
+			{ before: () => { seen.push("egress"); return { allow: false, reason: "web-access: that fetches" }; } },
+		);
+		expect(gated.echoed?.("x")).rejects.toThrow("web-access: that fetches");
+		// The order is the contract's: the session policy first, the subject policy second.
+		expect(seen).toEqual(["guard", "egress"]);
+		expect(ran).toBe(0);
+	});
+
+	it("is unchanged with an egress policy that answers nothing, and asks egress alone when guard is absent", async () => {
+		const surface2 = { echoed: async (t: unknown) => `echo:${String(t)}` };
+		expect(guarded(surface2, undefined, undefined)).toBe(surface2);
+		expect(guarded(surface2, { mountMode: () => "read-only" }, undefined)).toBe(surface2);
+		const seen: string[] = [];
+		const gated = guarded(surface2, undefined, { before: (call) => { seen.push(call.name); return undefined; } });
+		expect(await gated.echoed?.("hi")).toBe("echo:hi");
+		expect(seen).toEqual(["echoed"]);
+	});
+
 	it("gates code mode's own base functions and a contributed one alike", async () => {
 		const seen: string[] = [];
 		const host = makeHost({
@@ -170,8 +259,8 @@ describe("the guard's gate", () => {
 	it("pins the contract version a supplier has to check before contributing", () => {
 		// An older code mode refuses `guard` or `search` as an unknown field *whole*, so a package
 		// that must be obeyed — or that has an engine to offer — reads this before contributing.
-		// `handle.apiVersion` is where it reads it. 2 added `guard`; 3 added `search`.
-		expect(API_VERSION).toBe(3);
+		// `handle.apiVersion` is where it reads it. 2 added `guard`; 3 added `search`; 4 added `egress`.
+		expect(API_VERSION).toBe(4);
 	});
 });
 
@@ -254,8 +343,8 @@ describe("a guarded kernel", () => {
 		sentinel = join(dir, "sentinel");
 	});
 
-	/** A mounted kernel whose session has declared one guard, before the first cell. */
-	function mounted(guard: Guard) {
+	/** A mounted kernel whose session has declared one guard (and optionally one egress policy). */
+	function mounted(guard: Guard, egress?: Egress) {
 		const pi = fakePi();
 		codeMode(pi as never);
 		const entry = glob[REGISTRY_KEY] as RegistryEntry;
@@ -267,6 +356,10 @@ describe("a guarded kernel", () => {
 			hostFns: { noted: async () => `noted:${(noted += 1)}` },
 			guard,
 		});
+		if (egress) {
+			const egressReceipt = handle.contribute({ owner: "web-access", egress });
+			expect(egressReceipt.rejected).toEqual([]);
+		}
 		return { handle, session, receipt, countNoted: () => noted };
 	}
 
@@ -306,6 +399,33 @@ describe("a guarded kernel", () => {
 		expect(recorded).toHaveLength(1);
 		expect(recorded[0]?.name).toBe("noted");
 		expect(recorded[0]?.error).toEqual({ name: "PermissionError", message: "read-only mode: refusing noted" });
+	});
+
+	maybe("refuses a shell command the egress policy names, and the command never runs", async () => {
+		// The real pair: readonly-mode's guard allows bash, and web-access's egress policy refuses the
+		// command inside it. The proof is that the sentinel never appears *and* the model reads a
+		// PermissionError naming the egress rule.
+		const { handle, session } = mounted(
+			{ before: () => ({ allow: true }) }, // the guard lets every call through
+			{
+				// A stand-in for checkEgress: the policy's own corpus is web-access's test.
+				before: (call) => {
+					if (call.name !== "bash_host") return undefined;
+					const command = String((call.args as unknown[])[0] ?? "");
+					return command.includes("curl") ? refuse("a network fetch (curl); use fetch_content") : undefined;
+				},
+			},
+		);
+		const text = textOf(
+			await (handle.kernel as Kernel).execute(
+				{ code: `await bash(${JSON.stringify(`curl --max-time 1 http://127.0.0.1:9/ && touch ${sentinel}`)})` },
+				undefined,
+				session.ctx,
+			),
+		);
+		expect(text).toContain("PermissionError");
+		expect(text).toContain("use fetch_content");
+		expect(existsSync(sentinel)).toBe(false);
 	});
 
 	maybe("runs the same cell unchanged when an allow is answered", async () => {

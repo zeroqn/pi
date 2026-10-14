@@ -20,6 +20,7 @@ import { SHELL } from "./shell";
 import { bool, num, str } from "./util";
 import {
 	aborted,
+	type Egress,
 	type FindQuery,
 	type GrepQuery,
 	type Guard,
@@ -300,14 +301,25 @@ export function bind(args: unknown[], names: string[], fn: string): Record<strin
  * With no `before` the surface is returned **unchanged**, not copied: a session with no guard has
  * to behave exactly as it did before this existed.
  */
-export function guarded(host: HostFns, guard?: Guard): HostFns {
-	const before = guard?.before;
-	if (!before) return host;
+export function guarded(host: HostFns, ...policies: Array<Guard | Egress | undefined>): HostFns {
+	// Flattened once, at wrap time, so the hot path is a loop over bare functions rather than a walk
+	// over slots that may or may not be there.
+	const asked: Array<(call: { name: string; args: unknown[] }) => unknown> = [];
+	for (const policy of policies) {
+		if (typeof policy?.before === "function") asked.push(policy.before.bind(policy));
+	}
+	if (asked.length === 0) return host;
 	const wrapped: HostFns = {};
 	for (const [name, fn] of Object.entries(host)) {
 		const wrapper = async (...args: unknown[]) => {
-			const verdict = await before({ name, args });
-			if (verdict && verdict.allow === false) throw refusal(verdict.reason);
+			// Every policy is offered the call, **before** the callee runs, and the first refusal stops
+			// it: `guard` is asked first (may this call run at all), then `egress` (may it leave the
+			// host). The order is the contract's: a session policy decides whether the call is a call
+			// before a subject policy decides whether it may reach out.
+			for (const ask of asked) {
+				const verdict = (await ask({ name, args })) as { allow?: boolean; reason?: string } | undefined;
+				if (verdict && verdict.allow === false) throw refusal(String(verdict.reason));
+			}
 			return fn(...args);
 		};
 		Object.defineProperty(wrapper, "name", { value: name });
@@ -427,6 +439,8 @@ export function makeHost(options: {
 	background: ReturnType<typeof createBackgroundManager>;
 	/** The session's policy, when its owner declared one (readonly-guard ticket 02). */
 	guard?: Guard;
+	/** The session's egress policy, when its owner declared one — asked after `guard`, before the call. */
+	egress?: Egress;
 	/** What answers `grep`/`find` before rg/fd, when the session declared an engine
 	 * (`fff-search` ticket 05). Absent is the ordinary state, and leaves both primitives as they were. */
 	engine?: SearchEngine;
@@ -434,7 +448,7 @@ export function makeHost(options: {
 	 * when the host passed none, which leaves every function exactly as it was. */
 	signal?: AbortSignal;
 }): HostFns {
-	const { root, attachments, progress, extra, background: backgroundManager, guard, engine, signal } = options;
+	const { root, attachments, progress, extra, background: backgroundManager, guard, egress, engine, signal } = options;
 	const base: HostFns = {
 		async bash_host(...args: unknown[]) {
 			const { command, timeout, background } = bind(args, ["command", "timeout", "background"], "bash");
@@ -564,5 +578,5 @@ export function makeHost(options: {
 	// Contributed names win over base ones (ticket 01), and both halves are gated before they run.
 	// The abort gate is outermost of the three: a cancelled turn is refused before the policy is even
 	// asked, which is the order `readonly-guard`'s question ("may this call run") implies.
-	return abortable({ ...guarded(base, guard), ...guarded(extra, guard) }, signal);
+	return abortable({ ...guarded(base, guard, egress), ...guarded(extra, guard, egress) }, signal);
 }

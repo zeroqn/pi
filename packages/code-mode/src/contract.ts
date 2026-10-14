@@ -31,10 +31,10 @@ export const PUBLISHER = "pi-code-mode";
  *
  * A *supplier* reads it too. Code mode validates a contribution all-or-nothing, so an older code
  * mode refuses a field it does not know **whole** — which makes a slot a package must be obeyed
- * through unsafe to contribute blind. **2 added {@link Guard} and 3 added {@link SearchEngine}**: a package that has to be obeyed
- * rather than merely offered reads `handle.apiVersion` first, and fails closed below the version
- * it needs. */
-export const API_VERSION = 3;
+ * through unsafe to contribute blind. **2 added {@link Guard}, 3 added {@link SearchEngine} and 4 added
+ * {@link Egress}**: a package that has to be obeyed rather than merely offered reads `handle.apiVersion`
+ * first, and fails closed below the version it needs. */
+export const API_VERSION = 4;
 
 export type HostFn = (...args: unknown[]) => Promise<unknown>;
 
@@ -95,6 +95,27 @@ export type Guard = {
 	 * answer that changes mid-session takes effect at the next cell. `undefined` means `read-write`.
 	 */
 	mountMode?: () => MountMode | undefined;
+};
+
+/**
+ * The session's **egress** policy: may a host call leave this host?
+ *
+ * The sibling of {@link Guard}, asked the same way at the same moment, and deliberately a **separate
+ * slot** rather than a second entry in that one. The two ask different questions — `guard` asks *may
+ * this call run*, `egress` asks *may it reach the network* — and a session can hold both answers with
+ * neither implying the other: read-only mode governs the workspace, while the package whose subject is
+ * the network governs what leaves it (`web-access`, whose fence covers the web content that arrives).
+ * One shared slot is what would force the second subject to live inside the first owner's policy,
+ * because `guard` is single-owner and a package cannot be obeyed through a slot it cannot reach.
+ *
+ * **One owner only**, in the same all-or-nothing family as `guard`/`onNotice`/`provenance`: a second
+ * declarer is refused whole rather than silently ignored. `before` sees every call and answers for the
+ * ones its subject covers; anything but an explicit `{allow: false}` means "run it", so a policy that
+ * does not know a call lets it through — the same fail-open shape {@link Guard.before} has.
+ */
+export type Egress = {
+	/** Asked before every host call, under {@link Guard.before}'s rules: `{allow: false}` is a refusal. */
+	before?: (call: HostCall) => GuardVerdict | Promise<GuardVerdict>;
 };
 
 /** One grep hit, as a cell reads it. Both engines are asked for the file name and the line number, so
@@ -178,6 +199,8 @@ export type Contribution = {
 	provenance?: (ctx: unknown, own: OwnSession) => Provenance;
 	/** Whether a host call may run, and which mode the cwd mount gets. One owner only. */
 	guard?: Guard;
+	/** Whether a host call may leave the network. One owner only, and a slot of its own (see {@link Egress}). */
+	egress?: Egress;
 	/** What answers `grep`/`find`, when this session has an engine of its own. One owner only. */
 	search?: SearchEngine;
 };
@@ -378,6 +401,7 @@ const CONTRIBUTION_FIELDS = [
 	"onNotice",
 	"provenance",
 	"guard",
+	"egress",
 	"search",
 ];
 
@@ -619,16 +643,30 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 				const value = contribution[field as "onNotice" | "provenance"];
 				if (value !== undefined && typeof value !== "function") rejected.push({ name: field, reason: "not a function" });
 			}
-			if (contribution.guard !== undefined) {
-				const guard = contribution.guard;
-				if (typeof guard !== "object" || guard === null || Array.isArray(guard))
-					rejected.push({ name: "guard", reason: "not an object" });
-				else
-					for (const field of ["before", "mountMode"] as const) {
-						const value = guard[field];
-						if (value !== undefined && typeof value !== "function")
-							rejected.push({ name: `guard.${field}`, reason: "not a function" });
-					}
+			// The two policy slots are validated by one rule, because they are one shape: an object whose
+			// declared halves are functions. `guard` has a second half (the mount mode); `egress` does not.
+			for (const [field, halves] of [
+				["guard", ["before", "mountMode"]],
+				["egress", ["before"]],
+			] as const) {
+				const policy = contribution[field];
+				if (policy === undefined) continue;
+				if (typeof policy !== "object" || policy === null || Array.isArray(policy)) {
+					rejected.push({ name: field, reason: "not an object" });
+					continue;
+				}
+				// An unknown key is a typo, and a typo is loud — the same rule the contribution's own
+				// fields get. The one it catches is real: `mountMode` copied onto an `egress` policy,
+				// which would otherwise be accepted and silently do nothing.
+				for (const key of Object.keys(policy)) {
+					if (!(halves as readonly string[]).includes(key))
+						rejected.push({ name: `${field}.${key}`, reason: "not a field of this slot" });
+				}
+				for (const half of halves) {
+					const value = (policy as Record<string, unknown>)[half];
+					if (value !== undefined && typeof value !== "function")
+						rejected.push({ name: `${field}.${half}`, reason: "not a function" });
+				}
 			}
 			if (contribution.search !== undefined) {
 				const engine = contribution.search;
@@ -659,7 +697,7 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 			// shape: a second declarer is **refused** rather than silently ignored, which is what a
 			// slot dispatched first-owner-wins would otherwise do. An owner may still replace its own,
 			// which is what keeps a second `session_start` free.
-			for (const field of ["onNotice", "provenance", "guard", "search"] as const) {
+			for (const field of ["onNotice", "provenance", "guard", "egress", "search"] as const) {
 				if (contribution[field] === undefined) continue;
 				for (const [otherOwner, other] of accepted) {
 					if (otherOwner === owner) continue;
@@ -706,6 +744,13 @@ export function createLedger(spec: { reserved: string[]; base: BaseSurface; onCh
 		guard(): Guard | undefined {
 			for (const contribution of accepted.values()) {
 				if (contribution.guard) return contribution.guard;
+			}
+			return undefined;
+		},
+		/** The session's egress policy, from its one declarer. */
+		egress(): Egress | undefined {
+			for (const contribution of accepted.values()) {
+				if (contribution.egress) return contribution.egress;
 			}
 			return undefined;
 		},
