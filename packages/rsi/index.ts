@@ -365,6 +365,14 @@ export default function rsiExtension(pi: ExtensionAPI): void {
 
 	pi.on("before_agent_start", async (event) => {
 		if (!config.enabled) return undefined;
+		// Only a user prompt starts a run boundary for the tracker. pi 1.2.0 fires this hook for runs
+		// started by `pi.sendMessage(…, { triggerTurn: true })` as well — a child's completion notice, a
+		// background handle's — as a `messageType: "custom"` event that carries a `message` and no
+		// `prompt`, so `event` is a union there and `prompt` exists only on the user member. A custom run
+		// holds no `/skill:` expansion: `beginRun()` cleared the dedupe set in the middle of a session and
+		// `parseSkillBlock(undefined)` threw, which pi catches per handler and reported as an extension
+		// error on every one of those runs (measured: `.scratch/toolchain-1.2.0/acceptance.md`, row 14).
+		if (!("prompt" in event)) return undefined;
 		tracker.beginRun();
 		const expanded = parseSkillBlock(event.prompt);
 		if (expanded) {
