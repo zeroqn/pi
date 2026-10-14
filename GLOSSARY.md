@@ -89,6 +89,25 @@ loads, what it may hold (the ceiling) and what it was given. It lives in one pla
 the *policy* stays with the contributors.
 _Avoid_: child mode, inheritance
 
+**Policy slot**:
+A single-owner place a session's policy is declared, asked before its host calls run — `guard` (may this
+call run, and which mode does the cwd mount get) and `egress` (may it reach the network) — consulted in
+that order, one declarer each, a second refused whole. Two slots rather than one because they are two
+questions held by two packages: read-only mode owns the first, web-access the second.
+_Avoid_: callback, hook, interceptor
+
+**Egress policy**:
+The `egress` slot's content: whether a host call may leave this host. pi-web-access's `checkEgress`
+refuses a `bash` command whose purpose is to leave and steers it to `fetch_content` — and to the
+**escape hatch** when that route cannot reach the page.
+_Avoid_: network guard, firewall; and "egress" for the host surface itself, which is the **Host surface**
+
+**Escape hatch**:
+The sanctioned way past a refusal that would otherwise stop work: `fetch_content(url, via="shell")` runs
+`curl` on the host for the pages the guarded route cannot reach, and fences what it returns.
+_Avoid_: bypass, fallback — a bypass hides what it fetches, and a fallback may return unfenced text;
+this one cannot
+
 ## The agent side
 
 **rlm**:
