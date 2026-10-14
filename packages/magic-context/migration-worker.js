@@ -2,27 +2,27 @@ import"./index-0h2mkab2.js";
 import {
   setLogLineForwarder2,
   log2
-} from "./index-f956htf3.js";
+} from "./index-x3dcnxh0.js";
 import {
   Database2
 } from "./index-3cgbv47m.js";
 import"./index-135e8hvg.js";
 import {
   runMigrationsWithRetry
-} from "./index-jg27bxae.js";
+} from "./index-405dq1gq.js";
 import {
   closeQuietly
-} from "./index-gj0r90h9.js";
+} from "./index-nmsb3x01.js";
 import"./index-8976mezv.js";
-import"./index-dkx0b1kt.js";
+import"./index-041ex0cj.js";
 import {
   setSqlitePragmaConfig,
   initializeDatabase
-} from "./index-8pdxxv7j.js";
+} from "./index-8m86dmhb.js";
 import"./index-fapenpch.js";
-import"./index-603mt6nm.js";
-import"./index-xwgrhenf.js";
-import"./index-fp37he9a.js";
+import"./index-r024r8da.js";
+import"./index-vaah9fbg.js";
+import"./index-0vrkp1jq.js";
 
 // ../plugin/src/features/magic-context/migration-worker.ts
 import { parentPort, workerData } from "node:worker_threads";

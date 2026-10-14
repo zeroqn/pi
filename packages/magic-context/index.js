@@ -15,7 +15,7 @@ import {
   log2,
   sessionLog2,
   flushLogger2
-} from "./index-f956htf3.js";
+} from "./index-x3dcnxh0.js";
 import {
   COMPACTION_ENABLED_PATH,
   isDreamerRunnable,
@@ -105,7 +105,8 @@ import {
   deliverNoteNudgeAtomic,
   appendAutoSearchHintDecision,
   pruneNoteNudgeAnchors,
-  pruneAutoSearchHintDecisions,
+  queueAutoSearchHintDecisionRetirement,
+  flushAutoSearchHintDecisionRetirement,
   getPersistedTodoSyntheticAnchor,
   setPersistedTodoSyntheticAnchor,
   clearPersistedTodoSyntheticAnchor,
@@ -139,6 +140,9 @@ import {
   setSessionWorkMetrics,
   getSessionWorkMetrics,
   resolveEpochFloorForPass,
+  rememberUnpublishedAutoSearchNoHint,
+  getUnpublishedAutoSearchNoHint,
+  forgetUnpublishedAutoSearchNoHint,
   registerAutoSearchWork,
   cancelAutoSearchWork,
   readSessionMeta,
@@ -331,7 +335,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-4zepsjy7.js";
+} from "./index-004spr0j.js";
 import {
   isValidLanguageCode,
   withContentLanguageDirective,
@@ -342,7 +346,7 @@ import {
   DEFAULT_HISTORIAN_TIMEOUT_MS,
   DREAM_TASK_PROMOTION_DEFAULTS,
   LIVE_RELOAD_CONFIG_PATHS
-} from "./index-yy0h7gp8.js";
+} from "./index-eb3n6ysg.js";
 import {
   canonicalModelIdentity,
   piModelRefToCanonical,
@@ -374,8 +378,9 @@ import {
   openCurrentDatabase,
   openDatabaseAsync,
   closeDatabase
-} from "./index-8pdxxv7j.js";
+} from "./index-8m86dmhb.js";
 import {
+  sameProjectDirectory,
   setHomeProjectPermission,
   ProjectIdentityError,
   resolveProjectIdentityStrict,
@@ -385,7 +390,7 @@ import {
   resolveProjectIdentityForSession,
   beginBootQuietPeriod,
   scheduleAfterBootQuiet
-} from "./index-dkx0b1kt.js";
+} from "./index-041ex0cj.js";
 import {
   detectThinkingBindingMismatch,
   detectLatestTurnThinkingMismatch,
@@ -434,7 +439,7 @@ import {
   getRawSessionTagKeysThrough2,
   getLegacyProtectedTailStartOrdinal2,
   readSessionChunk2
-} from "./index-6ck7trd8.js";
+} from "./index-vjvb89qt.js";
 import {
   UNKNOWN_FIT_RATIO,
   hasMeasuredDecisionCalibration,
@@ -516,7 +521,7 @@ import {
   getToolTagNumberByOwner2,
   getNullOwnerToolTag2,
   adoptNullOwnerToolTag2
-} from "./index-mk0cr4vy.js";
+} from "./index-wj9v2eh7.js";
 import {
   textMentionsRecentCommit,
   hasMeaningfulUserText2,
@@ -528,7 +533,7 @@ import {
   estimateTokens,
   estimateFixedPromptTokens,
   normalizeText
-} from "./index-xwgrhenf.js";
+} from "./index-vaah9fbg.js";
 import {
   Database2,
   getSqliteDatabasePath2,
@@ -537,6 +542,7 @@ import {
   withoutSqliteTransformPass2,
   guardSqliteTransformPass2,
   assertTransformWrite2,
+  isTransientSqliteError2,
   withAsyncPrivilegedWriter2,
   indexCoordinationInput2
 } from "./index-3cgbv47m.js";
@@ -545,8 +551,13 @@ import {
   closeQuietly,
   isKnownAutocommit,
   observeTemporalDecisions,
-  freezeTemporalDecisions
-} from "./index-gj0r90h9.js";
+  freezeTemporalDecisions,
+  tagRevisionIncarnationSql,
+  tagRevisionCountSql,
+  tagRevisionKey,
+  tagIdentityRevisionKey,
+  TAG_INSERT_CONFLICT_ROWS
+} from "./index-nmsb3x01.js";
 import {
   resolveOpenCodeDbPath,
   assertOpenCodeStoreGeneration,
@@ -558,11 +569,11 @@ import {
 import {
   runSessionWarmupWorker,
   RAW_SUMMARY_TEXT_MAX_CHARS2
-} from "./index-rt5jgzp1.js";
+} from "./index-vakawmbc.js";
 import {
   formatSynapseLaneDescriptor
-} from "./index-7neahsnb.js";
-import"./index-603mt6nm.js";
+} from "./index-xkf1qyj1.js";
+import"./index-r024r8da.js";
 import {
   buildCanonicalChunkTextFromFts,
   buildCompartmentSummaryFallbackText,
@@ -572,7 +583,7 @@ import {
   replaceCompartmentChunkEmbeddings,
   deleteChunkEmbedBackoffForSession,
   chunkWindowSourceKey
-} from "./index-zmyrvs22.js";
+} from "./index-ddfbvmg3.js";
 import {
   readSessionActivity,
   observeSessionActivity,
@@ -587,7 +598,7 @@ import {
   indexSingleMessage,
   indexMessagesAfterOrdinal,
   sweepOrphanedOpenCodeMessageIndexes
-} from "./index-td9qvw23.js";
+} from "./index-3bc8wf03.js";
 import {
   recordSessionProjectIdentity,
   drainBackgroundBatches,
@@ -613,7 +624,7 @@ import {
   embedSessionCompartmentChunks2,
   getEmbeddingCoverageStatus2,
   getAutoEmbeddingSessionCoverage2
-} from "./index-9d4pnmrf.js";
+} from "./index-02kw8dfx.js";
 import {
   V2_MEMORY_CATEGORIES
 } from "./index-135e8hvg.js";
@@ -627,7 +638,7 @@ import {
   expandWorkspaceIdentitySetWithAliases,
   sourceNameForMemory,
   computeWorkspaceEpochFingerprint
-} from "./index-jg27bxae.js";
+} from "./index-405dq1gq.js";
 import {
   configureContextDatabasePragmas2
 } from "./index-fapenpch.js";
@@ -652,6 +663,16 @@ import {
   createPrimer,
   updatePrimerSupport,
   updatePrimerAnswer,
+  USER_FACING_FAILURES,
+  renderUserFacingFailure,
+  userFacingFailureCode,
+  renderCapabilityRefusal,
+  renderDreamFailure,
+  dreamFailureCode,
+  renderEmbeddingFailure,
+  renderSingleStoreMigrationRequiredRefusal,
+  SingleStoreMigrationRequiredError,
+  projectNeedsSingleStoreMigration,
   promoteSessionFactsDurable,
   embedPromotedFacts,
   recordMemoryMapping,
@@ -667,7 +688,7 @@ import {
   normalizeVerificationFiles,
   indexCommitsForProject,
   embedUnembeddedCommits
-} from "./index-a1zrv5dx.js";
+} from "./index-k3y5wmaq.js";
 import {
   setEmbeddingSessionBusy2,
   isEmbeddingHostBusy2
@@ -700,14 +721,15 @@ import {
 } from "./index-q1yc6bs0.js";
 import {
   cosineSimilarity
-} from "./index-yg8ktppn.js";
+} from "./index-q04p2kkb.js";
 import {
   buildHiddenAgentRegistrations,
+  logTemperatureDecision,
   subagentStepCap,
   SubagentTelemetry,
   readHostSystemPrompt
-} from "./index-w76x3af7.js";
-import"./index-wrm4nbj7.js";
+} from "./index-2nvf2rrr.js";
+import"./index-290tzwp1.js";
 import {
   __toESM
 } from "./index-22jkk6wg.js";
@@ -717,7 +739,7 @@ import {
 import {
   logSlowWriteTransaction,
   WriteTransactionSteps
-} from "./index-fp37he9a.js";
+} from "./index-0vrkp1jq.js";
 import {
   setStoragePrivatePermissionEnforcement,
   ensureStorageDirectorySync,
@@ -731,7 +753,7 @@ import {
 // src/index.ts
 import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
 import { createRequire as createRequire2 } from "node:module";
-import { join as join17, resolve as resolve5 } from "node:path";
+import { join as join17, resolve as resolve4 } from "node:path";
 
 // ../plugin/src/config/live-snapshot.ts
 import { createHash } from "node:crypto";
@@ -4065,335 +4087,9 @@ function evaluateTaskGate(task, ctx) {
   }
 }
 
-// ../plugin/src/shared/user-facing-codes.ts
-var USER_FACING_FAILURES = {
-  historian_unavailable: {
-    code: "MC-H01",
-    sentence: "History compression could not finish this turn.",
-    action: "It will retry automatically."
-  },
-  historian_saved_history_misaligned: {
-    code: "MC-H03",
-    sentence: "History compression is paused because this session's saved summaries no longer line up with its messages.",
-    action: "Run /ctx-recomp to rebuild them."
-  },
-  history_boundary_unresolved: {
-    code: "MC-H04",
-    sentence: "This request was not sent: the message that marks where this session's history summary ends is missing from the OpenCode store, and without it the request is larger than the model's context window.",
-    action: "Run /ctx-recomp to rebuild the history summary."
-  },
-  history_over_window_unmanaged: {
-    code: "MC-H06",
-    sentence: "This request was not sent: this session's history is larger than the model's context window, and Magic Context does not have a summary of it yet to send in its place.",
-    action: "Send your message again once history compression has caught up, or switch to a model with a larger context window."
-  },
-  frozen_history_over_window: {
-    code: "MC-H07",
-    sentence: "This request was not sent: the conversation is larger than the context window the provider reported, and the compressed history Magic Context has ready does not fit either.",
-    action: "Run /ctx-flush to compress it now, then send your message again."
-  },
-  historian_window_too_small: {
-    code: "MC-H05",
-    sentence: "History compression is paused because the history model's context window is too small for its instructions.",
-    action: "Set historian.model in magic-context.jsonc to a model with a larger context window."
-  },
-  recomp_unavailable: {
-    code: "MC-R01",
-    sentence: "History compression could not be rebuilt.",
-    action: "Run /ctx-recomp again."
-  },
-  dream_provider_timeout: {
-    code: "MC-D01",
-    sentence: "Memory maintenance took too long to respond.",
-    action: "Run /ctx-dream again."
-  },
-  dream_provider_error: {
-    code: "MC-D02",
-    sentence: "Memory maintenance could not reach its model.",
-    action: "Check the model connection, then run /ctx-dream again."
-  },
-  dream_local_refusal: {
-    code: "MC-D12",
-    sentence: "Memory maintenance was refused before reaching the model.",
-    action: "Check the hidden-request diagnostic in the Magic Context log before retrying."
-  },
-  dream_step_limit: {
-    code: "MC-D10",
-    sentence: "Memory maintenance stopped at its hidden agent step limit.",
-    action: "This task needs less work per run; changing the model connection will not help."
-  },
-  dream_token_budget: {
-    code: "MC-D11",
-    sentence: "Memory maintenance reached its prompt-token budget.",
-    action: "The unfinished items will be retried on the next run."
-  },
-  dream_empty_completion: {
-    code: "MC-D03",
-    sentence: "Memory maintenance received no usable response.",
-    action: "Run /ctx-dream again."
-  },
-  dream_no_models: {
-    code: "MC-D04",
-    sentence: "Memory maintenance has no model available.",
-    action: "Check the model settings, then run /ctx-dream again."
-  },
-  dream_child_aborted: {
-    code: "MC-D05",
-    sentence: "Memory maintenance was interrupted.",
-    action: "Run /ctx-dream again."
-  },
-  dream_parse_failed: {
-    code: "MC-D06",
-    sentence: "Memory maintenance could not use the model response.",
-    action: "Run /ctx-dream again."
-  },
-  dream_unknown: {
-    code: "MC-D07",
-    sentence: "Memory maintenance could not finish.",
-    action: "Run /ctx-dream again."
-  },
-  dreamer_tick_blocked: {
-    code: "MC-D09",
-    sentence: "Background maintenance is not running: its last pass stopped before it reached the scheduled tasks.",
-    action: "It is retried automatically; if it keeps happening, check the Magic Context log for the stage that stopped and run `npx @cortexkit/magic-context doctor`."
-  },
-  dream_task_needs_tool_loop: {
-    code: "MC-D08",
-    sentence: "Some memory maintenance tasks need a tool loop this host does not provide.",
-    action: "The remaining tasks still run; the listed ones are skipped on this host."
-  },
-  embedding_substitution_rejected: {
-    code: "MC-E01",
-    sentence: "Search indexing could not use the selected model.",
-    action: "Check the embedding model setting, then run /ctx-embed start again."
-  },
-  embedding_http_error: {
-    code: "MC-E02",
-    sentence: "The search indexing provider refused the request.",
-    action: "Check the provider connection and credentials, then run /ctx-embed start again."
-  },
-  embedding_transport_error: {
-    code: "MC-E03",
-    sentence: "Search indexing could not reach its provider.",
-    action: "Check the connection, then run /ctx-embed start again."
-  },
-  embedding_invalid_envelope: {
-    code: "MC-E04",
-    sentence: "Search indexing received an unsupported response.",
-    action: "Check the embedding endpoint, then run /ctx-embed start again."
-  },
-  embedding_empty_result: {
-    code: "MC-E05",
-    sentence: "Search indexing received no usable result.",
-    action: "Run /ctx-embed start again."
-  },
-  embedding_certification_refusal: {
-    code: "MC-E06",
-    sentence: "Search indexing is not ready for this provider.",
-    action: "Finish the provider setup, or set a fallback provider in the embedding settings, then run /ctx-embed start again."
-  },
-  embedding_credential_required: {
-    code: "MC-E07",
-    sentence: "Search indexing needs provider credentials.",
-    action: "Sign in to the provider, then run /ctx-embed start again."
-  },
-  embedding_local_binding_missing: {
-    code: "MC-E08",
-    sentence: "Local search indexing is unavailable on this system.",
-    action: "Run `npx @cortexkit/magic-context doctor`, then retry."
-  },
-  embedding_local_fs_unavailable: {
-    code: "MC-E09",
-    sentence: "Local search indexing cannot save its model files.",
-    action: "Update or reinstall Magic Context, then retry."
-  },
-  embedding_local_download_failure: {
-    code: "MC-E10",
-    sentence: "Local search indexing could not download its model.",
-    action: "Check the network connection, then retry."
-  },
-  embedding_local_runtime_error: {
-    code: "MC-E11",
-    sentence: "Local search indexing could not start.",
-    action: "Run `npx @cortexkit/magic-context doctor`, then retry."
-  },
-  embedding_unavailable: {
-    code: "MC-E12",
-    sentence: "Search indexing could not finish.",
-    action: "Run /ctx-embed start again."
-  },
-  status_unavailable: {
-    code: "MC-S01",
-    sentence: "Magic Context status is temporarily unavailable.",
-    action: "Retry /ctx-status in a moment."
-  },
-  transform_update_failed: {
-    code: "MC-S02",
-    sentence: "The last context update did not finish.",
-    action: "Send another message to retry."
-  },
-  transform_pass_degraded: {
-    code: "MC-S06",
-    sentence: "This request was not sent: Magic Context could not finish preparing it, and without that preparation it could be far larger than the previous request.",
-    action: "Send your message again."
-  },
-  configuration_warning: {
-    code: "MC-S03",
-    sentence: "Some configuration settings could not be applied.",
-    action: "Fix the configuration warning shown in /ctx-status, then restart."
-  },
-  status_log_unavailable: {
-    code: "MC-S04",
-    sentence: "Some diagnostic details could not be saved.",
-    action: "Retry /ctx-status in a moment."
-  },
-  memory_writes_paused: {
-    code: "MC-C01",
-    sentence: "Memory writes are paused while the engine syncs.",
-    action: "Retry in a moment."
-  },
-  memory_access_unavailable: {
-    code: "MC-C02",
-    sentence: "Memory access is temporarily unavailable.",
-    action: "Retry in a moment."
-  },
-  note_changes_paused: {
-    code: "MC-C03",
-    sentence: "Note changes are paused while the engine syncs.",
-    action: "Retry in a moment."
-  },
-  note_access_unavailable: {
-    code: "MC-C04",
-    sentence: "Notes are temporarily unavailable.",
-    action: "Retry in a moment."
-  },
-  context_cleanup_paused: {
-    code: "MC-C05",
-    sentence: "Context cleanup is paused while the engine syncs.",
-    action: "Retry in a moment."
-  },
-  partial_history_unavailable: {
-    code: "MC-C06",
-    sentence: "Partial history compression is not available in the current mode.",
-    action: "Run /ctx-recomp without a range."
-  },
-  smart_note_conditions_unavailable: {
-    code: "MC-C08",
-    sentence: "Conditional notes are not available in the current mode.",
-    action: "Save a regular note without a condition."
-  },
-  history_compression_paused: {
-    code: "MC-C09",
-    sentence: "History compression is paused while the engine syncs.",
-    action: "Retry in a moment."
-  },
-  history_compression_needs_message: {
-    code: "MC-C12",
-    sentence: "History compression has not seen this session since Magic Context reconnected.",
-    action: "Send a message in this session first, then run /ctx-wrapup again."
-  },
-  context_service_unavailable: {
-    code: "MC-C10",
-    sentence: "Magic Context is temporarily unavailable.",
-    action: "Retry in a moment."
-  },
-  context_db_missing: {
-    code: "MC-C15",
-    sentence: "Magic Context has no context.db.",
-    action: "Run `npx @cortexkit/magic-context doctor store init`, then restart ck-mc."
-  },
-  single_store_migration_required: {
-    code: "MC-C14",
-    sentence: "Magic Context's Rust mode needs a one-time migration of its store.",
-    action: "Quit OpenCode and every ck-mc process, then run `magic-context doctor single-store migrate`."
-  },
-  store_ahead_of_binary: {
-    code: "MC-C13",
-    sentence: "Magic Context refused to start: its store (store.db) was migrated by a newer ck-mc build than the one running.",
-    action: "Update ck-mc, or roll back by restoring ck-mc together with context.db and store.db from the same backup."
-  },
-  compaction_marker_missing: {
-    code: "MC-C11",
-    sentence: "The history boundary marker is missing from the OpenCode store, so requests carry the full session.",
-    action: "It is retried on every message; if this persists, run `/ctx-flush`."
-  },
-  memory_mirror_stalled: {
-    code: "MC-M01",
-    sentence: "Memory synchronization stopped before the host mirror caught up.",
-    action: "Send another message to resume it, or run `ck doctor drain-authority`."
-  },
-  memory_authority_mismatch: {
-    code: "MC-M02",
-    sentence: "Memory authority is inconsistent between the host and module.",
-    action: "Run `ck doctor drain-authority` before changing Rust mode."
-  },
-  dreamer_task_failing: {
-    code: "MC-S05",
-    sentence: "A background maintenance task keeps failing on its schedule.",
-    action: "Check the Magic Context log for the failing task and its error."
-  }
-};
-function renderUserFacingFailure(key, style = "markdown") {
-  const failure = USER_FACING_FAILURES[key];
-  const action = style === "plain" ? failure.action.replaceAll("`", "") : failure.action;
-  return `${failure.sentence} ${action} (${failure.code})`;
-}
-function userFacingFailureCode(key) {
-  return USER_FACING_FAILURES[key].code;
-}
-var CAPABILITY_FAILURES = {
-  memory_write: "memory_writes_paused",
-  memory_access: "memory_access_unavailable",
-  note_change: "note_changes_paused",
-  note_access: "note_access_unavailable",
-  context_cleanup: "context_cleanup_paused",
-  partial_history: "partial_history_unavailable",
-  smart_note_condition: "smart_note_conditions_unavailable",
-  history_compression: "history_compression_paused",
-  context_service: "context_service_unavailable"
-};
-function renderCapabilityRefusal(capability) {
-  return renderUserFacingFailure(CAPABILITY_FAILURES[capability]);
-}
-var DREAM_FAILURE_KEYS = {
-  provider_timeout: "dream_provider_timeout",
-  provider_error: "dream_provider_error",
-  local_refusal: "dream_local_refusal",
-  step_limit: "dream_step_limit",
-  token_budget: "dream_token_budget",
-  empty_completion: "dream_empty_completion",
-  no_models: "dream_no_models",
-  child_aborted: "dream_child_aborted",
-  parse_failed: "dream_parse_failed",
-  unknown: "dream_unknown"
-};
-var EMBEDDING_FAILURE_KEYS = {
-  substitution_rejected: "embedding_substitution_rejected",
-  http_error: "embedding_http_error",
-  transport_error: "embedding_transport_error",
-  invalid_envelope: "embedding_invalid_envelope",
-  empty_result: "embedding_empty_result",
-  certification_refusal: "embedding_certification_refusal",
-  credential_required: "embedding_credential_required",
-  local_binding_missing: "embedding_local_binding_missing",
-  local_fs_unavailable: "embedding_local_fs_unavailable",
-  local_download_failure: "embedding_local_download_failure",
-  local_runtime_error: "embedding_local_runtime_error"
-};
-function renderDreamFailure(failureClass, style = "markdown", refusalReason) {
-  const rendered = renderUserFacingFailure(DREAM_FAILURE_KEYS[failureClass], style);
-  return failureClass === "local_refusal" && refusalReason ? `${rendered} Reason: ${sanitizeDiagnosticText(refusalReason).slice(0, 500)}` : rendered;
-}
-function dreamFailureCode(failureClass) {
-  return userFacingFailureCode(DREAM_FAILURE_KEYS[failureClass]);
-}
-function renderEmbeddingFailure(failureClass, style = "markdown") {
-  return renderUserFacingFailure(EMBEDDING_FAILURE_KEYS[failureClass], style);
-}
-
 // src/dreamer/index.ts
 import { homedir as homedir2 } from "node:os";
-import { parse, resolve as resolve3 } from "node:path";
+import { parse, resolve as resolve2 } from "node:path";
 
 // ../plugin/src/features/magic-context/dreamer/open-opencode-db.ts
 function openOpenCodeDb() {
@@ -4557,25 +4253,6 @@ class HiddenCompletionRefusal extends Error {
     this.terminal = terminal;
     this.name = "HiddenCompletionRefusal";
   }
-}
-
-// ../plugin/src/hooks/magic-context/single-store-refusal.ts
-var SINGLE_STORE_MIGRATION_REQUIRED_CODE = "single_store_migration_required";
-function renderSingleStoreMigrationRequiredRefusal() {
-  const failure = USER_FACING_FAILURES.single_store_migration_required;
-  return `${failure.sentence} ${failure.action} (${failure.code})`;
-}
-
-class SingleStoreMigrationRequiredError extends Error {
-  code = SINGLE_STORE_MIGRATION_REQUIRED_CODE;
-  constructor(options) {
-    super(renderSingleStoreMigrationRequiredRefusal(), options);
-    this.name = "SingleStoreMigrationRequiredError";
-  }
-}
-function projectNeedsSingleStoreMigration(db, projectPath) {
-  const table = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'authority_managed'").get();
-  return Boolean(table && db.prepare("SELECT 1 FROM authority_managed WHERE project_path = ?").get(projectPath));
 }
 // ../plugin/src/features/magic-context/dreamer/provider-output-failure.ts
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -18022,12 +17699,14 @@ class PiSubagentRunner {
         } catch {}
       };
       let child;
+      const parentEnv = { ...process.env };
+      delete parentEnv.MAGIC_CONTEXT_HISTORIAN_TEMPERATURE;
       try {
         child = this.spawnImpl(this.invocation.command, [...this.invocation.prefixArgs, ...this.extraArgs, ...args], {
           windowsHide: true,
           cwd: options.cwd,
           env: {
-            ...process.env,
+            ...parentEnv,
             [MAGIC_CONTEXT_PI_SUBAGENT_ENV]: "1",
             MAGIC_CONTEXT_SUBAGENT_PROMPT_FILE: systemPromptPath,
             MAGIC_CONTEXT_SUBAGENT_BUDGET_GUARD_FILE: budgetGuardFile,
@@ -18088,6 +17767,22 @@ class PiSubagentRunner {
           child.stdin.end(options.userMessage, "utf8");
         } catch {}
       }
+      const observeTemperatureDecision = (event) => {
+        if (!event || typeof event !== "object")
+          return;
+        const notice = event;
+        if (notice.type !== "mc_temperature" || typeof notice.model !== "string")
+          return;
+        if (notice.source !== "host" && notice.source !== "catalog" && notice.source !== "none")
+          return;
+        if (notice.supported !== null && typeof notice.supported !== "boolean")
+          return;
+        logTemperatureDecision(notice.model, {
+          supported: notice.supported ?? undefined,
+          source: notice.source,
+          ...typeof notice.entry === "string" ? { entry: notice.entry } : {}
+        }, (message) => sessionLog2(options.accountingSessionId ?? "pi-subagent", message));
+      };
       let stderr = "";
       let stderrLine = "";
       const stderrDecoder = new StringDecoder("utf8");
@@ -18100,11 +17795,13 @@ class PiSubagentRunner {
 `);
         stderrLine = (lines.pop() ?? "").slice(-4096);
         for (const line of lines) {
-          if (settled || !line.startsWith('{"type":"mc_system_prompt"'))
+          if (settled || !(line.startsWith('{"type":"mc_system_prompt"') || line.startsWith('{"type":"mc_temperature"')))
             continue;
           const parsed = parsePiEventLine(line);
-          if (parsed.ok)
+          if (parsed.ok) {
             telemetry.observe(parsed.event);
+            observeTemperatureDecision(parsed.event);
+          }
         }
         stderr += text;
         if (stderr.length > 16000) {
@@ -18161,6 +17858,7 @@ class PiSubagentRunner {
           return;
         }
         const event = parsed.event;
+        observeTemperatureDecision(event);
         if (typeof event !== "object" || event === null)
           return;
         const e = event;
@@ -19268,7 +18966,7 @@ function createPiPrimerRawProviderFactory(deps = {}) {
 }
 
 // src/dreamer/retrospective-raw-provider-pi.ts
-import { join as join14, resolve as resolve2 } from "node:path";
+import { join as join14 } from "node:path";
 class PiRetrospectiveRawProvider {
   deps;
   sessionPathById = new Map;
@@ -19284,7 +18982,7 @@ class PiRetrospectiveRawProvider {
       directory = join14(mod.getAgentDir(), "sessions");
     }
     const sessions = this.deps.listSessions ? await this.deps.listSessions(directory) : directory ? sessionHeaders(directory, !this.deps.sessionDir) : [];
-    const projectCwd = resolve2(this.deps.projectCwd);
+    const projectCwd = this.deps.projectCwd;
     const result = [];
     this.sessionPathById.clear();
     for (const raw of sessions) {
@@ -19293,7 +18991,7 @@ class PiRetrospectiveRawProvider {
         continue;
       if (typeof info.id !== "string" || typeof info.path !== "string")
         continue;
-      if (typeof info.cwd !== "string" || resolve2(info.cwd) !== projectCwd)
+      if (typeof info.cwd !== "string" || !sameProjectDirectory(info.cwd, projectCwd))
         continue;
       const activity = this.deps.contextDb ? readSessionActivity(this.deps.contextDb, info.id) : typeof info.modified === "number" ? info.modified : undefined;
       if (this.deps.contextDb && activity === undefined)
@@ -19459,7 +19157,7 @@ var sessionCounter = 0;
 var piSubagentRunnerFactory = () => new PiSubagentRunner;
 var startDreamScheduleTimerFn = startDreamScheduleTimer;
 function registerPiDreamerProject(opts) {
-  const directory = resolve3(opts.projectDir);
+  const directory = resolve2(opts.projectDir);
   if (opts.config.disable === true || !isUsableProjectIdentity(opts.projectIdentity) || directory === parse(directory).root || directory === homedir2()) {
     return;
   }
@@ -20952,7 +20650,9 @@ function makeToolCompositeKey(ownerMsgId, callId) {
   return `${ownerMsgId}${TOOL_COMPOSITE_KEY_SEP}${callId}`;
 }
 var GET_COUNTER_SQL = `SELECT counter FROM session_meta WHERE session_id = ?`;
-var GET_TAGS_VERSION_SQL = `SELECT tags_version FROM session_meta WHERE session_id = ?`;
+var GET_TAGS_VERSION_SQL = `SELECT
+    (SELECT tags_version FROM session_meta WHERE session_id = ?) AS tags_version,
+    (SELECT value FROM schema_migrations_meta WHERE key = ?) AS identity_revision`;
 var GET_ASSIGNMENTS_SQL = "SELECT message_id, tag_number, type, tool_owner_message_id, byte_size, token_count, input_byte_size, input_token_count FROM tags WHERE session_id = ? ORDER BY tag_number ASC";
 var GET_ASSIGNMENTS_SCOPED_SQL = "SELECT message_id, tag_number, type, tool_owner_message_id, byte_size, token_count, input_byte_size, input_token_count FROM tags WHERE session_id = ? AND tag_number >= ? ORDER BY tag_number ASC";
 var probeTagsVersionStatements = new WeakMap;
@@ -21073,10 +20773,16 @@ function createTagger() {
       const memCounter = heapHolder.counters.get(sessionId) ?? 0;
       const dbMax = getMaxTagNumberBySession2(db, sessionId);
       const next = Math.max(memCounter, dbMax) + 1;
+      const loaded = heapHolder.loadSignatures.get(sessionId);
+      let ownedInitialIdentity;
       try {
         db.transaction(() => {
+          const admitted = loaded?.db === db && loaded.identityRevision === null ? probeSignature(sessionId, db) : null;
+          const initializesOwnedEpoch = admitted !== null && loaded !== undefined && admitted.identityRevision === null && admitted.tagsVersion === loaded.tagsVersion;
           getUpsertCounterStatement(db).run(sessionId, next, getHarness2());
           insertTag2(db, sessionId, messageId, type, byteSize, next, reasoningByteSize, toolName, inputByteSize, toolOwnerMessageId, entryFingerprint, tokenCounts);
+          if (initializesOwnedEpoch)
+            ownedInitialIdentity = probeSignature(sessionId, db).identityRevision;
         }).immediate();
       } catch (error) {
         if (!isUniqueConstraintError(error)) {
@@ -21097,6 +20803,8 @@ function createTagger() {
       const signature = heapHolder.loadSignatures.get(sessionId);
       if (signature?.db === db) {
         signature.tagsVersion += 1;
+        if (signature === loaded && ownedInitialIdentity !== undefined)
+          signature.identityRevision = ownedInitialIdentity;
       }
       if (type === "tool") {
         getSessionToolAccounting(sessionId).set(next, {
@@ -21199,15 +20907,16 @@ function createTagger() {
     return heapHolder.counters.get(sessionId) ?? 0;
   }
   function probeSignature(sessionId, db) {
-    const row = getProbeTagsVersionStatement(db).get(sessionId);
+    const row = getProbeTagsVersionStatement(db).get(sessionId, tagIdentityRevisionKey(sessionId));
     return {
-      tagsVersion: row?.tags_version ?? 0
+      tagsVersion: row?.tags_version ?? 0,
+      identityRevision: row?.identity_revision ?? null
     };
   }
   function initFromDb(sessionId, db, floor = 0) {
     const probe = probeSignature(sessionId, db);
     const cached = heapHolder.loadSignatures.get(sessionId);
-    if (cached !== undefined && cached.db === db && cached.tagsVersion === probe.tagsVersion && cached.floor === floor) {
+    if (cached !== undefined && cached.db === db && cached.tagsVersion === probe.tagsVersion && cached.identityRevision === probe.identityRevision && cached.floor === floor) {
       return;
     }
     const row = db.prepare(GET_COUNTER_SQL).get(sessionId);
@@ -21240,12 +20949,17 @@ function createTagger() {
     heapHolder.loadSignatures.set(sessionId, {
       db,
       tagsVersion: probe.tagsVersion,
+      identityRevision: probe.identityRevision,
       floor
     });
   }
   function getLoadedTagsVersion(sessionId, db) {
     const signature = heapHolder.loadSignatures.get(sessionId);
     return signature?.db === db ? signature.tagsVersion : undefined;
+  }
+  function getLoadedTagIdentityRevision(sessionId, db) {
+    const signature = heapHolder.loadSignatures.get(sessionId);
+    return signature?.db === db ? signature.identityRevision : undefined;
   }
   function cleanup(sessionId) {
     heapHolder.counters.delete(sessionId);
@@ -21289,6 +21003,7 @@ function createTagger() {
     getCounter,
     initFromDb,
     getLoadedTagsVersion,
+    getLoadedTagIdentityRevision,
     cleanup,
     getHeapStats
   };
@@ -21495,13 +21210,14 @@ function writeTransformDecisionRowOnDatabase(db, row, configureBusyTimeout) {
   const m0ModelKeyNew = row.materialized ? row.m0ModelKeyNew : null;
   const m0ToolSetHashPrev = row.m0ToolSetHashPrev ?? null;
   const m0ToolSetHashNew = row.m0ToolSetHashNew ?? null;
+  const persistedMaterializeReason = row.lkgFrozenReleaseReason ? `lkg_frozen_release:${row.lkgFrozenReleaseReason}` + (row.materializeReason ? `;materialize_reason=${row.materializeReason}` : "") : row.materializeReason;
   db.prepare(`INSERT OR REPLACE INTO transform_decisions (
                 session_id, harness, message_id, ts_ms, decision, materialized,
                 materialize_reason, system_hash_prev, system_hash_new,
                 m0_tool_set_hash_prev, m0_tool_set_hash_new,
                 m0_model_key_prev, m0_model_key_new, emergency, dropped_tokens,
                 dropped_count, input_tokens
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(row.sessionId, row.harness, row.messageId, row.tsMs, row.decision, row.materialized ? 1 : 0, row.materializeReason, systemHashPrev, systemHashNew, m0ToolSetHashPrev, m0ToolSetHashNew, m0ModelKeyPrev, m0ModelKeyNew, row.emergency ? 1 : 0, Math.max(0, Math.floor(row.droppedTokens)), Math.max(0, Math.floor(row.droppedCount)), Math.max(0, Math.floor(row.inputTokens)));
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(row.sessionId, row.harness, row.messageId, row.tsMs, row.decision, row.materialized ? 1 : 0, persistedMaterializeReason, systemHashPrev, systemHashNew, m0ToolSetHashPrev, m0ToolSetHashNew, m0ModelKeyPrev, m0ModelKeyNew, row.emergency ? 1 : 0, Math.max(0, Math.floor(row.droppedTokens)), Math.max(0, Math.floor(row.droppedCount)), Math.max(0, Math.floor(row.inputTokens)));
   db.prepare(`DELETE FROM transform_decisions
              WHERE session_id = ? AND harness = ?
                AND rowid NOT IN (
@@ -23392,9 +23108,11 @@ function estimateDroppedTokensFromTagReductions(db, sessionId, reductions) {
 // ../plugin/src/hooks/magic-context/emergency-fail-closed.ts
 var PROTECTED_TOOL_RESULTS_OVER_LIMIT = "The tool results kept by protected_tools are larger than this model's context window, so this turn was not sent. Lower the protected_tools counts.";
 var PROTECTED_TOOL_RESULTS_OVER_LIMIT_CODE = "protected_tool_results_over_limit";
+var SIGNED_TURN_OVER_LIMIT = "This turn's context is larger than the model's context window even after all of its thinking and reclaimable tool output were removed, so it was not sent. Send a new message or start a new session to continue.";
+var SIGNED_TURN_OVER_LIMIT_CODE = "signed_turn_over_limit";
 function contextRefusalError(message) {
   return new EmergencyFailClosedError(message, {
-    code: message === PROTECTED_TOOL_RESULTS_OVER_LIMIT ? PROTECTED_TOOL_RESULTS_OVER_LIMIT_CODE : undefined
+    code: message === PROTECTED_TOOL_RESULTS_OVER_LIMIT ? PROTECTED_TOOL_RESULTS_OVER_LIMIT_CODE : message === SIGNED_TURN_OVER_LIMIT ? SIGNED_TURN_OVER_LIMIT_CODE : undefined
   });
 }
 function outgoingContextRefusal(estimate, limit, protectedToolTokens = 0) {
@@ -23402,7 +23120,6 @@ function outgoingContextRefusal(estimate, limit, protectedToolTokens = 0) {
     return;
   return PROTECTED_TOOL_RESULTS_OVER_LIMIT;
 }
-
 class EmergencyFailClosedError extends Error {
   code;
   constructor(message, options) {
@@ -23701,6 +23418,39 @@ function opencodeReasoningBudgetStatus(messages, budget, prefixBound, proseRatio
     estimated,
     overrun: kept > budget ? exemptCost > budget ? "newest step" : prefixBound ? "signed prefix" : "awaiting rebuild" : undefined
   };
+}
+
+// ../plugin/src/hooks/magic-context/strict-thinking-prefix.ts
+function servedPrefixMatches(args) {
+  const heads = args.messages?.slice(0, 2);
+  if (!heads || heads.length !== 2 || args.m0Text == null || args.m1Text == null)
+    return false;
+  const text = (message) => {
+    if (!isRecord(message))
+      return;
+    if (typeof message.content === "string")
+      return message.content;
+    const parts = Array.isArray(message.parts) ? message.parts : message.content;
+    if (!Array.isArray(parts))
+      return;
+    return parts.filter(isRecord).filter((part) => part.type === "text").map((part) => String(part.text ?? "")).join("");
+  };
+  if (text(heads[0]) !== args.m0Text || text(heads[1]) !== args.m1Text)
+    return false;
+  const head = heads[0];
+  if (!isRecord(head))
+    return false;
+  const parts = Array.isArray(head.parts) ? head.parts : head.content;
+  if (!Array.isArray(parts))
+    return !args.muralDataUrl;
+  const images = parts.filter(isRecord).filter((part) => part.type === "image" || part.type === "file");
+  if (!args.muralDataUrl)
+    return images.length === 0;
+  if (images.length !== 1)
+    return false;
+  const image = images[0];
+  const url = typeof image.url === "string" ? image.url : typeof image.data === "string" && typeof image.mimeType === "string" ? `data:${image.mimeType};base64,${image.data}` : undefined;
+  return url === args.muralDataUrl;
 }
 
 // ../plugin/src/hooks/magic-context/supersession-reclaim.ts
@@ -24722,6 +24472,8 @@ function persistAutoSearchSkip(db, sessionId, messageId, reason = "timeout") {
     ok = outcome.ok && outcome.decision.decision === "no-hint";
   } catch {}
   assertTransformWrite2();
+  if (!ok)
+    rememberUnpublishedAutoSearchNoHint(sessionId, messageId, reason);
   const persistence = Promise.resolve(ok);
   messages.set(messageId, persistence);
   return persistence;
@@ -24910,7 +24662,36 @@ function queueAutoSearchRegistration(db, projectPath, register) {
 function persistAutoSearchDecision(db, sessionId, decision, startedAt) {
   if (performance.now() - startedAt >= AUTO_SEARCH_TIMEOUT_MS)
     return null;
-  return appendAutoSearchHintDecision(db, sessionId, decision);
+  let outcome;
+  try {
+    outcome = appendAutoSearchHintDecision(db, sessionId, decision);
+  } catch (error) {
+    assertTransformWrite2();
+    rememberUnpublishedAutoSearchNoHint(sessionId, decision.messageId, decision.decision === "no-hint" ? decision.reason : "error");
+    if (!isTransientSqliteError2(error))
+      throw error;
+    log2(`[auto-search] decision save hit a busy store for session ${sessionId}; serving without a hint and retrying the save on a later pass: ${error instanceof Error ? error.message : String(error)}`);
+    return { ok: false, kind: "storage-busy" };
+  }
+  if (!outcome.ok) {
+    assertTransformWrite2();
+    rememberUnpublishedAutoSearchNoHint(sessionId, decision.messageId, decision.decision === "no-hint" ? decision.reason : "error");
+  } else if (outcome.decision.decision === "no-hint") {
+    forgetUnpublishedAutoSearchNoHint(sessionId, decision.messageId);
+  }
+  return outcome;
+}
+function retryUnpublishedAutoSearchNoHint(db, sessionId, messageId, startedAt) {
+  const reason = getUnpublishedAutoSearchNoHint(sessionId, messageId);
+  if (reason === undefined)
+    return false;
+  try {
+    persistAutoSearchDecision(db, sessionId, { messageId, decision: "no-hint", reason }, startedAt);
+  } catch (error) {
+    assertTransformWrite2();
+    log2(`[auto-search] frozen omission save still failed for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return true;
 }
 async function searchAutoHint(db, sessionId, projectPath, query, options, entry = new URL(new URL(import.meta.url).pathname.endsWith(".ts") ? "./auto-search-worker.ts" : "./auto-search-worker.js", import.meta.url)) {
   return executeAutoSearchWorker(db, sessionId, projectPath, query, options, entry, "search");
@@ -25172,6 +24953,10 @@ async function runAutoSearchHintForPi(args) {
     args.passGuard?.assert();
     if (lifecycleSignal.aborted)
       return messages;
+    if (retryUnpublishedAutoSearchNoHint(db, sessionId, userMsgId, startedAt)) {
+      args.passGuard?.assert();
+      return messages;
+    }
     if (wasAutoSearchSkipped(db, sessionId, userMsgId))
       return messages;
     const existing = args.decisions ?? getAutoSearchHintDecisions(db, sessionId);
@@ -25258,7 +25043,10 @@ async function runAutoSearchHintForPi(args) {
       }, startedAt));
     } catch (error) {
       args.passGuard?.assert();
-      log2(`[auto-search] unified search failed for session ${sessionId} (will retry next pass): ${error instanceof Error ? error.message : String(error)}`);
+      if (lifecycleSignal.aborted)
+        return messages;
+      log2(`[auto-search] unified search failed for session ${sessionId} (no-hint frozen for this turn): ${error instanceof Error ? error.message : String(error)}`);
+      await writeNoHintAndReconcile("error");
       return messages;
     }
     args.passGuard?.assert();
@@ -25316,6 +25104,8 @@ ${hintText}`;
     }
   }, () => {
     args.passGuard?.assert();
+    if (getUnpublishedAutoSearchNoHint(sessionId, userMsgId) !== undefined)
+      return;
     if (wasAutoSearchSkipped(db, sessionId, userMsgId))
       return;
     const decision = getAutoSearchHintDecisions(db, sessionId).find((entry) => entry.messageId === userMsgId);
@@ -28729,17 +28519,6 @@ function isSyntheticMessage(message, index, input) {
   const role = typeof message.role === "string" ? message.role : "";
   return isPiSystemEntry(message) || role === "custom" || role === "compactionSummary";
 }
-function countRealPiUserMessages(input) {
-  let count = 0;
-  for (let index = 0;index < input.messages.length; index += 1) {
-    const message = input.messages[index];
-    if (!isRecord4(message) || message.role !== "user")
-      continue;
-    if (!isSyntheticMessage(message, index, input))
-      count += 1;
-  }
-  return count;
-}
 function imageContentAndTokens(part) {
   const data = typeof part.data === "string" ? part.data : "";
   const mimeType = typeof part.mimeType === "string" ? part.mimeType : "image/png";
@@ -28840,11 +28619,134 @@ function collectToolArcs(input) {
   }
   return { arcs, arcByPart, messageIds };
 }
+var tagAttributions = new WeakMap;
+function tagAttribution(input) {
+  const cacheable = input.tagCacheKey;
+  let cached = cacheable ? tagAttributions.get(input.tagCacheKey) : undefined;
+  const wasSimple = cached?.simple === true;
+  const added = [];
+  const removed = [];
+  if (cached) {
+    if (cached.tags === input.tags)
+      return cached;
+    let oldIndex = 0;
+    let newIndex = 0;
+    while (oldIndex < cached.tags.length || newIndex < input.tags.length) {
+      const old = cached.tags[oldIndex];
+      const next = input.tags[newIndex];
+      if (old && (!next || old.tagNumber < next.tagNumber)) {
+        removed.push(old);
+        oldIndex++;
+      } else if (next && (!old || next.tagNumber < old.tagNumber)) {
+        added.push(next);
+        newIndex++;
+      } else {
+        if (old !== next) {
+          if (old)
+            removed.push(old);
+          if (next)
+            added.push(next);
+        }
+        oldIndex++;
+        newIndex++;
+      }
+    }
+    if (!cached.simple && (removed.length || added.length))
+      cached = undefined;
+  }
+  if (!cached) {
+    removed.length = 0;
+    added.length = 0;
+    added.push(...input.tags);
+    cached = {
+      tags: input.tags,
+      messageTags: new Map,
+      tagsByNumber: new Map,
+      exactToolTags: new Map,
+      orphanTagsByCall: new Map,
+      boundsByOwner: new Map,
+      rowsByOwner: new Map,
+      simple: true
+    };
+  }
+  const dirtyOwners = new Set;
+  for (const tag of removed) {
+    cached.tagsByNumber.delete(tag.tagNumber);
+    if (tag.type !== "tool")
+      cached.messageTags.delete(tag.messageId);
+    else if (tag.toolOwnerMessageId !== null)
+      cached.exactToolTags.delete(`${tag.toolOwnerMessageId}\x00${tag.messageId}`);
+    else {
+      const rows = cached.orphanTagsByCall.get(tag.messageId)?.filter((row) => row !== tag) ?? [];
+      if (rows.length)
+        cached.orphanTagsByCall.set(tag.messageId, rows);
+      else
+        cached.orphanTagsByCall.delete(tag.messageId);
+    }
+    const owner = messageIdForTag(tag);
+    if (owner !== null) {
+      cached.rowsByOwner.get(owner)?.delete(tag);
+      dirtyOwners.add(owner);
+    }
+  }
+  for (const tag of added) {
+    if (cached.tagsByNumber.has(tag.tagNumber))
+      cached.simple = false;
+    cached.tagsByNumber.set(tag.tagNumber, tag);
+    if (tag.type === "tool") {
+      if (tag.toolOwnerMessageId === null) {
+        const rows = cached.orphanTagsByCall.get(tag.messageId) ?? [];
+        rows.push(tag);
+        cached.orphanTagsByCall.set(tag.messageId, rows);
+      } else {
+        const key = `${tag.toolOwnerMessageId}\x00${tag.messageId}`;
+        if (cached.exactToolTags.has(key))
+          cached.simple = false;
+        cached.exactToolTags.set(key, tag);
+      }
+    } else {
+      if (cached.messageTags.has(tag.messageId))
+        cached.simple = false;
+      cached.messageTags.set(tag.messageId, tag);
+    }
+    const owner = messageIdForTag(tag);
+    if (owner === null)
+      continue;
+    const rows = cached.rowsByOwner.get(owner) ?? new Set;
+    rows.add(tag);
+    cached.rowsByOwner.set(owner, rows);
+    dirtyOwners.add(owner);
+  }
+  for (const owner of dirtyOwners) {
+    const rows = cached.rowsByOwner.get(owner);
+    if (!rows?.size) {
+      cached.rowsByOwner.delete(owner);
+      cached.boundsByOwner.delete(owner);
+      continue;
+    }
+    let min = Infinity;
+    let max = -Infinity;
+    for (const row of rows) {
+      min = Math.min(min, row.tagNumber);
+      max = Math.max(max, row.tagNumber);
+    }
+    cached.boundsByOwner.set(owner, { min, max });
+  }
+  if (wasSimple && !cached.simple)
+    cached = tagAttribution({ ...input, tagCacheKey: undefined });
+  cached.tags = input.tags;
+  if (cacheable)
+    tagAttributions.set(input.tagCacheKey, cached);
+  return cached;
+}
 function attributeTags(input, arcs, messageIds) {
-  const messageTags = new Map;
-  const tagsByNumber = new Map;
-  const exactToolTags = new Map;
-  const orphanTagsByCall = new Map;
+  const {
+    messageTags,
+    tagsByNumber,
+    exactToolTags,
+    orphanTagsByCall,
+    boundsByOwner
+  } = tagAttribution(input);
   const messageIndexById = new Map;
   for (let index = 0;index < messageIds.length; index += 1) {
     const id = input.stableId?.(input.messages[index], index);
@@ -28852,28 +28754,10 @@ function attributeTags(input, arcs, messageIds) {
       messageIndexById.set(id, index);
   }
   const boundsByMessageIndex = new Map;
-  for (const tag of input.tags) {
-    tagsByNumber.set(tag.tagNumber, tag);
-    if (tag.type === "tool") {
-      if (tag.toolOwnerMessageId === null) {
-        const rows = orphanTagsByCall.get(tag.messageId) ?? [];
-        rows.push(tag);
-        orphanTagsByCall.set(tag.messageId, rows);
-      } else {
-        exactToolTags.set(`${tag.toolOwnerMessageId}\x00${tag.messageId}`, tag);
-      }
-    } else {
-      messageTags.set(tag.messageId, tag);
-    }
-    const ownerId = messageIdForTag(tag);
-    const messageIndex = ownerId === null ? undefined : messageIndexById.get(ownerId);
-    if (messageIndex === undefined)
-      continue;
-    const current = boundsByMessageIndex.get(messageIndex);
-    boundsByMessageIndex.set(messageIndex, {
-      min: current ? Math.min(current.min, tag.tagNumber) : tag.tagNumber,
-      max: current ? Math.max(current.max, tag.tagNumber) : tag.tagNumber
-    });
+  for (const [ownerId, index] of messageIndexById) {
+    const bounds = boundsByOwner.get(ownerId);
+    if (bounds)
+      boundsByMessageIndex.set(index, bounds);
   }
   const orphanCandidates = new Map;
   for (const arc of arcs) {
@@ -28978,6 +28862,7 @@ function measurePiTailHygiene(input) {
   const { messageTags, tagsByNumber } = attributeTags(input, arcs, messageIds);
   const drafts = [];
   let newestMessagePartStart = 0;
+  let realUserTurnCount = 0;
   for (let messageIndex = 0;messageIndex < input.messages.length; messageIndex += 1) {
     const raw = input.messages[messageIndex];
     if (messageIndex === input.messages.length - 1)
@@ -28992,6 +28877,8 @@ function measurePiTailHygiene(input) {
       continue;
     }
     const role = raw.role;
+    if (role === "user")
+      realUserTurnCount++;
     if (role !== "user" && role !== "assistant" && role !== "toolResult") {
       drafts.push(excludedDraft(`${messageKey}\x00excluded-role`, raw));
       continue;
@@ -29107,7 +28994,10 @@ function measurePiTailHygiene(input) {
       drafts.push(excludedDraft(`${key}\x00excluded`, part));
     }
   }
-  return finalizeParts(drafts, input.pendingDropTagNumbers ?? new Set, input.protectedTagNumbers, newestMessagePartStart, input.protectedToolTags);
+  return {
+    ...finalizeParts(drafts, input.pendingDropTagNumbers ?? new Set, input.protectedTagNumbers, newestMessagePartStart, input.protectedToolTags),
+    realUserTurnCount
+  };
 }
 function refreshPiTailHygieneBaseline(input) {
   const protectedToolsPolicy = adoptedProtectedToolsPolicy(input.protectedTools, input.previous?.protectedToolsPolicy, input.cacheBusting, !!input.previous);
@@ -29149,7 +29039,8 @@ function refreshPiTailHygieneBaseline(input) {
     generationInvalidated: false,
     contentSignature: measured.contentSignature,
     channel1PostReduceGrace: input.previous?.channel1PostReduceGrace,
-    lastPrefixMismatch: mismatch
+    lastPrefixMismatch: mismatch,
+    realUserTurnCount: rawMeasured.realUserTurnCount
   });
   if (input.cacheBusting || !input.previous)
     return refrozen();
@@ -29172,7 +29063,8 @@ function refreshPiTailHygieneBaseline(input) {
     evaluable: true,
     generationInvalidated: false,
     contentSignature: measured.contentSignature,
-    lastPrefixMismatch: undefined
+    lastPrefixMismatch: undefined,
+    realUserTurnCount: rawMeasured.realUserTurnCount
   };
 }
 function effectivePiTailHygiene(baseline) {
@@ -29414,53 +29306,100 @@ function createPiTagSnapshotReader(db) {
   db.exec(`
 		CREATE TEMP TABLE IF NOT EXISTS pi_tag_revision (revision INTEGER NOT NULL);
 		INSERT INTO pi_tag_revision SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM pi_tag_revision);
+		CREATE TEMP TABLE IF NOT EXISTS pi_tag_session_revision (session_id TEXT PRIMARY KEY, revision INTEGER NOT NULL);
 		CREATE TEMP TABLE IF NOT EXISTS pi_tag_watch (session_id TEXT PRIMARY KEY);
 		CREATE TEMP TABLE IF NOT EXISTS pi_tag_changes (session_id TEXT, tag_number INTEGER, PRIMARY KEY (session_id, tag_number));
+		CREATE TEMP TABLE IF NOT EXISTS pi_tag_version_own (session_id TEXT PRIMARY KEY, count INTEGER NOT NULL);
+		DROP TRIGGER IF EXISTS temp.pi_tag_version_ai;
+		DROP TRIGGER IF EXISTS temp.pi_tag_version_ad;
+		DROP TRIGGER IF EXISTS temp.pi_tag_version_au;
 		DROP TRIGGER IF EXISTS temp.pi_tag_insert;
 		DROP TRIGGER IF EXISTS temp.pi_tag_update;
 		DROP TRIGGER IF EXISTS temp.pi_tag_delete;
+		DROP TRIGGER IF EXISTS temp.pi_tag_insert_conflicts;
+		CREATE TEMP TRIGGER pi_tag_insert_conflicts BEFORE INSERT ON main.tags BEGIN
+			UPDATE pi_tag_revision SET revision = revision + (SELECT COUNT(*) FROM (${TAG_INSERT_CONFLICT_ROWS}));
+			INSERT INTO pi_tag_session_revision
+				SELECT session_id, COUNT(*) FROM (${TAG_INSERT_CONFLICT_ROWS}) GROUP BY session_id
+				ON CONFLICT(session_id) DO UPDATE SET revision = revision + excluded.revision;
+			INSERT INTO pi_tag_changes
+				SELECT session_id, tag_number FROM (${TAG_INSERT_CONFLICT_ROWS}) AS conflicts
+				WHERE EXISTS (SELECT 1 FROM pi_tag_watch WHERE session_id = conflicts.session_id)
+				AND NOT EXISTS (SELECT 1 FROM pi_tag_changes WHERE session_id = conflicts.session_id AND tag_number = conflicts.tag_number)
+				GROUP BY session_id, tag_number;
+		END;
 		CREATE TEMP TRIGGER IF NOT EXISTS pi_tag_insert AFTER INSERT ON main.tags BEGIN
 			UPDATE pi_tag_revision SET revision = revision + 1;
+			INSERT INTO pi_tag_session_revision VALUES (NEW.session_id, 1) ON CONFLICT(session_id) DO UPDATE SET revision = revision + 1;
 			INSERT INTO pi_tag_changes SELECT NEW.session_id, NEW.tag_number WHERE EXISTS (SELECT 1 FROM pi_tag_watch WHERE session_id = NEW.session_id) AND NOT EXISTS (SELECT 1 FROM pi_tag_changes WHERE session_id = NEW.session_id AND tag_number = NEW.tag_number);
 		END;
 		CREATE TEMP TRIGGER IF NOT EXISTS pi_tag_update AFTER UPDATE ON main.tags BEGIN
 			UPDATE pi_tag_revision SET revision = revision + 1;
+			INSERT INTO pi_tag_session_revision VALUES (OLD.session_id, 1) ON CONFLICT(session_id) DO UPDATE SET revision = revision + 1;
+			INSERT INTO pi_tag_session_revision SELECT NEW.session_id, 1 WHERE NEW.session_id IS NOT OLD.session_id ON CONFLICT(session_id) DO UPDATE SET revision = revision + 1;
 			INSERT INTO pi_tag_changes SELECT OLD.session_id, OLD.tag_number WHERE EXISTS (SELECT 1 FROM pi_tag_watch WHERE session_id = OLD.session_id) AND NOT EXISTS (SELECT 1 FROM pi_tag_changes WHERE session_id = OLD.session_id AND tag_number = OLD.tag_number);
 			INSERT INTO pi_tag_changes SELECT NEW.session_id, NEW.tag_number WHERE EXISTS (SELECT 1 FROM pi_tag_watch WHERE session_id = NEW.session_id) AND NOT EXISTS (SELECT 1 FROM pi_tag_changes WHERE session_id = NEW.session_id AND tag_number = NEW.tag_number);
 		END;
 		CREATE TEMP TRIGGER IF NOT EXISTS pi_tag_delete AFTER DELETE ON main.tags BEGIN
 			UPDATE pi_tag_revision SET revision = revision + 1;
+			INSERT INTO pi_tag_session_revision VALUES (OLD.session_id, 1) ON CONFLICT(session_id) DO UPDATE SET revision = revision + 1;
 			INSERT INTO pi_tag_changes SELECT OLD.session_id, OLD.tag_number WHERE EXISTS (SELECT 1 FROM pi_tag_watch WHERE session_id = OLD.session_id) AND NOT EXISTS (SELECT 1 FROM pi_tag_changes WHERE session_id = OLD.session_id AND tag_number = OLD.tag_number);
 		END;
+		CREATE TEMP TRIGGER pi_tag_version_ai AFTER INSERT ON main.tags BEGIN
+			INSERT INTO pi_tag_version_own VALUES (NEW.session_id, 1) ON CONFLICT(session_id) DO UPDATE SET count = count + 1;
+		END;
+		CREATE TEMP TRIGGER pi_tag_version_ad AFTER DELETE ON main.tags BEGIN
+			INSERT INTO pi_tag_version_own VALUES (OLD.session_id, 1) ON CONFLICT(session_id) DO UPDATE SET count = count + 1;
+		END;
+		CREATE TEMP TRIGGER pi_tag_version_au
+		AFTER UPDATE OF session_id, message_id, tag_number, type, tool_owner_message_id, status ON main.tags BEGIN
+			INSERT INTO pi_tag_version_own VALUES (OLD.session_id, 1) ON CONFLICT(session_id) DO UPDATE SET count = count + 1;
+			INSERT INTO pi_tag_version_own SELECT NEW.session_id, 1 WHERE NEW.session_id != OLD.session_id
+				ON CONFLICT(session_id) DO UPDATE SET count = count + 1;
+		END;
 	`);
-  const revision = db.prepare("SELECT revision FROM pi_tag_revision");
-  const dataVersion = db.prepare("PRAGMA main.data_version");
-  revisionReaders.set(db, () => {
+  const versionStamp = db.prepare(`SELECT
+		COALESCE((SELECT tags_version FROM session_meta WHERE session_id = ?), 0) AS durable,
+		COALESCE((SELECT count FROM pi_tag_version_own WHERE session_id = ?), 0) AS own`);
+  const revision = db.prepare(`WITH stamp AS (SELECT
+		COALESCE((SELECT revision FROM pi_tag_session_revision WHERE session_id = ?), 0) AS own,
+		COALESCE((SELECT value FROM schema_migrations_meta WHERE key = ?), '0') AS total)
+		SELECT CAST(own AS TEXT) AS local,
+		(${tagRevisionIncarnationSql("total")}) || ':' || CAST(${tagRevisionCountSql("total")} - own AS TEXT) AS foreign_revision FROM stamp`);
+  revisionReaders.set(db, (sessionId) => {
     const transaction = db;
     if (transaction.inTransaction || transaction.isTransaction)
       return null;
-    return [
-      revision.get().revision,
-      dataVersion.get().data_version
-    ];
+    const row = revision.get(sessionId, tagRevisionKey(sessionId));
+    return [row.local, row.foreign_revision];
   });
   const changed = db.prepare("SELECT tag_number FROM pi_tag_changes WHERE session_id = ? ORDER BY tag_number");
   const clearChanged = db.prepare("DELETE FROM pi_tag_changes WHERE session_id = ?");
   const watch = db.prepare("INSERT OR IGNORE INTO pi_tag_watch VALUES (?)");
   const unwatch = db.prepare("DELETE FROM pi_tag_watch WHERE session_id = ?");
   const cache = new Map;
-  const read = (sessionId) => {
+  const fallbackRows = db.prepare(`SELECT ${FALLBACK_ROW_COLUMNS} FROM tags WHERE session_id = ? AND ${FALLBACK_ROW_PREDICATE}`);
+  const fallbackRowsByNumbers = db.prepare(`SELECT ${FALLBACK_ROW_COLUMNS} FROM tags WHERE session_id = ?
+		 AND tag_number IN (SELECT value FROM json_each(?)) AND ${FALLBACK_ROW_PREDICATE}`);
+  const sync = (sessionId) => {
     const transaction = db;
     if (transaction.inTransaction || transaction.isTransaction)
-      return getTagsBySession2(db, sessionId);
-    const local = revision.get().revision;
-    const external = dataVersion.get().data_version;
+      return null;
+    const [local, external] = revisionReaders.get(db)?.(sessionId) ?? [
+      "0",
+      "0:0"
+    ];
+    const stamp = versionStamp.get(sessionId, sessionId);
     let snapshot = cache.get(sessionId);
-    if (!snapshot || snapshot.dataVersion !== external) {
+    if (!snapshot || snapshot.foreignRevision !== external) {
+      const tags = snapshot ? reuseUnchangedRows(snapshot.tags, getTagsBySession2(db, sessionId)) : getTagsBySession2(db, sessionId);
       snapshot = {
         revision: local,
-        dataVersion: external,
-        tags: getTagsBySession2(db, sessionId)
+        foreignRevision: external,
+        tags,
+        active: tags.filter(isActive),
+        durableVersion: stamp.durable,
+        ownVersion: stamp.own
       };
       if (cache.size >= 100 && !cache.has(sessionId)) {
         const oldest = cache.keys().next().value;
@@ -29471,82 +29410,140 @@ function createPiTagSnapshotReader(db) {
         }
       }
       cache.set(sessionId, snapshot);
+      for (const tag of snapshot.tags)
+        Object.freeze(tag);
       watch.run(sessionId);
     } else if (snapshot.revision !== local) {
       const numbers = changed.all(sessionId).map((row) => row.tag_number);
       if (numbers.length > 0) {
         const dirty = new Set(numbers);
         const replacements = getTagsByNumbers2(db, sessionId, numbers);
-        const unchanged = snapshot.tags.filter((tag) => !dirty.has(tag.tagNumber));
-        const merged = [];
-        let index = 0;
-        for (const tag of unchanged) {
-          while (index < replacements.length) {
-            const next = replacements[index];
-            if (!next)
-              break;
-            if (next.tagNumber > tag.tagNumber || next.tagNumber === tag.tagNumber && (next.id ?? 0) > (tag.id ?? 0))
-              break;
-            merged.push(next);
-            index += 1;
-          }
-          merged.push(tag);
+        for (const tag of replacements)
+          Object.freeze(tag);
+        snapshot.tags = mergeChangedRows(snapshot.tags, dirty, replacements);
+        snapshot.active = mergeChangedRows(snapshot.active, dirty, replacements.filter(isActive));
+        if (!numbers.every(Number.isSafeInteger)) {
+          snapshot.fallback = undefined;
+        } else if (snapshot.fallback) {
+          snapshot.fallback = [
+            ...snapshot.fallback.filter((row) => !dirty.has(row.tag_number)),
+            ...fallbackRowsByNumbers.all(sessionId, JSON.stringify(numbers))
+          ];
         }
-        merged.push(...replacements.slice(index));
-        snapshot.tags = merged;
       }
       snapshot.revision = local;
     }
+    if (stamp.durable - snapshot.durableVersion !== stamp.own - snapshot.ownVersion) {
+      snapshot.fallback = undefined;
+    }
+    snapshot.durableVersion = stamp.durable;
+    snapshot.ownVersion = stamp.own;
     clearChanged.run(sessionId);
-    return snapshot.tags.map((tag) => ({ ...tag }));
+    return snapshot;
   };
+  const read = (sessionId, borrowed = false) => {
+    const snapshot = sync(sessionId);
+    if (!snapshot)
+      return getTagsBySession2(db, sessionId);
+    return borrowed ? snapshot.tags : snapshot.tags.map((tag) => ({ ...tag }));
+  };
+  entryReaders.set(db, sync);
+  fallbackReaders.set(db, (sessionId) => {
+    const snapshot = sync(sessionId);
+    if (!snapshot)
+      return null;
+    snapshot.fallback ??= fallbackRows.all(sessionId);
+    return snapshot.fallback;
+  });
   readers.set(db, read);
   return read;
 }
+var FALLBACK_ROW_COLUMNS = "id, tag_number, type, message_id, tool_owner_message_id, entry_fingerprint";
+var FALLBACK_ROW_PREDICATE = `((type = 'message' AND message_id LIKE 'pi-msg-%')
+	OR (type = 'tool' AND tool_owner_message_id LIKE 'pi-msg-%'))`;
+var isActive = (tag) => tag.status === "active";
+function sameRow(left, right, keys) {
+  for (const key of keys)
+    if (!Object.is(left[key], right[key]))
+      return false;
+  return true;
+}
+function reuseUnchangedRows(cached, fresh) {
+  const first = fresh[0];
+  if (!first)
+    return fresh;
+  const keys = Object.keys(first);
+  let index = 0;
+  for (let position = 0;position < fresh.length; position += 1) {
+    const row = fresh[position];
+    if (!row)
+      continue;
+    while (index < cached.length) {
+      const old = cached[index];
+      if (!old || old.tagNumber > row.tagNumber || old.tagNumber === row.tagNumber && (old.id ?? 0) >= (row.id ?? 0))
+        break;
+      index += 1;
+    }
+    const old = cached[index];
+    if (old && old.id === row.id && sameRow(old, row, keys))
+      fresh[position] = old;
+  }
+  return fresh;
+}
+function mergeChangedRows(rows, dirty, replacements) {
+  const highest = rows.at(-1)?.tagNumber ?? -1;
+  let appendOnly = true;
+  for (const number of dirty) {
+    if (number <= highest) {
+      appendOnly = false;
+      break;
+    }
+  }
+  if (appendOnly)
+    return [...rows, ...replacements];
+  const unchanged = rows.filter((tag) => !dirty.has(tag.tagNumber));
+  const merged = [];
+  let index = 0;
+  for (const tag of unchanged) {
+    while (index < replacements.length) {
+      const next = replacements[index];
+      if (!next)
+        break;
+      if (next.tagNumber > tag.tagNumber || next.tagNumber === tag.tagNumber && (next.id ?? 0) > (tag.id ?? 0))
+        break;
+      merged.push(next);
+      index += 1;
+    }
+    merged.push(tag);
+  }
+  merged.push(...replacements.slice(index));
+  return merged;
+}
+var entryReaders = new WeakMap;
+var fallbackReaders = new WeakMap;
 var readers = new WeakMap;
 var revisionReaders = new WeakMap;
-function readPiTagSnapshotRevision(db) {
-  if (!readers.has(db))
-    createPiTagSnapshotReader(db);
-  return revisionReaders.get(db)?.() ?? null;
+function getPiTagSnapshotView(db, sessionId) {
+  return createPiTagSnapshotReader(db)(sessionId, true);
 }
-function getPiTagSnapshot(db, sessionId) {
-  let reader = readers.get(db);
-  if (!reader) {
-    reader = createPiTagSnapshotReader(db);
-    readers.set(db, reader);
-  }
-  return reader(sessionId);
+function getPiActiveTagSnapshotView(db, sessionId, passTags) {
+  createPiTagSnapshotReader(db);
+  const snapshot = entryReaders.get(db)?.(sessionId);
+  if (snapshot && (!passTags || snapshot.tags === passTags))
+    return snapshot.active.slice();
+  return (passTags ?? getTagsBySession2(db, sessionId)).filter(isActive);
+}
+function readPiFallbackTagRows(db, sessionId) {
+  createPiTagSnapshotReader(db);
+  return fallbackReaders.get(db)?.(sessionId) ?? null;
 }
 
 // src/fallback-tag-probes-pi.ts
-var probes = new WeakMap;
 function probe(db, sessionId, kind) {
-  const revision = readPiTagSnapshotRevision(db);
-  const read = () => kind === "message" ? hasPiFallbackMessageTags2(db, sessionId) : hasPiFallbackToolOwnerTags2(db, sessionId);
-  if (!revision)
-    return read();
-  let sessions = probes.get(db);
-  if (!sessions) {
-    sessions = new Map;
-    probes.set(db, sessions);
-  }
-  let snapshot = sessions.get(sessionId);
-  if (!snapshot || snapshot.local !== revision[0] || snapshot.external !== revision[1]) {
-    snapshot = { local: revision[0], external: revision[1] };
-    if (sessions.size >= 100 && !sessions.has(sessionId)) {
-      const oldest = sessions.keys().next().value;
-      if (oldest !== undefined)
-        sessions.delete(oldest);
-    }
-    sessions.set(sessionId, snapshot);
-  }
-  const cached = snapshot[kind];
-  if (cached !== undefined)
-    return cached;
-  const result = read();
-  snapshot[kind] = result;
-  return result;
+  const rows = readPiFallbackTagRows(db, sessionId);
+  if (!rows)
+    return kind === "message" ? hasPiFallbackMessageTags2(db, sessionId) : hasPiFallbackToolOwnerTags2(db, sessionId);
+  return rows.some((row) => row.type === kind);
 }
 function hasPiFallbackMessageTags(db, sessionId) {
   return probe(db, sessionId, "message");
@@ -29983,7 +29980,7 @@ function readPiHistorianTail(db, sessionId, provider) {
 function resolveStableId(msg, index, entryIds) {
   return resolvePiStableId(msg, index, entryIds) ?? "";
 }
-function trimPiMessagesToBoundary(piMessages, entryIds, cutoffMessageId, trimMutableEntryIds = false, sessionId, preserveBoundary = false) {
+function trimPiMessagesToBoundary(piMessages, entryIds, cutoffMessageId, trimMutableEntryIds = false, sessionId, preserveBoundary = false, retireDecisions) {
   if (cutoffMessageId.length === 0 || preserveBoundary)
     return 0;
   const effectiveCutoffId = cutoffMessageId.startsWith(SYNTH_USER_ID_PREFIX) ? cutoffMessageId.slice(SYNTH_USER_ID_PREFIX.length) : cutoffMessageId;
@@ -30054,6 +30051,16 @@ function trimPiMessagesToBoundary(piMessages, entryIds, cutoffMessageId, trimMut
       }
     }
   }
+  const retiredIds = new Set;
+  if (retireDecisions) {
+    for (const index of remove) {
+      if (index > cutoffIndex)
+        continue;
+      const id = resolveStableId(piMessages[index], index, entryIds);
+      if (id)
+        retiredIds.add(id);
+    }
+  }
   const kept = piMessages.filter((_, index) => !remove.has(index));
   const removed = piMessages.length - kept.length;
   piMessages.splice(0, piMessages.length, ...kept);
@@ -30061,6 +30068,7 @@ function trimPiMessagesToBoundary(piMessages, entryIds, cutoffMessageId, trimMut
     const keptIds = entryIds.filter((_, index) => !remove.has(index));
     entryIds.splice(0, entryIds.length, ...keptIds);
   }
+  retireDecisions?.(retiredIds);
   return removed;
 }
 function toolPairKey(callId, assistantIndex) {
@@ -30283,7 +30291,7 @@ function trimPiMessagesToCachedBoundary(db, sessionId, piMessages, entryIds, pas
   const boundaryIsLive = compartments.some((compartment) => compartment.endMessageId === boundary);
   if (!boundaryIsLive)
     return 0;
-  return trimPiMessagesToBoundary(piMessages, entryIds, boundary, true, sessionId, compartments.some((c) => c.endMessageId === boundary && c.endBlockIndex != null));
+  return trimPiMessagesToBoundary(piMessages, entryIds, boundary, true, sessionId, compartments.some((c) => c.endMessageId === boundary && c.endBlockIndex != null), (ids) => queueAutoSearchHintDecisionRetirement(db, sessionId, ids));
 }
 function setCachedBoundary(db, sessionId, boundary) {
   db.prepare("UPDATE session_meta SET cached_m0_last_baseline_end_message_id = ? WHERE session_id = ?").run(boundary, sessionId);
@@ -30907,6 +30915,8 @@ function cachedPiRowMatchesSnapshot(args) {
   return bufferEqualsNullable(args.row.cached_m0_bytes, args.m0Bytes) && rowMarkers.projectMemoryEpoch === args.markers.projectMemoryEpoch && rowMarkers.projectUserProfileVersion === args.markers.projectUserProfileVersion && rowMarkers.maxCompartmentSeq === args.markers.maxCompartmentSeq && rowMarkers.maxMemoryId === args.markers.maxMemoryId && rowMarkers.maxMutationId === args.markers.maxMutationId && rowMarkers.maxMemoryMutationId === args.markers.maxMemoryMutationId && rowMarkers.materializedAt === args.markers.materializedAt && rowMarkers.sessionFactsVersion === args.markers.sessionFactsVersion && (rowMarkers.upgradeState ?? null) === (args.markers.upgradeState ?? null) && rowMarkers.compartmentRenderEpoch === args.markers.compartmentRenderEpoch && (rowMarkers.systemHash ?? "") === (args.markers.systemHash ?? "") && piModelRefToCanonical(rowMarkers.modelKey ?? "") === piModelRefToCanonical(args.markers.modelKey ?? "") && (rowMarkers.projectIdentity ?? null) === (args.markers.projectIdentity ?? null) && (rowMarkers.workspaceFingerprint ?? null) === (args.markers.workspaceFingerprint ?? null);
 }
 function adoptCachedPiProjectIdentity(db, state) {
+  if (state.projectIdentity == null)
+    return;
   db.prepare("UPDATE session_meta SET cached_m0_project_identity = ? WHERE session_id = ? AND cached_m0_project_identity IS NULL").run(state.projectIdentity, state.sessionId);
 }
 function decodeCachedM1(row, sessionId) {
@@ -31036,7 +31046,7 @@ function prependM0M1Messages(piMessages, m0, m1, mural, timestampHint) {
   });
   return insertionIndex;
 }
-function replayCompletePiPrefix(state, row, compartments, messages, entryIds, reason) {
+function replayCompletePiPrefix(db, state, row, compartments, messages, entryIds, reason) {
   let m0 = decodeCachedM0(row.cached_m0_bytes) ?? "";
   const m1 = decodeCachedM1(row, state.sessionId);
   rememberPiMuralPayload(state.sessionId, row.cached_m0_mural_data_url, row.cached_m0_mural_hash);
@@ -31044,7 +31054,7 @@ function replayCompletePiPrefix(state, row, compartments, messages, entryIds, re
   if (!mural)
     m0 = stripMemoryMuralBlock(m0);
   const trimBoundaryId = row.cached_m0_last_baseline_end_message_id;
-  const skippedVisibleMessages = trimBoundaryId ? trimPiMessagesToBoundary(messages, entryIds, trimBoundaryId, false, state.sessionId, compartments.some((c) => c.endMessageId === trimBoundaryId && c.endBlockIndex != null)) : 0;
+  const skippedVisibleMessages = trimBoundaryId ? trimPiMessagesToBoundary(messages, entryIds, trimBoundaryId, false, state.sessionId, compartments.some((c) => c.endMessageId === trimBoundaryId && c.endBlockIndex != null), (ids) => queueAutoSearchHintDecisionRetirement(db, state.sessionId, ids)) : 0;
   const head = [];
   prependM0M1Messages(head, m0, m1, mural, messages[0]?.timestamp);
   const insertionIndex = placePiInitialSystemAtHead(messages);
@@ -31077,13 +31087,13 @@ function prepareCachedM0M1PiReplay(state, db, rowOverride) {
     freezePrefixForPass: true,
     preparedPrefix: undefined
   };
-  replayCompletePiPrefix(snapshot, cached, [], [], undefined, "cache_hit");
+  replayCompletePiPrefix(db, snapshot, cached, [], [], undefined, "cache_hit");
   return snapshot.preparedPrefix;
 }
 function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = false, passSnapshot) {
   if (state.preparedPrefix) {
     const prepared = state.preparedPrefix;
-    const skippedVisibleMessages = prepared.trimBoundaryId ? trimPiMessagesToBoundary(piMessages, entryIds, prepared.trimBoundaryId, false, state.sessionId, isPartialCompartmentEnd(db, state.sessionId, prepared.trimBoundaryId)) : 0;
+    const skippedVisibleMessages = prepared.trimBoundaryId ? trimPiMessagesToBoundary(piMessages, entryIds, prepared.trimBoundaryId, false, state.sessionId, isPartialCompartmentEnd(db, state.sessionId, prepared.trimBoundaryId), (ids) => queueAutoSearchHintDecisionRetirement(db, state.sessionId, ids)) : 0;
     const head = structuredClone(prepared.messages);
     const timestamp = piMessages[0]?.timestamp;
     if (typeof timestamp === "number") {
@@ -31130,7 +31140,7 @@ function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = fal
         throw error;
       const cached = state.allowFreshContentionFallback ? null : snapshot.cachedRow;
       if (cached?.cached_m0_bytes && cached.cached_m1_bytes) {
-        return replayCompletePiPrefix(state, cached, currentCompartments, piMessages, entryIds, decision.reason);
+        return replayCompletePiPrefix(db, state, cached, currentCompartments, piMessages, entryIds, decision.reason);
       }
       const fresh = renderFreshM0PiNonPersisted(state, db);
       m0 = fresh.m0;
@@ -31157,7 +31167,7 @@ function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = fal
           throw error;
         const cached = state.allowFreshContentionFallback ? null : snapshot.cachedRow;
         if (cached?.cached_m0_bytes && cached.cached_m1_bytes) {
-          return replayCompletePiPrefix(state, cached, currentCompartments, piMessages, entryIds, decision.reason);
+          return replayCompletePiPrefix(db, state, cached, currentCompartments, piMessages, entryIds, decision.reason);
         }
         const fresh = renderFreshM0PiNonPersisted(state, db);
         m0 = fresh.m0;
@@ -31246,7 +31256,7 @@ function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = fal
       };
     }
   }
-  const skippedVisibleMessages = trimBoundaryId ? trimPiMessagesToBoundary(piMessages, entryIds, trimBoundaryId, false, state.sessionId, isPartialCompartmentEnd(db, state.sessionId, trimBoundaryId)) : 0;
+  const skippedVisibleMessages = trimBoundaryId ? trimPiMessagesToBoundary(piMessages, entryIds, trimBoundaryId, false, state.sessionId, isPartialCompartmentEnd(db, state.sessionId, trimBoundaryId), (ids) => queueAutoSearchHintDecisionRetirement(db, state.sessionId, ids)) : 0;
   const muralWire = m0.includes("<memory-mural>") ? muralForWire(state.sessionId) : undefined;
   if (!muralWire)
     m0 = stripMemoryMuralBlock(m0);
@@ -31688,7 +31698,7 @@ class PiContextBudget {
   assertDecisionPublication = () => {
     if (!this.completed)
       this.assertOwner();
-    if (this.abandoned || this.elapsed() >= PI_CONTEXT_BUDGET.outcomeMs)
+    if (this.abandoned || !this.completed && this.elapsed() >= PI_CONTEXT_BUDGET.outcomeMs)
       throw new PiContextDeadlineError(this.diagnostic());
   };
   diagnostic() {
@@ -31764,6 +31774,25 @@ function resolvePiUsableContextLimit(args) {
 
 // src/pi-context-refusal.ts
 import { Text as Text2 } from "@earendil-works/pi-tui";
+
+// src/omp-diagnostic-context.ts
+function isOmpDumpContextStack(stack) {
+  if (!stack)
+    return false;
+  const frames = stack.replaceAll("\\", "/").split(`
+`);
+  const hostFrame = (method) => frames.some((frame) => new RegExp(`^\\s*at (?:async )?(?:AgentSession\\.)?${method} \\(.*?/@oh-my-pi/pi-coding-agent/src/session/agent-session\\.ts:\\d+:\\d+\\)$`).test(frame));
+  return hostFrame("#formatLlmRequestJson") && hostFrame("dumpLlmRequestToTmpDir");
+}
+function isOmpDumpContext() {
+  const limit = Error.stackTraceLimit;
+  try {
+    Error.stackTraceLimit = Math.max(limit ?? 10, 64);
+    return isOmpDumpContextStack(new Error().stack);
+  } finally {
+    Error.stackTraceLimit = limit;
+  }
+}
 
 // src/omp-request-kind.ts
 var SIDE_REMINDER = `<system-reminder>
@@ -31862,8 +31891,14 @@ function isOmpUnmanagedCaptureRequest(payload) {
 // src/pi-context-refusal.ts
 var ENTRY_TYPE = "magic-context-turn-refused";
 var RETRY_MESSAGE = "Magic Context could not safely prepare this turn; send your message again.";
+var MAX_UNSENDABLE_NONCES_PER_SESSION = 32;
 
 class PiContextSupersededError extends Error {
+  origin;
+  constructor(message, origin = "context ownership") {
+    super(message);
+    this.origin = origin;
+  }
 }
 var receiptMaps = new Set;
 function clearPiContextReceipt(sessionId) {
@@ -31873,17 +31908,70 @@ function clearPiContextReceipt(sessionId) {
 function operationKey(ctx) {
   return ctx.sessionManager?.getSessionId?.() ?? ctx.sessionManager ?? "no-session";
 }
+function messageKey(message) {
+  if (!message || typeof message !== "object")
+    return;
+  const { role, timestamp } = message;
+  return typeof role === "string" && typeof timestamp === "number" ? `${role}:${timestamp}` : undefined;
+}
+function endBelongsToEarlierRun(operation, event) {
+  if (!operation.pass || operation.dispatched)
+    return false;
+  const end = event;
+  if (end?.willContinue === true)
+    return true;
+  if (!operation.inputKeys || !Array.isArray(end?.messages))
+    return false;
+  const ended = new Set;
+  for (const message of end.messages) {
+    const key = messageKey(message);
+    if (key)
+      ended.add(key);
+  }
+  if (ended.size === 0)
+    return false;
+  return operation.inputKeys.some((key) => !ended.has(key));
+}
+function inputMessageKeys(event) {
+  try {
+    const messages = event.messages;
+    if (!Array.isArray(messages))
+      return;
+    const keys = [];
+    for (const message of messages) {
+      const key = messageKey(message);
+      if (key)
+        keys.push(key);
+    }
+    return keys;
+  } catch {
+    return;
+  }
+}
 function registerPiGuardedContext(pi, handler, options = {}) {
   const operations = new Map;
   const sideSessions = new Map;
   receiptMaps.add(operations);
   const newOperation = () => ({
+    dispatched: false,
     started: false,
     ready: false,
     refused: false,
     ended: false
   });
+  const lifecycle = new Map;
+  receiptMaps.add(lifecycle);
+  const lifecycleCounts = (key) => {
+    let counts = lifecycle.get(key);
+    if (!counts) {
+      counts = { starts: 0, ends: 0 };
+      lifecycle.set(key, counts);
+    }
+    return counts;
+  };
   const fenceEnabled = resolvePiHarnessKind() === "omp";
+  const unsendableNonces = new Map;
+  receiptMaps.add(unsendableNonces);
   const refuse = (ctx, budget, reason, isCurrent) => {
     if (!isCurrent()) {
       log2(`[magic-context][pi] DISCARDED CONTEXT RESULT ${budget.diagnostic()}`, reason);
@@ -31915,18 +32003,27 @@ function registerPiGuardedContext(pi, handler, options = {}) {
   if (fenceEnabled) {
     pi.on("agent_start", (_event, ctx) => {
       const key = operationKey(ctx);
+      lifecycleCounts(key).starts++;
       const pending = operations.get(key);
       const active = pending && !pending.started && !pending.ended ? pending : newOperation();
       active.started = true;
       operations.set(key, active);
     });
-    pi.on("agent_end", (_event, ctx) => {
+    pi.on("agent_end", (event, ctx) => {
       const key = operationKey(ctx);
+      const lifecycleSeen = lifecycleCounts(key);
+      lifecycleSeen.ends = Math.min(lifecycleSeen.ends + 1, lifecycleSeen.starts);
       const counts = sideSessions.get(key);
       if (counts)
         log2(`[magic-context][pi] OMP context counts session=${String(key)} side_contexts=${counts.sides} context_passes=${counts.contexts} dispatch_fence=${counts.sides ? "latched off" : "on"}`);
       const operation = operations.get(key);
       if (operation) {
+        if (endBelongsToEarlierRun(operation, event)) {
+          if (lifecycleSeen.starts <= lifecycleSeen.ends)
+            operation.started = false;
+          log2(`[magic-context][pi] agent_end attributed to an earlier run; keeping the latest context pass session=${String(key)} ${operation.pass?.diagnostic() ?? ""}`);
+          return;
+        }
         operation.ended = true;
         operation.ready = false;
       }
@@ -31935,10 +32032,20 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       if (options.compactionOff?.(ctx))
         return;
       const payload = event.payload;
-      if (isOmpAdvisorRequest(payload))
-        return;
       const key = operationKey(ctx);
       if (sideSessions.get(key)?.sides)
+        return;
+      const nonces = unsendableNonces.get(key);
+      if (nonces?.size) {
+        const serializedPayload = JSON.stringify(payload);
+        if (serializedPayload && [...nonces].some((nonce) => serializedPayload.includes(nonce))) {
+          const budget = new PiContextBudget;
+          budget.stage = "provider dispatch";
+          refuse(ctx, budget, "superseded context fallback is not a managed request", () => true);
+          return;
+        }
+      }
+      if (isOmpAdvisorRequest(payload))
         return;
       let operation = operations.get(key);
       if (!operation) {
@@ -31949,25 +32056,32 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       const isCurrent = () => operations.get(key) === active;
       const capture = isOmpUnmanagedCaptureRequest(payload);
       const budget = (capture ? undefined : active.pass) ?? new PiContextBudget;
+      let refusalOrigin;
       try {
         if (capture)
           throw new Error("no context pass ran for OMP auto-learn capture; raw conversation refused");
         if (!active.pass)
           throw new Error("no context pass ran for this operation");
-        budget.assertOwner();
-        if (!budget.completed)
-          budget.assertOutcome();
-        if (!active.ready || active.refused || active.ended || budget.abandoned)
+        if (!budget.completed && (budget.abandoned || budget.elapsed() >= PI_CONTEXT_BUDGET.outcomeMs))
+          throw new PiContextDeadlineError(budget.diagnostic());
+        if (active.ended) {
+          refusalOrigin = "agent_end";
+          throw new Error("the run that owned the latest context pass has ended; no managed result for this request");
+        }
+        if (!budget.completed || !active.ready || active.refused || budget.abandoned)
           throw new Error("context pass ran without a managed context receipt");
+        active.dispatched = true;
       } catch (error) {
         active.refused = true;
-        budget.stage = "provider dispatch";
+        budget.stage = refusalOrigin ? `provider dispatch (origin=${refusalOrigin}; context stage=${budget.stage})` : "provider dispatch";
         refuse(ctx, budget, error, isCurrent);
       }
     });
   }
   pi.registerEntryRenderer?.(ENTRY_TYPE, (entry) => new Text2(entry.data?.message ?? RETRY_MESSAGE, 0, 0));
   pi.on("context", async (event, ctx) => {
+    if (fenceEnabled && isOmpDumpContext())
+      return { messages: event.messages };
     const budget = new PiContextBudget;
     budget.sideTurn = fenceEnabled && isOmpSideContext(event);
     const key = operationKey(ctx);
@@ -31990,16 +32104,20 @@ function registerPiGuardedContext(pi, handler, options = {}) {
     }
     const active = operation;
     active.pass = budget;
+    active.inputKeys = undefined;
+    active.dispatched = false;
     active.ready = false;
+    active.refused = false;
     const isOwned = () => budget.sideTurn ? operations.get(key) === owner : operations.get(key) === active && active.pass === budget;
     const isCurrent = () => isOwned() && (budget.sideTurn || !active.ended);
     budget.assertOwner = () => {
       if (!isCurrent())
-        throw new PiContextSupersededError("Pi context pass superseded before writer admission");
+        throw new PiContextSupersededError("Pi context pass superseded: no longer valid for this operation", active.ended ? "agent_end" : operations.get(key) !== (budget.sideTurn ? owner : active) ? "operation replacement or cache eviction" : "newer context pass");
     };
     try {
-      const result = await withSqliteTransformPass2(() => handler(event, ctx, budget));
-      budget.assertOutcome();
+      if (fenceEnabled && !budget.sideTurn)
+        active.inputKeys = inputMessageKeys(event);
+      const result = await budget.waitMandatory(Promise.resolve(withSqliteTransformPass2(() => handler(event, ctx, budget))));
       if (result?.messages) {
         budget.completed = true;
         active.ready = true;
@@ -32007,6 +32125,30 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       return result;
     } catch (error) {
       if (error instanceof PiContextSupersededError || !isCurrent()) {
+        if (fenceEnabled && !budget.sideTurn && !sideSessions.get(key)?.sides && !options.compactionOff?.(ctx)) {
+          const nonce = crypto.randomUUID();
+          let nonces = unsendableNonces.get(key);
+          if (!nonces) {
+            nonces = new Set;
+            unsendableNonces.set(key, nonces);
+          }
+          nonces.add(nonce);
+          if (nonces.size > MAX_UNSENDABLE_NONCES_PER_SESSION) {
+            const oldest = nonces.values().next().value;
+            if (oldest !== undefined)
+              nonces.delete(oldest);
+          }
+          event.messages.push({
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Magic Context did not prepare this request for the current turn. ${nonce}`
+              }
+            ],
+            timestamp: Date.now()
+          });
+        }
         log2(`[magic-context][pi] DISCARDED CONTEXT RESULT ${budget.diagnostic()}`, error);
         throw error;
       }
@@ -32021,6 +32163,120 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       return { messages: event.messages };
     }
   });
+}
+
+// src/pi-fallback-index.ts
+function createPiFallbackIndex() {
+  const prior = [];
+  let priorHadDuplicateIds = false;
+  const byHeader = new Map;
+  const positions = new Map;
+  const owners = new Map;
+  let rebuilt = 0;
+  return {
+    get rebuiltMessages() {
+      return rebuilt;
+    },
+    update(args) {
+      const selected = new Map;
+      const guardIndexes = [];
+      const inputs = [];
+      const seen = new Set;
+      let duplicate = false;
+      for (let index = 0;index < args.messages.length; index++) {
+        const message = args.messages[index];
+        const id = args.resolveId(message, index) ?? `unmapped:${index}`;
+        if (seen.has(id))
+          duplicate = true;
+        seen.add(id);
+        const fields = (message && typeof message === "object" ? args.fields?.get(message) : undefined) ?? lkgContentFields(message && typeof message === "object" ? {
+          role: message.role,
+          timestamp: message.timestamp,
+          responseId: message.responseId,
+          toolCallId: message.toolCallId,
+          content: message.content
+        } : message);
+        inputs.push({ id, fields: fields ?? [Symbol()] });
+      }
+      let prefix = priorHadDuplicateIds ? 0 : exactReusablePrefix(inputs, prior);
+      if (duplicate) {
+        prefix = 0;
+        selected.clear();
+      }
+      priorHadDuplicateIds = duplicate;
+      for (let index = 0;index < prefix; index++) {
+        const old = prior[index];
+        if (old && !args.reusable?.has(old.id)) {
+          guardIndexes.push(index);
+          if (old.fingerprint)
+            selected.set(old.id, old.fingerprint);
+        }
+      }
+      for (const old of prior.slice(prefix)) {
+        positions.delete(old.id);
+        if (old.header) {
+          const bucket = byHeader.get(old.header);
+          bucket?.delete(old);
+          if (!bucket?.size)
+            byHeader.delete(old.header);
+        }
+        for (const [key, ids] of old.owners) {
+          const bucket = owners.get(key);
+          for (const id of ids)
+            bucket?.delete(id);
+          if (!bucket?.size)
+            owners.delete(key);
+        }
+      }
+      prior.length = prefix;
+      for (let index = prefix;index < args.messages.length; index++) {
+        guardIndexes.push(index);
+        const message = args.messages[index];
+        const input = inputs[index];
+        if (!input)
+          continue;
+        const record = {
+          ...input,
+          header: args.header(message),
+          fingerprint: input.id.startsWith("unmapped:") ? null : args.fingerprint(message),
+          owners: input.id.startsWith("unmapped:") ? new Map : args.toolOwners(message, input.id)
+        };
+        rebuilt++;
+        prior.push(record);
+        if (!positions.has(record.id))
+          positions.set(record.id, index);
+        if (record.header) {
+          const bucket = byHeader.get(record.header) ?? new Set;
+          bucket.add(record);
+          byHeader.set(record.header, bucket);
+        }
+        for (const [key, ids] of record.owners) {
+          const bucket = owners.get(key) ?? new Set;
+          for (const id of ids)
+            bucket.add(id);
+          owners.set(key, bucket);
+        }
+        if (!args.reusable?.has(record.id) && record.fingerprint)
+          selected.set(record.id, record.fingerprint);
+      }
+      return {
+        positions,
+        owners,
+        changedFrom: prefix,
+        guardIndexes,
+        fingerprints(headers) {
+          const result = new Map(selected);
+          const records = headers ? [...headers].flatMap((header) => [
+            ...byHeader.get(header) ?? []
+          ]) : headers === null ? prior : [];
+          for (const record of records)
+            if (record.fingerprint)
+              result.set(record.id, record.fingerprint);
+          return result;
+        }
+      };
+    }
+  };
 }
 
 // ../plugin/src/hooks/magic-context/openai-compat-adjacency.ts
@@ -32908,7 +33164,19 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
           ...reusePrior ? reusePrior.signatures.slice(0, reusablePrefix) : [],
           ...plan.inputs.slice(reusablePrefix).map((input) => signatureForFields(input.fields))
         ];
-        const incremental = incrementalLkgContentDigests(plan.inputs.map((input, index) => ({
+        const verifiedOwnPrefix = reusePrior && digestPrior === state.acceptedSlot && reusePrior.slot.inputIdSeq.length === reusePrior.signatures.length && reusePrior.signatures.length === reusePrior.slot.inputContentDigests.length;
+        let digestPrefix = 0;
+        if (verifiedOwnPrefix && reusePrior) {
+          while (digestPrefix < reusablePrefix && !isLegacyLkgDigest(reusePrior.slot.inputContentDigests[digestPrefix] ?? ""))
+            digestPrefix++;
+        }
+        const incremental = verifiedOwnPrefix && reusePrior ? {
+          reusedPrefix: digestPrefix,
+          digests: [
+            ...reusePrior.slot.inputContentDigests.slice(0, digestPrefix),
+            ...plan.inputs.slice(digestPrefix).map((input) => lkgContentDigestFromFields(input.fields))
+          ]
+        } : incrementalLkgContentDigests(plan.inputs.map((input, index) => ({
           id: input.id,
           signature: inputContentSignatures[index] ?? "",
           fields: input.fields
@@ -34527,7 +34795,7 @@ function isBoundChild(ctx) {
   }
   return false;
 }
-function resolve4(ctx) {
+function resolve3(ctx) {
   const keys = sessionKeys(ctx);
   for (const registration of registrations) {
     if (keys.some((key) => registration.bound.has(key)))
@@ -34556,8 +34824,8 @@ function registerPiRegistry(options) {
   };
   registrations.add(registration);
   const facade = {
-    transformContext: async (event, ctx) => resolve4(ctx)?.registry.transformContext(event, ctx),
-    compact: async (ctx) => resolve4(ctx)?.registry.compact(ctx),
+    transformContext: async (event, ctx) => resolve3(ctx)?.registry.transformContext(event, ctx),
+    compact: async (ctx) => resolve3(ctx)?.registry.compact(ctx),
     scrubMessage: (message) => {
       for (const entry of registrations)
         entry.registry.scrubMessage(message);
@@ -34586,7 +34854,7 @@ function registerPiRegistry(options) {
           details: undefined
         };
       }
-      const definition = resolve4(ctx)?.tools.get(toolName);
+      const definition = resolve3(ctx)?.tools.get(toolName);
       if (!definition) {
         return {
           content: [
@@ -34615,9 +34883,9 @@ function registerPiRegistry(options) {
   const unpublishBridge = bridge ? publishBridgeTools(`${BRIDGE_OWNER}\x00${options.dbPath}\x00${options.projectDir}`, {
     owner: BRIDGE_OWNER,
     apiVersion: BRIDGE_API_VERSION,
-    catalogue: (ctx) => resolve4(ctx) === registration ? bridgeToolEntries(registration.tools, grantedNames(ctx)) : [],
+    catalogue: (ctx) => resolve3(ctx) === registration ? bridgeToolEntries(registration.tools, grantedNames(ctx)) : [],
     execute: async (name, params, ctx) => {
-      if (resolve4(ctx) !== registration) {
+      if (resolve3(ctx) !== registration) {
         return bridgeRefusal(name, "Magic Context has no instance serving this session");
       }
       if (!grantedNames(ctx).includes(name)) {
@@ -34685,6 +34953,15 @@ function recordPiIdentityRecurrence(db, sessionId, key) {
 }
 function queuePiIdentityRebuild(db, sessionId, repair) {
   return freezeIdentityDecision(db, sessionId, "tag-identity-repair-pending", JSON.stringify(repair));
+}
+function claimPiIdentityRebuildFailure(db, sessionId) {
+  const decisions = readPiIdentityDecisions(db, sessionId);
+  if (!decisions)
+    return "unpersisted";
+  const key = encodePiContentDecision("tag-identity-rebuild-failed", "m0-m1-clear");
+  if (decisions.has(key))
+    return "again";
+  return freezeIdentityDecision(db, sessionId, "tag-identity-rebuild-failed", "m0-m1-clear") ? "first" : "unpersisted";
 }
 function readPiIdentityRebuilds(db, sessionId) {
   const repairs = [...readPiIdentityDecisions(db, sessionId) ?? []].flatMap((entry) => {
@@ -35029,7 +35306,7 @@ function applyPiProactiveThinkingStrip(args) {
     return null;
   if (!isPrefixBoundThinkingModel(args.provider, args.model))
     return null;
-  const protectedMessages = latestAssistantTurnMessages(args.messages);
+  const protectedMessages = args.stripActiveTurn ? new Set : latestAssistantTurnMessages(args.messages);
   const entryIds = [];
   const indices = [];
   for (let index = 0;index < args.messages.length; index += 1) {
@@ -35056,8 +35333,9 @@ function applyPiProactiveThinkingStrip(args) {
     reportBindingRecovery(args.sessionId, args.report, "proactive thinking strip: persistence failed; serving the thinking unchanged");
     return null;
   }
-  for (const index of indices)
-    stripThinkingParts(args.messages[index]);
+  if (!args.persistOnly)
+    for (const index of indices)
+      stripThinkingParts(args.messages[index]);
   reportBindingRecovery(args.sessionId, args.report, `proactive thinking strip: busting pass froze thinking of ${entryIds.length} entr${entryIds.length === 1 ? "y" : "ies"} [${entryIds.join(",")}]`);
   return { entryIds };
 }
@@ -36427,6 +36705,25 @@ function markToolRemoval(working, messageIndex, partIndex) {
 
 // src/context-handler.ts
 var EMERGENCY_BLOCK_PERCENTAGE = 95;
+function tagsWithNumber(sorted, number) {
+  let low = 0;
+  let high = sorted.length;
+  while (low < high) {
+    const middle = low + high >>> 1;
+    if ((sorted[middle]?.tagNumber ?? Number.POSITIVE_INFINITY) < number)
+      low = middle + 1;
+    else
+      high = middle;
+  }
+  const rows = [];
+  for (let index = low;index < sorted.length; index += 1) {
+    const row = sorted[index];
+    if (row?.tagNumber !== number)
+      break;
+    rows.push(row);
+  }
+  return rows;
+}
 function newestActiveTagNumbersByCount(tags, count) {
   return new Set(tags.filter((tag) => tag.status === "active").sort((left, right) => right.tagNumber - left.tagNumber).slice(0, Math.max(0, count)).map((tag) => tag.tagNumber));
 }
@@ -36469,9 +36766,11 @@ var contextPassGeneration = new Map;
 
 class PiLkgAdmissionReplay extends Error {
   messages;
-  constructor(messages) {
+  recovery;
+  constructor(messages, recovery = "fitting LKG before writer retries") {
     super("Saved request served before writer wait");
     this.messages = messages;
+    this.recovery = recovery;
   }
 }
 var liveModelBySession = new Map;
@@ -36500,6 +36799,7 @@ var piMessageTokenCacheBySession = new Map;
 var piTagTextTokenCacheBySession = new Map;
 var piTagToolTokenCacheBySession = new Map;
 var piTextIdentitySourceCacheBySession = new Map;
+var piFallbackIndexesBySession = new Map;
 function buildPiTextIdentityPlan(db, sessionId, tagger, transcript, reuseCandidates = new Set) {
   const currentSourcesByMessageId = new Map;
   for (const message of transcript.messages) {
@@ -37409,28 +37709,6 @@ function piMessageEntryFingerprint2(message) {
   piEntryFingerprintCount += 1;
   return piMessageEntryFingerprint(message);
 }
-function buildEntryFingerprintMap(messages, resolveStableId, reusableMessageIds, includeReusable = true, reusableHeaders) {
-  const map = new Map;
-  for (let i = 0;i < messages.length; i++) {
-    const msg = messages[i];
-    const id = resolveStableId(msg, i);
-    if (!id)
-      continue;
-    if (reusableMessageIds?.has(id)) {
-      if (!includeReusable)
-        continue;
-      if (reusableHeaders) {
-        const header = piMessageEntryFingerprintHeader(msg);
-        if (header === null || !reusableHeaders.has(header))
-          continue;
-      }
-    }
-    const fp = piMessageEntryFingerprint2(msg);
-    if (fp)
-      map.set(id, fp);
-  }
-  return map;
-}
 function piToolOwnerMapKey(timestamp, callId) {
   return `${timestamp}\x00${callId}`;
 }
@@ -37486,17 +37764,20 @@ var piToolGuardCallIds = new WeakMap;
 function fallbackPiToolCallIds(db, sessionId) {
   let statement = piToolGuardVersionStatements.get(db);
   if (!statement) {
-    statement = db.prepare("SELECT tags_version AS version FROM session_meta WHERE session_id = ?");
+    statement = db.prepare(`SELECT COALESCE((SELECT tags_version FROM session_meta WHERE session_id = ?), 0) AS version,
+			(SELECT value FROM schema_migrations_meta WHERE key = ?) AS identity_revision`);
     piToolGuardVersionStatements.set(db, statement);
   }
-  const version = statement.get(sessionId)?.version ?? 0;
+  const stamp = statement.get(sessionId, tagIdentityRevisionKey(sessionId));
+  const version = stamp?.version ?? 0;
+  const identityRevision = stamp?.identity_revision ?? null;
   let sessions = piToolGuardCallIds.get(db);
   if (!sessions) {
     sessions = new Map;
     piToolGuardCallIds.set(db, sessions);
   }
   const cached = sessions.get(sessionId);
-  if (cached?.version === version)
+  if (cached?.version === version && cached.identityRevision === identityRevision)
     return cached.ids;
   let fallbackStatement = piToolGuardFallbackStatements.get(db);
   if (!fallbackStatement) {
@@ -37506,7 +37787,7 @@ function fallbackPiToolCallIds(db, sessionId) {
   const ids = new Set(fallbackStatement.all(sessionId).map((row) => row.callId));
   if (!sessions.has(sessionId) && sessions.size >= MAX_TRACKED_SESSIONS)
     sessions.delete(sessions.keys().next().value);
-  sessions.set(sessionId, { version, ids });
+  sessions.set(sessionId, { version, identityRevision, ids });
   return ids;
 }
 var piUnresolvedIdentityLogged = new Set;
@@ -37520,10 +37801,10 @@ function logPiUnresolvedIdentities(sessionId, unresolved) {
     piUnresolvedIdentityLogged.add(`${sessionId}\x00${item.kind}\x00${item.id}`);
   sessionLog2(sessionId, `tag identity unresolved: serving with a newly allocated tag number (one cache change per identity) session=${sessionId} ${fresh.map((item) => `${item.kind}=${item.id}`).join(" ")}`);
 }
-function guardPiToolAllocations(db, sessionId, messages, resolveId, tagger) {
+function guardPiToolAllocations(db, sessionId, messages, resolveId, tagger, messageIndexes) {
   const unresolved = [];
   const fallbackCalls = fallbackPiToolCallIds(db, sessionId);
-  for (let index = 0;index < messages.length; index++) {
+  for (const index of messageIndexes ?? messages.keys()) {
     const message = messages[index];
     if (message?.role !== "assistant" || !Array.isArray(message.content))
       continue;
@@ -37766,6 +38047,8 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
   const recurrences = [];
   const plan = (rows, key, legacyKeys, served, cached) => {
     const proven = cached !== undefined || rows.filter((row) => served.has(row.tagNumber)).length === 1;
+    if (!proven && options.deferUnprovenRebuild)
+      return null;
     if (proven && options.allowUnprovenRebuild) {
       const decisions = readPiIdentityDecisions(db, sessionId);
       let unmerged = decisions === null || decisions.has(encodePiContentDecision("tag-identity-recurring", key));
@@ -37844,12 +38127,14 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
     return adoption;
   };
   let { realIdsByFingerprint, fallbackIdsByFingerprint, batches } = preparePiAdoptionFingerprints(fingerprintById);
-  const ownerMap = options.messages && options.resolveStableId ? buildPiToolOwnerMap(options.messages, options.resolveStableId) : null;
+  const ownerMap = options.toolOwners ?? (options.messages && options.resolveStableId ? buildPiToolOwnerMap(options.messages, options.resolveStableId) : null);
   if (!batches.length && !ownerMap?.size && !options.rebuildFingerprints)
     return outcome;
   const revision = () => readPiAdoptionRevision(db);
   const beforeDiscovery = revision();
-  const discovered = hasPiFallbackMessageTags2(db, sessionId) ? readAdoptablePiFallbackFingerprints(db, sessionId, batches) : new Set;
+  const discoveredMessageFallback = hasPiFallbackMessageTags2(db, sessionId);
+  const discoveredToolOwnerFallback = ownerMap?.size ? hasPiFallbackToolOwnerTags2(db, sessionId) : false;
+  const discovered = discoveredMessageFallback ? readAdoptablePiFallbackFingerprints(db, sessionId, batches) : new Set;
   const targetsFor = (fingerprints) => [...fingerprints].flatMap((fingerprint) => (realIdsByFingerprint.get(fingerprint) ?? []).map((id) => [id, fingerprint]));
   const fallbackTargetsFor = (fingerprints) => [...fingerprints].flatMap((fingerprint) => (fallbackIdsByFingerprint.get(fingerprint) ?? []).map((id) => [id, fingerprint]));
   const discoveredTargets = targetsFor(discovered);
@@ -37891,32 +38176,34 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
   };
   runImmediateTransaction(db, () => {
     const admitted = revision();
+    const unchangedSinceDiscovery = beforeDiscovery.external.data_version === admitted.external.data_version && beforeDiscovery.local.changes === admitted.local.changes;
     const preflight = options.preflightRevision;
     const rebuild = options.rebuildFingerprints;
     const expanded = Boolean(preflight && rebuild && (preflight.external.data_version !== admitted.external.data_version || preflight.local.changes !== admitted.local.changes));
     if (expanded && rebuild) {
       ({ realIdsByFingerprint, fallbackIdsByFingerprint, batches } = preparePiAdoptionFingerprints(rebuild()));
     }
-    if (batches.length && hasPiFallbackMessageTags2(db, sessionId)) {
-      const unchanged = !expanded && beforeDiscovery.external.data_version === admitted.external.data_version && beforeDiscovery.local.changes === admitted.local.changes;
+    if (batches.length && (unchangedSinceDiscovery ? discoveredMessageFallback : hasPiFallbackMessageTags2(db, sessionId))) {
+      const unchanged = !expanded && unchangedSinceDiscovery;
       const adoptable = unchanged ? discovered : readAdoptablePiFallbackFingerprints(db, sessionId, batches);
       const targets = expanded ? targetsFor(adoptable) : discoveredTargets.filter(([, fp]) => adoptable.has(fp));
       if (!expanded)
         targets.push(...targetsFor([...adoptable].filter((fp) => !discovered.has(fp))));
       const pairedBaseByRealId = new Map;
-      let positions;
+      let positions = options.realIdPositions;
       const realIdPositions = () => {
         if (positions)
           return positions;
         const { messages, resolveStableId } = options;
         if (!messages || !resolveStableId)
           return;
-        positions = new Map;
+        const computed = new Map;
         for (let index = 0;index < messages.length; index += 1) {
           const id = resolveStableId(messages[index], index);
-          if (id !== undefined && !positions.has(id))
-            positions.set(id, index);
+          if (id !== undefined && !computed.has(id))
+            computed.set(id, index);
         }
+        positions = computed;
         return positions;
       };
       for (const [realMessageId, fingerprint] of targets) {
@@ -37956,7 +38243,7 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
           adoptMessageCandidates(fallbackId, fingerprint, legacy.filter((c) => piFallbackBaseId(c.messageId) === base));
       }
     }
-    if (ownerMap && hasPiFallbackToolOwnerTags2(db, sessionId)) {
+    if (ownerMap && (unchangedSinceDiscovery ? discoveredToolOwnerFallback : hasPiFallbackToolOwnerTags2(db, sessionId))) {
       for (const row of findPiFallbackToolOwnerTags2(db, sessionId)) {
         const parsed = parsePiFallbackToolOwnerId(row.toolOwnerMessageId);
         if (parsed?.role !== "assistant")
@@ -38068,6 +38355,7 @@ function registerPiContextHandler(pi, baseOptions) {
     sessionLog2(sessionId, message);
   });
   const contextHandler = async (event, ctx, budget) => {
+    budget.assertOutcome();
     const passSessionId = ctx.sessionManager ? resolveSessionId2(ctx) : undefined;
     const generation = Symbol();
     if (passSessionId && !budget.sideTurn)
@@ -38077,7 +38365,7 @@ function registerPiContextHandler(pi, baseOptions) {
     budget.assertOwner = () => {
       assertOperation();
       if (!budget.sideTurn && passSessionId && contextPassGeneration.get(passSessionId) !== generation)
-        throw new PiContextSupersededError("Pi context pass superseded before writer admission");
+        throw new PiContextSupersededError("Pi context pass superseded by a newer context generation", "context generation");
       signal?.throwIfAborted();
     };
     let assertCurrentPass = budget.assert;
@@ -38178,6 +38466,10 @@ function registerPiContextHandler(pi, baseOptions) {
         transport: ctx.model?.transport
       });
       lkgPassSnapshot = snapshot;
+      const lkgInputFields = new WeakMap(snapshot.inputs.flatMap((input) => {
+        const message = event.messages[input.messageIndex];
+        return message && typeof message === "object" ? [[message, input.fields]] : [];
+      }));
       let checkedReplay = false;
       budget.stage = "writer admission";
       assertCurrentPass();
@@ -38309,6 +38601,8 @@ function registerPiContextHandler(pi, baseOptions) {
       if (currentModelKey !== undefined) {
         liveModelBySession.set(sessionId, currentModelKey);
       }
+      logTransformTiming(sessionId, "modelChangeDetection", tModelDetect);
+      const tPressureResolution = performance.now();
       const compactionTransition = reconcilePiCompactionMode({
         db: options.db,
         sessionId,
@@ -38403,6 +38697,7 @@ function registerPiContextHandler(pi, baseOptions) {
       let sessionMeta = sessionMetaForUsage;
       const modelKey = liveModelBySession.get(sessionId);
       const providerId = typeof ctx.model?.provider === "string" ? ctx.model.provider : undefined;
+      const fallbackInputFields = bindingStripOrder === "end" && !options.injection?.temporalAwareness && !beforePipelineForTests ? lkgInputFields : undefined;
       const canUseEmptySentinels = modelAcceptsEmptyContent(providerId);
       if (usageContextLimit === undefined) {
         const modelWindow = ctx.model?.contextWindow;
@@ -38485,7 +38780,7 @@ function registerPiContextHandler(pi, baseOptions) {
         schedulerDecision = "execute";
         sessionLog2(sessionId, `transform: large imported session detected (${piMessageCount} messages, no usage baseline) — forcing execute on first pass`);
       }
-      logTransformTiming(sessionId, "modelChangeDetection", tModelDetect);
+      logTransformTiming(sessionId, "pressureResolution", tPressureResolution);
       const storedStableIdScheme = sessionMeta.piStableIdScheme ?? 0;
       const realEntryIdsAvailable = strictEntryIds?.some((id) => typeof id === "string" && id.length > 0) ?? false;
       const stableIdSchemeCutover = storedStableIdScheme < PI_STABLE_ID_SCHEME && realEntryIdsAvailable;
@@ -38562,7 +38857,8 @@ function registerPiContextHandler(pi, baseOptions) {
       if (beforePipelineForTests)
         await budget.waitMandatory(beforePipelineForTests());
       assertCurrentPass();
-      const result = await budget.waitMandatory(runPipeline({
+      const inputForThinkingFit = isPrefixBoundThinkingModel(ctx.model?.provider, ctx.model?.id) ? structuredClone(event.messages) : null;
+      const pipelineArgs = {
         assertCurrentPass,
         db: options.db,
         tagger,
@@ -38597,6 +38893,7 @@ function registerPiContextHandler(pi, baseOptions) {
         entryIds,
         entryIdByRef,
         reusableMessageIds,
+        fallbackInputFields,
         stableIdSchemeCutover,
         schedulerDecision,
         schedulerDeferReason,
@@ -38621,8 +38918,32 @@ function registerPiContextHandler(pi, baseOptions) {
         readBranchEntries: resolvePiReadBranchEntries(ctx),
         isSubagent: sessionMeta.isSubagent,
         compactionOff: options.compactionOff === true,
-        injectionPassSnapshot: piM0M1PassSnapshot
-      }));
+        injectionPassSnapshot: piM0M1PassSnapshot,
+        readLastServedMessages: () => {
+          const serialized = getPiLastServedArray(sessionId);
+          try {
+            return serialized ? JSON.parse(serialized) : null;
+          } catch {
+            return null;
+          }
+        },
+        tryReplayHeldIdentityRebuild: () => {
+          const replay = lkgCoordinator.replay(snapshot, (id) => ctx.sessionManager.getEntry?.(id)?.parentId);
+          if (!replay.ok) {
+            sessionLog2(sessionId, `Pi held identity rebuild: prior prefix unavailable (${replay.reason}); applying the declared rebuild`);
+            return;
+          }
+          try {
+            assertPiRawFallbackFits(replay.messages, rawFallbackLimit, (line) => logPiLkgRecovery(sessionId, line), undefined, readPiLkgFitEnvelope(ctx, pi, lkgModelKey, sessionDecisionCalibration(options.db, sessionId), toolWireSchema), replay.measuredPrefix);
+          } catch (error) {
+            sessionLog2(sessionId, `Pi held identity rebuild: prior prefix cannot fit (${String(error)}); applying the declared rebuild`);
+            return;
+          }
+          logPiLkgRecovery(sessionId, "Pi held identity rebuild: replaying the served prefix and retaining the pending repair");
+          throw new PiLkgAdmissionReplay(replay.messages, "held tag-identity rebuild: replaying the served prefix");
+        }
+      };
+      let result = await budget.waitMandatory(runPipeline(pipelineArgs));
       logTransformTiming(sessionId, "runPipeline", tRunPipeline);
       if (result.identityRebuilt)
         schedulerDecision = "execute";
@@ -38724,7 +39045,7 @@ function registerPiContextHandler(pi, baseOptions) {
             projectIdentity,
             entryIds: strictEntryIds,
             entryIdByRef: result.postCommitEntryIdByRef,
-            isCacheBusting: isCacheBusting || result.executedWorkThisPass,
+            isCacheBusting: result.prefixBustPermitted && !result.strictThinkingKept,
             syntheticLeadingCount: result.syntheticLeadingCount,
             postTransformSnapshot
           });
@@ -38735,7 +39056,7 @@ function registerPiContextHandler(pi, baseOptions) {
       logTransformTiming(sessionId, "noteNudges", tNoteNudges);
       const tAutoSearch = performance.now();
       budget.stage = "auto-search";
-      if (options.autoSearch?.enabled && !options.compactionOff && !reduced && budget.remainingWork() > PI_CONTEXT_BUDGET.searchMs) {
+      if (options.autoSearch?.enabled && !options.compactionOff && result.prefixMutationAllowed && !reduced && budget.remainingWork() > PI_CONTEXT_BUDGET.searchMs) {
         guardSqliteTransformPass2({
           assert: budget.assert,
           remainingMs: () => budget.remainingWork()
@@ -38774,7 +39095,7 @@ function registerPiContextHandler(pi, baseOptions) {
       try {
         const sessionMetaForTodo = sessionMeta;
         if (options.todowriteEnabled === true && !options.compactionOff && !sessionMetaForTodo.isSubagent && sessionMetaForTodo.lastTodoState !== "") {
-          const isCacheBustingForTodo = isCacheBusting || result.executedWorkThisPass;
+          const isCacheBustingForTodo = result.prefixBustPermitted && !result.strictThinkingKept;
           outputMessages = injectSyntheticTodowriteForPi({
             db: options.db,
             sessionId,
@@ -38795,7 +39116,7 @@ function registerPiContextHandler(pi, baseOptions) {
         hostEditBeforeNewestThinking = stickyBefore === null || [...stickyAfter].some((key) => !stickyBefore.has(key)) || JSON.stringify(getPersistedTodoSyntheticAnchor(options.db, sessionId)) !== todoAnchorBefore;
       } catch {}
       const outputEntryIds = resolvePiLkgOutputEntryIds(outputMessages, result.syntheticLeadingCount, (message) => result.lkgEntryIdByRef.get(message) ?? result.postCommitEntryIdByRef.get(message) ?? bindingEntryIdByRef.get(message)).map((entryId) => entryId ?? undefined);
-      const thinkingBindingRecoveryApplied = bindingStripOrder === "end" ? applyPiThinkingBindingRecovery({
+      const thinkingBindingRecoveryApplied = bindingStripOrder === "end" && !result.signedPrefixRewritten ? applyPiThinkingBindingRecovery({
         db: options.db,
         sessionId,
         messages: outputMessages,
@@ -38817,7 +39138,8 @@ function registerPiContextHandler(pi, baseOptions) {
             entryIds: outputEntryIds,
             provider: lkgProviderKey ?? undefined,
             model: ctx.model?.id,
-            cacheBustingPass: isCacheBusting || result.executedWorkThisPass && (result.prefixEditBesidesReasoningTrim || hostEditBeforeNewestThinking),
+            cacheBustingPass: result.signedPrefixRewritten || result.prefixBustPermitted && !result.strictThinkingKept && (isCacheBusting || result.prefixRebuildAlreadyPriced || result.executedWorkThisPass && (result.prefixEditBesidesReasoningTrim || hostEditBeforeNewestThinking)),
+            stripActiveTurn: result.signedPrefixRewritten,
             report: (line) => sessionLog2(sessionId, line)
           });
         } catch (err) {
@@ -38837,11 +39159,12 @@ function registerPiContextHandler(pi, baseOptions) {
           const baseline = refreshPiTailHygieneBaseline({
             messages: outputMessages,
             tags,
+            tagCacheKey: result.channelBaselineSnapshot.tagCacheKey,
             protectedTagNumbers,
             protectedTools: options.protectedTools,
             pendingDropTagNumbers,
             stableId,
-            protectedToolTags: protectedToolTagNumbers(tags, options.protectedTools),
+            protectedToolTags: protectedToolTagNumbers(result.channelBaselineSnapshot.activeTags, options.protectedTools),
             syntheticLeadingCount: result.syntheticLeadingCount,
             cacheBusting: result.bustedThisPass,
             previous: previousBaseline,
@@ -38862,14 +39185,7 @@ function registerPiContextHandler(pi, baseOptions) {
           const channelState = {
             ...baseline,
             usableWindow: usageContextLimit ?? 0,
-            realUserTurnCount: countRealPiUserMessages({
-              messages: outputMessages,
-              tags,
-              protectedTagNumbers,
-              pendingDropTagNumbers,
-              stableId,
-              syntheticLeadingCount: result.syntheticLeadingCount
-            }),
+            realUserTurnCount: baseline.realUserTurnCount,
             reducedSinceRefresh: false,
             agentDropsAppliedThisPass: result.agentDropsAppliedThisPass,
             oldestReclaimableToolTags
@@ -38952,7 +39268,34 @@ function registerPiContextHandler(pi, baseOptions) {
       runPiDebugAssertion(assertTailHygieneLastWriter);
       if (!options.compactionOff && (result.executedWorkThisPass || isCacheBusting || schedulerDecision === "execute")) {
         const envelope = readPiLkgFitEnvelope(ctx, pi, resolvePiContextModelKey(ctx), sessionDecisionCalibration(options.db, sessionId), toolWireSchema);
-        const estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, lkgPassSnapshot ? lkgCoordinator.measureOutgoingPrefix(lkgPassSnapshot, outputMessages, (id) => ctx.sessionManager.getEntry?.(id)?.parentId) : undefined, rawFallbackLimit);
+        let estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, lkgPassSnapshot ? lkgCoordinator.measureOutgoingPrefix(lkgPassSnapshot, outputMessages, (id) => ctx.sessionManager.getEntry?.(id)?.parentId) : undefined, rawFallbackLimit);
+        if (inputForThinkingFit && result.strictThinkingKept && rawFallbackLimit && estimate.refusalGrade && (estimate.refusalTokens ?? estimate.tokens) > rawFallbackLimit) {
+          result = await budget.waitMandatory(runPipeline({
+            ...pipelineArgs,
+            messages: inputForThinkingFit,
+            forceSignedRebuildForFit: true,
+            forceMaterialization: true,
+            contextUsage: {
+              ...pipelineArgs.contextUsage,
+              percentage: Math.max(95, pipelineArgs.contextUsage.percentage)
+            }
+          }));
+          outputMessages = result.messages;
+          const retryIds = resolvePiLkgOutputEntryIds(outputMessages, result.syntheticLeadingCount, (message) => result.lkgEntryIdByRef.get(message) ?? result.postCommitEntryIdByRef.get(message));
+          applyPiProactiveThinkingStrip({
+            db: options.db,
+            sessionId,
+            messages: outputMessages,
+            entryIds: retryIds.map((id) => id ?? undefined),
+            provider: ctx.model?.provider,
+            model: ctx.model?.id,
+            cacheBustingPass: true,
+            stripActiveTurn: true
+          });
+          estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, undefined, rawFallbackLimit);
+        }
+        if (result.signedPrefixRewritten && rawFallbackLimit && estimate.refusalGrade && (estimate.refusalTokens ?? estimate.tokens) > rawFallbackLimit)
+          throw contextRefusalError("The request remains over the model window after stripping signed thinking and reclaiming context");
         const refusal = outgoingContextRefusal(estimate, rawFallbackLimit, protectedToolTokenCount(getActiveTagsBySession2(options.db, sessionId), options.protectedTools, envelope ? calibrationForModelKey(envelope.modelKey) : undefined));
         if (refusal)
           throw contextRefusalError(refusal);
@@ -39050,7 +39393,7 @@ function registerPiContextHandler(pi, baseOptions) {
             assertCurrentPass: budget.assertOutcome
           });
         budget.assertOutcome();
-        budget.recovery = "fitting LKG before writer retries";
+        budget.recovery = err.recovery;
         return { messages: err.messages };
       }
       if ((isFailClosedBlockingError(err) || err instanceof EmergencyFailClosedError) && !baseOptions.compactionOff)
@@ -39700,6 +40043,11 @@ async function runCompactionOffPipeline(args) {
   }
   return {
     messages: args.messages,
+    prefixBustPermitted: false,
+    prefixMutationAllowed: false,
+    strictThinkingKept: false,
+    signedPrefixRewritten: false,
+    prefixRebuildAlreadyPriced: false,
     heuristicsExecuted: false,
     executedWorkThisPass: false,
     historyInjected: false,
@@ -39719,6 +40067,7 @@ async function runCompactionOffPipeline(args) {
     activeTags: [],
     channelBaselineSnapshot: {
       tags: [],
+      activeTags: [],
       protectedTagNumbers: new Set,
       pendingDropTagNumbers: new Set
     },
@@ -39740,8 +40089,31 @@ async function runPipeline(args) {
   if (thinkingRecovery.ended)
     signalPiPendingMaterialization(args.sessionId);
   let restoreOriginals;
-  const activeThinkingTurn = hasActiveAnthropicThinkingTurn(args.messages, args.resolvedProviderID, args.resolvedModelID);
-  const protectedSignedPrefix = activeThinkingTurn && args.reasoningClearing?.prefixBound === true;
+  let activeThinkingTurn = hasActiveAnthropicThinkingTurn(args.messages, args.resolvedProviderID, args.resolvedModelID);
+  let protectedSignedPrefix = activeThinkingTurn && args.reasoningClearing?.prefixBound === true;
+  let rewritingSignedPrefix = false;
+  let workingForRewrite;
+  const stripForPrefixRewrite = () => {
+    const messages = workingForRewrite ?? args.messages;
+    const result = applyPiProactiveThinkingStrip({
+      db: args.db,
+      sessionId: args.sessionId,
+      messages,
+      entryIds: messages.map((message, index) => resolvePiStableId(message, index, args.entryIds, args.entryIdByRef ?? undefined)),
+      provider: args.resolvedProviderID,
+      model: args.resolvedModelID,
+      cacheBustingPass: true,
+      stripActiveTurn: true,
+      persistOnly: true
+    });
+    if (activeThinkingTurn && !result)
+      throw new Error("Cannot persist signed thinking omission before prefix rewrite");
+    rewritingSignedPrefix = true;
+    activeThinkingTurn = false;
+    protectedSignedPrefix = false;
+  };
+  if (args.forceSignedRebuildForFit && protectedSignedPrefix)
+    stripForPrefixRewrite();
   const realStableId = (msg, index) => resolvePiRealStableId(msg, index, args.entryIds, args.entryIdByRef ?? undefined);
   const passFallbackIds = settlePiFallbackOccurrences(args.db, args.sessionId, piContentFallbackIds(args.messages, realStableId));
   const stableIdResolver = (msg, index) => realStableId(msg, index) ?? passFallbackIds[index] ?? resolvePiStableId(msg, index);
@@ -39816,6 +40188,105 @@ async function runPipeline(args) {
   let casLost = false;
   let injectionPassSnapshot = args.injectionPassSnapshot;
   const deferredHistoryWasPendingAtPassStart = deferredHistoryRefreshSessions.has(args.sessionId);
+  const piHardSignals = args.injection ? (() => {
+    const hardMeta = args.sessionMeta;
+    let piTtlMs = 5 * 60 * 1000;
+    try {
+      piTtlMs = parseCacheTtl(hardMeta.cacheTtl);
+    } catch {}
+    return {
+      systemHash: typeof hardMeta.systemPromptHash === "string" ? hardMeta.systemPromptHash : "",
+      modelKey: liveModelBySession.get(args.sessionId) ?? "",
+      cacheExpired: isPiHardCacheExpired(hardMeta.lastResponseTime, piTtlMs, Date.now()),
+      lastResponseTime: hardMeta.lastResponseTime
+    };
+  })() : undefined;
+  const emergencyDropEligible = args.forceMaterialization === true || args.contextUsage.percentage >= forceMaterializationPercentage;
+  const piM0State = args.injection && piHardSignals ? {
+    sessionId: args.sessionId,
+    projectIdentity: args.projectIdentity,
+    projectDirectory: args.projectDirectory,
+    memoryEnabled: args.injection.memoryEnabled,
+    injectDocs: args.injection.injectDocs,
+    injectionBudgetTokens: args.injection.injectionBudgetTokens,
+    historyBudgetTokens: args.injection.historyBudgetTokens,
+    historyBudgetPolicyIdentity: args.injection.historyBudgetPolicyIdentity,
+    hardSignals: piHardSignals,
+    muralEnabled: args.injection.muralEnabled === true,
+    freezePrefixForPass: true,
+    allowFreshContentionFallback: args.forceMaterialization === true || emergencyDropEligible
+  } : undefined;
+  const foldDueDecision = piM0State ? mustMaterializePi(piM0State, args.db, injectionPassSnapshot?.compartments, injectionPassSnapshot) : { value: false, reason: null };
+  const firstRenderBust = piM0State !== undefined && !(injectionPassSnapshot?.cachedRow?.cached_m0_bytes && injectionPassSnapshot.cachedRow.cached_m1_bytes);
+  let foldExecutedThisPass = false;
+  let foldBustsServedPrefixThisPass = false;
+  let publishedM1RefreshedThisPass = false;
+  let prefixPreflightContended = false;
+  const softRefreshOpportunity = args.schedulerDecision === "execute";
+  const cachedPrefixBeforePreflight = piM0State && (foldDueDecision.value || softRefreshOpportunity) && !emergencyDropEligible ? prepareCachedM0M1PiReplay(piM0State, args.db, injectionPassSnapshot?.cachedRow) : undefined;
+  let preFoldInjectionResult = null;
+  const persistedM0BeforeFold = injectionPassSnapshot?.sessionMeta ?? args.sessionMeta;
+  const m0CoverageBeforeFold = persistedM0BeforeFold.cachedM0Bytes === null ? -1 : persistedM0BeforeFold.cachedM0MaxCompartmentSeq;
+  if (protectedSignedPrefix && !firstRenderBust && piM0State) {
+    piM0State.preparedPrefix = prepareCachedM0M1PiReplay(piM0State, args.db, injectionPassSnapshot?.cachedRow);
+  }
+  if ((!protectedSignedPrefix || firstRenderBust) && (foldDueDecision.value || softRefreshOpportunity) && piM0State) {
+    try {
+      preFoldInjectionResult = injectM0M1PiForRun(piM0State, args.db, [], undefined, softRefreshOpportunity, injectionPassSnapshot);
+      if (protectedSignedPrefix && firstRenderBust) {
+        const candidate = getOrCreateSessionMeta(args.db, args.sessionId);
+        if (!servedPrefixMatches({
+          messages: args.readLastServedMessages?.(),
+          m0Text: candidate.cachedM0Bytes?.toString(),
+          m1Text: candidate.cachedM1Bytes?.toString(),
+          muralDataUrl: candidate.cachedM0MuralDataUrl
+        }))
+          stripForPrefixRewrite();
+      }
+      prefixPreflightContended = preFoldInjectionResult.contentionExhausted === true;
+      publishedM1RefreshedThisPass = !prefixPreflightContended && persistedM0BeforeFold.cachedM1Bytes?.toString("utf8") !== getOrCreateSessionMeta(args.db, args.sessionId).cachedM1Bytes?.toString("utf8");
+      foldExecutedThisPass = foldExecutesThisPass(foldDueDecision.value || softRefreshOpportunity, preFoldInjectionResult.m0Materialized === true);
+      if (foldExecutedThisPass) {
+        const afterFold = getOrCreateSessionMeta(args.db, args.sessionId);
+        foldBustsServedPrefixThisPass = !protectedSignedPrefix && foldBustsServedPrefix(foldDueDecision.reason, {
+          m0Bytes: persistedM0BeforeFold.cachedM0Bytes ?? null,
+          m1Bytes: persistedM0BeforeFold.cachedM1Bytes ?? null,
+          muralDataUrl: persistedM0BeforeFold.cachedM0MuralDataUrl ?? null
+        }, {
+          m0Bytes: afterFold.cachedM0Bytes ?? null,
+          m1Bytes: afterFold.cachedM1Bytes ?? null,
+          muralDataUrl: afterFold.cachedM0MuralDataUrl ?? null
+        });
+      }
+      if (preFoldInjectionResult.m0Materialized) {
+        injectionPassSnapshot = createPiM0M1PassSnapshot({
+          db: args.db,
+          sessionId: args.sessionId,
+          compactionOff: false,
+          compartments: injectionPassSnapshot?.compartments
+        });
+      }
+      const m0CoverageAfterFold = injectionPassSnapshot?.sessionMeta.cachedM0MaxCompartmentSeq ?? m0CoverageBeforeFold;
+      try {
+        rearmChannel2AfterCoverageAdvancingHardFold({
+          db: args.db,
+          sessionId: args.sessionId,
+          foldExecuted: foldExecutedThisPass,
+          compactionOff: false,
+          previousCoverage: m0CoverageBeforeFold,
+          currentCoverage: m0CoverageAfterFold
+        });
+      } catch (error) {
+        sessionLog2(args.sessionId, `pi channel2 fold-cycle reset failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } catch (error) {
+      piM0State.preparedPrefix = cachedPrefixBeforePreflight;
+      prefixPreflightContended = true;
+      sessionLog2(args.sessionId, `pi m[0] HARD fold pre-execution failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const mismatch = foldDueDecision.mismatch ? ` mismatch=${JSON.stringify(foldDueDecision.mismatch)}` : "";
+    sessionLog2(args.sessionId, `pi m[0] HARD fold decision: reason=${preFoldInjectionResult?.m0Reason ?? foldDueDecision.reason ?? "soft_refresh"}${mismatch} executed=${foldExecutedThisPass} bustsServedPrefix=${foldBustsServedPrefixThisPass}`);
+  }
   const temporalCandidates = args.temporalAwareness ? collectPiTemporalCandidates(args.messages, args.entryIds ?? []) : new Map;
   for (const entry of readPiIdentityDecisions(args.db, args.sessionId) ?? []) {
     const decision = decodePiContentDecision(entry);
@@ -39859,6 +40330,7 @@ async function runPipeline(args) {
   });
   logTransformTiming(args.sessionId, "transcriptBuild", tTranscriptBuild);
   const workingMessages = transcript.getWorkingMessages();
+  workingForRewrite = workingMessages;
   const currentTurnId = (() => {
     const ids = buildPiMessageIdByIndex(args.messages, args.entryIds ?? null);
     return findLatestUserMessageIdPi(args.messages, ids)?.messageId ?? null;
@@ -39866,96 +40338,7 @@ async function runPipeline(args) {
   const alreadyRanHeuristicsThisTurn = currentTurnId !== null && lastHeuristicsTurnIdBySession.get(args.sessionId) === currentTurnId;
   const ctxReduceCallable = !args.sessionMeta.isSubagent;
   const canConsumeDeferredLate = args.schedulerDecision === "execute" || args.forceMaterialization === true || args.contextUsage.percentage >= forceMaterializationPercentage;
-  const deferredMaterializeEligible = canConsumeDeferredLate && deferredMaterializationSessions.has(args.sessionId);
-  const piHardSignals = args.injection ? (() => {
-    const hardMeta = args.sessionMeta;
-    let piTtlMs = 5 * 60 * 1000;
-    try {
-      piTtlMs = parseCacheTtl(hardMeta.cacheTtl);
-    } catch {}
-    return {
-      systemHash: typeof hardMeta.systemPromptHash === "string" ? hardMeta.systemPromptHash : "",
-      modelKey: liveModelBySession.get(args.sessionId) ?? "",
-      cacheExpired: isPiHardCacheExpired(hardMeta.lastResponseTime, piTtlMs, Date.now()),
-      lastResponseTime: hardMeta.lastResponseTime
-    };
-  })() : undefined;
-  const emergencyDropEligible = args.forceMaterialization === true || args.contextUsage.percentage >= forceMaterializationPercentage;
-  const piM0State = args.injection && piHardSignals ? {
-    sessionId: args.sessionId,
-    projectIdentity: args.projectIdentity,
-    projectDirectory: args.projectDirectory,
-    memoryEnabled: args.injection.memoryEnabled,
-    injectDocs: args.injection.injectDocs,
-    injectionBudgetTokens: args.injection.injectionBudgetTokens,
-    historyBudgetTokens: args.injection.historyBudgetTokens,
-    historyBudgetPolicyIdentity: args.injection.historyBudgetPolicyIdentity,
-    hardSignals: piHardSignals,
-    muralEnabled: args.injection.muralEnabled === true,
-    freezePrefixForPass: true,
-    allowFreshContentionFallback: args.forceMaterialization === true || emergencyDropEligible
-  } : undefined;
-  const foldDueDecision = piM0State ? mustMaterializePi(piM0State, args.db, injectionPassSnapshot?.compartments, injectionPassSnapshot) : { value: false, reason: null };
-  const firstRenderBust = piM0State !== undefined && !(injectionPassSnapshot?.cachedRow?.cached_m0_bytes && injectionPassSnapshot.cachedRow.cached_m1_bytes);
-  let foldExecutedThisPass = false;
-  let foldBustsServedPrefixThisPass = false;
-  let publishedM1RefreshedThisPass = false;
-  let prefixPreflightContended = false;
-  const softRefreshOpportunity = args.schedulerDecision === "execute";
-  const cachedPrefixBeforePreflight = piM0State && (foldDueDecision.value || softRefreshOpportunity) && !emergencyDropEligible ? prepareCachedM0M1PiReplay(piM0State, args.db, injectionPassSnapshot?.cachedRow) : undefined;
-  let preFoldInjectionResult = null;
-  const persistedM0BeforeFold = injectionPassSnapshot?.sessionMeta ?? args.sessionMeta;
-  const m0CoverageBeforeFold = persistedM0BeforeFold.cachedM0Bytes === null ? -1 : persistedM0BeforeFold.cachedM0MaxCompartmentSeq;
-  if (protectedSignedPrefix && piM0State) {
-    piM0State.preparedPrefix = prepareCachedM0M1PiReplay(piM0State, args.db, injectionPassSnapshot?.cachedRow);
-  }
-  if (!protectedSignedPrefix && (foldDueDecision.value || softRefreshOpportunity) && piM0State) {
-    try {
-      preFoldInjectionResult = injectM0M1PiForRun(piM0State, args.db, [], undefined, softRefreshOpportunity, injectionPassSnapshot);
-      prefixPreflightContended = preFoldInjectionResult.contentionExhausted === true;
-      publishedM1RefreshedThisPass = !prefixPreflightContended && persistedM0BeforeFold.cachedM1Bytes?.toString("utf8") !== getOrCreateSessionMeta(args.db, args.sessionId).cachedM1Bytes?.toString("utf8");
-      foldExecutedThisPass = foldExecutesThisPass(foldDueDecision.value || softRefreshOpportunity, preFoldInjectionResult.m0Materialized === true);
-      if (foldExecutedThisPass) {
-        const afterFold = getOrCreateSessionMeta(args.db, args.sessionId);
-        foldBustsServedPrefixThisPass = foldBustsServedPrefix(foldDueDecision.reason, {
-          m0Bytes: persistedM0BeforeFold.cachedM0Bytes ?? null,
-          m1Bytes: persistedM0BeforeFold.cachedM1Bytes ?? null,
-          muralDataUrl: persistedM0BeforeFold.cachedM0MuralDataUrl ?? null
-        }, {
-          m0Bytes: afterFold.cachedM0Bytes ?? null,
-          m1Bytes: afterFold.cachedM1Bytes ?? null,
-          muralDataUrl: afterFold.cachedM0MuralDataUrl ?? null
-        });
-      }
-      if (preFoldInjectionResult.m0Materialized) {
-        injectionPassSnapshot = createPiM0M1PassSnapshot({
-          db: args.db,
-          sessionId: args.sessionId,
-          compactionOff: false,
-          compartments: injectionPassSnapshot?.compartments
-        });
-      }
-      const m0CoverageAfterFold = injectionPassSnapshot?.sessionMeta.cachedM0MaxCompartmentSeq ?? m0CoverageBeforeFold;
-      try {
-        rearmChannel2AfterCoverageAdvancingHardFold({
-          db: args.db,
-          sessionId: args.sessionId,
-          foldExecuted: foldExecutedThisPass,
-          compactionOff: false,
-          previousCoverage: m0CoverageBeforeFold,
-          currentCoverage: m0CoverageAfterFold
-        });
-      } catch (error) {
-        sessionLog2(args.sessionId, `pi channel2 fold-cycle reset failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    } catch (error) {
-      piM0State.preparedPrefix = cachedPrefixBeforePreflight;
-      prefixPreflightContended = true;
-      sessionLog2(args.sessionId, `pi m[0] HARD fold pre-execution failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-    const mismatch = foldDueDecision.mismatch ? ` mismatch=${JSON.stringify(foldDueDecision.mismatch)}` : "";
-    sessionLog2(args.sessionId, `pi m[0] HARD fold decision: reason=${preFoldInjectionResult?.m0Reason ?? foldDueDecision.reason ?? "soft_refresh"}${mismatch} executed=${foldExecutedThisPass} bustsServedPrefix=${foldBustsServedPrefixThisPass}`);
-  }
+  let deferredMaterializeEligible = canConsumeDeferredLate && deferredMaterializationSessions.has(args.sessionId) && !protectedSignedPrefix;
   const executePressureEligible = args.schedulerDecision === "execute" || emergencyDropEligible;
   if (!executePressureEligible) {
     routinePressureAppliedBySession.delete(args.sessionId);
@@ -39963,21 +40346,17 @@ async function runPipeline(args) {
     routinePressureAppliedBySession.set(args.sessionId, true);
   }
   const routinePressureAlreadyApplied = !args.sessionMeta.isSubagent && executePressureEligible && routinePressureAppliedBySession.get(args.sessionId) === true;
-  const hasPendingMaterializeSignal = hasPendingMaterialization(args.sessionId);
+  let hasPendingMaterializeSignal = !protectedSignedPrefix && hasPendingMaterialization(args.sessionId);
+  const heldIdleExpiryRebuild = protectedSignedPrefix && piHardSignals?.cacheExpired === true;
   const rideSignals = {
     subagentExecute: args.sessionMeta.isSubagent && args.schedulerDecision === "execute",
-    hardFold: foldBustsServedPrefixThisPass || firstRenderBust,
+    hardFold: foldBustsServedPrefixThisPass || firstRenderBust || heldIdleExpiryRebuild,
     force: (args.forceMaterialization === true || emergencyDropEligible) && (args.contextUsage.percentage >= 95 || getEmergencyInputSample(args.db, args.sessionId) === 0),
     explicitFlush: hasPendingMaterializeSignal || deferredMaterializeEligible && !prefixPreflightContended,
     publishedHistory: !prefixPreflightContended && (args.isCacheBusting || publishedM1RefreshedThisPass || canConsumeDeferredLate && deferredHistoryWasPendingAtPassStart)
   };
-  let isCacheBustingPass = hasReclaimRide(rideSignals);
-  if (args.temporalAwareness && isCacheBustingPass) {
-    temporalDecisions = freezeTemporalDecisions(args.db, args.sessionId, temporalCandidates);
-    if (injectPiTemporalMarkers(args.messages, temporalDecisions, stableIdResolver) > 0) {
-      recordFirstApplicationWireEdit(true);
-    }
-  }
+  let prefixMutationAllowed = !protectedSignedPrefix || firstRenderBust || heldIdleExpiryRebuild || emergencyDropEligible;
+  let isCacheBustingPass = prefixMutationAllowed && hasReclaimRide(rideSignals);
   let publishedWorkDrainAllowed = isCacheBustingPass;
   const usesTokenProtection = args.protectedTokenTierOverrides !== undefined || args.protectedTokens !== undefined;
   const resolveProtectionFloor = () => resolveEpochFloorForPass(args.db, args.sessionId, {
@@ -39988,44 +40367,99 @@ async function runPipeline(args) {
     onRejectedProjectOverride: (warning) => sessionLog2(args.sessionId, warning)
   });
   let protectionFloorResolution = resolveProtectionFloor();
-  const shouldRunHeuristics = args.heuristics !== undefined && isCacheBustingPass && (rideSignals.publishedHistory || args.forceMaterialization === true || hasPendingMaterializeSignal || deferredMaterializeEligible || foldBustsServedPrefixThisPass || firstRenderBust || rideSignals.subagentExecute || args.schedulerDecision === "execute" && !alreadyRanHeuristicsThisTurn);
+  let shouldRunHeuristics = args.heuristics !== undefined && isCacheBustingPass && (rideSignals.publishedHistory || args.forceMaterialization === true || hasPendingMaterializeSignal || deferredMaterializeEligible || foldBustsServedPrefixThisPass || firstRenderBust || heldIdleExpiryRebuild || rideSignals.subagentExecute || args.schedulerDecision === "execute" && !alreadyRanHeuristicsThisTurn);
+  let unavoidableCarriedIdentityRebuild = false;
+  if (protectedSignedPrefix && readPiIdentityRebuilds(args.db, args.sessionId).length > 0) {
+    args.tryReplayHeldIdentityRebuild?.();
+    stripForPrefixRewrite();
+    unavoidableCarriedIdentityRebuild = true;
+    prefixMutationAllowed = true;
+    args.tagger.cleanup(args.sessionId);
+    args.tagger.initFromDb(args.sessionId, args.db);
+  }
+  const tTagSnapshotSync = performance.now();
+  readPiFallbackTagRows(args.db, args.sessionId);
+  logTransformTiming(args.sessionId, "tagSnapshotSync", tTagSnapshotSync);
   const tFallbackIdentity = performance.now();
   const preflightRevision = readPiAdoptionRevision(args.db);
   const hasFallbackMessageTags = hasPiFallbackMessageTags(args.db, args.sessionId);
-  const entryFingerprintByMessageId = buildEntryFingerprintMap(args.messages, stableIdResolver, args.reusableMessageIds, hasFallbackMessageTags, hasFallbackMessageTags ? readPiFallbackFingerprintHeaders(args.db, args.sessionId) : undefined);
+  let fallbackCache = piFallbackIndexesBySession.get(args.sessionId);
+  if (!fallbackCache || fallbackCache.db !== args.db) {
+    fallbackCache = { db: args.db, index: createPiFallbackIndex() };
+    piFallbackIndexesBySession.set(args.sessionId, fallbackCache);
+  }
+  const fallbackIndex = fallbackCache.index.update({
+    messages: args.messages,
+    fields: args.fallbackInputFields,
+    resolveId: stableIdResolver,
+    header: piMessageEntryFingerprintHeader,
+    fingerprint: piMessageEntryFingerprint2,
+    toolOwners: (message, id) => buildPiToolOwnerMap([message], () => id),
+    reusable: args.reusableMessageIds
+  });
+  const entryFingerprintByMessageId = fallbackIndex.fingerprints(hasFallbackMessageTags ? readPiFallbackFingerprintHeaders(args.db, args.sessionId) : undefined);
   args.assertCurrentPass?.();
   const identityAdoption = adoptPiFallbackTags(args.db, args.sessionId, args.tagger, entryFingerprintByMessageId, {
     allowUnprovenRebuild: true,
+    deferUnprovenRebuild: !prefixMutationAllowed,
     messages: args.messages,
     resolveStableId: stableIdResolver,
+    toolOwners: fallbackIndex.owners,
+    realIdPositions: fallbackIndex.positions,
     hasFallbackMessageTags,
     preflightRevision,
     rebuildFingerprints: args.reusableMessageIds?.size ? () => {
       args.assertCurrentPass?.();
-      const full = buildEntryFingerprintMap(args.messages, stableIdResolver, args.reusableMessageIds, true, readPiFallbackFingerprintHeaders(args.db, args.sessionId));
+      const full = fallbackIndex.fingerprints(readPiFallbackFingerprintHeaders(args.db, args.sessionId));
       for (const [id, fingerprint] of full)
         entryFingerprintByMessageId.set(id, fingerprint);
       return entryFingerprintByMessageId;
     } : undefined
   });
-  const identityRebuild = identityAdoption.rebuilds.length > 0;
+  let identityRebuild = unavoidableCarriedIdentityRebuild || identityAdoption.rebuilds.length > 0;
   if (identityRebuild) {
+    if (!prefixMutationAllowed) {
+      if (!unavoidableCarriedIdentityRebuild) {
+        args.tryReplayHeldIdentityRebuild?.();
+        stripForPrefixRewrite();
+        args.tagger.cleanup(args.sessionId);
+        args.tagger.initFromDb(args.sessionId, args.db);
+      }
+      prefixMutationAllowed = true;
+    }
     args.schedulerDecision = "execute";
-    isCacheBustingPass = true;
-    publishedWorkDrainAllowed = true;
-    if (piM0State) {
-      clearM0M1PiCache(args.db, args.sessionId, PI_TAG_IDENTITY_REPAIR_REASON);
-      piM0State.preparedPrefix = undefined;
-      piM0State.freezePrefixForPass = false;
-      injectionPassSnapshot = createPiM0M1PassSnapshot({
-        db: args.db,
-        sessionId: args.sessionId,
-        compactionOff: false
-      });
+    hasPendingMaterializeSignal = hasPendingMaterialization(args.sessionId);
+    deferredMaterializeEligible = canConsumeDeferredLate && deferredMaterializationSessions.has(args.sessionId);
+    isCacheBustingPass = prefixMutationAllowed;
+    publishedWorkDrainAllowed = isCacheBustingPass;
+    shouldRunHeuristics = args.heuristics !== undefined;
+    if (piM0State && prefixMutationAllowed) {
+      try {
+        clearM0M1PiCache(args.db, args.sessionId, PI_TAG_IDENTITY_REPAIR_REASON);
+        piM0State.preparedPrefix = undefined;
+        piM0State.freezePrefixForPass = false;
+        injectionPassSnapshot = createPiM0M1PassSnapshot({
+          db: args.db,
+          sessionId: args.sessionId,
+          compactionOff: false
+        });
+      } catch (error) {
+        if (claimPiIdentityRebuildFailure(args.db, args.sessionId) === "first")
+          throw error;
+        identityRebuild = false;
+        piM0State.preparedPrefix ??= prepareCachedM0M1PiReplay(piM0State, args.db, injectionPassSnapshot?.cachedRow);
+        piM0State.freezePrefixForPass = true;
+        sessionLog2(args.sessionId, "Pi identity rebuild failed again; serving with the repair still pending");
+      }
     }
   }
+  if (args.temporalAwareness && isCacheBustingPass && !protectedSignedPrefix) {
+    temporalDecisions = freezeTemporalDecisions(args.db, args.sessionId, temporalCandidates);
+    if (injectPiTemporalMarkers(args.messages, temporalDecisions, stableIdResolver) > 0)
+      recordFirstApplicationWireEdit(true);
+  }
   logPiUnresolvedIdentities(args.sessionId, [
-    ...guardPiToolAllocations(args.db, args.sessionId, args.messages, stableIdResolver, args.tagger),
+    ...guardPiToolAllocations(args.db, args.sessionId, args.messages, stableIdResolver, args.tagger, fallbackIndex.guardIndexes),
     ...guardPiMessageAllocations(args.db, args.sessionId, entryFingerprintByMessageId)
   ]);
   logTransformTiming(args.sessionId, "fallbackIdentityAndAdoption", tFallbackIdentity);
@@ -40070,26 +40504,45 @@ async function runPipeline(args) {
   const frozenThinkingForProtection = activeThinkingTurn ? frozenBindingEntryIds(args.db, args.sessionId) : new Set;
   const protectedThinkingProxies = new Set;
   if (activeThinkingTurn) {
-    for (let i = latestAssistantTurnStart(workingMessages);i < mutationView.length; i++) {
-      const id = stableIdResolver(workingMessages[i], i);
+    const rawById = new Map(workingMessages.map((message, index) => [
+      stableIdResolver(message, index),
+      message
+    ]));
+    for (let i = latestAssistantTurnStart(mutationView);i < mutationView.length; i++) {
+      const id = mutationView[i].info.id;
       if (!thinkingRecovery.restore && id && frozenThinkingForProtection.has(id))
         continue;
       for (let p = 0;p < mutationView[i].parts.length; p++) {
         const part = mutationView[i].parts[p];
         if (part.kind !== "thinking")
           continue;
-        const local = workingMessages[i].content?.[p];
-        if (!thinkingRecovery.restore && !local?.redacted && id && (reasoningTagsForProtection.get(id) ?? Infinity) <= (args.sessionMeta.clearedReasoningThroughTag ?? 0))
+        const raw = rawById.get(id);
+        const redacted = raw?.content?.some((part) => part.redacted === true);
+        if (!thinkingRecovery.restore && !redacted && id && (reasoningTagsForProtection.get(id) ?? Infinity) <= (args.sessionMeta.clearedReasoningThroughTag ?? 0))
           continue;
         protectedThinkingProxies.add(part);
       }
     }
   }
-  const newTargets = new Map(protectNewTagMutations(mutationView.map((message) => ({
+  let newTargets = new Map(protectNewTagMutations(mutationView.map((message) => ({
     info: message.info,
     parts: message.parts
   })), targets, protectedThinkingProxies, args.reasoningClearing?.prefixBound === true));
+  if (protectedSignedPrefix && args.contextUsage.percentage >= 95) {
+    const candidates = getActiveTagsBySession2(args.db, args.sessionId).filter((tag) => tag.type === "tool" && targets.get(tag.tagNumber)?.canDrop?.());
+    if (candidates.length > 0 && candidates.every((tag) => newTargets.get(tag.tagNumber)?.thinkingRewriteProtected === true)) {
+      stripForPrefixRewrite();
+      newTargets = targets;
+      prefixMutationAllowed = true;
+      isCacheBustingPass = true;
+      publishedWorkDrainAllowed = true;
+      shouldRunHeuristics = args.heuristics !== undefined;
+      hasPendingMaterializeSignal = hasPendingMaterialization(args.sessionId);
+    }
+  }
   for (const number of identityAdoption.protectedTagNumbers) {
+    if (rewritingSignedPrefix)
+      break;
     const target = newTargets.get(number);
     if (!target)
       continue;
@@ -40107,7 +40560,7 @@ async function runPipeline(args) {
       setContent: () => false
     });
   }
-  if (thinkingRecovery.restore) {
+  if (thinkingRecovery.restore && !rewritingSignedPrefix) {
     transcript.commit();
     restoreOriginals = captureOriginalTurn(args.messages, (message) => message.content, (message, content) => {
       message.content = content;
@@ -40253,8 +40706,8 @@ async function runPipeline(args) {
   let routineCleanupApplied = false;
   let heuristicsResult = null;
   const tActiveTags = performance.now();
-  const allTagsForPass = getPiTagSnapshot(args.db, args.sessionId);
-  const activeTags = allTagsForPass.filter((tag) => tag.status === "active");
+  const allTagsForPass = getPiTagSnapshotView(args.db, args.sessionId);
+  const activeTags = getPiActiveTagSnapshotView(args.db, args.sessionId, allTagsForPass);
   logTransformTiming(args.sessionId, "getTagsBySessionSnapshot", tActiveTags, `all=${allTagsForPass.length} active=${activeTags.length}`);
   if (shouldRunHeuristics) {
     const reason = args.forceMaterialization ? "force_materialization" : foldBustsServedPrefixThisPass && args.schedulerDecision !== "execute" ? `m0_hard_fold (drain folded into executed m[0] bust, scheduler=${args.schedulerDecision})` : `${reclaimRideLabel(rideSignals)} (pendingOps=${pendingOps.length}, scheduler=${args.schedulerDecision})`;
@@ -40270,7 +40723,7 @@ async function runPipeline(args) {
   if (shouldRunHeuristics && args.heuristics) {
     try {
       const tHeuristic = performance.now();
-      const independentMutationBeforeHeuristics = pendingOpsDidMutate || foldBustsServedPrefixThisPass;
+      const independentMutationBeforeHeuristics = pendingOpsDidMutate || foldBustsServedPrefixThisPass || identityRebuild || firstRenderBust || heldIdleExpiryRebuild;
       if (args.forceMaterialization === true && independentMutationBeforeHeuristics && getEmergencyInputSample(args.db, args.sessionId) > 0) {
         clearEmergencyDropSample(args.db, args.sessionId);
       }
@@ -40350,7 +40803,8 @@ async function runPipeline(args) {
   }
   let reasoningPersistenceFailed = false;
   let reasoningBudgetCutoffThisPass = 0;
-  if (args.reasoningClearing && shouldRunHeuristics && routineCleanupApplied) {
+  const nativeBudgetClearingAllowed = Boolean(args.reasoningClearing && args.reasoningClearing.prefixBound !== true);
+  if (args.reasoningClearing && nativeBudgetClearingAllowed && shouldRunHeuristics && routineCleanupApplied && !protectedSignedPrefix) {
     const rollbackReasoning = captureReasoningMutationRollback(workingMessages);
     try {
       const tClearReasoning = performance.now();
@@ -40489,7 +40943,7 @@ async function runPipeline(args) {
         db: args.db,
         sessionId: args.sessionId,
         messages: workingMessages,
-        detect: isCacheBustingPass,
+        detect: isCacheBustingPass && !protectedSignedPrefix,
         watermark: getMaxDroppedTagNumber2(args.db, args.sessionId),
         messageIdToMaxTag,
         stableId: stableIdResolver,
@@ -40507,7 +40961,7 @@ async function runPipeline(args) {
     db: args.db,
     sessionId: args.sessionId,
     activeTags,
-    targets,
+    targets: newTargets,
     legacyReminderTagNumbers: textIdentityPlan.legacyReminderTagNumbers,
     cacheBusting: isCacheBustingPass
   });
@@ -40601,11 +41055,11 @@ async function runPipeline(args) {
           stripPiLeadingTemporalMarker(message);
         }
       }
-      if (args.isCacheBusting) {
+      if (args.isCacheBusting && prefixMutationAllowed) {
         historyRefreshSessions.delete(args.sessionId);
         historyWasConsumedThisPass = true;
       }
-      if (deferredHistoryRefresh) {
+      if (deferredHistoryRefresh && prefixMutationAllowed) {
         historyWasConsumedThisPass = true;
       }
       logTransformTiming(args.sessionId, "prepareCompartmentInjection", tInjection);
@@ -40620,9 +41074,9 @@ async function runPipeline(args) {
     db: args.db,
     sessionId: args.sessionId,
     messages: args.messages,
-    isCacheBusting: args.isCacheBusting,
+    isCacheBusting: args.isCacheBusting && prefixMutationAllowed,
     stableIdByRef: postCommitStableIdByRef,
-    forceDiscovery: args.stableIdSchemeCutover === true,
+    forceDiscovery: args.stableIdSchemeCutover === true && prefixMutationAllowed,
     canFirstApply: isCacheBustingPass,
     onFirstApplication: (message, index) => recordFirstApplicationAt(message, index, 0, (item) => item && typeof item === "object" ? postCommitStableIdByRef.get(item) : undefined)
   });
@@ -40772,10 +41226,12 @@ async function runPipeline(args) {
     onAdopt: (message) => sessionLog2(args.sessionId, message)
   });
   protectionFloorResolution = resolveProtectionFloor();
-  const protectedTagNumbers = usesTokenProtection ? computeProtectionWindow(allTagsForPass, protectionFloorResolution.floor, activeCalibration.toolsRatio).protectedTagNumbers : newestActiveTagNumbersByCount(allTagsForPass, args.protectedTags);
+  const protectedTagNumbers = usesTokenProtection ? computeProtectionWindow(allTagsForPass, protectionFloorResolution.floor, activeCalibration.toolsRatio).protectedTagNumbers : newestActiveTagNumbersByCount(activeTags, args.protectedTags);
   const channelPendingOps = shouldApplyPendingOps ? getPendingOps(args.db, args.sessionId) : shouldReadPendingOps ? pendingOps : getPendingOps(args.db, args.sessionId);
   const channelBaselineSnapshot = {
+    tagCacheKey: fallbackCache.index,
     tags: allTagsForPass,
+    activeTags,
     protectedTagNumbers,
     pendingDropTagNumbers: new Set(channelPendingOps.filter((operation) => operation.operation === "drop").map((operation) => operation.tagId))
   };
@@ -40793,9 +41249,20 @@ async function runPipeline(args) {
       }
     }
   }
-  const servedTagNumbers = new Set(allTagsForPass.filter((tag) => targets.has(tag.tagNumber) && (tag.type === "message" ? ctxReduceCallable || tag.status !== "active" : tag.type === "tool" && visibleCallIds.has(tag.messageId) && (ctxReduceCallable || tag.status !== "active"))).map((tag) => tag.tagNumber));
+  const servedTagNumbers = new Set;
+  for (const number of [...targets.keys()].sort((a, b) => a - b)) {
+    for (const tag of tagsWithNumber(allTagsForPass, number)) {
+      if (tag.type === "message" ? ctxReduceCallable || tag.status !== "active" : tag.type === "tool" && visibleCallIds.has(tag.messageId) && (ctxReduceCallable || tag.status !== "active"))
+        servedTagNumbers.add(tag.tagNumber);
+    }
+  }
   return {
     messages: outputMessages,
+    prefixBustPermitted: isCacheBustingPass,
+    prefixMutationAllowed,
+    strictThinkingKept: protectedSignedPrefix,
+    signedPrefixRewritten: rewritingSignedPrefix,
+    prefixRebuildAlreadyPriced: firstRenderBust || heldIdleExpiryRebuild,
     identityRebuilt: identityRebuild,
     servedTagNumbers,
     heuristicsExecuted,
@@ -40891,7 +41358,7 @@ function applyNoteNudges(args) {
   }
   const autoSearchDecisions = args.postTransformSnapshot?.autoSearchDecisions ?? getAutoSearchHintDecisions(db, sessionId);
   for (const decision of autoSearchDecisions) {
-    if (decision.decision === "hint") {
+    if (decision.decision === "hint" && getUnpublishedAutoSearchNoHint(sessionId, decision.messageId) === undefined) {
       appendReminderToUserMessageByIdPi(messages, replayMessageIdByIndex, decision.messageId, decision.text);
     }
   }
@@ -40934,7 +41401,7 @@ function applyNoteNudges(args) {
     const allResolved = messageIdByIndex.size === realMessageCount;
     if (allResolved && visibleIds.size > 0) {
       pruneNoteNudgeAnchors(db, sessionId, visibleIds);
-      pruneAutoSearchHintDecisions(db, sessionId, visibleIds);
+      flushAutoSearchHintDecisionRetirement(db, sessionId, visibleIds);
     }
   }
   return messages;
@@ -41072,6 +41539,7 @@ function clearContextHandlerSession(sessionId) {
   piTagTextTokenCacheBySession.delete(sessionId);
   piTagToolTokenCacheBySession.delete(sessionId);
   piTextIdentitySourceCacheBySession.delete(sessionId);
+  piFallbackIndexesBySession.delete(sessionId);
   piBranchProjectionBySession.delete(sessionId);
   piAlignmentMismatchLoggedSessions.delete(sessionId);
   clearPiOrdinalAlignmentSession(sessionId);
@@ -43721,7 +44189,7 @@ function buildStatusViewFor(check, options) {
 // package.json
 var package_default = {
   name: "@cortexkit/pi-magic-context",
-  version: "0.48.0",
+  version: "0.49.0",
   type: "module",
   description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
   main: "dist/index.js",
@@ -45684,7 +46152,7 @@ function ensureConfigLocationsMigrated(dir) {
   });
 }
 function logPiConfigLoad(args) {
-  const key = resolve5(args.dir);
+  const key = resolve4(args.dir);
   if (args.dedupe && loggedPiConfigDirs.has(key))
     return;
   if (args.dedupe) {
@@ -46408,6 +46876,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
   const todowriteOverlayEnabled = todowriteEnabled && bootProjectDeps.config.todowrite.overlay;
   const todowriteDefinition = todowriteEnabled ? createTodowriteTool() : undefined;
   const registeredTools = registerMagicContextTools(pi, {
+    rerankConnectionFile: config.subc?.connection_file,
     expandTools: config.historian?.expand_tools,
     db,
     ensureProjectRegistered: ensureProjectRegisteredFromPiDirectory,

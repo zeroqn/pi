@@ -1,9 +1,10 @@
-import"./index-0h2mkab2.js";
-import"./index-f956htf3.js";
 import {
+  subagentTemperature,
   promptFingerprint,
   readHostSystemPrompt
-} from "./index-w76x3af7.js";
+} from "./index-2nvf2rrr.js";
+import"./index-0h2mkab2.js";
+import"./index-x3dcnxh0.js";
 
 // src/historian-calibration-extension.ts
 import { readFileSync } from "node:fs";
@@ -55,6 +56,21 @@ function calibrateHistorianProviderPayload(payload, temperature, maxOutputTokens
   }
   return calibrated;
 }
+function withoutProviderTemperature(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload))
+    return payload;
+  const clean = { ...payload };
+  delete clean.temperature;
+  for (const key of ["generationConfig", "inferenceConfig"]) {
+    const nested = clean[key];
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      const options = { ...nested };
+      delete options.temperature;
+      clean[key] = options;
+    }
+  }
+  return clean;
+}
 function historianCalibrationExtension(pi) {
   const intendedPath = process.env.MAGIC_CONTEXT_SUBAGENT_PROMPT_FILE;
   if (intendedPath) {
@@ -73,11 +89,20 @@ function historianCalibrationExtension(pi) {
   const maxOutputTokens = finiteNumber(process.env[HISTORIAN_MAX_OUTPUT_TOKENS_ENV]);
   if (temperature === undefined && maxOutputTokens === undefined)
     return;
-  pi.on("before_provider_request", (event) => calibrateHistorianProviderPayload(event.payload, temperature, maxOutputTokens));
+  pi.on("before_provider_request", (event, ctx) => {
+    const model = ctx.model;
+    const key = `${model?.provider ?? "unknown"}/${model?.id ?? "unknown"}`;
+    const sampling = subagentTemperature(key, model, temperature, (_message, decision) => {
+      process.stdout.write(`${JSON.stringify({ type: "mc_temperature", model: key, supported: decision.supported ?? null, source: decision.source, ...decision.entry ? { entry: decision.entry } : {} })}
+`);
+    });
+    return calibrateHistorianProviderPayload(sampling === undefined ? withoutProviderTemperature(event.payload) : event.payload, sampling, maxOutputTokens);
+  });
 }
 export {
   HISTORIAN_MAX_OUTPUT_TOKENS_ENV,
   HISTORIAN_TEMPERATURE_ENV,
   calibrateHistorianProviderPayload,
-  historianCalibrationExtension as default
+  historianCalibrationExtension as default,
+  withoutProviderTemperature
 };

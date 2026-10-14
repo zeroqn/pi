@@ -1,46 +1,46 @@
 import {
   TOKEN_BUDGET_TOOL_REFUSAL
-} from "./index-6ck7trd8.js";
+} from "./index-vjvb89qt.js";
 import {
   setHarness2
 } from "./index-0h2mkab2.js";
 import {
   log2
-} from "./index-f956htf3.js";
+} from "./index-x3dcnxh0.js";
 import {
   resolveProjectIdentityForSession
-} from "./index-dkx0b1kt.js";
+} from "./index-041ex0cj.js";
 import {
   openDatabase
-} from "./index-8pdxxv7j.js";
+} from "./index-8m86dmhb.js";
 import"./index-3cgbv47m.js";
 import"./index-fapenpch.js";
-import"./index-603mt6nm.js";
-import"./index-jg27bxae.js";
-import"./index-gj0r90h9.js";
+import"./index-r024r8da.js";
+import"./index-405dq1gq.js";
+import"./index-nmsb3x01.js";
 import"./index-135e8hvg.js";
 import"./index-8976mezv.js";
-import"./index-xwgrhenf.js";
+import"./index-vaah9fbg.js";
 import {
   loadPiConfig,
   ensureProjectRegisteredFromPiDirectory,
   resolvePiHarnessKind,
   registerMagicContextTools
-} from "./index-4zepsjy7.js";
-import"./index-yy0h7gp8.js";
+} from "./index-004spr0j.js";
+import"./index-eb3n6ysg.js";
 import"./index-bgmv2kaf.js";
-import"./index-7neahsnb.js";
-import"./index-zmyrvs22.js";
-import"./index-9d4pnmrf.js";
+import"./index-xkf1qyj1.js";
+import"./index-ddfbvmg3.js";
+import"./index-02kw8dfx.js";
 import"./index-9p40dgkm.js";
 import"./index-yhzhdp3m.js";
-import"./index-yg8ktppn.js";
-import"./index-td9qvw23.js";
-import"./index-mk0cr4vy.js";
-import"./index-rt5jgzp1.js";
-import"./index-a1zrv5dx.js";
+import"./index-q04p2kkb.js";
+import"./index-3bc8wf03.js";
+import"./index-wj9v2eh7.js";
+import"./index-vakawmbc.js";
+import"./index-k3y5wmaq.js";
 import"./index-xjqheg7a.js";
-import"./index-fp37he9a.js";
+import"./index-0vrkp1jq.js";
 import {
   setStoragePrivatePermissionEnforcement
 } from "./index-vf38qhee.js";
@@ -84,6 +84,7 @@ function magicContextSubagentExtension(pi) {
       await ensureProjectRegisteredFromPiDirectory(directory, db);
       const dreamerActionsEnabled = pi.getFlag(SUBAGENT_DREAMER_ACTIONS_FLAG) === true;
       registerMagicContextTools(pi, {
+        rerankConnectionFile: cfg.subc?.connection_file,
         db,
         ensureProjectRegistered: ensureProjectRegisteredFromPiDirectory,
         resolveProjectIdentity: (ctx) => resolveProjectIdentityForSession(ctx.cwd, cfg.allow_home_project),

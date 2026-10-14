@@ -7,7 +7,7 @@ var input = workerData;
 port.postMessage({ kind: "accepted" });
 var [{ Database }, { scanRawSessionSummaryRows }] = await Promise.all([
   import("./sqlite-3yye76ht.js"),
-  import("./read-session-raw-yn8nawav.js")
+  import("./read-session-raw-npx3920c.js")
 ]);
 var db;
 var reply;
@@ -22,11 +22,11 @@ try {
       { configureContextDatabasePragmas },
       { registerSqliteDiagnosticSink }
     ] = await Promise.all([
-      import("./message-index-bounded-xqxdc010.js"),
+      import("./message-index-bounded-7ew2ye8s.js"),
       import("./sqlite-context-pragmas-gcgch6qz.js"),
       import("./sqlite-3yye76ht.js")
     ]);
-    const { log } = await import("./logger-v3dsxdnm.js");
+    const { log } = await import("./logger-j6tecd1h.js");
     registerSqliteDiagnosticSink(log);
     configureContextDatabasePragmas(db);
     const writer = db;
@@ -35,7 +35,7 @@ try {
     const result = await indexMessageInShortChunks(writer, input.sessionId, message, input, () => !cancellation || Atomics.load(cancellation, 0) === 0);
     reply = { kind: "indexed", inserted: result.inserted, measurements: result.measurements };
   } else if (input.tagRatio !== undefined) {
-    const { scanTagOwnerSummary, scanTagOwnerDelta } = await import("./storage-tags-5dz487mr.js");
+    const { scanTagOwnerSummary, scanTagOwnerDelta } = await import("./storage-tags-4w8sfwfa.js");
     const delta = input.tagState ? scanTagOwnerDelta(db, input.sessionId, input.tagState) : null;
     if (delta)
       reply = { kind: "tag-delta", delta };
