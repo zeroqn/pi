@@ -74,6 +74,18 @@ export type KernelGuard = {
 	mountMode?: () => "read-only" | "read-write" | undefined;
 };
 
+/**
+ * The session's egress policy, mirrored from code mode's `Egress` (contract version 4): asked after
+ * `guard` and before every host call, and answered by the owner whose subject is the network.
+ *
+ * A slot of its own rather than a second half of {@link KernelGuard}, because the two ask different
+ * questions — may this call run, may it reach the network — and a session holds both; and because
+ * `guard` is single-owner, so one package's policy could not carry another package's subject.
+ */
+export type KernelEgress = {
+	before?: (call: KernelHostCall) => KernelGuardVerdict | Promise<KernelGuardVerdict>;
+};
+
 /** One grep hit, as a cell reads it. Code mode's own shape, mirrored. */
 export type KernelMatch = { path: string; line: number; text: string };
 
@@ -119,12 +131,12 @@ export type KernelSearchEngine = {
 /**
  * What a contributor writes into a kernel. This mirrors code-mode's own `Contribution` — the fields
  * are the publisher's, and this module must not widen them (standing preference 2: no change to code
- * mode's contract). `owner`, `onNotice`, `provenance` and `guard` are single-owner there: a second
- * declarer of a slot is refused whole by the ledger, not silently ignored.
+ * mode's contract). `owner`, `onNotice`, `provenance`, `guard` and `egress` are single-owner there: a
+ * second declarer of a slot is refused whole by the ledger, not silently ignored.
  *
- * The mirror tracks the publisher's *version*: `guard` arrived with contract version 2 and `search`
- * with 3, and a consumer that reads the registry compares `handle.apiVersion` before sending one (a
- * contributor cannot: the ledger refuses it whole, and the session would never learn).
+ * The mirror tracks the publisher's *version*: `guard` arrived with contract version 2, `search` with 3
+ * and `egress` with 4, and a consumer that reads the registry compares `handle.apiVersion` before
+ * sending one (a contributor cannot: the ledger refuses it whole, and the session would never learn).
  */
 export type KernelContribution = {
 	owner: string;
@@ -139,6 +151,8 @@ export type KernelContribution = {
 		own: { sessionFile?: string; firstIndex?: number },
 	) => KernelProvenance;
 	guard?: KernelGuard;
+	/** Whether a host call may leave the network, when this session has a policy of its own. One owner only. */
+	egress?: KernelEgress;
 	/** What answers `grep`/`find`, when this session has an engine of its own. One owner only. */
 	search?: KernelSearchEngine;
 };
