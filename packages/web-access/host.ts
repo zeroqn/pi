@@ -21,10 +21,11 @@
  */
 
 import { mkdirSync } from "node:fs";
+import { checkEgress } from "./egress";
 import { tmpdir } from "node:os";
 import { loadConfig, providerOrder, DEFAULT_PROVIDERS, type WebConfig, type DomainPolicy } from "./config";
 import { asWebError, messageOf, webError } from "./errors";
-import { fetchContent, type FetchEnvelope, type FetchMode } from "./fetch";
+import { fetchContent, type FetchEnvelope, type FetchMode, type FetchVia, type ShellExec } from "./fetch";
 import { searchAnySearch } from "./providers/anysearch";
 import { searchDuckDuckGo } from "./providers/duckduckgo";
 import type { SearchResult } from "./providers/types";
@@ -43,6 +44,7 @@ import {
 	type SessionInput,
 	registerContributor,
 } from "../host-bridge/src/convention";
+import type { KernelContribution, KernelEgress } from "../host-bridge/src/client";
 
 export const SEARCH_TIMEOUT_MS = 30_000;
 export const FETCH_TIMEOUT_MS = 60_000;
@@ -244,14 +246,22 @@ export function createHost(ctx: HostContext, deps: HostDeps = {}) {
 	 *  `markdown` writes extracted text and returns it with a head (tickets 04, 05). */
 	async function fetch_content(...args: unknown[]): Promise<FetchEnvelope> {
 		try {
-			const bound = bindArgs(args, ["url", "mode"]);
+			const bound = bindArgs(args, ["url", "mode", "via", "args"]);
 			const rawUrl = bound.url;
 			const rawMode = bound.mode ?? "markdown";
+			const rawVia = bound.via ?? "http";
 			if (typeof rawUrl !== "string") throw webError("TypeError", `fetch_content: url must be a string, got ${typeof rawUrl}`);
 			const url = rawUrl.trim();
 			if (!url) throw webError("ValueError", "fetch_content: url must not be empty");
 			if (rawMode !== "markdown" && rawMode !== "raw") {
 				throw webError("ValueError", `fetch_content: mode must be "markdown" or "raw", got ${JSON.stringify(rawMode)}`);
+			}
+			if (rawVia !== "http" && rawVia !== "shell") {
+				throw webError("ValueError", `fetch_content: via must be "http" or "shell", got ${JSON.stringify(rawVia)}`);
+			}
+			const rawArgs = bound.args;
+			if (rawArgs !== null && rawArgs !== undefined && !(Array.isArray(rawArgs) && rawArgs.every((entry) => typeof entry === "string"))) {
+				throw webError("TypeError", "fetch_content: args must be a list of curl flags (strings)");
 			}
 			return fenceFetchEnvelope(
 				await fetchContent(url, {
@@ -259,8 +269,11 @@ export function createHost(ctx: HostContext, deps: HostDeps = {}) {
 					scratchDir,
 					timeoutMs: FETCH_TIMEOUT_MS,
 					guard: { allowRanges: config.allowRanges, domainPolicy: config.domainPolicy },
+					via: rawVia as FetchVia,
+					...(Array.isArray(rawArgs) ? { shellArgs: rawArgs as string[] } : {}),
 					progress: ctx.progress,
 					fetchImpl: deps.fetchImpl,
+					shellExec: deps.shellExec,
 				}),
 			);
 		} catch (error) {
@@ -272,10 +285,11 @@ export function createHost(ctx: HostContext, deps: HostDeps = {}) {
 }
 
 /**
- * Test seams. `fetchImpl` drives provider responses and fetches without a network;
- * `config` replaces the shared `web-search.json`, which is read once per kernel.
+ * Test seams. `fetchImpl` drives provider responses and fetches without a network; `shellExec`
+ * stands in for the real `curl` child process of `via="shell"` (the hatch itself is not simulated,
+ * only the binary); `config` replaces the shared `web-search.json`, read once per kernel.
  */
-export type HostDeps = { fetchImpl?: typeof fetch; config?: WebConfig };
+export type HostDeps = { fetchImpl?: typeof fetch; shellExec?: ShellExec; config?: WebConfig };
 
 /** `pi install` loads this file as an extension: the default export registers the guard and
  *  nothing else. No pi-level tools — the capability is the kernel's (round 2). */
@@ -302,27 +316,76 @@ const WEB_ACCESS_DESCRIPTION =
 	" Host functions also include await web_search(query, num_results=5, provider=None, domain_filter=None), which searches DuckDuckGo and then AnySearch " +
 	'and returns {query, provider, results:[{title,url,snippet,content}], errors}; and await fetch_content(url, mode="markdown"), which writes the page text ' +
 	'to SCRATCH and returns {url, title, path, chars, head} — read or grep that path for more than the head. mode="raw" writes the response bytes and ' +
-	'returns {url, path, bytes, content_type} instead. Fetches are http and https only and refuse local and private addresses: a check on this tool, not a ' +
-	"sandbox — the kernel's bash is unfiltered.";
+	'returns {url, path, bytes, content_type} instead. Fetches are http and https only and refuse local and private addresses — a check on this tool, ' +
+	'not a sandbox. Fetch a page with this function rather than a shell command: only this route fences what it returns. When the guarded route cannot ' +
+	'reach a page — a server on localhost, an authenticated or POST API, a 403, a body nothing can extract — make the same call with via="shell": it runs ' +
+	'curl on this host and fences that too, and args=[…] passes its flags (-H, -X POST, -d, -k).';
 
 const WEB_ACCESS_GUIDELINES = [
 	"Use await web_search(query, num_results=5, provider=None, domain_filter=None) for web research: it returns {query, provider, results:[{title,url,snippet,content}], errors}, where a per-provider failure beside a success is data in errors.",
 	'Use await fetch_content(url, mode="markdown") to read a page: it writes the text to SCRATCH and returns {url, title, path, chars, head}, so grep or read the path instead of printing the head twice; mode="raw" writes the bytes and returns {path, bytes, content_type}.',
+	"Do not fetch a page with a shell command — curl, wget, nc, a package manager, an interpreter's HTTP library: use await fetch_content(url). It fences what it returns, a shell fetch does not, and the session may refuse one outright. When the guarded route cannot reach the page — a server on localhost, a 403, a POST or authenticated API, a body nothing can extract — say so in the same call: await fetch_content(url, via=\"shell\") runs curl on this host and fences that too, and args=[…] passes its flags.",
 ];
+
+/**
+ * The code-mode contract version that added the `egress` slot.
+ *
+ * Read before offering it, because code mode validates a contribution **all-or-nothing**: an older
+ * code mode refuses an unknown field whole, so contributing `egress` blind would drop this package's
+ * host functions (`web_search`, `fetch_content`) along with it and the session would hold neither the
+ * fence nor the functions. Below this version the policy is omitted and the degradation is reported.
+ */
+const EGRESS_API_VERSION = 4;
+
+/**
+ * The egress policy: the one call this package can stop before it leaves the host.
+ *
+ * `bash_host` is the whole of it. This package's own two functions *are* the sanctioned route and are
+ * left alone; a contributed host function or a bridged pi tool returns somebody else's value, which no
+ * policy here can fence and no name list can reliably guess — that half is the rule's, not this
+ * policy's. So it reads the one command text a cell can turn into an outbound connection, and
+ * `checkEgress` refuses the ones whose purpose is to leave, steering to the fenced route.
+ */
+function egressPolicy(): KernelEgress {
+	return {
+		before: (call) => {
+			if (call.name !== "bash_host") return undefined;
+			const bound = bindArgs(call.args, ["command", "timeout", "background"]);
+			// A command that is not a string is `bash`'s own `TypeError` to raise, with its own message;
+			// answering `undefined` here leaves that path exactly as it was.
+			if (typeof bound.command !== "string") return undefined;
+			const verdict = checkEgress(bound.command);
+			return verdict.ok ? undefined : { allow: false, reason: verdict.reason };
+		},
+	};
+}
 
 /** What this package contributes to one session: the two host functions, their prose, and the rule. */
 export function webAccessAnswer(input: SessionInput): ContributorAnswer {
+	const contribution: KernelContribution = {
+		owner: WEB_ACCESS_OWNER,
+		hostFns: createHost({
+			cwd: input.cwd,
+			sessionFile: input.sessionFile,
+			progress: input.progress,
+		}),
+		description: WEB_ACCESS_DESCRIPTION,
+		guidelines: WEB_ACCESS_GUIDELINES,
+	};
+	const problems: string[] = [];
+	if (input.handle.apiVersion >= EGRESS_API_VERSION) {
+		contribution.egress = egressPolicy();
+	} else {
+		// Fail **loud, not closed**: refusing the contribution would take the fence's own two functions
+		// with it, so the session keeps them and the record says what it did not get.
+		problems.push(
+			`web-access: this code mode speaks contract version ${input.handle.apiVersion}, and the shell egress policy needs ${EGRESS_API_VERSION}: ` +
+				"a shell command whose purpose is to fetch is NOT refused in this session, and the text it returns reaches the model unfenced.",
+		);
+	}
 	return {
-		contribution: {
-			owner: WEB_ACCESS_OWNER,
-			hostFns: createHost({
-				cwd: input.cwd,
-				sessionFile: input.sessionFile,
-				progress: input.progress,
-			}),
-			description: WEB_ACCESS_DESCRIPTION,
-			guidelines: WEB_ACCESS_GUIDELINES,
-		},
+		contribution,
+		problems,
 		// Written once per session by the seam, deduped — in a spawned child, where this package's own
 		// entry never runs, the seam is the only writer. Under the same tag `installGuard` writes, so
 		// the two appenders meet by key.

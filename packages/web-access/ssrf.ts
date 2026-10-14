@@ -163,6 +163,15 @@ export function isBlockedIPv6(address: string): boolean {
 	return false;
 }
 
+/**
+ * Appended to the refusals a `via="shell"` fetch would get past — the internal-address and scheme
+ * checks. The hatch is the remedy, and the remedy arrives with the failure rather than living only
+ * in a guideline the model may not have read. The domain policy's refusal deliberately does *not*
+ * carry it: `via="shell"` honours that one (see `fetch.ts`).
+ */
+export const HATCH_HINT =
+	' If this URL is reachable only from this host (a local server, an internal address), retry with via="shell" — fetch_content runs curl here instead, and fences what it returns.';
+
 export function isBlockedAddress(address: string): boolean {
 	const version = isIP(normalizeHostname(address));
 	if (version === 4) return isBlockedIPv4(normalizeHostname(address));
@@ -173,14 +182,14 @@ export function isBlockedAddress(address: string): boolean {
 function assertPublicAddress(address: string, hostname: string, ranges: ParsedRange[], hop?: number): void {
 	const at = hop === undefined ? "" : ` (hop ${hop})`;
 	const parsed = parseAddress(normalizeHostname(address));
-	if (!parsed) throw webError("ValueError", `Blocked non-IP address for ${hostname}: ${address}${at}`);
+	if (!parsed) throw webError("ValueError", `Blocked non-IP address for ${hostname}: ${address}${at}${HATCH_HINT}`);
 	if (ranges.some((range) => isInRange(parsed, range))) return;
 	const blocked = parsed.family === 4 ? isBlockedIPv4(normalizeHostname(address)) : isBlockedIPv6(normalizeHostname(address));
 	if (!blocked) return;
 	const hint = parsed.family === 4 && isFakeIpProxyAddress(normalizeHostname(address))
 		? '. This address is in 198.18.0.0/15, commonly used by TUN/fake-IP proxies. Configure ssrf.allowRanges with ["198.18.0.0/15"] in web-search.json if that matches your setup.'
 		: "";
-	throw webError("ValueError", `Blocked internal address for ${hostname}: ${normalizeHostname(address)}${at}${hint}`);
+	throw webError("ValueError", `Blocked internal address for ${hostname}: ${normalizeHostname(address)}${at}${hint}${HATCH_HINT}`);
 }
 
 function domainMatches(hostname: string, entry: string): boolean {
@@ -216,12 +225,12 @@ export async function validateRemoteUrl(rawUrl: string, options: GuardOptions): 
 		throw webError("ValueError", `not a valid URL: ${rawUrl}`);
 	}
 	if (url.protocol !== "http:" && url.protocol !== "https:") {
-		throw webError("ValueError", `Only HTTP and HTTPS URLs can be fetched: ${url.protocol}`);
+		throw webError("ValueError", `Only HTTP and HTTPS URLs can be fetched: ${url.protocol}${HATCH_HINT}`);
 	}
 	const hostname = normalizeHostname(url.hostname);
 	if (!hostname) throw webError("ValueError", `URL must include a hostname: ${rawUrl}`);
 	if (hostname === "localhost" || hostname.endsWith(".localhost")) {
-		throw webError("ValueError", `Blocked internal hostname: ${hostname}${options.hop === undefined ? "" : ` (hop ${options.hop})`}`);
+		throw webError("ValueError", `Blocked internal hostname: ${hostname}${options.hop === undefined ? "" : ` (hop ${options.hop})`}${HATCH_HINT}`);
 	}
 	const ranges = parseAllowRanges(options.allowRanges);
 	assertDomainPolicy(hostname, options.domainPolicy, options.hop);

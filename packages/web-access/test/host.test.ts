@@ -1,11 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createHost } from "../host";
-import piWebAccess from "../host";
+import { createHost, type HostDeps } from "../host";
+import piWebAccess, { webAccessAnswer } from "../host";
 import { CLOSE_MARKER, OPEN_MARKER, PREAMBLE } from "../guard";
 import type { WebConfig } from "../config";
+import type { SessionInput } from "../../host-bridge/src/convention";
 
 /** The fence's inverse, for the assertions that predate it: strip the markers a fenced field carries. */
 function plain(text: string): string {
@@ -53,9 +54,9 @@ function router(handlers: Record<string, () => Response>) {
 	return { impl, calls };
 }
 
-function makeHost(handlers: Record<string, () => Response>, sessionFile?: string) {
+function makeHost(handlers: Record<string, () => Response>, sessionFile?: string, extraDeps: Partial<HostDeps> = {}) {
 	const { impl, calls } = router(handlers);
-	const host = createHost({ cwd: "/tmp", sessionFile, progress: () => {} }, { config, fetchImpl: impl });
+	const host = createHost({ cwd: "/tmp", sessionFile, progress: () => {} }, { config, fetchImpl: impl, ...extraDeps });
 	return { host, calls };
 }
 
@@ -255,6 +256,85 @@ describe("the kernel route's fence (web-access's own output)", () => {
 		if (!("bytes" in result)) throw new Error("expected a raw envelope");
 		expect(result.bytes).toBe(4);
 		expect(JSON.stringify(result)).not.toContain(OPEN_MARKER);
+	});
+});
+
+describe('fetch_content\'s escape hatch (via="shell")', () => {
+	/** The curl stand-in: writes the body where the hatch's own `-o` points. */
+	function curlStub(body: string, contentType: string) {
+		const calls: string[][] = [];
+		const shellExec = async (args: string[]) => {
+			calls.push(args);
+			writeFileSync(args[args.indexOf("-o") + 1]!, body);
+			return { code: 0, stdout: Buffer.from(`${contentType}\t${args[args.length - 1]}\t200`), stderr: Buffer.from("") };
+		};
+		return { shellExec, calls };
+	}
+
+	it("binds via and args, positionally and by keyword, and runs curl for via=shell", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "pi-web-access-hatch-"));
+		const { shellExec, calls } = curlStub("plain body", "text/plain");
+		const { host } = makeHost({}, join(dir, "session.jsonl"), { shellExec });
+
+		const positional = await host.fetch_content("http://localhost:3000/a.txt", "markdown", "shell", ["-H", "X: 1"]);
+		if (!("chars" in positional)) throw new Error("expected a markdown envelope");
+		expect(positional.via).toBe("shell");
+		expect(plain(readFileSync(positional.path, "utf8"))).toBe("plain body");
+		expect(calls[0]).toContain("X: 1");
+
+		const byKeyword = await host.fetch_content("http://localhost:3000/a.txt", { via: "shell" });
+		expect(byKeyword.via).toBe("shell");
+		expect(calls.length).toBe(2);
+
+		// The default route is still the guarded one, and it does not run curl.
+		await host.fetch_content("http://example.com/a.txt").catch(() => {});
+		expect(calls.length).toBe(2);
+	});
+
+	it("rejects a bad via as ValueError, and args that is not a list of strings as TypeError", async () => {
+		const { host } = makeHost({});
+		await expect(host.fetch_content("http://example.com/", "markdown", "curl")).rejects.toThrow(/via must be "http" or "shell"/);
+		await expect(host.fetch_content("http://example.com/", { via: "shell", args: "-H x" })).rejects.toThrow(/args must be a list of curl flags/);
+		await expect(host.fetch_content("http://example.com/", { via: "shell", args: ["-H", 7] })).rejects.toThrow(/args must be a list of curl flags/);
+	});
+});
+
+describe("the egress policy this package contributes", () => {
+	/** The answer for one session, asked exactly as the composition root asks it. */
+	function answer(apiVersion: number) {
+		return webAccessAnswer({
+			cwd: "/tmp",
+			sessionKey: "s",
+			ctx: {},
+			isChild: false,
+			progress: () => {},
+			handle: { apiVersion },
+		} as unknown as SessionInput);
+	}
+	const call = (name: string, args: unknown[]) => ({ name, args }) as never;
+
+	it("declares one at contract version 4, and it refuses a fetch-shaped bash call", async () => {
+		const verdicts = answer(4);
+		expect(verdicts.problems).toEqual([]);
+		const before = verdicts.contribution?.egress?.before;
+		if (before === undefined) throw new Error("expected an egress policy");
+		const refused = await before(call("bash_host", ["curl -s https://example.com"]));
+		expect(refused).toEqual({ allow: false, reason: expect.stringContaining("fetch_content") });
+		// Its own two functions are the sanctioned route, a local command is not its subject, and a
+		// name it does not know is not its business either — the slot is one policy, not a censor.
+		expect(await before(call("fetch_content", ["https://example.com"]))).toBeUndefined();
+		expect(await before(call("bash_host", ["ls -la"]))).toBeUndefined();
+		expect(await before(call("someones_else_fetch", ["https://example.com"]))).toBeUndefined();
+	});
+
+	it("omits it below version 4 and says so, instead of the session believing itself guarded", () => {
+		const older = answer(3);
+		expect(older.contribution?.egress).toBeUndefined();
+		// It degrades loud and *not* closed: the host functions and the rule are still contributed.
+		expect(older.contribution?.hostFns).toBeDefined();
+		expect(older.contribution?.description ?? "").toContain("fetch_content");
+		expect((older.problems ?? []).join(" ")).toContain("contract version 3");
+		expect((older.problems ?? []).join(" ")).toContain("NOT refused");
 	});
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fetchContent, spillPath } from "../fetch";
@@ -221,5 +221,220 @@ describe("spill naming", () => {
 		expect(path.startsWith(`${dir}/web/simonwillison.net-2026-Feb-6-pydantic-monty-`)).toBe(true);
 		expect(path.endsWith(".md")).toBe(true);
 		expect(spillPath(dir, "https://simonwillison.net/2026/Feb/6/pydantic-monty/?utm=1", "md")).toBe(path);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// via="shell": the escape hatch. The hatch exists because a refusal here does not stop a session
+// that needs the page — it sends it to `bash` and `curl`, and that text arrives with no fence on it
+// at all. So the fetch is done by the package, on the same pipeline, and fenced the same way.
+// ---------------------------------------------------------------------------
+
+/** A stand-in for the curl child process, not for the hatch: it reads the argv the hatch built,
+ *  writes the body where `-o` points, and answers the `-w` line curl would print on stdout. */
+function curlStub(
+	body: string | Uint8Array,
+	contentType: string,
+	options: { status?: number; url?: string; code?: number; stderr?: string; throws?: string } = {},
+) {
+	const calls: Array<{ args: string[]; timeoutMs: number }> = [];
+	const shellExec = async (args: string[], opts: { timeoutMs: number }) => {
+		calls.push({ args, timeoutMs: opts.timeoutMs });
+		if (options.throws !== undefined) throw new Error(options.throws);
+		if (options.code !== undefined && options.code !== 0) {
+			return { code: options.code, stdout: Buffer.from(""), stderr: Buffer.from(options.stderr ?? "") };
+		}
+		const outIndex = args.indexOf("-o");
+		writeFileSync(args[outIndex + 1]!, body);
+		const url = args[args.length - 1]!;
+		return { code: 0, stdout: Buffer.from(`${contentType}\t${options.url ?? url}\t${options.status ?? 200}`), stderr: Buffer.from("") };
+	};
+	return { shellExec, calls };
+}
+
+describe('fetch_content via="shell" — the escape hatch', () => {
+	it("fetches with curl and fences what it returns, exactly as the guarded route does", async () => {
+		const dir = scratch();
+		const { shellExec, calls } = curlStub(article, "text/html");
+		const result = await fetchContent("http://localhost:3000/draft", {
+			mode: "markdown",
+			scratchDir: dir,
+			timeoutMs: 5_000,
+			guard,
+			via: "shell",
+			shellExec,
+		});
+		if (!("chars" in result)) throw new Error("expected a markdown envelope");
+		// The envelope says which route ran, and the note says it in words.
+		expect(result.via).toBe("shell");
+		expect(result.note ?? "").toContain('via="shell"');
+		// The spill is fenced, and it is the *article*, not the nav or the footer.
+		const spilled = readFileSync(result.path, "utf8");
+		expect(spilled.startsWith(`${OPEN_MARKER}${PREAMBLE}`)).toBe(true);
+		expect(spilled.endsWith(CLOSE_MARKER)).toBe(true);
+		expect(spilled).toContain("sandboxed Python subset written in Rust");
+		expect(result.chars).toBe(plain(spilled).length);
+		expect(calls.length).toBe(1);
+	});
+
+	it("reaches an address the guarded client refuses, which is the whole point", async () => {
+		const dir = scratch();
+		const { shellExec, calls } = curlStub("plain body", "text/plain");
+		// The guarded route refuses this host before DNS (`Blocked internal hostname`); the hatch
+		// must not, because a server on localhost is a legitimate reason to have one.
+		const result = await fetchContent("http://localhost:3000/a.txt", {
+			mode: "markdown",
+			scratchDir: dir,
+			timeoutMs: 5_000,
+			guard: { ...guard, lookup: async () => ["127.0.0.1"] },
+			via: "shell",
+			shellExec,
+		});
+		expect(calls.length).toBe(1);
+		expect(plain(readFileSync(result.path, "utf8"))).toBe("plain body");
+	});
+
+	it("keeps the operator's domain policy: the hatch is not a way around a configured decision", async () => {
+		const dir = scratch();
+		const { shellExec, calls } = curlStub(article, "text/html");
+		const denied = { ...guard, domainPolicy: { allow: [], deny: ["reddit.com"] } };
+		await expect(
+			fetchContent("https://www.reddit.com/r/x", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard: denied, via: "shell", shellExec }),
+		).rejects.toThrow(/domain policy/);
+		expect(calls.length).toBe(0);
+	});
+
+	it("passes the caller's flags through, puts the URL last, and owns the output file", async () => {
+		const dir = scratch();
+		const { shellExec, calls } = curlStub('{"ok":true}', "application/json");
+		const result = await fetchContent("https://api.example.com/v1/thing", {
+			mode: "markdown",
+			scratchDir: dir,
+			timeoutMs: 7_000,
+			guard,
+			via: "shell",
+			shellArgs: ["-H", "Authorization: Bearer t", "-X", "POST", "--data", "{}"],
+			shellExec,
+		});
+		const { args, timeoutMs } = calls[0]!;
+		expect(args.slice(0, 2)).toEqual(["-sS", "-L"]);
+		expect(args).toContain("Authorization: Bearer t");
+		expect(args[args.length - 1]).toBe("https://api.example.com/v1/thing");
+		// Ours come after theirs, so our `-o` is the one that decides where the body lands.
+		expect(args[args.indexOf("-o") + 1]).toContain(".curl-");
+		expect(timeoutMs).toBe(7_000);
+		expect(plain(readFileSync(result.path, "utf8"))).toBe('{"ok":true}');
+	});
+
+	it("says so when the response was not a success, rather than pretending it fetched a page", async () => {
+		const dir = scratch();
+		const { shellExec } = curlStub("<html><body>nope</body></html>", "text/html", { status: 403 });
+		const result = await fetchContent("https://example.com/private", {
+			mode: "markdown",
+			scratchDir: dir,
+			timeoutMs: 5_000,
+			guard,
+			via: "shell",
+			shellExec,
+		});
+		if (!("chars" in result)) throw new Error("expected a markdown envelope");
+		expect(result.note ?? "").toContain("HTTP 403");
+	});
+
+	it("raw mode keeps its bytes, and still says the shell route produced them", async () => {
+		const dir = scratch();
+		// An undeclared type is the one raw mode accepts without an extraction attempt — and what
+		// curl reports when the server sends no `Content-Type` at all.
+		const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+		const { shellExec } = curlStub(bytes, "application/octet-stream");
+		const result = await fetchContent("https://example.com/i.png", { mode: "raw", scratchDir: dir, timeoutMs: 5_000, guard, via: "shell", shellExec });
+		if (!("bytes" in result)) throw new Error("expected a raw envelope");
+		expect(result.via).toBe("shell");
+		expect([...readFileSync(result.path)]).toEqual([...bytes]);
+	});
+
+	it("raises OSError naming curl's own exit and stderr, and one when curl cannot run at all", async () => {
+		const dir = scratch();
+		const failing = curlStub("", "", { code: 6, stderr: "Could not resolve host: nope.invalid" });
+		await expect(
+			fetchContent("https://nope.invalid/", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, via: "shell", shellExec: failing.shellExec }),
+		).rejects.toThrow(/curl exited 6 .*Could not resolve host/);
+		const missing = curlStub("", "", { throws: "spawn curl ENOENT" });
+		await expect(
+			fetchContent("https://example.com/", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, via: "shell", shellExec: missing.shellExec }),
+		).rejects.toThrow(/could not run curl.*ENOENT/);
+	});
+
+	it("refuses the args that would stop it being a fetch, and names the route that keeps the bytes", async () => {
+		const dir = scratch();
+		const { shellExec, calls } = curlStub("x", "text/plain");
+		// The flags that name an output file steer to the route that keeps the bytes on disk.
+		for (const arg of ["-o", "--output=f.md", "-O", "--remote-name", "-J", "--output-dir", "--create-dirs"]) {
+			await expect(
+				fetchContent("https://example.com/x", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, via: "shell", shellArgs: [arg, "value"], shellExec }),
+			).rejects.toThrow(/args must not .*mode="raw"/);
+		}
+		// A URL belongs in `url`, not in args: a second one takes curl's output-file mapping with it.
+		await expect(
+			fetchContent("https://example.com/x", {
+				mode: "markdown",
+				scratchDir: dir,
+				timeoutMs: 5_000,
+				guard,
+				via: "shell",
+				shellArgs: ["https://other.example/"],
+				shellExec,
+			}),
+		).rejects.toThrow(/args must not contain a URL.*pass it as url/);
+
+		// The rest are refused for their own reason, each named in the message.
+		for (const [arg, why] of [
+			["-Tf.zip", /args must not upload a local file/],
+			["--upload-file", /args must not upload a local file/],
+			["--config", /args must not take further curl options from a file/],
+			["-K=g", /args must not take further curl options from a file/],
+			["-cJar", /args must not write a cookie jar file/],
+			["-D", /args must not write the response headers to a file/],
+		] as const) {
+			await expect(
+				fetchContent("https://example.com/x", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, via: "shell", shellArgs: [arg, "value"], shellExec }),
+			).rejects.toThrow(why);
+		}
+		// Nothing was ever run: the refusal is before the child process, not after it.
+		expect(calls.length).toBe(0);
+		// The flags a fetch actually needs still pass.
+		await fetchContent("https://example.com/x", {
+			mode: "markdown",
+			scratchDir: dir,
+			timeoutMs: 5_000,
+			guard,
+			via: "shell",
+			shellArgs: ["-H", "Accept: text/plain", "-X", "POST", "--data", "{}", "-k", "--compressed"],
+			shellExec,
+		});
+		expect(calls.length).toBe(1);
+	});
+
+	it("leaves no body file behind, on either outcome", async () => {
+		const dir = scratch();
+		const ok = curlStub(article, "text/html");
+		await fetchContent("https://example.com/one", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, via: "shell", shellExec: ok.shellExec });
+		const failed = curlStub("", "", { code: 7 });
+		await fetchContent("https://example.com/two", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, via: "shell", shellExec: failed.shellExec }).catch(() => {});
+		expect(readdirSync(join(dir, "web")).filter((name) => name.startsWith(".curl-"))).toEqual([]);
+	});
+
+	it("the guarded route's own refusals name the hatch, so the remedy arrives with the failure", async () => {
+		const dir = scratch();
+		const impl = (async () => new Response("x", { status: 200, headers: { "content-type": "application/zip" } })) as unknown as typeof fetch;
+		const error = (await fetchContent("https://example.com/a.zip", {
+			mode: "markdown",
+			scratchDir: dir,
+			timeoutMs: 5_000,
+			guard,
+			fetchImpl: impl,
+		}).catch((caught: unknown) => caught)) as Error;
+		expect(error.message).toContain("unsupported content type");
+		expect(error.message).toContain('via="shell"');
 	});
 });

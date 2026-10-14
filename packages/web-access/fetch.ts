@@ -16,36 +16,89 @@
  * **Every text spilled to disk is fenced** (`fenceText`): the model reads these files with
  * `read_text`/`grep`, so the file itself must say the content is untrusted, not only the envelope
  * that points at it. Byte spills (raw mode, a PDF with no text, an empty body) stay bytes.
+ *
+ * ## `via="shell"` — the escape hatch, and why it is here
+ *
+ * The guarded HTTP client refuses what it is designed to refuse: internal addresses (`localhost`
+ * and friends), non-http(s) schemes, and content types the extraction stack does not handle. Those
+ * refusals are right for an *automatic* fetch and wrong for a deliberate one — a development server
+ * on `localhost:3000`, an authenticated API behind a POST, a page that answers 403 to our client's
+ * request shape, a body nothing can extract. A session that needs one of those and cannot get it
+ * does not stop: it reaches for `bash` and `curl`, and the text arrives with no
+ * `<untrusted_web_content>` marker on it at all. That is the bypass this package's rule, its fence
+ * and the kernel's `egress` policy (`egress.ts`) all exist to close, and closing it by refusing the
+ * shell fetch outright would trade a real injection risk for a real work stoppage.
+ *
+ * So the fetch itself is the hatch: `via="shell"` runs `curl` **on this host** and feeds the body
+ * back through the *same* pipeline below — same extraction, same spill, same fence. Nothing about
+ * the envelope changes but a `via` field and a note saying which route ran.
+ *
+ * The split of what it skips is deliberate:
+ *
+ *   - **Skipped:** the address checks (internal hosts, redirect hops, DNS) and the scheme check.
+ *     Reaching those is the point of the hatch.
+ *   - **Kept:** the operator's `domainPolicy`. That is a decision somebody made in
+ *     `web-search.json`, not a safety default, and an escape hatch is not the place to overrule it.
+ *     It is checked against the URL asked for, not against a redirect curl followed on its own.
+ *   - **Refused, in `args`:** the flags that would stop it being a fetch — anything naming a file for
+ *     curl to write or upload, and `--config` (`NON_FETCH_FLAGS`). The hatch fetches into the
+ *     envelope; `mode="raw"` is the route that keeps a copy of the bytes.
  */
 
-import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { extname } from "node:path";
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
 import { extractText, getDocumentProxy } from "unpdf";
 import { webError } from "./errors";
-import { fetchGuarded, type GuardOptions } from "./ssrf";
+import { assertDomainPolicy, fetchGuarded, HATCH_HINT, type GuardOptions } from "./ssrf";
 import { fenceText } from "./guard";
 
 export const HEAD_CHARS = 2000;
 
 export type FetchMode = "markdown" | "raw";
 
-export type MarkdownEnvelope = { url: string; title: string; path: string; chars: number; head: string; note?: string };
-export type RawEnvelope = { url: string; path: string; bytes: number; content_type: string };
+/** Which route obtained the body: the guarded HTTP client (`http`, the default), or `curl` on this
+ *  host (`shell`, the escape hatch). Both deliver and fence identically. */
+export type FetchVia = "http" | "shell";
+
+export type MarkdownEnvelope = {
+	url: string;
+	title: string;
+	path: string;
+	chars: number;
+	head: string;
+	note?: string;
+	/** Present only on the `via="shell"` route, so the model knows a shell fetch produced this. */
+	via?: "shell";
+};
+export type RawEnvelope = { url: string; path: string; bytes: number; content_type: string; via?: "shell" };
 export type FetchEnvelope = MarkdownEnvelope | RawEnvelope;
+
+/** Runs `curl` with these argv entries and answers its streams. The default spawns the process;
+ *  tests inject one, which is the only reason it is a seam — the hatch is real, not simulated. */
+export type ShellExec = (
+	args: string[],
+	options: { timeoutMs: number },
+) => Promise<{ code: number; stdout: Buffer; stderr: Buffer }>;
 
 export type FetchOptions = {
 	mode: FetchMode;
 	scratchDir: string;
 	timeoutMs: number;
 	guard: GuardOptions;
+	/** How to obtain the body. `shell` is the escape hatch (see the header); default `http`. */
+	via?: FetchVia;
+	/** Extra `curl` argv, before the URL, for the `shell` route only: `-H`, `-X POST`, `-d`, `-k`. */
+	shellArgs?: string[];
 	signal?: AbortSignal;
 	progress?: (text: string) => void;
 	/** Injected in tests. */
 	fetchImpl?: typeof fetch;
+	shellExec?: ShellExec;
 };
 
 function extensionFor(contentType: string): string {
@@ -134,33 +187,53 @@ export function extractMarkdown(html: string, url: string): { title: string; mar
 }
 
 export async function fetchContent(url: string, options: FetchOptions): Promise<FetchEnvelope> {
+	// The hatch first: everything below this line assumes the guarded client, and the shell route
+	// rejoins it at `deliver`, so both routes share the policy, the extraction and the fence.
+	if (options.via === "shell") return fetchViaShell(url, options);
 	options.progress?.(`fetch_content: ${url.slice(0, 120)} — fetching`);
 	const { response, finalUrl } = await fetchGuarded(url, { ...options.guard, timeoutMs: options.timeoutMs, signal: options.signal, fetchImpl: options.fetchImpl });
-	const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim() || "application/octet-stream";
 	const buffer = new Uint8Array(await response.arrayBuffer());
+	return deliver(buffer, response.headers.get("content-type") ?? "", finalUrl, options, null);
+}
+
+/** The delivery pipeline both routes share: the content-type policy, the extraction stack, the
+ *  spill and the fence. `extraNote` carries whatever the route itself has to say (the shell route's
+ *  "fetched with curl", a non-2xx status); the envelope's own notes are added here. */
+async function deliver(
+	buffer: Uint8Array,
+	rawContentType: string,
+	finalUrl: string,
+	options: FetchOptions,
+	extraNote: string | null,
+): Promise<FetchEnvelope> {
+	const via = options.via === "shell" ? ({ via: "shell" } as const) : {};
+	const contentType = rawContentType.split(";")[0]!.trim() || "application/octet-stream";
 
 	const supported = isTextish(contentType) || isHtml(contentType) || contentType.toLowerCase().includes("pdf");
 	if (!supported && !isUnknownType(contentType)) {
-		throw webError("ValueError", `unsupported content type ${contentType} at ${finalUrl} (text, HTML, PDF and undeclared bodies only)`);
+		throw webError("ValueError", `unsupported content type ${contentType} at ${finalUrl} (text, HTML, PDF and undeclared bodies only)${HATCH_HINT}`);
 	}
 
 	if (options.mode === "raw") {
 		const path = spillPath(options.scratchDir, finalUrl, extensionFor(contentType));
 		writeFileSync(path, buffer);
 		options.progress?.(`fetch_content: wrote ${buffer.length} bytes to ${path}`);
-		return { url: finalUrl, path, bytes: buffer.length, content_type: contentType };
+		return { url: finalUrl, path, bytes: buffer.length, content_type: contentType, ...via };
 	}
 
 	// markdown mode. A declared type we cannot deliver refused above; an undeclared one is decided
 	// here, by the bytes.
 	const sniff = supported ? null : sniffBody(buffer);
 	if (sniff === "binary") {
-		return spillRawBody(buffer, finalUrl, contentType, `the body is not text despite the ${contentType} declaration`, options);
+		return spillRawBody(buffer, finalUrl, contentType, `the body is not text despite the ${contentType} declaration`, options, extraNote);
 	}
 	// Sniffed HTML and text are delivered as if the server had said so; the note records that the
 	// type was a non-answer rather than an extraction guess.
 	const type = sniff === "html" ? "text/html" : sniff === "text" ? "text/plain" : contentType;
-	const note = sniff ? `the server declared ${contentType}; the body decodes as ${sniff === "html" ? "HTML" : "text"}` : undefined;
+	const note = joinNotes(
+		sniff ? `the server declared ${contentType}; the body decodes as ${sniff === "html" ? "HTML" : "text"}` : null,
+		extraNote,
+	);
 
 	if (contentType.toLowerCase().includes("pdf")) {
 		let text: string;
@@ -171,25 +244,25 @@ export async function fetchContent(url: string, options: FetchOptions): Promise<
 		} catch (error) {
 			throw webError("OSError", `could not read the PDF at ${finalUrl}: ${error instanceof Error ? error.message : String(error)}`);
 		}
-		if (!text) return spillRawBody(buffer, finalUrl, contentType, "the PDF yielded no text", options);
+		if (!text) return spillRawBody(buffer, finalUrl, contentType, "the PDF yielded no text", options, extraNote);
 		const path = spillPath(options.scratchDir, finalUrl, "txt");
 		writeFileSync(path, fenceText(text));
 		options.progress?.(`fetch_content: ${text.length} chars of PDF text to ${path}`);
-		return { url: finalUrl, title: "", path, chars: text.length, head: text.slice(0, HEAD_CHARS) };
+		return { url: finalUrl, title: "", path, chars: text.length, head: text.slice(0, HEAD_CHARS), ...(note ? { note } : {}), ...via };
 	}
 
-	const body = decodeBody(buffer, response.headers.get("content-type") ?? "");
+	const body = decodeBody(buffer, rawContentType);
 	if (!isHtml(type)) {
-		if (!body.trim()) return spillRawBody(buffer, finalUrl, contentType, "the response was empty", options);
+		if (!body.trim()) return spillRawBody(buffer, finalUrl, contentType, "the response was empty", options, extraNote);
 		const path = spillPath(options.scratchDir, finalUrl, extensionFor(type));
 		writeFileSync(path, fenceText(body));
 		options.progress?.(`fetch_content: ${body.length} chars (${contentType}) to ${path}`);
-		return { url: finalUrl, title: "", path, chars: body.length, head: body.slice(0, HEAD_CHARS), ...(note ? { note } : {}) };
+		return { url: finalUrl, title: "", path, chars: body.length, head: body.slice(0, HEAD_CHARS), ...(note ? { note } : {}), ...via };
 	}
 
 	const extracted = extractMarkdown(body, finalUrl);
 	if (!extracted) {
-		return spillRawBody(buffer, finalUrl, type, "no readable content", options);
+		return spillRawBody(buffer, finalUrl, type, "no readable content", options, extraNote);
 	}
 	const path = spillPath(options.scratchDir, finalUrl, "md");
 	writeFileSync(path, fenceText(extracted.markdown));
@@ -201,12 +274,149 @@ export async function fetchContent(url: string, options: FetchOptions): Promise<
 		chars: extracted.markdown.length,
 		head: extracted.markdown.slice(0, HEAD_CHARS),
 		...(note ? { note } : {}),
+		...via,
 	};
+}
+
+/** The envelope's `note` is one string: the parts join with `; `, and nothing joins to nothing. */
+function joinNotes(...parts: (string | null)[]): string | undefined {
+	const kept = parts.filter((part): part is string => part !== null && part !== "");
+	return kept.length === 0 ? undefined : kept.join("; ");
+}
+
+function safeUnlink(path: string): void {
+	try {
+		unlinkSync(path);
+	} catch {
+		// The body file is scratch; a missing one is not an error worth failing a fetch over.
+	}
+}
+
+/** `-w` is how curl tells us what the response *was*; the body itself goes to a file so that a
+ *  binary body, and a body that is not UTF-8, survive being read back. */
+const CURL_WRITE_OUT = "%{content_type}\t%{url_effective}\t%{http_code}";
+
+/** The default {@link ShellExec}: `curl` as a real child process, argv-only — no shell string is
+ *  ever built, so `args` cannot smuggle shell syntax and the hatch stays a *fetch* rather than a
+ *  second way to run commands. */
+const defaultShellExec: ShellExec = (args, options) =>
+	new Promise((resolve, reject) => {
+		execFile("curl", args, { timeout: options.timeoutMs, maxBuffer: 64 * 1024 * 1024 }, (error, stdout, stderr) => {
+			const code = (error as { code?: unknown } | null)?.code;
+			// A numeric `code` is curl's own exit status; anything else (ENOENT, EACCES) is a failure
+			// to run it at all, and the caller's message has to say which.
+			if (error !== null && typeof code !== "number") return reject(error);
+			resolve({ code: error === null ? 0 : (code as number), stdout: Buffer.from(stdout), stderr: Buffer.from(stderr) });
+		});
+	});
+
+/**
+ * `curl` flags that stop `via="shell"` being a **fetch** — the ones that name a file for curl to write
+ * or upload, and the one that takes further options from a file this hatch cannot see. The hatch's
+ * promise is that it fetches into the envelope and writes nothing but its own scratch body, so the
+ * flags that would break that promise are refused rather than silently reshaped.
+ *
+ * `-o`/`--output` is on the list because *our* `-o` has to be the one that decides where the body
+ * lands — a caller's would take the first URL and leave us reading a file nobody wrote — and because a
+ * copy of the bytes is already a first-class thing this tool does: `mode="raw"`.
+ */
+const NON_FETCH_FLAGS = new Map<string, string>([
+	["-o", 'name an output file for curl — use mode="raw" to keep the bytes on disk'],
+	["--output", 'name an output file for curl — use mode="raw" to keep the bytes on disk'],
+	["--output-dir", 'name an output directory for curl — use mode="raw" to keep the bytes on disk'],
+	["-O", 'tell curl to name the output file itself — use mode="raw" to keep the bytes on disk'],
+	["--remote-name", 'tell curl to name the output file itself — use mode="raw" to keep the bytes on disk'],
+	["-J", 'tell curl to name the output file itself — use mode="raw" to keep the bytes on disk'],
+	["--remote-header-name", 'tell curl to name the output file itself — use mode="raw" to keep the bytes on disk'],
+	["--create-dirs", 'create directories for an output file — use mode="raw" to keep the bytes on disk'],
+	["-D", "write the response headers to a file — fetch and read them instead"],
+	["--dump-header", "write the response headers to a file — fetch and read them instead"],
+	["-c", "write a cookie jar file — this is a fetch, not an interactive client"],
+	["--cookie-jar", "write a cookie jar file — this is a fetch, not an interactive client"],
+	["-T", "upload a local file — the hatch fetches; a POST body goes in --data"],
+	["--upload-file", "upload a local file — the hatch fetches; a POST body goes in --data"],
+	["-K", "take further curl options from a file — pass them in args directly"],
+	["--config", "take further curl options from a file — pass them in args directly"],
+]);
+
+function assertFetchOnlyArgs(args: string[]): void {
+	for (const arg of args) {
+		// One URL, and it is the `url` parameter: a second one in `args` would take our `-o` (curl maps
+		// output files to URLs in order) and leave the caller reading a body nobody asked for.
+		if (/^[a-z][a-z0-9+.-]*:\/\//i.test(arg)) {
+			throw webError("ValueError", `fetch_content via="shell": args must not contain a URL (${arg}) — pass it as url`);
+		}
+		// `-o file`, `-ofile` and `--output=file` are all the same option to curl, so all three are
+		// looked for: the exact flag, its `=`-form, and a short flag's attached value.
+		const short = arg.length > 2 && !arg.startsWith("--") ? arg.slice(0, 2) : undefined;
+		const flag = NON_FETCH_FLAGS.get(arg) ?? NON_FETCH_FLAGS.get(arg.split("=")[0] ?? "") ?? (short ? NON_FETCH_FLAGS.get(short) : undefined);
+		if (flag === undefined) continue;
+		throw webError("ValueError", `fetch_content via="shell": args must not ${flag} (${arg})`);
+	}
+}
+
+/** The escape hatch: `curl` on this host, then the same pipeline the guarded client feeds. See the
+ *  header for what it skips (the address and scheme checks) and what it keeps (the domain policy). */
+async function fetchViaShell(url: string, options: FetchOptions): Promise<FetchEnvelope> {
+	let hostname: string;
+	try {
+		hostname = new URL(url).hostname;
+	} catch {
+		throw webError("ValueError", `not a valid URL: ${url}`);
+	}
+	assertDomainPolicy(hostname, options.guard.domainPolicy);
+
+	const dir = `${options.scratchDir}/web`;
+	mkdirSync(dir, { recursive: true });
+	const bodyPath = `${dir}/.curl-${randomUUID()}.body`;
+	options.progress?.(`fetch_content: ${url.slice(0, 120)} — fetching with curl`);
+	assertFetchOnlyArgs(options.shellArgs ?? []);
+
+	let result: { code: number; stdout: Buffer; stderr: Buffer };
+	try {
+		result = await (options.shellExec ?? defaultShellExec)(["-sS", "-L", ...(options.shellArgs ?? []), "-o", bodyPath, "-w", CURL_WRITE_OUT, url], {
+			timeoutMs: options.timeoutMs,
+		});
+	} catch (error) {
+		throw webError("OSError", `fetch_content via="shell": could not run curl: ${error instanceof Error ? error.message : String(error)}`);
+	}
+
+	const headerLine = result.stdout.toString("utf-8").trim().split("\n").slice(-1)[0] ?? "";
+	const [contentType = "", finalUrl = "", httpStatus = "0"] = headerLine.split("\t");
+
+	if (result.code !== 0) {
+		safeUnlink(bodyPath);
+		const why = result.stderr.toString("utf-8").trim().slice(0, 300);
+		throw webError("OSError", `fetch_content via="shell": curl exited ${result.code} for ${url}${why ? `: ${why}` : ""}`);
+	}
+
+	let buffer = new Uint8Array();
+	try {
+		buffer = new Uint8Array(readFileSync(bodyPath));
+	} catch {
+		// `--head`, or a body curl declined to write: an empty body, which `deliver` reports as such.
+	} finally {
+		safeUnlink(bodyPath);
+	}
+
+	const status = Number(httpStatus);
+	const extraNote = joinNotes(
+		'fetched with curl on this host (via="shell")',
+		status > 0 && (status < 200 || status >= 300) ? `the response was HTTP ${status}` : null,
+	);
+	return deliver(buffer, contentType, finalUrl || url, options, extraNote ?? null);
 }
 
 /** Nothing readable came out: spill the raw body and say so rather than returning a
  *  silently empty page (ticket 05). */
-function spillRawBody(buffer: Uint8Array, url: string, contentType: string, why: string, options: FetchOptions): MarkdownEnvelope {
+function spillRawBody(
+	buffer: Uint8Array,
+	url: string,
+	contentType: string,
+	why: string,
+	options: FetchOptions,
+	extraNote: string | null = null,
+): MarkdownEnvelope {
 	const path = spillPath(options.scratchDir, url, extensionFor(contentType));
 	// A text-ish raw body is still page text a cell may read, so it is fenced. A binary body (a PDF
 	// with no extractable text) cannot be, and the note says what the file holds.
@@ -214,13 +424,15 @@ function spillRawBody(buffer: Uint8Array, url: string, contentType: string, why:
 	const textish = text.trim().length > 0;
 	writeFileSync(path, textish ? fenceText(text) : buffer);
 	options.progress?.(`fetch_content: ${why}; the raw response is at ${path}`);
+	const note = joinNotes(`${why}; the file holds the raw response (${contentType}, ${buffer.length} bytes)${textish ? ", fenced" : ""}`, extraNote);
 	return {
 		url,
 		title: "",
 		path,
 		chars: 0,
 		head: "",
-		note: `${why}; the file holds the raw response (${contentType}, ${buffer.length} bytes)${textish ? ", fenced" : ""}`,
+		...(note ? { note } : {}),
+		...(options.via === "shell" ? { via: "shell" as const } : {}),
 	};
 }
 

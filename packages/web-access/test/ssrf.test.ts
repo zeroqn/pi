@@ -22,6 +22,25 @@ function fakeFetch(script: Array<{ status: number; headers?: Record<string, stri
 	return { impl, calls };
 }
 
+describe('the hatch hint (the remedy arrives with the refusal)', () => {
+	it("names via=\"shell\" on the internal-address and scheme refusals a shell fetch gets past", async () => {
+		for (const url of ["http://localhost/", "http://169.254.169.254/latest/meta-data/", "ftp://example.com/file"]) {
+			const error = (await fetchGuarded(url, { ...guard(), timeoutMs: 5_000, fetchImpl: fakeFetch([]).impl }).catch((caught: unknown) => caught)) as Error;
+			expect(error.message, url).toContain('via="shell"');
+		}
+	});
+
+	it("does not name it on the domain policy's refusal, which the hatch honours", async () => {
+		const error = (await fetchGuarded("https://www.reddit.com/r/x", {
+			...guard({ domainPolicy: { allow: [], deny: ["reddit.com"] } }),
+			timeoutMs: 5_000,
+			fetchImpl: fakeFetch([]).impl,
+		}).catch((caught: unknown) => caught)) as Error;
+		expect(error.message).toContain("domain policy");
+		expect(error.message).not.toContain('via="shell"');
+	});
+});
+
 describe("the guard's address tables (ticket 06, ported from upstream)", () => {
 	it("blocks the IPv4 classes upstream blocks", () => {
 		for (const address of ["0.0.0.0", "10.0.0.1", "127.0.0.1", "100.64.0.1", "169.254.169.254", "172.16.0.1", "192.168.1.1", "198.18.0.1", "224.0.0.1", "255.255.255.255"]) {
