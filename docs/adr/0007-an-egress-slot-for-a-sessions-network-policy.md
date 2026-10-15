@@ -119,3 +119,15 @@ ability, and this points to it rather than restating it.
   (preference 4 of `.scratch/ssh-grant`): a script, base64, an interpreter the table does not know or
   an absolute path still walks around it, `-D` is refused even under a grant, and the system-prompt
   rule stays the load-bearing half. The grant buys a fence, not a hole.
+
+## Amendment, 2026-10-15 — the slot is no longer the only seam
+
+The decision above is left as written; this records what came after it. The `egress` slot is still code
+mode's and its contract has not moved (`API_VERSION` 5, ADR 0008). But it is no longer the **only** place
+the session's egress policy is enforced: the same policy — the same matcher, the same grants and ask, the
+same verdict — is also enforced at pi's own `tool_call`/`tool_result` events, so a session with no code
+mode (no kernel, no slot) is guarded too.
+`docs/adr/0009-the-coverage-belongs-to-the-policy.md` is the decision that made the coverage a property
+of the policy rather than of this slot; a reader of this ADR should read it beside this one. Nothing here
+is withdrawn: the slot is one of the policy's two **seams**, and its own shape, version and fail-closed
+rules are exactly as the decision above records them.

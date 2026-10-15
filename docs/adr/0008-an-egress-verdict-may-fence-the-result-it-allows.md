@@ -76,3 +76,14 @@ byte-identical, and ordinary `ls`/`grep`/`npm`/`git` output must not move — a 
   still reads `API_VERSION = 4`, and code mode has no fence descriptor and no `applyFence`. This ADR
   records a decision, not shipped behaviour, and ADR 0007's "a verdict cannot rewrite a result" sentence
   is amended when the field does.
+
+## Amendment, 2026-10-15 — the fence has a second applier
+
+The decision above is left as written. Its sentence "code mode supplies the act (`applyFence` in
+`guarded()`)" is now one of two: the same `REMOTE_OUTPUT_FENCE` is applied at pi's own **tool seam** by
+`fenceToolResult` (`web-access/tool-seam.ts`) when the model calls the `bash`/`powershell` tool directly.
+The words are still this package's, and now two seams perform the act. The contract this ADR records
+(`EgressVerdict`'s fenced allowance, `API_VERSION` 5) is unchanged, and the field it decided is in the
+tree — the last Consequences bullet's "does not exist in the tree" is no longer true.
+`docs/adr/0009-the-coverage-belongs-to-the-policy.md` is the decision that gave the policy its second
+seam.

@@ -198,6 +198,38 @@ in the next session.
 reaching the same target are two grants, and each session's children are more — nothing here is
 machine-wide.
 
+**The tool seam.** pi's own `bash` tool is the second place the same policy is enforced — pi's
+`tool_call` and `tool_result` events, not code mode's `egress` slot — and it is what covers a session with
+**no code mode at all**, where a model that ran `ssh build-host …` directly used to get remote text back
+with no marker on it. It judges the **shell tools** only (`bash` and `powershell`), reading
+`input.command`, and it is deliberately not a scan for "text that looks like a command": a `python` tool
+call is itself a tool call whose source contains the command, so a content-scanning handler would judge
+the cell's own call and nest the kernel seam's markers. It is registered in every session, including ones
+with a kernel — gating only the kernel-less ones would leave the most capable sessions unguarded and make
+the same command allowed in a cell while refused from the tool.
+
+A blocked call reaches the model as an **error result carrying the refusal sentence** — the same words the
+kernel seam refuses with, so a model told "a grant is the only route" does not retry another spelling.
+A granted call's result has each **text block** wrapped whole in the same `<untrusted_remote_output>`
+markers, and the handler returns **`content` only** — replacing it without `structuredContent` makes the
+runner delete that field, whose `output` is the *fuller* (untruncated) output, so carrying it would leave
+an unfenced copy larger than the one wrapped. Images and `details` are untouched, an empty text block is
+not wrapped, and a block already carrying the wrapper is left alone; a granted call that *fails* is
+fenced too, and because a blocked call is also an error result the fence's presence is the model's only
+signal that the command **ran** rather than being refused. The **TTY rule** is the same as the kernel's:
+under a grant `-t`/`-tt` is refused (an interactive session has no result to wrap) while `-T` runs. The
+session's footer shows what it holds and how often it refused — `ssh-grant: 2 granted, 1 refused` —
+written with `ctx.ui.setStatus` and cleared when there is nothing, the pattern readonly-mode uses;
+headless keeps the transcript, where a refusal or a fence is already in the record.
+
+**Coverage.** The policy governs the **command text** a cell's host calls carry and the **command text**
+pi's shell tool carries, in every session. It does not govern two paths, and both are named rather than
+assumed: a tool that reaches the network with **no shell command** — an MCP server, a provider SDK, a
+future fetch tool — leaves nothing for a command-text policy to read; and a `bash` tool whose backend is
+`BashOperations` over SSH runs **no command text at all**, so neither seam can see it. The second is the
+strongest instance of the first, and neither is closed here. Coverage is what the two seams now match; the
+class rule — external text is data, however it arrived — still carries what they do not.
+
 ## The escape hatch: `fetch_content(url, via="shell")`
 
 A refusal that cannot be got past does not protect work, it stops it — and a session that needs a page

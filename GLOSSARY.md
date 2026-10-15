@@ -89,6 +89,22 @@ loads, what it may hold (the ceiling) and what it was given. It lives in one pla
 the *policy* stays with the contributors.
 _Avoid_: child mode, inheritance
 
+**Seam**:
+A place a policy can be enforced — a **kernel seam** or a **tool seam**. The kernel seam is code mode's
+`egress` slot, where a cell's host calls are judged; the tool seam is pi's own `tool_call`/`tool_result`
+events, where the model's direct tool calls are judged. One policy can be enforced at both, and what it
+governs is its **coverage**, not the seam it was born in
+(`docs/adr/0009-the-coverage-belongs-to-the-policy.md`).
+_Avoid_: slot, hook — a slot is one seam's contract; a seam is the place, whatever reaches it
+
+**Coverage**:
+Which seams and which paths a policy actually governs. The guardrail's claim has always been
+class-shaped — external text is data, however it arrived — and coverage is what makes its reach match it,
+and says where it does not. Two known gaps: a tool that reaches the network with **no shell command** (an
+MCP server, a future fetch tool), and a shell tool whose backend is `BashOperations` over SSH, which runs
+no command text for either seam to read.
+_Avoid_: scope, boundary — coverage names the seams and paths a policy governs, not what contains them
+
 **Policy slot**:
 A single-owner place a session's policy is declared, asked before its host calls run — `guard` (may this
 call run, and which mode does the cwd mount get) and `egress` (may it reach the network) — consulted in
@@ -101,7 +117,9 @@ The `egress` slot's content: whether a host call may leave this host. pi-web-acc
 refuses a `bash` command whose purpose is to leave and steers it to `fetch_content` — and to the
 **escape hatch** when that route cannot reach the page. For a target-bearing transport the refusal is no
 longer the only answer: where a human is present it becomes **the ask**, and a **grant** turns it into
-an allowance that carries the **remote-output fence**.
+an allowance that carries the **remote-output fence**. It is no longer only the kernel's: the same
+policy is enforced at the **tool seam** too, so a session with no code mode is guarded, and a command is
+never allowed in a cell while refused as a shell tool.
 _Avoid_: network guard, firewall; and "egress" for the host surface itself, which is the **Host surface**
 
 **Escape hatch**:
@@ -115,7 +133,8 @@ this one cannot, and a grant fences instead of hiding
 
 **Fence**:
 The untrusted-content markers wrapped around text that came from outside this host, so the model reads
-it as data.
+it as data. One set of words with two appliers: code mode's `applyFence` wraps a granted cell call's
+result, and the tool seam's `fenceToolResult` wraps a granted shell tool call's text block.
 _Avoid_: sandbox, boundary — a fence wraps text, it does not contain a process
 
 **Untrusted content**:
@@ -127,7 +146,8 @@ rule wears the wire name if anyone needs it (`untrusted_external_content`)
 
 **Remote-output fence**:
 The fence for a granted connection's output: its own marker and preamble, because a remote shell is not
-a web page even though both are external.
+a web page even though both are external. Both seams apply it: `applyFence` for the kernel, and
+`fenceToolResult` for pi's own shell tool.
 _Avoid_: ssh fence, shell fence — one fence covers every granted transport, and it is not the web fence
 
 **Verdict**:
@@ -138,7 +158,8 @@ is not what the call returned
 
 **Grant**:
 A human's answer for one session: *this* destination may be reached. Not a **declaration**, not a model's
-decision, and not a property of the host — the answer comes from a person.
+decision, and not a property of the host — the answer comes from a person. It is held once per session
+**across both seams**: one store, one ask, and a refusal at either seam counts the same.
 _Avoid_: permission, access — a grant is one session's answer about one destination, not a host-wide
 policy
 
@@ -163,7 +184,8 @@ _Avoid_: endpoint, address — a key is text from the command line, not a resolv
 
 **The ask**:
 The moment the refusal turns into a question, at the call that was refused. Its answer is the grant; its
-absence (no UI, no answer) is a refusal.
+absence (no UI, no answer) is a refusal. The dialog says which **seam** is asking — *in a cell* or *as a
+shell command* — so the same refusal reads the same whichever seam raised it.
 _Avoid_: prompt, request — the ask is the refusal's own question, not the model asking in prose
 
 ## The agent side

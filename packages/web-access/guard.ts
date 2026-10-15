@@ -51,11 +51,12 @@ export const REMOTE_PREAMBLE =
  * its own marker and its own preamble, and the system-prompt rule names it as a second instance of
  * the same class — not a second section.
  *
- * **Code mode applies this, not this package.** When the egress policy answers a granted call with
- * `{ allow: true, fence: REMOTE_OUTPUT_FENCE }`, code mode's `applyFence` wraps that one call's text
- * fields with these three strings — the egress owner supplies the words, the kernel performs the act
- * — so a revision of the marker never touches code mode. The words live here because this package
- * owns the untrusted-content vocabulary and its next revision.
+ * **This package supplies the words; the seam performs the act.** Two seams apply them, and neither
+ * revision touches the words: code mode's `applyFence` wraps a granted cell call's text fields (the
+ * egress policy answers `{ allow: true, fence: REMOTE_OUTPUT_FENCE }`), and this package's own tool
+ * seam (`tool-seam.ts`'s `fenceToolResult`) wraps a granted shell tool call's text block — the second
+ * seam, for a session with no kernel (`docs/adr/0009-the-coverage-belongs-to-the-policy.md`). The
+ * words live here because this package owns the untrusted-content vocabulary and its next revision.
  *
  * `fenceText`'s rule holds verbatim for this marker too: **always wrap**, even when the value already
  * carries it. A remote command's output can forge `<untrusted_remote_output>` as easily as a page can
