@@ -938,3 +938,36 @@ export function checkEgress(command: string): EgressVerdict {
 	}
 	return { ok: true };
 }
+
+/** One shell segment of a command, split and peeled exactly as `checkEgress` reads it. */
+export type EgressSegment = {
+	/** The segment's text, as split (quoting intact, comments already stripped). */
+	text: string;
+	/** The command word: the basename after leading `VAR=value` assignments and wrapper words. */
+	command: string;
+	/** The command's arguments, wrappers peeled. */
+	args: string[];
+};
+
+/**
+ * Split a command into the segments `checkEgress` sees, each with its command word and arguments.
+ *
+ * `checkEgress` itself returns one verdict for the whole text, which is all a refusal needs. The
+ * grant-aware policy needs the segments: it routes the **transport family** through
+ * `destinationKeys` while every *other* segment keeps `checkEgress`'s rules, so a command that
+ * combines a granted `ssh` with a `curl` is still refused for the `curl`. This is a read of the same
+ * walk (`stripComments` -> `splitSegments` -> `segmentTokens` -> `unwrap`) rather than a second
+ * grammar; the three functions above are unchanged.
+ */
+export function egressSegments(command: string): EgressSegment[] {
+	const out: EgressSegment[] = [];
+	for (const segment of splitSegments(stripComments(command))) {
+		const tokens = unwrap(segmentTokens(segment));
+		out.push({
+			text: segment,
+			command: tokens.length > 0 ? basename(tokens[0]) : "",
+			args: tokens.slice(1),
+		});
+	}
+	return out;
+}

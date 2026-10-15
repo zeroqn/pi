@@ -292,6 +292,7 @@ const PAIR_ALLOWED: PairRow[] = [
 	{ command: "rsync -av dev@build-box:/srv/ ./dst/", granted: ["dev@build-box"], keys: ["dev@build-box"], reason: "A3/A6: rsync's destination is a role, so a remote SRC is a key." },
 	{ command: "rsync ./dst/ dev@build-box:/srv/ -av", granted: ["dev@build-box"], keys: ["dev@build-box"], reason: "A3: options may follow the paths; the remote DEST is a key." },
 	{ command: "rsync -a src/ dst/", granted: [], keys: [], reason: "A6: no colon, no URI — a local copy names no key." },
+	{ command: "rsync -e ssh local1 local2", granted: [], keys: [], reason: "Amendment: the -e option makes it 'remote' to checkEgress, but it names no host, so the key set is empty and part C's policy allows it — the deliberate loosening of an over-refusal." },
 	{ command: "ssh -o ProxyJump=ops@bastion dev@build-box", granted: ["dev@build-box", "ops@bastion"], keys: ["dev@build-box", "ops@bastion"], reason: "A4: -o's value is a route; ProxyJump names a second host." },
 	{ command: "ssh -o Hostname=build-box.internal dev@build-box", granted: ["dev@build-box", "build-box.internal"], keys: ["dev@build-box", "build-box.internal"], reason: "A4: -o Hostname= is a second plain-text host." },
 	{ command: "ssh -o ProxyCommand='ssh -W %h:%p bastion' dev@build-box", granted: ["dev@build-box", "bastion"], keys: ["dev@build-box", "bastion"], reason: "A4: a ProxyCommand's host tokens, read as the nested command line they are." },

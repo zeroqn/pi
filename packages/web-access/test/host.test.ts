@@ -313,8 +313,8 @@ describe("the egress policy this package contributes", () => {
 	}
 	const call = (name: string, args: unknown[]) => ({ name, args }) as never;
 
-	it("declares one at contract version 4, and it refuses a fetch-shaped bash call", async () => {
-		const verdicts = answer(4);
+	it("at contract 5, declares one with no problems and refuses a fetch-shaped call", async () => {
+		const verdicts = answer(5);
 		expect(verdicts.problems).toEqual([]);
 		const before = verdicts.contribution?.egress?.before;
 		if (before === undefined) throw new Error("expected an egress policy");
@@ -327,22 +327,40 @@ describe("the egress policy this package contributes", () => {
 		expect(await before(call("someones_else_fetch", ["https://example.com"]))).toBeUndefined();
 	});
 
+	it("below 5 keeps the refusal but drops the grant, and says so", async () => {
+		const older = answer(4);
+		const before = older.contribution?.egress?.before;
+		if (before === undefined) throw new Error("expected an egress policy");
+		// The fetch refusal is unchanged...
+		const fetched = await before(call("bash_host", ["curl -s https://example.com"]));
+		expect(fetched).toEqual({ allow: false, reason: expect.stringContaining("fetch_content") });
+		// ...and an otherwise-grantable target is refused with the code mode's version named.
+		const refused = await before(call("bash_host", ["ssh dev@build-box"]));
+		expect(refused).toEqual({ allow: false, reason: expect.stringContaining("contract version 4") });
+		const problems = (older.problems ?? []).join(" ");
+		expect(problems).toContain("granting a target needs 5");
+		expect(problems).toContain("/ssh-grant is unavailable");
+	});
+
 	it("omits it below version 4 and says so, instead of the session believing itself guarded", () => {
-		const older = answer(3);
-		expect(older.contribution?.egress).toBeUndefined();
+		const tooOld = answer(3);
+		expect(tooOld.contribution?.egress).toBeUndefined();
 		// It degrades loud and *not* closed: the host functions and the rule are still contributed.
-		expect(older.contribution?.hostFns).toBeDefined();
-		expect(older.contribution?.description ?? "").toContain("fetch_content");
-		expect((older.problems ?? []).join(" ")).toContain("contract version 3");
-		expect((older.problems ?? []).join(" ")).toContain("NOT refused");
+		expect(tooOld.contribution?.hostFns).toBeDefined();
+		expect(tooOld.contribution?.description ?? "").toContain("fetch_content");
+		const problems = (tooOld.problems ?? []).join(" ");
+		expect(problems).toContain("contract version 3");
+		expect(problems).toContain("NOT refused");
+		// A second sentence, beside the existing one: the grant route is unavailable too.
+		expect(problems).toContain("granting a target needs 5");
 	});
 });
 
 describe("pi install loads the guard too", () => {
-	it("registers both guard layers on the extension api", () => {
+	it("registers both guard layers and the /ssh-grant session read on the extension api", () => {
 		const events: string[] = [];
 		piWebAccess({ on: (event: string) => events.push(event) } as never);
-		expect(events).toEqual(["before_agent_start", "tool_result"]);
+		expect(events).toEqual(["before_agent_start", "tool_result", "session_start", "session_shutdown"]);
 	});
 });
 
@@ -370,12 +388,13 @@ describe("the shell guideline keeps its ban and gains the ask route", () => {
 		expect(shellGuideline()).toContain("the session may refuse one outright");
 	});
 
-	it("names the granted route when the errand needs a host, and promises nothing yet", () => {
-		// The route is described by what happens, not by naming a command: `/ssh-grant` does not exist
-		// until ticket 06/07 of the ssh-grant map builds it, and a guideline must not teach a command
-		// the session cannot run. What it must say is that a grant is a human's to give.
+	it("names the granted route and, now that it exists, the /ssh-grant command", () => {
+		// The route is described by what happens, and the up-front command is named now that ticket 06
+		// built it — ticket 08 deliberately left it out while a session could not yet run it. What the
+		// line must still say is that a grant is a human's to give.
 		expect(shellGuideline()).toContain("a target only an ssh connection reaches");
 		expect(shellGuideline()).toContain("a human is asked for one if a dialog can appear");
+		expect(shellGuideline()).toContain("/ssh-grant <key>");
 		expect(shellGuideline()).toContain("do not read a refusal as an invitation to route around it");
 		expect(shellGuideline()).toContain("No grant exists until a human gives one");
 	});

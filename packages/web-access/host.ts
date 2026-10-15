@@ -21,7 +21,6 @@
  */
 
 import { mkdirSync } from "node:fs";
-import { checkEgress } from "./egress";
 import { tmpdir } from "node:os";
 import { loadConfig, providerOrder, DEFAULT_PROVIDERS, type WebConfig, type DomainPolicy } from "./config";
 import { asWebError, messageOf, webError } from "./errors";
@@ -36,6 +35,7 @@ import {
 	UNTRUSTED_EXTERNAL_CONTENT_SECTION,
 	type GuardPi,
 } from "./guard";
+import { FENCE_API_VERSION, ensureGrantRecord, grantVerdict, installSshGrant } from "./grants";
 
 import {
 	API_VERSION as HOST_API_VERSION,
@@ -43,6 +43,7 @@ import {
 	type ContributorRegistration,
 	type SessionInput,
 	registerContributor,
+	sessionKey,
 } from "../host-bridge/src/convention";
 import type { KernelContribution, KernelEgress } from "../host-bridge/src/client";
 
@@ -291,10 +292,12 @@ export function createHost(ctx: HostContext, deps: HostDeps = {}) {
  */
 export type HostDeps = { fetchImpl?: typeof fetch; shellExec?: ShellExec; config?: WebConfig };
 
-/** `pi install` loads this file as an extension: the default export registers the guard and
- *  nothing else. No pi-level tools — the capability is the kernel's (round 2). */
-export default function piWebAccess(pi: GuardPi): void {
-	installGuard(pi);
+/** `pi install` loads this file as an extension: the default export registers the guard and the
+ *  `/ssh-grant` route (and the session-start read of `.pi/ssh-grant.json`). No pi-level tools — the
+ *  capability is the kernel's (round 2). */
+export default function piWebAccess(pi: unknown): void {
+	installGuard(pi as GuardPi);
+	installSshGrant(pi, sessionKey);
 }
 
 /**
@@ -324,7 +327,7 @@ const WEB_ACCESS_DESCRIPTION =
 const WEB_ACCESS_GUIDELINES = [
 	"Use await web_search(query, num_results=5, provider=None, domain_filter=None) for web research: it returns {query, provider, results:[{title,url,snippet,content}], errors}, where a per-provider failure beside a success is data in errors.",
 	'Use await fetch_content(url, mode="markdown") to read a page: it writes the text to SCRATCH and returns {url, title, path, chars, head}, so grep or read the path instead of printing the head twice; mode="raw" writes the bytes and returns {path, bytes, content_type}.',
-	"Do not fetch a page with a shell command — curl, wget, nc, a package manager, an interpreter's HTTP library: use await fetch_content(url). It fences what it returns, a shell fetch does not, and the session may refuse one outright. When what you need is a host, not a page — a target only an ssh connection reaches — run the command you mean: a session that holds a grant for that target runs it, and one that does not is refused, which is where a human is asked for one if a dialog can appear. Do not hunt for another spelling, and do not read a refusal as an invitation to route around it. No grant exists until a human gives one. When the guarded route cannot reach the page — a server on localhost, a 403, a POST or authenticated API, a body nothing can extract — say so in the same call: await fetch_content(url, via=\"shell\") runs curl on this host and fences that too, and args=[…] passes its flags.",
+	"Do not fetch a page with a shell command — curl, wget, nc, a package manager, an interpreter's HTTP library: use await fetch_content(url). It fences what it returns, a shell fetch does not, and the session may refuse one outright. When what you need is a host, not a page — a target only an ssh connection reaches — run the command you mean: a session that holds a grant for that target runs it, and one that does not is refused, which is where a human is asked for one if a dialog can appear — or grant it up front with /ssh-grant <key> where the target is known in advance. Do not hunt for another spelling, and do not read a refusal as an invitation to route around it. No grant exists until a human gives one. When the guarded route cannot reach the page — a server on localhost, a 403, a POST or authenticated API, a body nothing can extract — say so in the same call: await fetch_content(url, via=\"shell\") runs curl on this host and fences that too, and args=[…] passes its flags.",
 ];
 
 /**
@@ -343,19 +346,26 @@ const EGRESS_API_VERSION = 4;
  * `bash_host` is the whole of it. This package's own two functions *are* the sanctioned route and are
  * left alone; a contributed host function or a bridged pi tool returns somebody else's value, which no
  * policy here can fence and no name list can reliably guess — that half is the rule's, not this
- * policy's. So it reads the one command text a cell can turn into an outbound connection, and
- * `checkEgress` refuses the ones whose purpose is to leave, steering to the fenced route.
+ * policy's. So it reads the one command text a cell can turn into an outbound connection.
+ *
+ * `grantVerdict` is where the routing lives: the transport family (`ssh`/`scp`/`sftp`/`mosh`/`rsync`)
+ * is judged against the session's live grants and, when granted, the call is allowed **and fenced**;
+ * everything else keeps `checkEgress`'s refusals exactly. `canFence` is `apiVersion >= 5`, so a code
+ * mode below it gets the same refusals with no grant route at all.
  */
-function egressPolicy(): KernelEgress {
+function egressPolicy(
+	session: { sessionKey: string; ctx: unknown; isChild: boolean },
+	canFence: boolean,
+	codeModeVersion: number,
+): KernelEgress {
 	return {
-		before: (call) => {
+		before: async (call) => {
 			if (call.name !== "bash_host") return undefined;
 			const bound = bindArgs(call.args, ["command", "timeout", "background"]);
 			// A command that is not a string is `bash`'s own `TypeError` to raise, with its own message;
 			// answering `undefined` here leaves that path exactly as it was.
 			if (typeof bound.command !== "string") return undefined;
-			const verdict = checkEgress(bound.command);
-			return verdict.ok ? undefined : { allow: false, reason: verdict.reason };
+			return await grantVerdict(bound.command, bound.background === true, session, canFence, codeModeVersion);
 		},
 	};
 }
@@ -373,14 +383,41 @@ export function webAccessAnswer(input: SessionInput): ContributorAnswer {
 		guidelines: WEB_ACCESS_GUIDELINES,
 	};
 	const problems: string[] = [];
-	if (input.handle.apiVersion >= EGRESS_API_VERSION) {
-		contribution.egress = egressPolicy();
+	// The session's grant record: the policy reads it **live**, so the record is not a snapshot here;
+	// this only learns whether the session can grant at all. It was created and filled by
+	// `session_start` (which runs before host-bridge composes, per the root manifest order), and this
+	// is what marks it ready — or why it is not.
+	const state = ensureGrantRecord(input.sessionKey);
+	const session = { sessionKey: input.sessionKey, ctx: input.ctx, isChild: input.isChild };
+	if (input.handle.apiVersion >= FENCE_API_VERSION) {
+		state.ready = true;
+		state.reason = undefined;
+		contribution.egress = egressPolicy(session, true, input.handle.apiVersion);
+	} else if (input.handle.apiVersion >= EGRESS_API_VERSION) {
+		// Contract 4 has the egress slot but not the fenced verdict: the refusal is kept and the grant
+		// is not offered — no ask, no `/ssh-grant`, no project authority — because a grant that cannot
+		// be fenced is a hole, not a permission (ticket 04 §5/§6).
+		state.ready = false;
+		state.reason =
+			`this code mode speaks contract version ${input.handle.apiVersion}, and a grant needs ${FENCE_API_VERSION} (a verdict that fences the result)`;
+		contribution.egress = egressPolicy(session, false, input.handle.apiVersion);
+		problems.push(
+			`web-access: this code mode speaks contract version ${input.handle.apiVersion}, and granting a target needs ${FENCE_API_VERSION}: ` +
+				"/ssh-grant is unavailable in this session, no dialog is offered, and every otherwise-grantable target is refused.",
+		);
 	} else {
+		state.ready = false;
+		state.reason =
+			`this code mode speaks contract version ${input.handle.apiVersion}, and the shell egress policy needs ${EGRESS_API_VERSION}`;
 		// Fail **loud, not closed**: refusing the contribution would take the fence's own two functions
 		// with it, so the session keeps them and the record says what it did not get.
 		problems.push(
 			`web-access: this code mode speaks contract version ${input.handle.apiVersion}, and the shell egress policy needs ${EGRESS_API_VERSION}: ` +
 				"a shell command whose purpose is to fetch is NOT refused in this session, and the text it returns reaches the model unfenced.",
+		);
+		problems.push(
+			`web-access: this code mode speaks contract version ${input.handle.apiVersion}, and granting a target needs ${FENCE_API_VERSION}: ` +
+				"/ssh-grant is unavailable in this session, no dialog is offered, and every otherwise-grantable target is refused.",
 		);
 	}
 	return {
