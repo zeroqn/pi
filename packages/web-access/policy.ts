@@ -147,6 +147,7 @@ export async function askForGrant(
 	keys: readonly string[],
 	declared: readonly string[],
 	stale: readonly { key: string; at: number }[] = [],
+	where = "in a cell",
 ): Promise<boolean> {
 	const ui = uiOf(ctx);
 	if (ui === null || typeof ui.confirm !== "function") return false;
@@ -158,7 +159,10 @@ export async function askForGrant(
 					.map((entry) => `${entry.key} was granted ${describeAge(entry.at)} ago, past the ${GRANT_IDLE_DAYS}-day window`)
 					.join("; ")}.`
 			: "";
-	const body = `The session is asking to run, in a cell:\n\n${command}\n\nThis grants: ${keys.join(", ")}${declaredNote}${staleNote}`;
+	// `where` is the seam's own word for what is asking: a kernel cell, or pi's own shell tool. The dialog
+	// is the same dialog either way (one store, one ask), but it must not tell a human the command is
+	// running "in a cell" when the model asked for it as a tool call — row 4 of the map's bar caught that.
+	const body = `The session is asking to run, ${where}:\n\n${command}\n\nThis grants: ${keys.join(", ")}${declaredNote}${staleNote}`;
 	try {
 		const yes = await (ui.confirm as (title: string, body: string, opts: { timeout: number; signal?: AbortSignal }) => Promise<boolean>)(
 			title,
@@ -225,6 +229,8 @@ export async function decide(
 	session: GrantSession,
 	canFence: boolean,
 	codeModeVersion: number,
+	/** The seam's word for what is asking, for the dialog's own sentence (see {@link askForGrant}). */
+	where = "in a cell",
 ): Promise<CallVerdict> {
 	// 1. Everything the present gate refuses, except the family — so a command combining a granted
 	//    ssh with a curl is still refused for the curl.
@@ -270,7 +276,7 @@ export async function decide(
 		.map((entry) => ({ key: entry.key, at: entry.grant.at as number }));
 	if (dialogCapable && !denied) {
 		const declared = reading.keys.filter((key) => state.project !== null && state.project.keys.includes(key));
-		const yes = await askForGrant(session.ctx, command, reading.keys, declared, stale);
+		const yes = await askForGrant(session.ctx, command, reading.keys, declared, stale, where);
 		if (yes === true) {
 			// A yes **re-stamps** every key, so an actively used grant never re-asks twice.
 			const at = Date.now();

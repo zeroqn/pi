@@ -133,7 +133,7 @@ export async function judgeToolCall(
 	const key = sessionKeyOf(ctx);
 	if (key === undefined) return undefined;
 	// The tool seam always fences: it performs the wrap itself, in `tool_result` below.
-	const verdict = await decide(command, false, { sessionKey: key, ctx, isChild: isChildOf(ctx) }, true, FENCE_VERSION);
+	const verdict = await decide(command, false, { sessionKey: key, ctx, isChild: isChildOf(ctx) }, true, FENCE_VERSION, "as a shell command");
 	if (verdict.kind === "allow") return undefined;
 	if (verdict.kind === "refuse") return { block: true, reason: verdict.reason };
 	if (typeof event.toolCallId === "string") {

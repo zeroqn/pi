@@ -256,3 +256,17 @@ describe("the TTY rule and the status line (ticket 05, preferences 6 and 7)", ()
 		expect(statusText(state)).toBe("ssh-grant: 0 granted, 1 declined");
 	});
 });
+
+describe("the dialog says which seam is asking (found by the bar's row 4)", () => {
+	it("defaults to a cell, and follows the seam's own word", async () => {
+		const bodies: string[] = [];
+		const ctx = makeCtx({
+			hasUI: true,
+			confirm: async (_title: string, body: string) => (bodies.push(body), false),
+		});
+		await ask(newKey(), ctx, "ssh dev@build-box uptime");
+		expect(bodies[0]).toContain("The session is asking to run, in a cell:");
+		await decide("ssh dev@build-box uptime", false, session(newKey(), ctx), true, 5, "as a shell command");
+		expect(bodies[1]).toContain("The session is asking to run, as a shell command:");
+	});
+});
