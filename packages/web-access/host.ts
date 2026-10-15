@@ -35,7 +35,14 @@ import {
 	UNTRUSTED_EXTERNAL_CONTENT_SECTION,
 	type GuardPi,
 } from "./guard";
-import { FENCE_API_VERSION, ensureGrantRecord, grantVerdict, installSshGrant } from "./grants";
+import {
+	FENCE_API_VERSION,
+	bindGrantFloor,
+	composeChildGrants,
+	ensureGrantRecord,
+	grantVerdict,
+	installSshGrant,
+} from "./grants";
 
 import {
 	API_VERSION as HOST_API_VERSION,
@@ -388,6 +395,10 @@ export function webAccessAnswer(input: SessionInput): ContributorAnswer {
 	// `session_start` (which runs before host-bridge composes, per the root manifest order), and this
 	// is what marks it ready — or why it is not.
 	const state = ensureGrantRecord(input.sessionKey);
+	// A **child** gets its own composition: the marker into its own transcript, its project file read
+	// for its own cwd, and (via the floor) the spawner's live state that `grantVerdict` reads. A child
+	// loads no ambient extension, so this contributor's answer is the only place it happens.
+	if (input.isChild) composeChildGrants(input.ctx, input.sessionKey, input.cwd);
 	const session = { sessionKey: input.sessionKey, ctx: input.ctx, isChild: input.isChild };
 	if (input.handle.apiVersion >= FENCE_API_VERSION) {
 		state.ready = true;
@@ -436,6 +447,18 @@ export const webAccessRegistration: ContributorRegistration = {
 	owner: WEB_ACCESS_OWNER,
 	apiVersion: HOST_API_VERSION,
 	session: (input) => webAccessAnswer(input),
+	/**
+	 * Ticket 07 §5's floor: told about a child of some session in this process, bind the child's
+	 * session file to a **live thunk** into its spawner's effective grants. The registration is
+	 * module-level (a single `pi-web-access` for every session), so the filter is inside the thunk,
+	 * not around the registration: `bindGrantFloor` reads the spawner's record by its resolved session
+	 * file, and `grantVerdict` only consults a floor for `isChild` sessions, so a root session never
+	 * reads one.
+	 */
+	bindChild: (input) => {
+		if (!input.childSessionFile || !input.parentSessionFile) return;
+		bindGrantFloor(input.childSessionFile, input.parentSessionFile);
+	},
 };
 
 registerContributor(webAccessRegistration);

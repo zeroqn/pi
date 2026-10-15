@@ -371,6 +371,14 @@ export type TransportRefusalFlags = {
 	projectTrusted: boolean;
 	/** Whether the human already declined one of these keys for this session. */
 	declined?: boolean;
+	/**
+	 * The oldest restored grant past the idle window among the ungranted keys, when there is one.
+	 *
+	 * A stale grant is neither granted nor refused by a human, so the refusal says which it is: the age
+	 * and that re-confirmation needs a human (ticket 07 §3). Optional, so the builder's existing
+	 * callers are unchanged.
+	 */
+	stale?: { key: string; at: number; windowDays: number };
 };
 
 /** Split a shell segment into logical tokens: whitespace outside quotes, quotes stripped. */
@@ -908,6 +916,11 @@ export function transportRefusal(flags: TransportRefusalFlags): string {
 	let route: string;
 	if (flags.declined === true) {
 		route = `the human declined ${keys} for this session; /ssh-grant --revoke clears that.`;
+	} else if (flags.stale !== undefined) {
+		route =
+			`its grant was restored from an earlier session and is ${describeAge(flags.stale.at)} old — past the ` +
+			`${flags.stale.windowDays}-day idle window — so it will not run without a human re-confirming it, ` +
+			`and nobody can be asked here. A target this project declares in .pi/ssh-grant.json (trusted only) still runs.`;
 	} else if (flags.isChild) {
 		route =
 			`a spawned child cannot show a dialog: ask the session that spawned this one — ` +
@@ -923,6 +936,17 @@ export function transportRefusal(flags: TransportRefusalFlags): string {
 			`a grant names the key as written, user and port included.`;
 	}
 	return `web-access: ${flags.command} reaches ${named.join(", ")}, and ${held}; ${route} Do not look for another spelling — a grant is the only route.`;
+}
+
+/** A human-readable age for a refusal or a re-confirmation note ("7 days", "3 hours", "12 minutes"). */
+export function describeAge(at: number, now = Date.now()): string {
+	const ms = Math.max(0, now - at);
+	const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+	if (days >= 1) return `${days} day${days === 1 ? "" : "s"}`;
+	const hours = Math.floor(ms / (60 * 60 * 1000));
+	if (hours >= 1) return `${hours} hour${hours === 1 ? "" : "s"}`;
+	const minutes = Math.floor(ms / (60 * 1000));
+	return `${minutes} minute${minutes === 1 ? "" : "s"}`;
 }
 
 /**

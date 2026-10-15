@@ -24,19 +24,19 @@
  *     `appendCustomEntry("ssh-grant-inherited", …)` into a child's own transcript (this module already
  *     *reads* both kinds in {@link readGrantEntries});
  *   - the **child floor** — a `Symbol.for("pi-ssh-grant:floors")` thunk into the spawner's *effective*
- *     state, which {@link heldKeys} consults (today it reads only the record's own grants);
+ *     state, which {@link childView} resolves for a child and {@link heldKeysOf} judges;
  *   - the **7-day idle window** on restored `ask`/`command` grants and the revoke's propagation.
- * One thing this module does that ticket 07 must carry forward: `--revoke` of a project-declared key
- * removes it from `project.keys` **for this session only** (the file is never edited). The file is
- * re-read at each session start, so persisting that override across a resume has no home in ticket
- * 07's `{grants, denials}` entry shape yet — the build report records the choice rather than guessing
- * it here.
+ * `--revoke` of a project-declared key records the override as a **denial** rather than editing the
+ * file: the declaration still stands and still asks, but the denial keeps the key out of `heldKeys`
+ * where nobody can be asked, and ticket 07's persisted entry is what makes the override survive a
+ * resume (the file is re-read at each session start, so an in-memory filter would be undone).
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import {
 	checkEgress,
+	describeAge,
 	destinationKeys,
 	egressSegments,
 	transportRefusal,
@@ -58,8 +58,28 @@ export const PROJECT_FILE = ".pi/ssh-grant.json";
 /** The ask's timeout in **milliseconds** (ticket 05's trap; readonly-mode's `60_000` precedent). */
 export const ASK_TIMEOUT_MS = 60_000;
 
+/**
+ * The idle window: a restored `ask`/`command` grant older than this is a **declaration, not a grant**
+ * (ticket 07 §3). The number is skill-bridge's `PRUNE_AFTER_MS` (`packages/skill-bridge/index.ts:49`)
+ * — the repo's existing "how old is too old" constant, reused rather than re-invented.
+ */
+export const GRANT_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** The window in whole days, for the sentences that name it (7). */
+export const GRANT_IDLE_DAYS = Math.round(GRANT_IDLE_MS / (24 * 60 * 60 * 1000));
+
 /** Where the per-session records live. A `Symbol.for` because a child's load is a second instance. */
 export const RECORDS_KEY = Symbol.for("pi-ssh-grant:records");
+
+/**
+ * Where a spawner's **live** floor lives, keyed by the child's resolved session file (ticket 07 §5).
+ *
+ * A `Symbol.for` for the same reason `RECORDS_KEY` is: a child's load of an entry is a different
+ * module instance, so a module-level map would be written by the spawner and read as empty by the
+ * child. The value is a **thunk**, never a copy, so a revoke in the spawner reaches the child on its
+ * next call and a grant made after a refusal is visible to the retry (ticket 11's escalation).
+ */
+export const FLOORS_KEY = Symbol.for("pi-ssh-grant:floors");
 
 export type GrantRoute = "ask" | "command" | "project";
 
@@ -67,7 +87,10 @@ export type GrantRoute = "ask" | "command" | "project";
 export type Grant = { route: GrantRoute; at?: number };
 
 /** What one entry kind carries. Ticket 07's shape: `{grants:[{key,route,at}], denials:[{key,at}]}`. */
-export type GrantEntryState = { grants: Map<string, Grant>; denials: Set<string> };
+export type GrantEntryState = { grants: Map<string, Grant>; denials: Set<string>; deniedAt?: Map<string, number> };
+
+/** The grants, denials and project a held-key view reads: a record, a floor, or a marker's state. */
+export type GrantView = { grants: Map<string, Grant>; denials: Set<string>; project: ProjectDeclaration | null };
 
 /** A project's declaration: the file's path and the keys it listed. */
 export type ProjectDeclaration = { path: string; keys: string[] };
@@ -76,9 +99,18 @@ export type ProjectDeclaration = { path: string; keys: string[] };
 export type SshGrantState = {
 	grants: Map<string, Grant>;
 	denials: Set<string>;
+	/** When each denial was made, so the persisted `{key, at}` is honest (denials are never aged). */
+	deniedAt: Map<string, number>;
 	project: ProjectDeclaration | null;
 	/** Whether the project was trusted, so a no-dialog refusal can say which reason applies. */
 	projectTrusted: boolean;
+	/**
+	 * The writer installed by {@link installSshGrant}: `pi.appendEntry(SSH_GRANT_ENTRY, …)`. It is
+	 * absent in a session whose host cannot write entries (or in a plain test). Every mutation calls it
+	 * through {@link persistGrantState}, which is best-effort: a failed write must not fail the call
+	 * that triggered it.
+	 */
+	persist?: () => void;
 	/** Whether this session's code mode can honour a grant (`/ssh-grant` reports on this). */
 	ready: boolean;
 	/** Why it cannot, when it cannot. */
@@ -131,6 +163,7 @@ export function ensureGrantRecord(sessionKey: string): SshGrantState {
 	const created: SshGrantState = {
 		grants: new Map(),
 		denials: new Set(),
+		deniedAt: new Map(),
 		project: null,
 		projectTrusted: false,
 		ready: false,
@@ -152,6 +185,93 @@ export function __resetGrantRecordsForTests(): void {
 }
 
 // ---------------------------------------------------------------------------
+// The live floor, the marker and the persisted entry (ticket 07 §1, §3, §5).
+// ---------------------------------------------------------------------------
+
+/**
+ * The floors: a child's session file -> a **live thunk** into its spawner's effective grants.
+ *
+ * {@link effectiveView} resolves a grandchild too: the thunk bound for a child calls `effectiveView`
+ * on its parent, which consults *that* parent's floor first — so an inheritance is a chain of live
+ * reads, never a snapshot taken at spawn.
+ */
+function floors(): Map<string, () => GrantView | undefined> {
+	const holder = globalThis as Record<symbol, unknown>;
+	const existing = holder[FLOORS_KEY];
+	if (existing instanceof Map) return existing as Map<string, () => GrantView | undefined>;
+	const created = new Map<string, () => GrantView | undefined>();
+	holder[FLOORS_KEY] = created;
+	return created;
+}
+
+/** Test seam: forget every floor this process holds. */
+export function __resetGrantFloorsForTests(): void {
+	floors().clear();
+}
+
+/**
+ * A session's **effective** grants, denials and project: its own record, or its spawner's through a
+ * floor. `undefined` means no record and no floor — a child whose marker is the only carrier, or a
+ * session before `session_start` made one.
+ */
+export function effectiveView(sessionKey: string): GrantView | undefined {
+	const floor = floors().get(sessionKey);
+	if (floor !== undefined) return floor();
+	const state = records().get(sessionKey);
+	if (state === undefined) return undefined;
+	return { grants: state.grants, denials: state.denials, project: state.project };
+}
+
+/** Bind a child session file to its spawner's live effective state (host-bridge's `bindChild`). */
+export function bindGrantFloor(childSessionFile: string, parentSessionFile: string): void {
+	let childKey: string;
+	let parentKey: string;
+	try {
+		childKey = resolve(childSessionFile);
+		parentKey = resolve(parentSessionFile);
+	} catch {
+		return;
+	}
+	floors().set(childKey, () => effectiveView(parentKey));
+}
+
+/** The entry data in ticket 07's shape — the exact JSON `readGrantEntries`/`entryStateFrom` read. */
+export function serializeGrantState(state: {
+	grants: Map<string, Grant>;
+	denials: Set<string>;
+	deniedAt?: Map<string, number>;
+}): {
+	grants: { key: string; route: GrantRoute; at?: number }[];
+	denials: { key: string; at: number }[];
+} {
+	const grants = [...state.grants].map(([key, grant]) => ({
+		key,
+		route: grant.route,
+		...(grant.at !== undefined ? { at: grant.at } : {}),
+	}));
+	const now = Date.now();
+	const denials = [...state.denials].map((key) => ({ key, at: state.deniedAt?.get(key) ?? now }));
+	return { grants, denials };
+}
+
+/**
+ * Write this session's state to its transcript (ticket 07 §1). Every mutation calls this.
+ *
+ * Best-effort by design: the state change *is* the grant, and a transcript that cannot take the entry
+ * (no `pi`, a host without `appendEntry`, a disposed ctx) loses only the *resume*, never the call that
+ * triggered the write. A failure is swallowed rather than thrown — the policy must not fail a cell
+ * because a bookkeeping write did.
+ */
+export function persistGrantState(state: SshGrantState): void {
+	if (state.persist === undefined) return;
+	try {
+		state.persist();
+	} catch {
+		/* a failed write must not fail the call that triggered it */
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Reading the entries ticket 07 writes (part C reads them; part D writes them).
 // ---------------------------------------------------------------------------
 
@@ -162,6 +282,7 @@ function routeOf(value: unknown): GrantRoute {
 function entryStateFrom(data: unknown): GrantEntryState {
 	const grants = new Map<string, Grant>();
 	const denials = new Set<string>();
+	const deniedAt = new Map<string, number>();
 	const record = data as { grants?: unknown; denials?: unknown } | null;
 	if (Array.isArray(record?.grants)) {
 		for (const raw of record.grants) {
@@ -173,11 +294,14 @@ function entryStateFrom(data: unknown): GrantEntryState {
 	}
 	if (Array.isArray(record?.denials)) {
 		for (const raw of record.denials) {
-			const entry = raw as { key?: unknown } | null;
-			if (typeof entry?.key === "string" && entry.key.length > 0) denials.add(entry.key);
+			const entry = raw as { key?: unknown; at?: unknown } | null;
+			if (typeof entry?.key === "string" && entry.key.length > 0) {
+				denials.add(entry.key);
+				if (typeof entry.at === "number") deniedAt.set(entry.key, entry.at);
+			}
 		}
 	}
-	return { grants, denials };
+	return { grants, denials, deniedAt };
 }
 
 /**
@@ -336,21 +460,32 @@ function notify(ctx: unknown, text: string, kind?: string): void {
 // The live grant view the policy reads.
 // ---------------------------------------------------------------------------
 
+/** Whether a restored `ask`/`command` grant has outlived the idle window (ticket 07 §3). */
+export function isStaleGrant(grant: Grant, now = Date.now()): boolean {
+	return grant.route !== "project" && grant.at !== undefined && now - grant.at > GRANT_IDLE_MS;
+}
+
 /**
- * The keys this session may reach right now.
+ * The keys a view may reach right now.
  *
- * `ask`/`command` grants always count. A **project declaration** counts only where nobody can be
+ * `ask`/`command` grants count while they are **fresh**; a restored one past the idle window is a
+ * declaration, not a grant, so it is left out and the call is refused — or re-asked, where a dialog
+ * can appear (the policy handles that). A **project declaration** counts only where nobody can be
  * asked: where a dialog can appear the first use still asks (ticket 06 §2), so the declaration is
- * not silently authoritative there.
- *
- * Part D replaces the `state.grants` read here with the spawner's live floor for a child.
+ * not silently authoritative there. Project keys carry no age (the file is read fresh each start).
  */
-export function heldKeys(state: SshGrantState, dialogCapable: boolean): Set<string> {
-	const held = new Set(state.grants.keys());
-	if (!dialogCapable && state.project !== null) {
-		for (const key of state.project.keys) if (!state.denials.has(key)) held.add(key);
+export function heldKeysOf(view: GrantView, dialogCapable: boolean): Set<string> {
+	const held = new Set<string>();
+	for (const [key, grant] of view.grants) if (!isStaleGrant(grant)) held.add(key);
+	if (!dialogCapable && view.project !== null) {
+		for (const key of view.project.keys) if (!view.denials.has(key)) held.add(key);
 	}
 	return held;
+}
+
+/** The held-key view of one record; kept for the callers part C built. */
+export function heldKeys(state: SshGrantState, dialogCapable: boolean): Set<string> {
+	return heldKeysOf(state, dialogCapable);
 }
 
 /** Whether this segment is one the transport matcher judges (so `checkEgress` must not). */
@@ -428,18 +563,30 @@ function versionRefusal(command: string, keys: readonly string[], version: numbe
 	return `web-access: ${command} reaches ${keys.join(", ")}, and this session cannot grant it: its code mode speaks contract version ${version}, and a grant needs ${FENCE_API_VERSION} (a verdict that fences what comes back). Fetch a page with await fetch_content(url); for a host, no route exists in this session.`;
 }
 
-/** Ask one question, with the literal command and every key it would grant. Any non-answer is a no. */
+/**
+ * Ask one question, with the literal command and every key it would grant. Any non-answer is a no.
+ *
+ * A **stale** grant is being re-confirmed, so the body says so and how old it is: a human deciding
+ * again should know it is a resume and not a fresh ask (ticket 07 §3).
+ */
 async function askForGrant(
 	ctx: unknown,
 	command: string,
 	keys: readonly string[],
 	declared: readonly string[],
+	stale: readonly { key: string; at: number }[] = [],
 ): Promise<boolean> {
 	const ui = uiOf(ctx);
 	if (ui === null || typeof ui.confirm !== "function") return false;
 	const title = `Reach ${keys.join(", ")} for this session?`;
 	const declaredNote = declared.length > 0 ? `\n\nDeclared in ${PROJECT_FILE}: ${declared.join(", ")}.` : "";
-	const body = `The session is asking to run, in a cell:\n\n${command}\n\nThis grants: ${keys.join(", ")}${declaredNote}`;
+	const staleNote =
+		stale.length > 0
+			? `\n\nThis is a re-confirmation: ${stale
+					.map((entry) => `${entry.key} was granted ${describeAge(entry.at)} ago, past the ${GRANT_IDLE_DAYS}-day window`)
+					.join("; ")}.`
+			: "";
+	const body = `The session is asking to run, in a cell:\n\n${command}\n\nThis grants: ${keys.join(", ")}${declaredNote}${staleNote}`;
 	try {
 		const yes = await (ui.confirm as (title: string, body: string, opts: { timeout: number; signal?: AbortSignal }) => Promise<boolean>)(
 			title,
@@ -452,7 +599,14 @@ async function askForGrant(
 	}
 }
 
-function declineOrRefusal(session: GrantSession, command: string, keys: readonly string[], held: Set<string>, declined: boolean): string {
+function declineOrRefusal(
+	session: GrantSession,
+	command: string,
+	keys: readonly string[],
+	held: Set<string>,
+	declined: boolean,
+	stale: readonly { key: string; at: number }[] = [],
+): string {
 	const state = ensureGrantRecord(session.sessionKey);
 	return transportRefusal({
 		command,
@@ -462,7 +616,28 @@ function declineOrRefusal(session: GrantSession, command: string, keys: readonly
 		isChild: session.isChild,
 		projectTrusted: state.projectTrusted,
 		declined,
+		// The policy only reaches this without a dialog, so the stale sentence's "nobody can be asked"
+		// is true by construction; it names the age and the human (ticket 07 §3).
+		...(stale.length > 0 ? { stale: { key: stale[0].key, at: stale[0].at, windowDays: GRANT_IDLE_DAYS } } : {}),
 	});
+}
+
+/**
+ * A child session's effective grants, denials and project; the record itself for anyone else.
+ *
+ * The floor is consulted **live** and is the whole truth — a key revoked in the spawner must not
+ * survive here because a marker once named it. The project is always the child's **own** declaration:
+ * the spawner's project is about the spawner's cwd, not the child's.
+ */
+function childView(session: GrantSession, state: SshGrantState): GrantView {
+	if (!session.isChild) return state;
+	const floor = floors().get(session.sessionKey);
+	const source = floor !== undefined ? floor() : state.inherited;
+	return {
+		grants: source?.grants ?? new Map(),
+		denials: source?.denials ?? new Set(),
+		project: state.project,
+	};
 }
 
 /**
@@ -499,31 +674,47 @@ export async function grantVerdict(
 	if (!canFence) return { allow: false, reason: versionRefusal(command, reading.keys, codeModeVersion) };
 
 	// 3. Compare against the live grants. A dialog-capable session does not let a project declaration
-	//    stand in for a human's answer; where nobody can be asked, it is what applies.
+	//    stand in for a human's answer; where nobody can be asked, it is what applies. A **child**
+	//    reads its spawner's effective state through the floor (live, removals included); a resumed
+	//    child with no spawner reads the marker its transcript carries.
+	const view = childView(session, state);
 	const dialogCapable = hasUi(session.ctx) && !session.isChild;
-	const held = heldKeys(state, dialogCapable);
+	const held = heldKeysOf(view, dialogCapable);
 	const comparison = unmatched(reading.keys, held);
 	const unheld = [...comparison.missing, ...comparison.unmatched];
 	if (unheld.length === 0) return grantedVerdict(command, background);
 
 	// 4. A no is remembered for the session; without it the next cell asks again, which reads as the
-	//    tool not listening (ticket 06 §4).
-	const denied = unheld.some((key) => state.denials.has(key));
+	//    tool not listening (ticket 06 §4). A stale grant is **not** a no: it re-asks where a dialog
+	//    can appear, and is refused with its age where nobody can be asked (ticket 07 §3).
+	const denied = unheld.some((key) => view.denials.has(key));
+	const stale = unheld
+		.map((key) => ({ key, grant: view.grants.get(key) }))
+		.filter((entry): entry is { key: string; grant: Grant } => entry.grant !== undefined)
+		.filter((entry) => isStaleGrant(entry.grant))
+		.map((entry) => ({ key: entry.key, at: entry.grant.at as number }));
 	if (dialogCapable && !denied) {
 		const declared = reading.keys.filter((key) => state.project !== null && state.project.keys.includes(key));
-		const yes = await askForGrant(session.ctx, command, reading.keys, declared);
+		const yes = await askForGrant(session.ctx, command, reading.keys, declared, stale);
 		if (yes === true) {
+			// A yes **re-stamps** every key, so an actively used grant never re-asks twice.
 			const at = Date.now();
 			for (const key of reading.keys) {
 				state.grants.set(key, { route: "ask", at });
 				state.denials.delete(key);
+				state.deniedAt.delete(key);
 			}
+			persistGrantState(state);
 			return grantedVerdict(command, background);
 		}
-		for (const key of unheld) state.denials.add(key);
-		return { allow: false, reason: declineOrRefusal(session, command, reading.keys, held, true) };
+		for (const key of unheld) {
+			state.denials.add(key);
+			state.deniedAt.set(key, Date.now());
+		}
+		persistGrantState(state);
+		return { allow: false, reason: declineOrRefusal(session, command, reading.keys, held, true, stale) };
 	}
-	return { allow: false, reason: declineOrRefusal(session, command, reading.keys, held, denied) };
+	return { allow: false, reason: declineOrRefusal(session, command, reading.keys, held, denied, stale) };
 }
 
 // ---------------------------------------------------------------------------
@@ -535,7 +726,8 @@ function listText(state: SshGrantState): string {
 	const seen = new Set<string>();
 	for (const [key, grant] of state.grants) {
 		const when = grant.at !== undefined ? `, granted ${new Date(grant.at).toISOString()}` : "";
-		lines.push(`${key} — route ${grant.route}${when}${state.denials.has(key) ? ", denied this session" : ""}`);
+		const stale = isStaleGrant(grant) ? `, stale (${describeAge(grant.at as number)} old — it will re-ask)` : "";
+		lines.push(`${key} — route ${grant.route}${when}${stale}${state.denials.has(key) ? ", denied this session" : ""}`);
 		seen.add(key);
 	}
 	for (const key of state.project?.keys ?? []) {
@@ -573,6 +765,7 @@ export async function sshGrantCommand(args: string, ctx: unknown, sessionKey: st
 			return;
 		}
 		state.grants.delete(key);
+		state.deniedAt.delete(key);
 		const declared = state.project !== null && state.project.keys.includes(key);
 		if (declared) {
 			// A declaration is not a grant, so there is nothing to delete: the session's override is a
@@ -580,9 +773,11 @@ export async function sshGrantCommand(args: string, ctx: unknown, sessionKey: st
 			// what ticket 07's entry persists. Filtering `state.project.keys` in memory instead would
 			// have lost the revoke at the next session start, when the file is read again.
 			state.denials.add(key);
+			state.deniedAt.set(key, Date.now());
 		} else {
 			state.denials.delete(key);
 		}
+		persistGrantState(state);
 		notify(
 			ctx,
 			`ssh-grant: revoked ${key} for this session${
@@ -598,6 +793,8 @@ export async function sshGrantCommand(args: string, ctx: unknown, sessionKey: st
 	const key = tokens[0];
 	state.grants.set(key, { route: "command", at: Date.now() });
 	state.denials.delete(key);
+	state.deniedAt.delete(key);
+	persistGrantState(state);
 	notify(ctx, `ssh-grant: granted ${key} for this session.`);
 }
 
@@ -609,13 +806,22 @@ export async function sshGrantCommand(args: string, ctx: unknown, sessionKey: st
  * manifest, so the record holds this session's answer before the kernel is composed with it. That
  * order is a requirement now, not a coincidence.
  */
-export function restoreGrantSession(ctx: unknown, keyOf: (ctx: unknown) => string): SshGrantState {
+export function restoreGrantSession(
+	ctx: unknown,
+	keyOf: (ctx: unknown) => string,
+	appender?: (data: { grants: { key: string; route: GrantRoute; at?: number }[]; denials: { key: string; at: number }[] }) => void,
+): SshGrantState {
 	const key = keyOf(ctx);
 	const state = ensureGrantRecord(key);
+	// The persist hook: the policy path has no `pi`, so `installSshGrant` hands the writer down here,
+	// and every mutation calls the hook (ticket 07 §1). Re-installed on each restore, reading the live
+	// state through the closure's `state` reference.
+	if (appender !== undefined) state.persist = () => appender(serializeGrantState(state));
 	const restored = readGrantEntries(getEntries(ctx));
 	if (restored.own !== null) {
 		state.grants = restored.own.grants;
 		state.denials = restored.own.denials;
+		state.deniedAt = restored.own.deniedAt ?? new Map();
 	}
 	state.inherited = restored.inherited;
 	const trusted = isTrusted(ctx);
@@ -634,6 +840,55 @@ export function restoreGrantSession(ctx: unknown, keyOf: (ctx: unknown) => strin
 	return state;
 }
 
+/**
+ * Prepare a **child** session's record for `webAccessAnswer`: the marker into its own transcript, the
+ * floor it will read live, and its own project declaration (ticket 07 §3, §5).
+ *
+ * The marker is written from the spawner's floor when one is live, so a later resume in a process
+ * with no spawner still knows what the child held. A child's own project file is read for **its** cwd,
+ * trusted only — the one route a child can reach a target by without a dialog.
+ */
+export function composeChildGrants(ctx: unknown, sessionKey: string, cwd: string): void {
+	const state = ensureGrantRecord(sessionKey);
+	// The child's own load of this entry never ran (a spawned child loads no ambient extension), so a
+	// resumed child reads its marker here; `restoreGrantSession` may already have set it.
+	if (state.inherited === null) state.inherited = readGrantEntries(getEntries(ctx)).inherited ?? null;
+	const floor = floors().get(sessionKey);
+	if (floor !== undefined) {
+		const view = floor();
+		if (view !== undefined) writeInherited(ctx, view);
+	}
+	const trusted = isTrusted(ctx);
+	state.projectTrusted = trusted;
+	if (state.project === null && trusted) {
+		const file = findProjectFile(cwd);
+		if (file !== null) {
+			const { keys, problems } = readProjectFile(file);
+			state.project = { path: file, keys };
+			for (const problem of problems) notify(ctx, problem, "warning");
+		}
+	}
+}
+
+/**
+ * Write an inherited-grant marker into a **child's own** transcript (ticket 07 §3).
+ *
+ * `ctx` is the child's ctx — the correction `../readonly-limits` ticket 02 records, and the same ctx
+ * readonly-mode writes through (`index.ts:542-550`). The marker carries the grant keys **with their
+ * routes and `at`** and the denials, so a resume in a later process can honour or refuse each exactly
+ * as the live floor did. Best effort: a marker is a convenience for a later resume, never a
+ * precondition for the mount that asked for it.
+ */
+function writeInherited(ctx: unknown, view: GrantView): void {
+	try {
+		const manager = (ctx as { sessionManager?: { appendCustomEntry?: (type: string, data?: unknown) => string } } | null)
+			?.sessionManager;
+		manager?.appendCustomEntry?.(SSH_GRANT_INHERITED_ENTRY, serializeGrantState(view));
+	} catch {
+		/* a marker is a convenience for a later resume, never a precondition */
+	}
+}
+
 function getEntries(ctx: unknown): readonly unknown[] {
 	try {
 		const entries = (ctx as { sessionManager?: { getEntries?: () => unknown } } | null)?.sessionManager?.getEntries?.();
@@ -650,6 +905,8 @@ export type SshGrantPi = {
 		name: string,
 		options: { description?: string; handler: (args: string, ctx: unknown) => Promise<void> | void },
 	) => void;
+	/** Writes a session entry; ticket 07's persistence. Missing on a host that cannot hold one. */
+	appendEntry?: (customType: string, data: unknown) => unknown;
 };
 
 /**
@@ -659,6 +916,16 @@ export type SshGrantPi = {
  */
 export function installSshGrant(pi: unknown, keyOf: (ctx: unknown) => string): void {
 	const surface = pi as SshGrantPi;
+	// The writer the policy path cannot reach: the ask's yes and a denial happen inside the egress
+	// closure, which has no `pi`, so `restoreGrantSession` installs this on the record and every
+	// mutation calls it (ticket 07 §1). A host without `appendEntry` leaves the hook undefined and
+	// persistence a no-op — state changes for the live session; only a resume loses it.
+	const appender =
+		typeof surface.appendEntry === "function"
+			? (data: { grants: { key: string; route: GrantRoute; at?: number }[]; denials: { key: string; at: number }[] }) => {
+					surface.appendEntry?.(SSH_GRANT_ENTRY, data);
+				}
+			: undefined;
 	if (typeof surface.registerCommand === "function") {
 		surface.registerCommand("ssh-grant", {
 			description: "Grant, list, or revoke a session's ssh/transport destination grants",
@@ -669,7 +936,7 @@ export function installSshGrant(pi: unknown, keyOf: (ctx: unknown) => string): v
 	}
 	if (typeof surface.on === "function") {
 		surface.on("session_start", (_event, ctx) => {
-			restoreGrantSession(ctx, keyOf);
+			restoreGrantSession(ctx, keyOf, appender);
 			return undefined;
 		});
 		surface.on("session_shutdown", (_event, ctx) => {
