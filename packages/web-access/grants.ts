@@ -34,16 +34,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import {
-	checkEgress,
-	describeAge,
-	destinationKeys,
-	egressSegments,
-	transportRefusal,
-	unmatched,
-	type EgressSegment,
-} from "./egress";
-import { REMOTE_OUTPUT_FENCE } from "./guard";
+import { describeAge } from "./egress";
+
+/** The grant's text rule, re-exported here because this package's tests reach it at this path. */
+export { redirectsOrTees } from "./command-rules";
 
 /** The contract version whose egress verdict can allow a call *and* fence its result (ticket 04). */
 export const FENCE_API_VERSION = 5;
@@ -119,12 +113,6 @@ export type SshGrantState = {
 	inherited: GrantEntryState | null;
 };
 
-/** The verdict an egress policy may return, mirrored structurally (host-bridge's `KernelEgressVerdict`). */
-export type GrantVerdict =
-	| { allow: false; reason: string }
-	| { allow: true; fence: { open: string; preamble: string; close: string } }
-	| undefined;
-
 /** The session shape a policy decision needs; a contributor builds it once, per session. */
 export type GrantSession = {
 	/** The session key the record is filed under (the kernel's key, ticket 02). */
@@ -134,9 +122,6 @@ export type GrantSession = {
 	/** True when this session was spawned by another (a child has no dialog at all). */
 	isChild: boolean;
 };
-
-/** The five-family command words whose destination is a host; `sshpass` wraps one. */
-const FAMILY = new Set(["ssh", "scp", "sftp", "mosh", "rsync", "sshpass"]);
 
 // ---------------------------------------------------------------------------
 // The process global: one record per session key.
@@ -214,6 +199,16 @@ export function __resetGrantFloorsForTests(): void {
  * floor. `undefined` means no record and no floor — a child whose marker is the only carrier, or a
  * session before `session_start` made one.
  */
+/**
+ * The live floor bound for a child session, or `undefined` when this child has none.
+ *
+ * `policy.ts`'s `childView` reads it: the floor is a **thunk** into the spawner's state, so a revocation
+ * propagates to the child's next call (ticket 07 §5).
+ */
+export function grantFloor(childSessionFile: string): (() => GrantView | undefined) | undefined {
+	return floors().get(childSessionFile);
+}
+
 export function effectiveView(sessionKey: string): GrantView | undefined {
 	const floor = floors().get(sessionKey);
 	if (floor !== undefined) return floor();
@@ -404,7 +399,7 @@ export function readProjectFile(path: string): { keys: string[]; problems: strin
 // The session context readers, defensive because `ctx` is `unknown` here.
 // ---------------------------------------------------------------------------
 
-function hasUi(ctx: unknown): boolean {
+export function hasUi(ctx: unknown): boolean {
 	try {
 		return (ctx as { hasUI?: unknown } | null)?.hasUI === true;
 	} catch {
@@ -429,7 +424,7 @@ function sessionCwd(ctx: unknown): string | undefined {
 	}
 }
 
-function signalOf(ctx: unknown): AbortSignal | undefined {
+export function signalOf(ctx: unknown): AbortSignal | undefined {
 	try {
 		const signal = (ctx as { signal?: unknown } | null)?.signal;
 		return signal instanceof AbortSignal ? signal : undefined;
@@ -438,7 +433,7 @@ function signalOf(ctx: unknown): AbortSignal | undefined {
 	}
 }
 
-function uiOf(ctx: unknown): { confirm?: unknown; notify?: unknown } | null {
+export function uiOf(ctx: unknown): { confirm?: unknown; notify?: unknown } | null {
 	try {
 		const ui = (ctx as { ui?: unknown } | null)?.ui;
 		return ui !== null && typeof ui === "object" ? (ui as { confirm?: unknown; notify?: unknown }) : null;
@@ -486,235 +481,6 @@ export function heldKeysOf(view: GrantView, dialogCapable: boolean): Set<string>
 /** The held-key view of one record; kept for the callers part C built. */
 export function heldKeys(state: SshGrantState, dialogCapable: boolean): Set<string> {
 	return heldKeysOf(state, dialogCapable);
-}
-
-/** Whether this segment is one the transport matcher judges (so `checkEgress` must not). */
-function isFamilySegment(segment: EgressSegment): boolean {
-	if (FAMILY.has(segment.command)) return true;
-	const reading = destinationKeys(segment.text);
-	return reading.keys.length > 0 || reading.refused !== undefined;
-}
-
-/** The command's non-transport text: what `checkEgress` still judges on its own terms. */
-function nonFamilyText(command: string): string {
-	return egressSegments(command)
-		.filter((segment) => !isFamilySegment(segment))
-		.map((segment) => segment.text)
-		.join("\n");
-}
-
-/** The command text with comments stripped, so a `# /dev/tcp/...` comment cannot be mistaken for one. */
-function strippedText(command: string): string {
-	return egressSegments(command)
-		.map((segment) => segment.text)
-		.join("\n");
-}
-
-const SOCKET_REDIRECT = /\/dev\/(tcp|udp)\//;
-
-const BACKGROUND_REFUSAL =
-	"web-access: that command is granted for this session, but a `background=True` invocation returns a handle, not the output — the remote text would reach the cell later through calls this policy did not produce, so the fence cannot wrap it. Run it in the foreground.";
-
-const REDIRECT_REFUSAL =
-	"web-access: that command is granted for this session, but its output is redirected or teed: the text would land on the host's disk, where read_text returns it unfenced. A granted command's output comes back to the cell or it does not run — run it without the redirect.";
-
-/** Whether the command sends the granted output somewhere other than the cell. */
-export function redirectsOrTees(command: string): boolean {
-	if (egressSegments(command).some((segment) => segment.command === "tee")) return true;
-	// One unquoted `>` is enough: `> file`, `>> file`, `>| file`, `2> file`. A `>&N` duplication
-	// (`2>&1`) still returns the output to the cell and is not a file redirect.
-	let quote: string | null = null;
-	for (let index = 0; index < command.length; index += 1) {
-		const ch = command[index];
-		if (quote !== null) {
-			if (ch === "\\" && quote === '"') index += 1;
-			else if (ch === quote) quote = null;
-			continue;
-		}
-		if (ch === "'" || ch === '"') {
-			quote = ch;
-			continue;
-		}
-		if (ch === "\\") {
-			index += 1;
-			continue;
-		}
-		if (ch === ">") {
-			const next = command[index + 1];
-			if (next === "&") {
-				const after = command[index + 2];
-				if (after !== undefined && (after === "-" || (after >= "0" && after <= "9"))) continue;
-			}
-			return true;
-		}
-	}
-	return false;
-}
-
-/** A granted invocation's verdict: fenced if the result comes back, refused if it cannot. */
-function grantedVerdict(command: string, background: boolean): GrantVerdict {
-	if (background) return { allow: false, reason: BACKGROUND_REFUSAL };
-	if (redirectsOrTees(command)) return { allow: false, reason: REDIRECT_REFUSAL };
-	return { allow: true, fence: REMOTE_OUTPUT_FENCE };
-}
-
-/** The refusal for a target this code mode cannot grant (below contract 5), naming the version. */
-function versionRefusal(command: string, keys: readonly string[], version: number): string {
-	return `web-access: ${command} reaches ${keys.join(", ")}, and this session cannot grant it: its code mode speaks contract version ${version}, and a grant needs ${FENCE_API_VERSION} (a verdict that fences what comes back). Fetch a page with await fetch_content(url); for a host, no route exists in this session.`;
-}
-
-/**
- * Ask one question, with the literal command and every key it would grant. Any non-answer is a no.
- *
- * A **stale** grant is being re-confirmed, so the body says so and how old it is: a human deciding
- * again should know it is a resume and not a fresh ask (ticket 07 §3).
- */
-async function askForGrant(
-	ctx: unknown,
-	command: string,
-	keys: readonly string[],
-	declared: readonly string[],
-	stale: readonly { key: string; at: number }[] = [],
-): Promise<boolean> {
-	const ui = uiOf(ctx);
-	if (ui === null || typeof ui.confirm !== "function") return false;
-	const title = `Reach ${keys.join(", ")} for this session?`;
-	const declaredNote = declared.length > 0 ? `\n\nDeclared in ${PROJECT_FILE}: ${declared.join(", ")}.` : "";
-	const staleNote =
-		stale.length > 0
-			? `\n\nThis is a re-confirmation: ${stale
-					.map((entry) => `${entry.key} was granted ${describeAge(entry.at)} ago, past the ${GRANT_IDLE_DAYS}-day window`)
-					.join("; ")}.`
-			: "";
-	const body = `The session is asking to run, in a cell:\n\n${command}\n\nThis grants: ${keys.join(", ")}${declaredNote}${staleNote}`;
-	try {
-		const yes = await (ui.confirm as (title: string, body: string, opts: { timeout: number; signal?: AbortSignal }) => Promise<boolean>)(
-			title,
-			body,
-			{ timeout: ASK_TIMEOUT_MS, signal: signalOf(ctx) },
-		);
-		return yes === true;
-	} catch {
-		return false;
-	}
-}
-
-function declineOrRefusal(
-	session: GrantSession,
-	command: string,
-	keys: readonly string[],
-	held: Set<string>,
-	declined: boolean,
-	stale: readonly { key: string; at: number }[] = [],
-): string {
-	const state = ensureGrantRecord(session.sessionKey);
-	return transportRefusal({
-		command,
-		keys,
-		comparison: unmatched(keys, held),
-		hasUI: hasUi(session.ctx),
-		isChild: session.isChild,
-		projectTrusted: state.projectTrusted,
-		declined,
-		// The policy only reaches this without a dialog, so the stale sentence's "nobody can be asked"
-		// is true by construction; it names the age and the human (ticket 07 §3).
-		...(stale.length > 0 ? { stale: { key: stale[0].key, at: stale[0].at, windowDays: GRANT_IDLE_DAYS } } : {}),
-	});
-}
-
-/**
- * A child session's effective grants, denials and project; the record itself for anyone else.
- *
- * The floor is consulted **live** and is the whole truth — a key revoked in the spawner must not
- * survive here because a marker once named it. The project is always the child's **own** declaration:
- * the spawner's project is about the spawner's cwd, not the child's.
- */
-function childView(session: GrantSession, state: SshGrantState): GrantView {
-	if (!session.isChild) return state;
-	const floor = floors().get(session.sessionKey);
-	const source = floor !== undefined ? floor() : state.inherited;
-	return {
-		grants: source?.grants ?? new Map(),
-		denials: source?.denials ?? new Set(),
-		project: state.project,
-	};
-}
-
-/**
- * Decide one `bash_host` call.
- *
- * Everything `checkEgress` refuses stays refused, except the transport family, which is judged by
- * `destinationKeys` against this session's live grants. `canFence` is the caller's
- * `apiVersion >= 5`: below it the transport family is refused with a reason naming the version,
- * because a grant that cannot be fenced must not be offered (ticket 04 §6).
- */
-export async function grantVerdict(
-	command: string,
-	background: boolean,
-	session: GrantSession,
-	canFence: boolean,
-	codeModeVersion: number,
-): Promise<GrantVerdict> {
-	// 1. Everything the present gate refuses, except the family — so a command combining a granted
-	//    ssh with a curl is still refused for the curl.
-	const whole = checkEgress(command);
-	if (!whole.ok) {
-		const restVerdict = checkEgress(nonFamilyText(command));
-		if (!restVerdict.ok) return { allow: false, reason: restVerdict.reason };
-		// The refusal came from a family segment, or from a raw socket inside one; tell them apart.
-		if (SOCKET_REDIRECT.test(strippedText(command))) return { allow: false, reason: whole.reason };
-	}
-
-	// 2. The transport family, through the matcher.
-	const reading = destinationKeys(command);
-	if (reading.refused !== undefined) return { allow: false, reason: reading.refused };
-	if (reading.keys.length === 0) return undefined; // reaches nobody: `ssh -V`, a local `rsync -e ssh`.
-
-	const state = ensureGrantRecord(session.sessionKey);
-	if (!canFence) return { allow: false, reason: versionRefusal(command, reading.keys, codeModeVersion) };
-
-	// 3. Compare against the live grants. A dialog-capable session does not let a project declaration
-	//    stand in for a human's answer; where nobody can be asked, it is what applies. A **child**
-	//    reads its spawner's effective state through the floor (live, removals included); a resumed
-	//    child with no spawner reads the marker its transcript carries.
-	const view = childView(session, state);
-	const dialogCapable = hasUi(session.ctx) && !session.isChild;
-	const held = heldKeysOf(view, dialogCapable);
-	const comparison = unmatched(reading.keys, held);
-	const unheld = [...comparison.missing, ...comparison.unmatched];
-	if (unheld.length === 0) return grantedVerdict(command, background);
-
-	// 4. A no is remembered for the session; without it the next cell asks again, which reads as the
-	//    tool not listening (ticket 06 §4). A stale grant is **not** a no: it re-asks where a dialog
-	//    can appear, and is refused with its age where nobody can be asked (ticket 07 §3).
-	const denied = unheld.some((key) => view.denials.has(key));
-	const stale = unheld
-		.map((key) => ({ key, grant: view.grants.get(key) }))
-		.filter((entry): entry is { key: string; grant: Grant } => entry.grant !== undefined)
-		.filter((entry) => isStaleGrant(entry.grant))
-		.map((entry) => ({ key: entry.key, at: entry.grant.at as number }));
-	if (dialogCapable && !denied) {
-		const declared = reading.keys.filter((key) => state.project !== null && state.project.keys.includes(key));
-		const yes = await askForGrant(session.ctx, command, reading.keys, declared, stale);
-		if (yes === true) {
-			// A yes **re-stamps** every key, so an actively used grant never re-asks twice.
-			const at = Date.now();
-			for (const key of reading.keys) {
-				state.grants.set(key, { route: "ask", at });
-				state.denials.delete(key);
-				state.deniedAt.delete(key);
-			}
-			persistGrantState(state);
-			return grantedVerdict(command, background);
-		}
-		for (const key of unheld) {
-			state.denials.add(key);
-			state.deniedAt.set(key, Date.now());
-		}
-		persistGrantState(state);
-		return { allow: false, reason: declineOrRefusal(session, command, reading.keys, held, true, stale) };
-	}
-	return { allow: false, reason: declineOrRefusal(session, command, reading.keys, held, denied, stale) };
 }
 
 // ---------------------------------------------------------------------------

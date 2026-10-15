@@ -357,10 +357,20 @@ describe("the egress policy this package contributes", () => {
 });
 
 describe("pi install loads the guard too", () => {
-	it("registers both guard layers and the /ssh-grant session read on the extension api", () => {
+	it("registers the guard, the /ssh-grant session read, and the tool seam on the extension api", () => {
 		const events: string[] = [];
 		piWebAccess({ on: (event: string) => events.push(event) } as never);
-		expect(events).toEqual(["before_agent_start", "tool_result", "session_start", "session_shutdown"]);
+		// Two `tool_result` handlers on purpose: the guard's fences the web tools' own output, and the
+		// tool seam's fences a **granted shell call** whose text came from a host. `tool_call` is the
+		// seam's refusal half (`.scratch/guardrail-blindspots` ticket 03).
+		expect(events).toEqual([
+			"before_agent_start",
+			"tool_result",
+			"session_start",
+			"session_shutdown",
+			"tool_call",
+			"tool_result",
+		]);
 	});
 });
 

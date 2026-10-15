@@ -40,9 +40,10 @@ import {
 	bindGrantFloor,
 	composeChildGrants,
 	ensureGrantRecord,
-	grantVerdict,
 	installSshGrant,
 } from "./grants";
+import { decide, toEgressVerdict } from "./policy";
+import { installToolSeam, type ToolSeamPi } from "./tool-seam";
 
 import {
 	API_VERSION as HOST_API_VERSION,
@@ -305,6 +306,9 @@ export type HostDeps = { fetchImpl?: typeof fetch; shellExec?: ShellExec; config
 export default function piWebAccess(pi: unknown): void {
 	installGuard(pi as GuardPi);
 	installSshGrant(pi, sessionKey);
+	// The second seam: pi's own shell tool, which the kernel's egress slot does not reach. Same policy,
+	// same store, same ask — the adapter is what differs (tickets 02 and 03).
+	installToolSeam(pi as ToolSeamPi);
 }
 
 /**
@@ -355,10 +359,14 @@ const EGRESS_API_VERSION = 4;
  * policy here can fence and no name list can reliably guess — that half is the rule's, not this
  * policy's. So it reads the one command text a cell can turn into an outbound connection.
  *
- * `grantVerdict` is where the routing lives: the transport family (`ssh`/`scp`/`sftp`/`mosh`/`rsync`)
- * is judged against the session's live grants and, when granted, the call is allowed **and fenced**;
- * everything else keeps `checkEgress`'s refusals exactly. `canFence` is `apiVersion >= 5`, so a code
- * mode below it gets the same refusals with no grant route at all.
+ * `policy.ts`'s `decide` is where the routing lives: the transport family
+ * (`ssh`/`scp`/`sftp`/`mosh`/`rsync`) is judged against the session's live grants and, when granted, the
+ * call is allowed **and fenced**; everything else keeps `checkEgress`'s refusals exactly. `canFence` is
+ * `apiVersion >= 5`, so a code mode below it gets the same refusals with no grant route at all.
+ *
+ * This adapter keeps only three things — the translation of the seam-neutral verdict
+ * ({@link toEgressVerdict}), the version gate, and the `problems` channel — because the decision itself
+ * is shared with the **tool seam** (`tool-seam.ts`), which asks the same question of pi's own `bash` tool.
  */
 function egressPolicy(
 	session: { sessionKey: string; ctx: unknown; isChild: boolean },
@@ -372,7 +380,8 @@ function egressPolicy(
 			// A command that is not a string is `bash`'s own `TypeError` to raise, with its own message;
 			// answering `undefined` here leaves that path exactly as it was.
 			if (typeof bound.command !== "string") return undefined;
-			return await grantVerdict(bound.command, bound.background === true, session, canFence, codeModeVersion);
+			const verdict = await decide(bound.command, bound.background === true, session, canFence, codeModeVersion);
+			return toEgressVerdict(verdict);
 		},
 	};
 }
@@ -396,7 +405,7 @@ export function webAccessAnswer(input: SessionInput): ContributorAnswer {
 	// is what marks it ready — or why it is not.
 	const state = ensureGrantRecord(input.sessionKey);
 	// A **child** gets its own composition: the marker into its own transcript, its project file read
-	// for its own cwd, and (via the floor) the spawner's live state that `grantVerdict` reads. A child
+	// for its own cwd, and (via the floor) the spawner's live state that `decide` reads. A child
 	// loads no ambient extension, so this contributor's answer is the only place it happens.
 	if (input.isChild) composeChildGrants(input.ctx, input.sessionKey, input.cwd);
 	const session = { sessionKey: input.sessionKey, ctx: input.ctx, isChild: input.isChild };
@@ -452,7 +461,7 @@ export const webAccessRegistration: ContributorRegistration = {
 	 * session file to a **live thunk** into its spawner's effective grants. The registration is
 	 * module-level (a single `pi-web-access` for every session), so the filter is inside the thunk,
 	 * not around the registration: `bindGrantFloor` reads the spawner's record by its resolved session
-	 * file, and `grantVerdict` only consults a floor for `isChild` sessions, so a root session never
+	 * file, and `decide` only consults a floor for `isChild` sessions, so a root session never
 	 * reads one.
 	 */
 	bindChild: (input) => {
