@@ -93,7 +93,9 @@ Three layers, defense in depth:
    with `await bash("curl …")`, and that text comes back through the `python` tool result with no
    marker this package could have added — it never saw the text. So the session's **`egress` policy**
    (`checkEgress`, `egress.ts`) refuses a `bash` command whose purpose is to leave the host, steering
-   to `fetch_content` — and, when that route cannot reach the page, to the **escape hatch** below. It
+   to `fetch_content` — and, when that route cannot reach the page, to the **escape hatch** below. Where
+   the command is a transport to a host a human has **granted** for this session, the policy allows it
+   instead and code mode wraps its output in the remote-output fence — the grant is below. It
    reasons about command *text*, so it is a guardrail and not a boundary — via a small script, base64,
    an interpreter it does not know, or an absolute path, it can be walked around — which is exactly why
    (1) has to be a rule about the content and not about the tools. It refuses only what puts external
@@ -132,13 +134,69 @@ so this is depth against the easy mistake, not a boundary.
 `egress = { before(call) }`, one owner, asked by code mode after the session's `guard` and before every
 host call. That is a code-mode contract slot added at version 4 —
 `docs/adr/0007-an-egress-slot-for-a-sessions-network-policy.md` records why it is a slot of its own
-rather than a second half of `guard`.
+rather than a second half of `guard` — and version 5 lets the slot's verdict **allow a call and fence
+its result** (`docs/adr/0008-an-egress-verdict-may-fence-the-result-it-allows.md`). The ssh grant below
+is what uses that.
 
-The contribution is made **only when the mounted code mode speaks version 4**, read from
-`handle.apiVersion`. Code mode validates a contribution all-or-nothing, so an older code mode refuses a
-field it does not know *whole* — `web_search` and `fetch_content` included. Below version 4 the policy
-is omitted, the session keeps its functions and its fence, and the reason is recorded as a `problem`
-rather than the session believing itself guarded.
+The contribution is made **when the mounted code mode speaks version 4 or above**, read from
+`handle.apiVersion`; a **grant** needs version 5. Code mode validates a contribution all-or-nothing, so
+an older code mode refuses a field it does not know *whole* — `web_search` and `fetch_content`
+included. Below version 4 the policy is omitted, the session keeps its functions and its fence, and the
+reason is recorded as a `problem` rather than the session believing itself guarded. A version 4 code
+mode gets the refusals and no route to a grant: it cannot fence a result, so `/ssh-grant` says so and
+every otherwise-grantable target is refused with a reason naming its version — the refusal is kept and
+the grant is withdrawn loudly.
+
+**The grant.** A grant is a human's answer for one session — *this* destination may be reached — and
+the refusal for a transport command is where the human is asked. The transport family (`ssh`, `scp`,
+`sftp`, `mosh`, `rsync`, and `sshpass` riding one of them) is judged by the **destination keys** the
+command's text names — `[user@]host[:port]`, exactly as written, user and port included, no wildcards,
+no `~/.ssh/config` alias resolution, no CIDR — against the session's live grants, and one key without a
+grant refuses the call. Everything else the gate refuses keeps its refusal, so a command that combines
+a granted `ssh` with a `curl` is still refused for the `curl`, and `-D` (a SOCKS proxy that names no
+destination in the text) is refused even under a grant. There are three routes to a grant:
+
+- **the ask** — run the command; the refusal turns into a `ctx.ui.confirm` dialog showing the literal
+  command and **every** key it would grant, waiting 60 s. Every non-answer —
+  expiry, abort, cancel, or a no-UI stub — is a refusal. The ask exists only where a dialog can appear
+  (interactive TUI and RPC); `pi -p`/JSON and a spawned **child** have none.
+- **`/ssh-grant`** — up front: `/ssh-grant <key>` grants for the session; `/ssh-grant` lists what the
+  session holds, each key with the route it came from and any remembered denial; `/ssh-grant --revoke
+  <key>` revokes a grant and clears a denial.
+- **`.pi/ssh-grant.json`** — a **project declaration**: `{"grants": ["dev@build-box"]}`, found by
+  walking up from the cwd to the nearest VCS root, read **only when the project is trusted**
+  (`ctx.isProjectTrusted()`, as `rlm` and `mcp-lazy` already do), and read once at session start. A
+  declared target is still asked for once where a dialog can appear; where nobody can be asked (a
+  headless `pi -p`, a JSON run, a child) the declaration is what applies, and every key it read is
+  recorded and printed at session start. Nothing writes the file back. A denial is remembered for the
+  session too: a `No` records that key, and the next attempt is refused with `declined for this
+  session` rather than being asked again.
+
+**The fence the grant buys.** A granted foreground call is **allowed and fenced**: code mode wraps that
+one call's `stdout`/`stderr` in `<untrusted_remote_output>`, the `REMOTE_OUTPUT_FENCE` of `guard.ts` —
+its own marker and preamble, because a remote shell is not a web page even though both are external.
+Only that call's result changes shape: with no fence returned, an ordinary `ls`/`grep`/`npm`/`git`
+returns byte-identical to before. The fence is the price of the grant, so where it cannot reach the
+grant does not apply and the refusal is not weakened to make it convenient: `background=True` (the
+text would arrive later through calls this policy never produced) and a redirect or a `tee` (the text
+would land on the host's disk, where `read_text` returns it unfenced) are both refused on a granted
+target, each with a reason saying why.
+
+**The grant's lifetime.** A grant is written as a session entry and restored on resume, so a resume
+neither silently re-asks nor silently forgets; `/new` starts clean. A restored `ask`/`command` grant
+older than **7 days** is a declaration rather than a grant: it asks again on first use where a dialog
+exists, and a yes re-stamps it; where nobody can be asked it is refused naming its age. Denials are
+never aged. A **child inherits** through a live floor into its spawner's effective grants — a revoke
+propagates, and a grant made after the child was refused reaches its retry — and, having no dialog, a
+child that needs a new target is refused with a reason naming the parent and `agent_message.send`, then
+retries. A fork keeps what its transcript's entries carry. `/ssh-grant --revoke <key>` overrides a
+project declaration for the session without editing the repo: a declaration is not a grant, so the
+override is recorded as a denial (and survives a resume), while the file still declares and still asks
+in the next session.
+
+**The grant is per session; a declaration is per project; the host is the machine.** Two sessions
+reaching the same target are two grants, and each session's children are more — nothing here is
+machine-wide.
 
 ## The escape hatch: `fetch_content(url, via="shell")`
 

@@ -38,11 +38,20 @@
  * ## The line: what is refused, and what is deliberately not
  *
  * Refused: commands whose **stdout is external content** — the fence bypass itself. A fetcher
- * (`curl`, `wget`, httpie, `aria2c`), a raw transport (`nc`, `socat`, `telnet`, `ftp`, `ssh`,
- * `scp`, `sftp`, `mosh`), a remote-spec `rsync`, the git subcommands that print what a remote
- * answers (`ls-remote`, `remote show`, `archive --remote`), a raw `/dev/tcp` socket, or an
- * interpreter whose inline program names a network capability. Each of these puts text from the
- * network in front of the model with no `<untrusted_web_content>` marker.
+ * (`curl`, `wget`, httpie, `aria2c`), a raw transport (`nc`, `socat`, `telnet`, `ftp`), a
+ * remote-spec `rsync`, the git subcommands that print what a remote answers (`ls-remote`,
+ * `remote show`, `archive --remote`), a raw `/dev/tcp` socket, or an interpreter whose inline
+ * program names a network capability. Each of these puts text from the network in front of the
+ * model with no `<untrusted_web_content>` marker.
+ *
+ * The **transport family** (`ssh`, `scp`, `sftp`, `mosh`, `rsync`, and `sshpass` wrapping one of
+ * them) is the one exception, and it is not handled here: the session's egress policy judges it by
+ * the **destination keys** `destinationKeys` reads against the session's **live grants**, so a
+ * granted foreground call is allowed and its result wrapped in the remote-output fence. That
+ * decision lives in `grants.ts` (`grantVerdict`), not in `checkEgress` — which is unchanged and
+ * still refuses every invocation listed here. Everything else keeps its refusal, so a segment that
+ * combines a granted `ssh` with a `curl` is refused for the `curl`, and `-D` (a dynamic forward
+ * that names no destination) is refused even under a grant.
  *
  * Deliberately **not** refused: everything that downloads code to disk or talks to a remote API —
  * `npm`/`pnpm`/`yarn`/`pip`/`uv`/`cargo`/`go`/`gem`/`composer`/`apt`/`brew`/`nix` install and build,
@@ -58,7 +67,8 @@
  *   - `curl`/`wget` are refused **only when they actually transfer**: `curl --version`, `wget -h`
  *     and a bare `curl` pass, because none of them opens a socket.
  *   - `rsync` is refused only for a **remote spec** (`host:path`, `rsync://`, `-e ssh`); plain
- *     `rsync -a src/ dst/` is a local copy.
+ *     `rsync -a src/ dst/` is a local copy, and under the grant policy a remote spec that reaches
+ *     nobody (`rsync -e ssh local1 local2`, an inert rsh option) runs without a grant.
  *   - an interpreter's inline program is refused only when it names a network capability, so
  *     `python3 -c 'print(1)'` passes and `python3 -c 'import urllib.request'` does not. The match is
  *     against the whole segment, so a program that merely *mentions* `requests` is refused too — at
@@ -304,8 +314,8 @@ function checkSegment(segment: string): EgressVerdict {
 // to `checkEgress` for the five commands whose destination is a host.
 //
 // `checkEgress` decides *whether a command's stdout is external content*. This
-// pair decides *which hosts a transport command names*, so the policy (a later
-// ticket) can compare the set against a session's grants:
+// pair decides *which hosts a transport command names*, so the grant policy in
+// `grants.ts` can compare the set against a session's live grants:
 //
 //   destinationKeys(command)  ->  { keys, refused? }   // read the text
 //   unmatched(keys, granted)  ->  { missing, unmatched } // compare the set
@@ -951,6 +961,11 @@ export function describeAge(at: number, now = Date.now()): string {
 
 /**
  * The refusal for a shell command that leaves this host, or `{ ok: true }` to let it run.
+ *
+ * This is the pre-grant half, unchanged: a pure text read that holds no session state. The
+ * **transport family** is judged by the session's live grants in `grants.ts` (`grantVerdict`),
+ * which calls this function for the rest of a command and to keep a raw-socket refusal; the
+ * destination matcher above is its text half.
  */
 export function checkEgress(command: string): EgressVerdict {
 	const text = stripComments(command);

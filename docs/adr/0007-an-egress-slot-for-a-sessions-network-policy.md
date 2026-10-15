@@ -95,3 +95,27 @@ leave and steers the model to `fetch_content`.
   field, on `0006`'s rule that the composition root must not narrow the publisher's contract.
 - **The widening budget now has three members.** `guard`, `search` and `egress` are the contract's
   additions; anything further is a ticket against code mode, never a quiet extra field.
+
+## Amendment, 2026-10-15 — the verdict may carry a fence
+
+The decision above is left as written; this records what later work made of two of its own claims.
+`docs/adr/0008-an-egress-verdict-may-fence-the-result-it-allows.md` is the decision that adds the
+ability, and this points to it rather than restating it.
+
+- **"A verdict cannot rewrite a result" now holds in the narrow form ADR 0008 describes.** The
+  `egress` slot's verdict may be `{allow: true, fence}` and code mode wraps the result of **the one
+  call the verdict allowed**; the sentence is true as a scope and false as a limit. The field is in
+  the tree, `API_VERSION` is **5** (the first Consequences bullet reads 4), and the mirror in
+  `pi-host-bridge` carries it. Anything past it is a new decision, never a quiet extra field.
+- **The hatch is no longer the refusal's only sanctioned way past.** `fetch_content(url,
+  via="shell")` still fences, for the reason the Consequences give — the text is produced inside this
+  package — and an **ssh grant** is the second: a human authorises one destination for one session,
+  and the granted call is allowed and fenced. The two fence for different reasons, "*this package
+  produced the text*" against "*the human authorised this destination and the output is fenced on the
+  way back*", which is why the grant's words are this package's too and why it is not a second hatch
+  but the refusal's third answer where a human is present.
+- **The gate is still a guardrail, not a boundary.** The transport family is now judged by the
+  destination keys its text names against a session's live grants, but the posture is unchanged
+  (preference 4 of `.scratch/ssh-grant`): a script, base64, an interpreter the table does not know or
+  an absolute path still walks around it, `-D` is refused even under a grant, and the system-prompt
+  rule stays the load-bearing half. The grant buys a fence, not a hole.
