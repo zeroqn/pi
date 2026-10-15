@@ -130,6 +130,12 @@ The fence for a granted connection's output: its own marker and preamble, becaus
 a web page even though both are external.
 _Avoid_: ssh fence, shell fence — one fence covers every granted transport, and it is not the web fence
 
+**Verdict**:
+One policy's answer for one host call: `{allow: false, reason}` or `{allow: true}` — and for the **egress
+policy**, since ADR 0008, `{allow: true, fence}`.
+_Avoid_: decision, result — a verdict answers *whether* (and, for egress, *how the answer comes back*); it
+is not what the call returned
+
 **Grant**:
 A human's answer for one session: *this* destination may be reached. Not a **declaration**, not a model's
 decision, and not a property of the host — the answer comes from a person.
@@ -145,9 +151,15 @@ _Avoid_: default, allowlist — a declaration is what a project says about itsel
 than answered
 
 **Granted target**:
-The destination a grant names, as character-for-character text: the key the allowlist holds and the
-matcher compares against.
+The destination a grant names, as character-for-character text — the form a **destination key** holds and
+the matcher compares against.
 _Avoid_: host, alias — an alias is a promise about what a key resolves to, and the gate cannot resolve
+
+**Destination key**:
+The identity of a **granted target**: `[user@]host[:port]` exactly as the command line writes it, matched
+per command family. Port is part of the key only when the command names one; a key that names no user
+covers no user.
+_Avoid_: endpoint, address — a key is text from the command line, not a resolved endpoint
 
 **The ask**:
 The moment the refusal turns into a question, at the call that was refused. Its answer is the grant; its
