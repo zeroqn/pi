@@ -206,6 +206,48 @@ describe("the footer line", () => {
 		}
 	});
 
+	it("unrefs the heartbeat, so a footer repaint can never decide the process's liveness", async () => {
+		// The bug this pins (`.scratch/teardown-hang/diagnosis.md`): the tick was ref'd and only a
+		// `session_shutdown` cleared it. A child that finished normally was never disposed, so nothing
+		// ever cleared the child's own tick — and a headless `pi -p` run which had spawned a child
+		// printed its answer and then waited on a timer that would never let the loop empty.
+		const statuses: Array<[string, string]> = [];
+		const ctx = fakeCtx(statuses, "/tmp/rlm-status-unref.jsonl");
+		record("/tmp/rlm-status-unref.jsonl", true);
+		const spy = spyOn(globalThis, "setInterval");
+		const pi = fakePi();
+		createRlm(pi, null);
+		try {
+			await pi.emit("session_start", { reason: "startup" }, ctx);
+			await pi.emit("before_agent_start", { systemPrompt: "" }, ctx);
+			const handle = spy.mock.results[0]?.value as { hasRef?: () => boolean } | undefined;
+			expect(handle?.hasRef?.()).toBe(false);
+			await pi.emit("session_shutdown", { reason: "quit" }, ctx);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	it("arms no heartbeat in a child, where the footer is not a human-facing surface", async () => {
+		// A child's ctx does carry a UI object (print mode's methods are no-ops), so `Boolean(ctx?.ui)`
+		// armed a 30 s repaint in every child — work nobody can see, on a lifetime tied to a
+		// `session_shutdown` a completed child never received.
+		const statuses: Array<[string, string]> = [];
+		const ctx = fakeCtx(statuses, "/tmp/rlm-status-child.jsonl");
+		record("/tmp/rlm-status-child.jsonl", true);
+		const spy = spyOn(globalThis, "setInterval");
+		const pi = fakePi();
+		createRlm(pi, { id: "child-1", name: "probe", depth: 1 } as unknown as Parameters<typeof createRlm>[1]);
+		try {
+			await pi.emit("session_start", { reason: "startup" }, ctx);
+			await pi.emit("before_agent_start", { systemPrompt: "" }, ctx);
+			expect(spy).not.toHaveBeenCalled();
+			await pi.emit("session_shutdown", { reason: "quit" }, ctx);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
 	it("writes the code-mode-unavailable notice into a section, forcing no prompt", async () => {
 		// Ordered before the test below on purpose: `toldModel` is a module-level once-per-process flag
 		// (there is no reset seam), and this is the branch that reads it.

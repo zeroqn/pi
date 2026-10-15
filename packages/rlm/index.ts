@@ -69,8 +69,10 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	let envOverridesAllowed = false;
 	/**
 	 * The footer's own cadence (rlm-stop ticket 07). The verdict is computed at read time, so a child
-	 * *becoming* stale has no event behind it — and nothing else in the session may wake: the tick is
-	 * armed with the first running child, disarmed with the last, and never armed without a UI.
+	 * *becoming* stale has no event behind it — and nothing else in the session may wake. Ticket 07's
+	 * arm-on-transition rule for it was superseded by `.scratch/long-work` ticket 04 (the root's own
+	 * work gives no transition to arm on); what survives is where it may be armed at all: a session
+	 * with a UI, and a root one — see `syncStatusTick`.
 	 */
 	let statusTick: ReturnType<typeof setInterval> | null = null;
 	/** The last line written, so a tick that changes nothing writes nothing. */
@@ -193,10 +195,27 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 	 * never arm the tick. That second call site was missing when this first shipped, and the live E1
 	 * check found it: a session with a UI showed `rlm: code-mode (monty)` through a nineteen-minute-shaped
 	 * cell, never a clause.
+	 *
+	 * Two limits on the arming itself, both learned the hard way (`.scratch/teardown-hang/diagnosis.md`):
+	 * a **child** never arms it (its ctx has a `ui` object, but no human reads a child's footer, and a
+	 * completed child's session is disposed late if at all), and the handle is **unref'd** — a repaint
+	 * must never be what keeps the process alive.
 	 */
 	function syncStatusTick(ctx: any) {
-		const wants = Boolean(ctx?.ui);
-		if (wants && !statusTick) statusTick = setInterval(() => renderStatus(ctx), STATUS_TICK_MS);
+		// Where a repaint can be seen at all: a **root** session. A child's ctx carries a `ui` object
+		// too (print mode's methods are no-ops), so `Boolean(ctx?.ui)` alone armed a 30 s tick in every
+		// child — a repaint no human sees, whose lifetime hung on a `session_shutdown` a *completed*
+		// child never received (`.scratch/teardown-hang/diagnosis.md`). The provenance check covers a
+		// resumed child, which knows it is one from its own transcript, not from this closure.
+		const isChild = childContext !== null || readChildProvenance(ctx?.sessionManager) !== null;
+		const wants = Boolean(ctx?.ui) && !isChild;
+		if (wants && !statusTick) {
+			statusTick = setInterval(() => renderStatus(ctx), STATUS_TICK_MS);
+			// Unref'd: a footer repaint is a nicety and must never decide the process's liveness. A
+			// ref'd tick that outlived its session is exactly how a headless `pi -p` run which had
+			// spawned a child came to print its answer and then never exit.
+			statusTick.unref?.();
+		}
 		if (!wants && statusTick) {
 			clearInterval(statusTick);
 			statusTick = null;

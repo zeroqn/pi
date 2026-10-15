@@ -450,6 +450,44 @@ describe("a turn that ends unfinished (2026-09-30)", () => {
 
 		expect(h.manager.poll(handle.child_id).status).toBe("stopped");
 	});
+
+	it("disposes a finished child's session too, so nothing it armed outlives the session", async () => {
+		// A child that *completed* is not "running", and every other path that releases a child's
+		// session reaches running children only (`stop`, `shutdownAll`'s own filter). So before this, a
+		// done child's session was disposed by nothing at all — and `disposeChildSession` is the only
+		// place a child's extensions are told the session is gone. The ref'd timers it left behind are
+		// what made a headless `pi -p` run which had spawned a child print its answer and then never
+		// exit (`.scratch/teardown-hang/diagnosis.md`).
+		const h = managerHarness();
+		const handle = await h.spawn();
+		h.release();
+		await settle();
+		expect(h.manager.poll(handle.child_id).status).toBe("done");
+		// Counted by session file, not as the whole array: `disposedSessions` accumulates across this
+		// describe (it resets in the ones that assert on it wholesale).
+		const disposals = () => disposedSessions.filter((file) => file === handle.session_file).length;
+		expect(disposals()).toBe(0);
+
+		await h.manager.shutdownAll();
+
+		expect(shutdownReasons).toContain("quit");
+		expect(disposals()).toBe(1);
+	});
+
+	it("does not dispose a stopped child's session twice", async () => {
+		// A stop already released it, and a second `session_shutdown` would run every one of the
+		// child's extension cleanups again (rlm's own drops its session's deps).
+		const h = managerHarness();
+		const handle = await h.spawn();
+		await h.manager.stop(handle.child_id);
+		await settle();
+		const disposals = () => disposedSessions.filter((file) => file === handle.session_file).length;
+		expect(disposals()).toBe(1);
+
+		await h.manager.shutdownAll();
+
+		expect(disposals()).toBe(1);
+	});
 });
 
 /* ------------------------------------------------------------------ *

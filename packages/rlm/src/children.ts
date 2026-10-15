@@ -1361,7 +1361,16 @@ export function createChildManager(deps: ChildManagerDeps) {
 				record.noticeRead = true;
 			}
 			if (running.length > 0) changed();
-			await teardown(running);
+			// Every record that still holds a session — not only the running ones. A child that
+			// **completed** is `done`, and `stop`/`remove` reach running children only, so `done` was
+			// the one status nothing ever disposed: the child's session, its kernel, and every timer
+			// its extensions armed lived until the process ended. A ref'd timer among them is what made
+			// a headless `pi -p` run which had spawned a child print its answer and then never exit
+			// (`.scratch/teardown-hang/diagnosis.md`). `stopped` is excluded because its teardown
+			// already ran and a second `session_shutdown` would re-run every one of the child's
+			// extension cleanups.
+			const holding = [...records.values()].filter((record) => record.status !== "stopped");
+			await teardown(holding);
 		},
 	};
 }
