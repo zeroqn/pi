@@ -1,0 +1,32 @@
+{
+	"name": "pi-mcp-lazy",
+	"version": "0.1.0",
+	"description": "Connect an MCP server only when a code-mode cell names one, while pi's active tool surface stays `python`.",
+	"type": "module",
+	"scripts": {
+		"test": "bun test",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"code-mode",
+		"mcp",
+		"lazy"
+	],
+	"license": "MIT",
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*"
+	},
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	},
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "^1.2.0",
+		"@types/node": "^22.20.0",
+		"typescript": "^5.8.0"
+	}
+}
