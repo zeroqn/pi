@@ -24,6 +24,7 @@ import { prelude } from "./prelude";
 import { remedyFor } from "./remedy";
 import { renderValue } from "./render";
 import { shellProblem } from "./shell";
+import { withToolDispatch } from "./tool-host";
 import { errorText } from "./util";
 
 // ---------------------------------------------------------------------------
@@ -1111,7 +1112,10 @@ export function createKernel(options: {
 					root,
 					attachments,
 					progress,
-					extra: { ...backgroundHostFns(), ...ledger.hostFns() },
+					// The contributed surface plus the per-cell `tool` route to MCP tools
+					// (`tool-host.ts`): one name, composed here because the owner `tool` is per
+					// session while the dispatch target is this cell's ctx.
+					extra: withToolDispatch({ ...backgroundHostFns(), ...ledger.hostFns() }, ctx),
 					background,
 					guard: ledger.guard(),
 					// The session's egress policy, if any owner declared one: web-access refuses a shell
