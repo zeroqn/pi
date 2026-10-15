@@ -99,14 +99,60 @@ _Avoid_: callback, hook, interceptor
 **Egress policy**:
 The `egress` slot's content: whether a host call may leave this host. pi-web-access's `checkEgress`
 refuses a `bash` command whose purpose is to leave and steers it to `fetch_content` — and to the
-**escape hatch** when that route cannot reach the page.
+**escape hatch** when that route cannot reach the page. For a target-bearing transport the refusal is no
+longer the only answer: where a human is present it becomes **the ask**, and a **grant** turns it into
+an allowance that carries the **remote-output fence**.
 _Avoid_: network guard, firewall; and "egress" for the host surface itself, which is the **Host surface**
 
 **Escape hatch**:
 The sanctioned way past a refusal that would otherwise stop work: `fetch_content(url, via="shell")` runs
-`curl` on the host for the pages the guarded route cannot reach, and fences what it returns.
+`curl` on the host for the pages the guarded route cannot reach, and fences what it returns. A **grant**
+is the other sanctioned way past a refusal, and it is not this one: the escape hatch reaches a *page*
+the guardrail was never built for, while a grant reaches a *host* the human named. Neither hides what it
+brings back — a bypass does, and that is why both are fenced rather than allowed silently.
 _Avoid_: bypass, fallback — a bypass hides what it fetches, and a fallback may return unfenced text;
-this one cannot
+this one cannot, and a grant fences instead of hiding
+
+**Fence**:
+The untrusted-content markers wrapped around text that came from outside this host, so the model reads
+it as data.
+_Avoid_: sandbox, boundary — a fence wraps text, it does not contain a process
+
+**Untrusted content**:
+Text that came from outside this host — a web page, a search result, a remote command's output — and
+must be read as data, never as instructions. It is a claim about *where the text came from*, not about
+which tool fetched it.
+_Avoid_: untrusted input, tainted text — the class is about *provenance*, and the section that states the
+rule wears the wire name if anyone needs it (`untrusted_external_content`)
+
+**Remote-output fence**:
+The fence for a granted connection's output: its own marker and preamble, because a remote shell is not
+a web page even though both are external.
+_Avoid_: ssh fence, shell fence — one fence covers every granted transport, and it is not the web fence
+
+**Grant**:
+A human's answer for one session: *this* destination may be reached. Not a **declaration**, not a model's
+decision, and not a property of the host — the answer comes from a person.
+_Avoid_: permission, access — a grant is one session's answer about one destination, not a host-wide
+policy
+
+**Declaration**:
+A project's statement of a destination, in `.pi/ssh-grant.json` (a **trusted** project only, read at
+session start). It is not a **grant**: where a human can be asked it is a pre-filled question, and where
+nobody can be asked — no UI — it is what applies, because a session must not be left with no route at
+all. A session's own refusal or revocation overrides it without editing the repo.
+_Avoid_: default, allowlist — a declaration is what a project says about itself, and it is offered rather
+than answered
+
+**Granted target**:
+The destination a grant names, as character-for-character text: the key the allowlist holds and the
+matcher compares against.
+_Avoid_: host, alias — an alias is a promise about what a key resolves to, and the gate cannot resolve
+
+**The ask**:
+The moment the refusal turns into a question, at the call that was refused. Its answer is the grant; its
+absence (no UI, no answer) is a refusal.
+_Avoid_: prompt, request — the ask is the refusal's own question, not the model asking in prose
 
 ## The agent side
 
