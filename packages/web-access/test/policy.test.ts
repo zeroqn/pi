@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 
 import { REMOTE_OUTPUT_FENCE } from "../guard";
-import { ensureGrantRecord, __resetGrantRecordsForTests, __resetGrantFloorsForTests } from "../grants";
+import {
+	ensureGrantRecord,
+	sshGrantCommand,
+	statusText,
+	__resetGrantFloorsForTests,
+	__resetGrantRecordsForTests,
+} from "../grants";
 import { backgroundsItself } from "../command-rules";
 import { decide, toEgressVerdict, type CallVerdict } from "../policy";
 
@@ -189,5 +195,64 @@ describe("the ask, at the seam-neutral level (ticket 02 §2)", () => {
 		const verdict = await ask(key, ctx, "ssh dev@build-box uptime");
 		expect(reasonOf(verdict)).toContain("nobody can be asked here");
 		expect(asked).toBe(0);
+	});
+});
+
+describe("the TTY rule and the status line (ticket 05, preferences 6 and 7)", () => {
+	const granted = () => {
+		const key = newKey();
+		ensureGrantRecord(key).grants.set("dev@build-box", { route: "command", at: Date.now() });
+		return key;
+	};
+
+	it("refuses a granted command that asks for a terminal, in every spelling", async () => {
+		for (const command of [
+			"ssh -t dev@build-box top",
+			"ssh -tt dev@build-box top",
+			"ssh -nt dev@build-box top",
+			"ssh -o RequestTTY=yes dev@build-box top",
+			"ssh -o RequestTTY=force dev@build-box top",
+		]) {
+			const verdict = await ask(granted(), makeCtx(), command);
+			expect(verdict.kind).toBe("refuse");
+			expect(reasonOf(verdict)).toContain("asks for a terminal");
+		}
+	});
+
+	it("allows `-T` and a plain call, because the safe direction is not the same request", async () => {
+		for (const command of ["ssh -T dev@build-box top", "ssh dev@build-box top", "ssh -o RequestTTY=no dev@build-box top"]) {
+			expect(await ask(granted(), makeCtx(), command)).toEqual({ kind: "fence", fence: REMOTE_OUTPUT_FENCE });
+		}
+	});
+
+	it("counts what it refused, and says what the session holds", async () => {
+		const key = newKey();
+		const status: (string | undefined)[] = [];
+		const ctx = makeCtx({ hasUI: false });
+		(ctx.ui as { setStatus?: (key: string, text: string | undefined) => void }).setStatus = (_k, text) =>
+			status.push(text);
+		expect(statusText(ensureGrantRecord(key))).toBeUndefined();
+
+		await ask(key, ctx, "ssh dev@build-box uptime");
+		expect(statusText(ensureGrantRecord(key))).toBe("ssh-grant: 0 granted, 1 refused");
+		expect(status.at(-1)).toBe("ssh-grant: 0 granted, 1 refused");
+
+		// `/ssh-grant` refreshes the line too — the real route by which a session gains one — and a call
+		// that reaches nobody changes nothing.
+		// A record is `ready` once this session's contributor has answered; `/ssh-grant` refuses to hold
+		// state for a session whose policy cannot read it (ticket 06 §3).
+		ensureGrantRecord(key).ready = true;
+		await sshGrantCommand("dev@build-box", ctx, key);
+		expect(status.at(-1)).toBe("ssh-grant: 1 granted, 1 refused");
+		await ask(key, ctx, "ssh dev@build-box uptime");
+		await ask(key, ctx, "ssh -V");
+		expect(status.at(-1)).toBe("ssh-grant: 1 granted, 1 refused");
+	});
+
+	it("clears the line when there is nothing to say", () => {
+		const key = newKey();
+		const state = ensureGrantRecord(key);
+		state.denials.add("ops@other-box");
+		expect(statusText(state)).toBe("ssh-grant: 0 granted, 1 declined");
 	});
 });

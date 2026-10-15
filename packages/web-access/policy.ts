@@ -51,6 +51,7 @@ import {
 	FENCE_API_VERSION,
 	GRANT_IDLE_DAYS,
 	PROJECT_FILE,
+	countRefusal,
 	ensureGrantRecord,
 	grantFloor,
 	hasUi,
@@ -58,6 +59,7 @@ import {
 	isStaleGrant,
 	persistGrantState,
 	signalOf,
+	updateStatus,
 	uiOf,
 	type Grant,
 	type GrantSession,
@@ -116,11 +118,16 @@ const REDIRECT_REFUSAL =
 const DETACHED_REFUSAL =
 	"web-access: that command is granted for this session, but it detaches itself (an unquoted trailing `&`): the connection would outlive the call, and the fence wraps a result that came back. Run it in the foreground.";
 
+/** Preference 6: an interactive connection has no completion, and a cell cannot drive a terminal anyway. */
+const TTY_REFUSAL =
+	"web-access: that command is granted for this session, but it asks for a terminal (`-t`/`-tt`, `-o RequestTTY=`): an interactive session has no result for the fence to wrap, and a cell cannot drive a terminal. Drop `-t` (use `-T` to say so explicitly) and run the command non-interactively.";
+
 /** A granted invocation's verdict: fenced if the result comes back, refused if it cannot. */
-function grantedCall(command: string, background: boolean): CallVerdict {
+function grantedCall(command: string, background: boolean, tty: boolean): CallVerdict {
 	if (background) return { kind: "refuse", reason: BACKGROUND_REFUSAL };
 	if (redirectsOrTees(command)) return { kind: "refuse", reason: REDIRECT_REFUSAL };
 	if (backgroundsItself(command)) return { kind: "refuse", reason: DETACHED_REFUSAL };
+	if (tty) return { kind: "refuse", reason: TTY_REFUSAL };
 	return { kind: "fence", fence: REMOTE_OUTPUT_FENCE };
 }
 
@@ -235,7 +242,10 @@ export async function decide(
 	if (reading.keys.length === 0) return { kind: "allow" }; // reaches nobody: `ssh -V`, a local `rsync -e ssh`.
 
 	const state = ensureGrantRecord(session.sessionKey);
-	if (!canFence) return { kind: "refuse", reason: versionRefusal(command, reading.keys, codeModeVersion) };
+	if (!canFence) {
+		countRefusal(session.ctx, state);
+		return { kind: "refuse", reason: versionRefusal(command, reading.keys, codeModeVersion) };
+	}
 
 	// 3. Compare against the live grants. A dialog-capable session does not let a project declaration
 	//    stand in for a human's answer; where nobody can be asked, it is what applies. A **child**
@@ -246,7 +256,8 @@ export async function decide(
 	const held = heldKeysOf(view, dialogCapable);
 	const comparison = unmatched(reading.keys, held);
 	const unheld = [...comparison.missing, ...comparison.unmatched];
-	if (unheld.length === 0) return grantedCall(command, background);
+	const tty = reading.ttyRequested === true;
+	if (unheld.length === 0) return grantedCall(command, background, tty);
 
 	// 4. A no is remembered for the session; without it the next cell asks again, which reads as the
 	//    tool not listening (ticket 06 §4). A stale grant is **not** a no: it re-asks where a dialog
@@ -269,15 +280,18 @@ export async function decide(
 				state.deniedAt.delete(key);
 			}
 			persistGrantState(state);
-			return grantedCall(command, background);
+			updateStatus(session.ctx, state);
+			return grantedCall(command, background, tty);
 		}
 		for (const key of unheld) {
 			state.denials.add(key);
 			state.deniedAt.set(key, Date.now());
 		}
 		persistGrantState(state);
+		countRefusal(session.ctx, state);
 		return { kind: "refuse", reason: declineOrRefusal(session, command, reading.keys, held, true, stale) };
 	}
+	countRefusal(session.ctx, state);
 	return { kind: "refuse", reason: declineOrRefusal(session, command, reading.keys, held, denied, stale) };
 }
 

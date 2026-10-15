@@ -105,6 +105,13 @@ export type SshGrantState = {
 	 * that triggered it.
 	 */
 	persist?: () => void;
+	/**
+	 * How many transport calls this session's policy has refused (ticket 05's status line).
+	 *
+	 * **Not persisted**: it is this session's own tally, and a resume that showed a stale count would be
+	 * reporting work the current session did not do.
+	 */
+	refusals: number;
 	/** Whether this session's code mode can honour a grant (`/ssh-grant` reports on this). */
 	ready: boolean;
 	/** Why it cannot, when it cannot. */
@@ -151,6 +158,7 @@ export function ensureGrantRecord(sessionKey: string): SshGrantState {
 		deniedAt: new Map(),
 		project: null,
 		projectTrusted: false,
+		refusals: 0,
 		ready: false,
 		reason: "this session has no web-access egress policy yet",
 		inherited: null,
@@ -484,6 +492,44 @@ export function heldKeys(state: SshGrantState, dialogCapable: boolean): Set<stri
 }
 
 // ---------------------------------------------------------------------------
+// The visible state: one status line (ticket 05, preference 7).
+// ---------------------------------------------------------------------------
+
+/**
+ * What the session holds, for the status line — or `undefined` when there is nothing to say.
+ *
+ * A session holding nothing and refusing nothing gets **no line at all**: a status that says "nothing" in
+ * every session is noise, and `setStatus(key, undefined)` is how pi clears one (readonly-mode's pattern).
+ * The two numbers are the ones a human can act on: what the session may reach, and how often the policy
+ * has said no.
+ */
+export function statusText(state: SshGrantState): string | undefined {
+	const held = state.grants.size + (state.project?.keys.length ?? 0);
+	if (held === 0 && state.refusals === 0 && state.denials.size === 0) return undefined;
+	const parts: string[] = [`${held} granted`];
+	if (state.denials.size > 0) parts.push(`${state.denials.size} declined`);
+	if (state.refusals > 0) parts.push(`${state.refusals} refused`);
+	return `ssh-grant: ${parts.join(", ")}`;
+}
+
+/** Write (or clear) that line. Best effort: a status must never fail the call that changed it. */
+export function updateStatus(ctx: unknown, state: SshGrantState): void {
+	try {
+		const ui = uiOf(ctx) as { setStatus?: unknown } | null;
+		if (ui === null || typeof ui.setStatus !== "function") return;
+		(ui.setStatus as (key: string, text: string | undefined) => void)("ssh-grant", statusText(state));
+	} catch {
+		/* a status line is a courtesy, never a precondition */
+	}
+}
+
+/** Count one refusal and refresh the line — the policy calls this on its way out. */
+export function countRefusal(ctx: unknown, state: SshGrantState): void {
+	state.refusals += 1;
+	updateStatus(ctx, state);
+}
+
+// ---------------------------------------------------------------------------
 // The routes: /ssh-grant, and the session-start read.
 // ---------------------------------------------------------------------------
 
@@ -544,6 +590,7 @@ export async function sshGrantCommand(args: string, ctx: unknown, sessionKey: st
 			state.denials.delete(key);
 		}
 		persistGrantState(state);
+		updateStatus(ctx, state);
 		notify(
 			ctx,
 			`ssh-grant: revoked ${key} for this session${
@@ -561,6 +608,7 @@ export async function sshGrantCommand(args: string, ctx: unknown, sessionKey: st
 	state.denials.delete(key);
 	state.deniedAt.delete(key);
 	persistGrantState(state);
+	updateStatus(ctx, state);
 	notify(ctx, `ssh-grant: granted ${key} for this session.`);
 }
 
@@ -603,6 +651,7 @@ export function restoreGrantSession(
 		notify(ctx, `ssh-grant: trusted project ${file} declares ${keys.length} target(s): ${keys.join(", ")} — route project.`);
 	}
 	for (const problem of problems) notify(ctx, problem, "warning");
+	updateStatus(ctx, state);
 	return state;
 }
 

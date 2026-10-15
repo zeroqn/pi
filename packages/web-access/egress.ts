@@ -348,6 +348,12 @@ export type DestinationReading = {
 	 * reason, so the policy can pass it straight through.
 	 */
 	refused?: string;
+	/**
+	 * Whether the invocation asks for a **TTY** (`-t`, `-tt`, `-o RequestTTY=yes`) — a capability a cell
+	 * does not have and a completion the fence cannot wrap, so `policy.ts` refuses it under a grant
+	 * (`.scratch/guardrail-blindspots` preference 6).
+	 */
+	ttyRequested?: boolean;
 };
 
 /**
@@ -508,6 +514,8 @@ type Parsed = {
 	dynamicForward: boolean;
 	/** A local query (`ssh -V`, `ssh -Q …`, `mosh --version`) — reaches nobody. */
 	querySeen: boolean;
+	/** A terminal was asked for: `-t`, `-tt`, `-o RequestTTY=yes|force|force-auto`. */
+	ttyRequested: boolean;
 	/** A URI whose host or port the text does not determine — refused, not guessed. */
 	ambiguous: boolean;
 	/** Whether a positional yielded a destination key. */
@@ -521,6 +529,7 @@ function newParsed(): Parsed {
 		extraKeys: [],
 		dynamicForward: false,
 		querySeen: false,
+		ttyRequested: false,
 		ambiguous: false,
 		destinationFound: false,
 	};
@@ -684,6 +693,7 @@ function handleDirective(value: string | undefined, p: Parsed): void {
 	else if (name === "hostname") { if (val !== "") p.secondSpecs.push(val); }
 	else if (name === "proxycommand") p.secondSpecs.push(...hostsInCommand(val));
 	else if (name === "dynamicforward") p.dynamicForward = true;
+	else if (name === "requesttty") { if (val === "yes" || val === "force" || val === "force-auto") p.ttyRequested = true; }
 	else if (name === "port") { if (val !== "" && p.port === undefined) p.port = val; }
 	else if (name === "user") { if (val !== "" && p.user === undefined) p.user = val; }
 	// `LocalForward` and `RemoteForward` are deliberately not mined: a forward is covered by the
@@ -790,6 +800,8 @@ function handleShortOption(cmd: FamilyName, letter: string, value: string | unde
 		if (letter === "p") { if (value !== undefined && value !== "") p.port = value; return; }
 		if (letter === "D") { p.dynamicForward = true; return; }
 		if (letter === "V" || letter === "Q") { p.querySeen = true; return; }
+		// `-t`/`-tt` (coalesced letters reach here one at a time); `-T` is its absence and is left alone.
+		if (letter === "t") { p.ttyRequested = true; return; }
 		if (letter === "J") { p.secondSpecs.push(...hops(value)); return; }
 		if (letter === "W") { if (value !== undefined && value !== "") p.secondSpecs.push(value); return; }
 		if (letter === "o") { handleDirective(value, p); return; }
@@ -862,13 +874,16 @@ function ambiguousRefusal(cmd: FamilyName): string {
 function readTransport(cmd: FamilyName, args: string[]): DestinationReading {
 	const parsed = parseFamily(cmd, args);
 	const keys = keysOfParsed(cmd, parsed);
-	if (parsed.dynamicForward) return { keys, refused: DYNAMIC_FORWARD_REFUSAL };
+	// The TTY fact travels with the keys: a granted invocation that asks for a terminal is refused by
+	// the policy, so the reading has to carry it (preference 6).
+	const tty = parsed.ttyRequested ? { ttyRequested: true } : {};
+	if (parsed.dynamicForward) return { keys, refused: DYNAMIC_FORWARD_REFUSAL, ...tty };
 	if (parsed.querySeen) return { keys: [] };
-	if (parsed.ambiguous) return { keys, refused: ambiguousRefusal(cmd) };
+	if (parsed.ambiguous) return { keys, refused: ambiguousRefusal(cmd), ...tty };
 	if (!parsed.destinationFound && (cmd === "ssh" || cmd === "mosh" || cmd === "sftp")) {
-		return { keys, refused: unreadableRefusal(cmd) };
+		return { keys, refused: unreadableRefusal(cmd), ...tty };
 	}
-	return { keys };
+	return { keys, ...tty };
 }
 
 /**
@@ -883,6 +898,7 @@ export function destinationKeys(command: string): DestinationReading {
 	const text = stripComments(command);
 	const keys: string[] = [];
 	let refused: string | undefined;
+	let tty = false;
 	for (const segment of splitSegments(text)) {
 		const tokens = peel(shellTokens(segment));
 		if (tokens.length === 0) continue;
@@ -891,9 +907,11 @@ export function destinationKeys(command: string): DestinationReading {
 		const reading = readTransport(cmd as FamilyName, tokens.slice(1));
 		for (const key of reading.keys) keys.push(key);
 		if (reading.refused !== undefined && refused === undefined) refused = reading.refused;
+		if (reading.ttyRequested === true) tty = true;
 	}
 	const unique = dedupe(keys);
-	return refused !== undefined ? { keys: unique, refused } : { keys: unique };
+	const out: DestinationReading = tty ? { keys: unique, ttyRequested: true } : { keys: unique };
+	return refused === undefined ? out : { ...out, refused };
 }
 
 /**
