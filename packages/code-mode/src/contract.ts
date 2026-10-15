@@ -31,10 +31,10 @@ export const PUBLISHER = "pi-code-mode";
  *
  * A *supplier* reads it too. Code mode validates a contribution all-or-nothing, so an older code
  * mode refuses a field it does not know **whole** — which makes a slot a package must be obeyed
- * through unsafe to contribute blind. **2 added {@link Guard}, 3 added {@link SearchEngine} and 4 added
- * {@link Egress}**: a package that has to be obeyed rather than merely offered reads `handle.apiVersion`
- * first, and fails closed below the version it needs. */
-export const API_VERSION = 4;
+ * through unsafe to contribute blind. **2 added {@link Guard}, 3 added {@link SearchEngine}, 4 added
+ * {@link Egress} and 5 added {@link EgressVerdict}'s fenced allowance**: a package that has to be obeyed
+ * rather than merely offered reads `handle.apiVersion` first, and fails closed below the version it needs. */
+export const API_VERSION = 5;
 
 export type HostFn = (...args: unknown[]) => Promise<unknown>;
 
@@ -98,6 +98,25 @@ export type Guard = {
 };
 
 /**
+ * The words around a granted call's result, supplied by the **egress owner** and applied by code mode.
+ *
+ * The vocabulary is the egress subject's, not code mode's: a revision of the marker text — or a second
+ * consumer with a fence of its own — never touches this file. Code mode supplies only the act
+ * (`applyFence` in `host.ts`), wrapping the one call's result in these three strings.
+ */
+export type Fence = { open: string; preamble: string; close: string };
+
+/**
+ * What an {@link Egress.before} answers: the guard's verdict, or a **fenced allowance**.
+ *
+ * `{ allow: true, fence }` is the call may run **and its answer is external text**, to be wrapped with
+ * the owner's words before the cell sees it. {@link GuardVerdict} is untouched — "may this call run" and
+ * "is its answer external text" stay two questions, which is why the fence belongs to the egress slot
+ * rather than to a second field on the guard.
+ */
+export type EgressVerdict = GuardVerdict | { allow: true; fence: Fence };
+
+/**
  * The session's **egress** policy: may a host call leave this host?
  *
  * The sibling of {@link Guard}, asked the same way at the same moment, and deliberately a **separate
@@ -114,8 +133,9 @@ export type Guard = {
  * does not know a call lets it through — the same fail-open shape {@link Guard.before} has.
  */
 export type Egress = {
-	/** Asked before every host call, under {@link Guard.before}'s rules: `{allow: false}` is a refusal. */
-	before?: (call: HostCall) => GuardVerdict | Promise<GuardVerdict>;
+	/** Asked before every host call, under {@link Guard.before}'s rules: `{allow: false}` is a refusal,
+	 * and a `{allow: true, fence}` says the answer it allows is external text. */
+	before?: (call: HostCall) => EgressVerdict | Promise<EgressVerdict>;
 };
 
 /** One grep hit, as a cell reads it. Both engines are asked for the file name and the line number, so

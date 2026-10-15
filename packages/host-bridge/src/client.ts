@@ -75,15 +75,30 @@ export type KernelGuard = {
 };
 
 /**
- * The session's egress policy, mirrored from code mode's `Egress` (contract version 4): asked after
- * `guard` and before every host call, and answered by the owner whose subject is the network.
+ * The words around a granted call's result, mirrored from code mode's `Fence` (contract version 5):
+ * the egress owner supplies them, and code mode performs the act.
+ */
+export type KernelFence = { open: string; preamble: string; close: string };
+
+/**
+ * What a {@link KernelEgress.before} answers, mirrored from code mode's `EgressVerdict` (contract
+ * version 5): the guard's verdict, or a **fenced allowance** that says the call may run and its answer
+ * is external text to be wrapped with {@link KernelFence}. {@link KernelGuardVerdict} is untouched, the
+ * same two questions the publisher keeps apart.
+ */
+export type KernelEgressVerdict = KernelGuardVerdict | { allow: true; fence: KernelFence };
+
+/**
+ * The session's egress policy, mirrored from code mode's `Egress` (contract version 4; the fenced
+ * allowance arrived at 5): asked after `guard` and before every host call, and answered by the owner
+ * whose subject is the network.
  *
  * A slot of its own rather than a second half of {@link KernelGuard}, because the two ask different
  * questions — may this call run, may it reach the network — and a session holds both; and because
  * `guard` is single-owner, so one package's policy could not carry another package's subject.
  */
 export type KernelEgress = {
-	before?: (call: KernelHostCall) => KernelGuardVerdict | Promise<KernelGuardVerdict>;
+	before?: (call: KernelHostCall) => KernelEgressVerdict | Promise<KernelEgressVerdict>;
 };
 
 /** One grep hit, as a cell reads it. Code mode's own shape, mirrored. */
@@ -134,9 +149,10 @@ export type KernelSearchEngine = {
  * mode's contract). `owner`, `onNotice`, `provenance`, `guard` and `egress` are single-owner there: a
  * second declarer of a slot is refused whole by the ledger, not silently ignored.
  *
- * The mirror tracks the publisher's *version*: `guard` arrived with contract version 2, `search` with 3
- * and `egress` with 4, and a consumer that reads the registry compares `handle.apiVersion` before
- * sending one (a contributor cannot: the ledger refuses it whole, and the session would never learn).
+ * The mirror tracks the publisher's *version*: `guard` arrived with contract version 2, `search` with 3,
+ * `egress` with 4 and its fenced allowance with 5, and a consumer that reads the registry compares
+ * `handle.apiVersion` before sending one (a contributor cannot: the ledger refuses it whole, and the
+ * session would never learn).
  */
 export type KernelContribution = {
 	owner: string;

@@ -60,7 +60,7 @@ Published **at module load**, first publisher wins:
 // globalThis[Symbol.for("pi-code-mode:registry")]
 {
   publisher: "pi-code-mode",
-  apiVersion: 4,                       // the contract's version, not the package's
+  apiVersion: 5,                       // the contract's version, not the package's
   sessions: Map<string, KernelHandle>, // one kernel per session key
   mount(pi, ctx): KernelHandle,        // idempotent by session key
 }
@@ -98,7 +98,11 @@ Published **at module load**, first publisher wins:
   rather than one because they ask different questions — *may this call run* and *may it leave the
   network* — and a session holds both: read-only mode owns the first, web-access the second, and neither
   package can be obeyed through a slot the other holds. `egress` is the reason the contract reached
-  version 4 — `docs/adr/0007-an-egress-slot-for-a-sessions-network-policy.md`.
+  version 4 — `docs/adr/0007-an-egress-slot-for-a-sessions-network-policy.md` — and its verdict may
+  answer a **fenced allowance** since version 5 (`{ allow: true, fence }`): the call runs and its answer
+  is external text, which code mode wraps with the owner's own words before the cell sees it. Only that
+  one call's result changes shape; `guard`'s verdict is untouched, and
+  `docs/adr/0008-an-egress-verdict-may-fence-the-result-it-allows.md` records why.
 - **`apiVersion` is the only version signal there is.** pi exposes no extension enumeration and no
   version query, so a consumer cannot tell *absent* from *old* from *inert* any other way.
 

@@ -21,6 +21,7 @@ import { bool, num, str } from "./util";
 import {
 	aborted,
 	type Egress,
+	type Fence,
 	type FindQuery,
 	type GrepQuery,
 	type Guard,
@@ -292,14 +293,60 @@ export function bind(args: unknown[], names: string[], fn: string): Record<strin
 }
 
 /**
+ * The fields of a structured result that carry external text. `bash_host` is the shape that matters
+ * today: `stdout` and `stderr` are the remote text, while `exit_code`/`truncated`/`killed`/
+ * `full_output_path` are this session's own facts about the call and never move. An object with none of
+ * these is not a text-bearing result and comes back unchanged.
+ */
+const FENCE_TEXT_FIELDS = ["stdout", "stderr"] as const;
+
+/** One text value under a fence: the opening marker, the preamble, the value, the closing marker.
+ *
+ * `fenceText`'s rule, verbatim (`web-access/guard.ts`): **always wrap**, even when the value already
+ * carries the marker. An idempotency check would be a bypass — external text can forge the marker — so
+ * re-entry is handled where it can happen, by recognising the exact wrapper. */
+function underFence(text: string, fence: Fence): string {
+	return `${fence.open}${fence.preamble}\n${text}\n${fence.close}`;
+}
+
+/**
+ * Wrap the text of one call's result with the fence its policy answered (see `Fence`).
+ *
+ * A plain string result is wrapped unless it is empty; a structured result has its **text fields**
+ * ({@link FENCE_TEXT_FIELDS}) wrapped, each only when it is a non-empty string; anything else — a
+ * number, a boolean, an object with no text field, an empty string — is returned unchanged. The egress
+ * owner supplies the words and code mode supplies only this act, so a revision of the marker text never
+ * touches this file.
+ */
+export function applyFence(result: unknown, fence: Fence): unknown {
+	if (typeof result === "string") return result === "" ? result : underFence(result, fence);
+	if (result === null || typeof result !== "object" || Array.isArray(result)) return result;
+	const record = result as Record<string, unknown>;
+	let wrapped: Record<string, unknown> | undefined;
+	for (const field of FENCE_TEXT_FIELDS) {
+		const value = record[field];
+		if (typeof value === "string" && value !== "") {
+			wrapped ??= { ...record };
+			wrapped[field] = underFence(value, fence);
+		}
+	}
+	return wrapped ?? result;
+}
+
+/**
  * The guard's gate: the same surface, with every call offered to the session's policy first.
  *
  * A refusal throws **before** the callee runs, and the wrapper carries the name of the function it
  * wraps — monty identifies a host function by its JS `.name` (`recordingHost`'s note; a wrapper
  * named `<anonymous>` binds as nothing and every later call through the binding raises `NameError`).
  *
+ * A policy may also answer a **fenced allowance** (`EgressVerdict`): the call runs, and the fence is
+ * applied to **its** result before the cell sees it — a plain string, or the text fields of a structured
+ * result. Only that one call's answer changes shape.
+ *
  * With no `before` the surface is returned **unchanged**, not copied: a session with no guard has
- * to behave exactly as it did before this existed.
+ * to behave exactly as it did before this existed. With no fence returned, the callee's result is the
+ * callee's own object — byte-identical and uncopied.
  */
 export function guarded(host: HostFns, ...policies: Array<Guard | Egress | undefined>): HostFns {
 	// Flattened once, at wrap time, so the hot path is a loop over bare functions rather than a walk
@@ -316,11 +363,18 @@ export function guarded(host: HostFns, ...policies: Array<Guard | Egress | undef
 			// it: `guard` is asked first (may this call run at all), then `egress` (may it leave the
 			// host). The order is the contract's: a session policy decides whether the call is a call
 			// before a subject policy decides whether it may reach out.
+			let fence: Fence | undefined;
 			for (const ask of asked) {
-				const verdict = (await ask({ name, args })) as { allow?: boolean; reason?: string } | undefined;
+				const verdict = (await ask({ name, args })) as
+					| { allow?: boolean; reason?: string; fence?: Fence }
+					| undefined;
 				if (verdict && verdict.allow === false) throw refusal(String(verdict.reason));
+				// A fenced allowance is remembered rather than acted on yet: a fence lands on the result
+				// of the call it allowed, and on nothing else.
+				if (verdict?.fence) fence = verdict.fence;
 			}
-			return fn(...args);
+			const result = await fn(...args);
+			return fence ? applyFence(result, fence) : result;
 		};
 		Object.defineProperty(wrapper, "name", { value: name });
 		wrapped[name] = wrapper;
