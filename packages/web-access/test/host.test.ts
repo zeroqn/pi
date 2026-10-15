@@ -345,3 +345,38 @@ describe("pi install loads the guard too", () => {
 		expect(events).toEqual(["before_agent_start", "tool_result"]);
 	});
 });
+
+describe("the shell guideline keeps its ban and gains the ask route", () => {
+	/** The answer for one session, asked exactly as the composition root asks it. */
+	function answer() {
+		return webAccessAnswer({
+			cwd: "/tmp",
+			sessionKey: "s",
+			ctx: {},
+			isChild: false,
+			progress: () => {},
+			handle: { apiVersion: 4 },
+		} as unknown as SessionInput);
+	}
+
+	const shellGuideline = () =>
+		(answer().contribution?.guidelines ?? []).find((line) =>
+			line.startsWith("Do not fetch a page with a shell command"),
+		) ?? "";
+
+	it("still refuses a shell fetch, and still calls it unfenced", () => {
+		expect(shellGuideline()).toContain("use await fetch_content(url)");
+		expect(shellGuideline()).toContain("a shell fetch does not");
+		expect(shellGuideline()).toContain("the session may refuse one outright");
+	});
+
+	it("names the granted route when the errand needs a host, and promises nothing yet", () => {
+		// The route is described by what happens, not by naming a command: `/ssh-grant` does not exist
+		// until ticket 06/07 of the ssh-grant map builds it, and a guideline must not teach a command
+		// the session cannot run. What it must say is that a grant is a human's to give.
+		expect(shellGuideline()).toContain("a target only an ssh connection reaches");
+		expect(shellGuideline()).toContain("a human is asked for one if a dialog can appear");
+		expect(shellGuideline()).toContain("do not read a refusal as an invitation to route around it");
+		expect(shellGuideline()).toContain("No grant exists until a human gives one");
+	});
+});

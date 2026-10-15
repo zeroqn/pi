@@ -5,6 +5,10 @@ import {
 	installGuard,
 	OPEN_MARKER,
 	PREAMBLE,
+	REMOTE_CLOSE_MARKER,
+	REMOTE_OPEN_MARKER,
+	REMOTE_OUTPUT_FENCE,
+	REMOTE_PREAMBLE,
 	SYSTEM_PROMPT_SECTION,
 	UNTRUSTED_EXTERNAL_CONTENT_SECTION,
 	withGuardSection,
@@ -55,6 +59,32 @@ describe("the system-prompt rule (layer 1)", () => {
 			expect(SYSTEM_PROMPT_SECTION).toContain(tool);
 		}
 		expect(SYSTEM_PROMPT_SECTION).toContain(OPEN_MARKER);
+	});
+});
+
+describe("the remote-output fence (the granted route's words)", () => {
+	it("has its own marker and preamble, distinct from the web fence's", () => {
+		expect(REMOTE_OPEN_MARKER).toBe("<untrusted_remote_output>");
+		expect(REMOTE_CLOSE_MARKER).toBe("</untrusted_remote_output>");
+		expect(REMOTE_OPEN_MARKER).not.toBe(OPEN_MARKER);
+		expect(REMOTE_CLOSE_MARKER).not.toBe(CLOSE_MARKER);
+		expect(REMOTE_PREAMBLE).toContain("UNTRUSTED REMOTE OUTPUT");
+		expect(REMOTE_PREAMBLE).toContain("granted");
+		expect(REMOTE_PREAMBLE).not.toBe(PREAMBLE);
+		// The three strings travel as one unit for code mode's applyFence to consume.
+		expect(REMOTE_OUTPUT_FENCE).toEqual({
+			open: REMOTE_OPEN_MARKER,
+			preamble: REMOTE_PREAMBLE,
+			close: REMOTE_CLOSE_MARKER,
+		});
+	});
+
+	it("names the remote marker as a second instance of the class rule, in the one section", () => {
+		// The class rule still names the web marker, and now the remote one beside it.
+		expect(SYSTEM_PROMPT_SECTION).toContain(OPEN_MARKER);
+		expect(SYSTEM_PROMPT_SECTION).toContain(REMOTE_OUTPUT_FENCE.open);
+		// One section, not two: the heading appears exactly once.
+		expect(SYSTEM_PROMPT_SECTION.split("## Untrusted External Content").length - 1).toBe(1);
 	});
 });
 
