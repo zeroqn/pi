@@ -17,17 +17,20 @@ two are forks.
 | [`ask-user-question`](packages/ask-user-question) | `ask_user_question()` in a cell: the questionnaire, ported from rpiv-ask-user-question. Root sessions only. |
 | [`tool-bridge`](packages/tool-bridge) | Another extension's published pi tools, callable from inside a cell as `await tool(...)`. |
 | [`readonly-mode`](packages/readonly-mode) | Query-only mode: removes writer tools, gates bash, injects a prompt. |
+| [`mcp-lazy`](packages/mcp-lazy) | Replaces pi's MCP extension: a server connects only when a cell names one of its tools. |
 | [`magic-context`](packages/magic-context) | Forked. Cross-session memory and context management for pi. **Prebuilt** — see below. |
 | [`pi-fff`](packages/pi-fff) | Forked. [FFF](https://github.com/dmtrKovalenko/fff)'s indexed search, with the finder published for a cell's `grep`/`find`. **Prebuilt** — see below. |
 
-Twelve of them compose into one code-mode runtime. `code-mode` owns the kernel and the `python` tool, and
+Thirteen of them compose into one code-mode runtime. `code-mode` owns the kernel and the `python` tool, and
 `host-bridge` is the composition root — the one client of code-mode's registry, and what asks each
 contributor for a session. `rlm`, `skill-bridge`, `tool-bridge`, `web-access`, `zvec-grep`, `advisor`,
 `ask-user-question` and `fff-search` register with it, a contract rather than an import, and each *contributes* the host
 functions, prelude lines and sentences it is responsible for; `readonly-mode` registers to contribute the
 policy that governs a cell; `rsi` reaches the same client only to hold a kernel handle, and contributes
 nothing. `tool-bridge` also carries the reconciler that keeps pi's active set to the tools a cell cannot
-stand in for. Uninstall any contributor and the kernel still runs, with fewer names in it; uninstall
+stand in for, and `mcp-lazy` registers for `childFactories` alone — it adds nothing to the kernel's
+surface; its registration is what gives a spawned child the same lazy MCP loader a root session has.
+Uninstall any contributor and the kernel still runs, with fewer names in it; uninstall
 `code-mode` and the others say so instead of half-working. The other two — `magic-context` and `pi-fff` —
 are independent: they are forks of somebody else's package, and one of them (`pi-fff`) is a *supplier*
 rather than a contributor, publishing the finder another package turns into a cell's engine.
@@ -60,7 +63,7 @@ Install one at a time, or the whole set from the root manifest:
 
 ```bash
 pi install ./packages/rlm      # one package
-pi install .                   # or this repo's root, whose manifest declares all fourteen
+pi install .                   # or this repo's root, whose manifest declares all fifteen
 ```
 
 ## The forks
