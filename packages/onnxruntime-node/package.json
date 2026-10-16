@@ -20,5 +20,8 @@
   "author": {
     "name": "fs-eire"
   },
-  "homepage": "https://github.com/Microsoft/onnxruntime#readme"
+  "homepage": "https://github.com/Microsoft/onnxruntime#readme",
+  "scripts": {
+    "test": "bun test"
+  }
 }

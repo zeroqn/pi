@@ -78,7 +78,7 @@
         "zod": "^4.1.8",
       },
       "optionalDependencies": {
-        "onnxruntime-node": "1.24.3",
+        "onnxruntime-node": "file:../onnxruntime-node",
         "sharp": "^0.35.0",
       },
       "peerDependencies": {
@@ -741,6 +741,8 @@
     "p-retry/retry": ["retry@0.13.1", "", {}, "sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg=="],
 
     "pi-host-bridge/@types/node": ["@types/node@22.20.4", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA=="],
+
+    "pi-magic-context-prebuilt/onnxruntime-node": ["onnxruntime-node@file:packages/onnxruntime-node", { "dependencies": { "onnxruntime-common": "1.24.3" } }],
 
     "pi-mcp-lazy/@types/node": ["@types/node@22.20.4", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA=="],
 

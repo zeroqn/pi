@@ -10,13 +10,22 @@ already ships (`pkgs.onnxruntime`, 1.27.1) instead of the npm package's own 35 M
 `libonnxruntime.so.1`, its 179 MB of Windows/macOS/arm64 binaries and its 301 MB of
 CUDA/TensorRT providers.
 
-`packages/magic-context/package.json` declares
-`optionalDependencies: { "onnxruntime-node": "1.24.3" }`; because this member is
-named and versioned exactly that, npm links it (`node_modules/onnxruntime-node ->
-../packages/onnxruntime-node`) instead of fetching the 86 MB tarball. **The
-`version` here and the declared range are one value: change them together, or npm
-silently reaches for the registry package instead** — that is the one rule that
-matters for this directory.
+`packages/magic-context/package.json` asks for it by **path** —
+`optionalDependencies: { "onnxruntime-node": "file:../onnxruntime-node" }` — so the
+dependency names this directory and cannot be satisfied by the registry package.
+(npm materializes that as a symlink and records `"link": true`; bun hardlinks it into
+`node_modules/.bun/onnxruntime-node@file+packages+onnxruntime-node/`, so under bun a
+file *replaced* here rather than edited in place needs a `bun install` to reach the
+installed copy.) Until 2026-10-16 this was a version range, `1.24.3`, and the link then
+depended on this member's `version` equalling it — which is why the tests below assert
+what resolution *yields*, not what the manifest says: a range that stops matching
+silently installs the 86 MB registry tarball instead.
+
+`test/vendored.test.ts` is that guard — it asserts byte-identity with the files listed
+below, no `postinstall`, no library/provider/`script` artifacts anywhere, a payload
+under 1 MB, and no registry form of the name in `bun.lock`. It runs as part of the
+repo's `bun run test` (and therefore in CI), so the invariants above are enforced
+rather than documented.
 
 ## Provenance
 
@@ -127,8 +136,9 @@ carry a version node — `VERS_1.24.3` — that no released ONNX Runtime ever ha
 
 Re-extract the tarball for the new version with `./vendor.sh <tarball>` (it applies
 the library rename and checks the result), diff the `dist/` tree, update the sha256
-block above from the script's output, and change this `version` and
-`packages/magic-context/package.json`'s range **in the same commit**.
+block above from the script's output, and bump this `version` — the manifest's `file:`
+spec needs no change with it, and the guard's byte-identity check is what proves the
+new bytes are the ones being loaded (run `bun install` first under bun).
 A version bump that moves the ORT release also moves `VERS_…`, which is what
 `shell/onnxruntime-shim/VERS_1.24.3.map` names — but the shim's version node only has
 to satisfy *this binding*, so it follows this package, not the shim's forward target.
