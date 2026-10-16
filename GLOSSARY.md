@@ -70,7 +70,10 @@ _Avoid_: plugin, extension point, provider (a provider supplies skills to the sk
 
 **Owner**:
 An extension whose *pi tools* the tool bridge publishes on a cell's behalf. A publisher behind the tool
-bridge, not a contributor in its own right: Magic Context is the live one.
+bridge, not a contributor in its own right: Magic Context is one, and since 2026-10-16 **mcp-lazy** is the
+other — its `catalogue` advertises one entry per configured MCP server and its `execute` answers that
+server's inventory, so `await tool("mcp__<server>")` is an owner call and `await tool("mcp__<server>__<tool>")`
+falls through to code mode's own MCP dispatch.
 _Avoid_: contributor, publisher (of the tool bridge's slot)
 
 **Client** (of the registry):
@@ -399,3 +402,63 @@ Read-only mode asked for and not yet on, because background shells are still run
 toggle's question was *wait*. The status line says so, the mode's ordinary effects have not begun, and it
 starts by itself once nothing is running.
 _Avoid_: queued, deferred mode, half-on
+
+## MCP discovery
+
+The vocabulary of the two layers that let a cell-surface session learn which MCP servers exist — map
+`.scratch/mcp-discovery/`, and `packages/mcp-lazy`. The distinction the whole design turns on is between a
+server the session is *told about* and a server that is *running*.
+
+**Discovery**:
+What the model learns about MCP servers **before it acts**: their names, and what each offers. Two layers:
+an eager line per server in the system prompt, and an on-demand answer about one named server.
+_Avoid_: probing, listing (that is one call's answer, not the layer)
+
+**Configured server**:
+An MCP server named in `<agentDir>/mcp.json`, or in the trusted project's `.pi/mcp.json` (project entries
+override global ones by name). The set discovery must be able to name exactly.
+_Avoid_: available server, installed server
+
+**Registered server**:
+A server this session has handed to pi — by a cell naming it, or by any extension calling
+`pi.registerMcpServer()`. Registration is what makes its tools exist; it says nothing about whether the
+server answered.
+_Avoid_: loaded server, active server
+
+**Connected server**:
+A registered server whose transport is up and whose tools pi can report. Only a connected server has an
+inventory to read, and only a **named** server is ever connected in a code-mode session.
+_Avoid_: live server, running server
+
+**Named** (a server):
+A cell's source spells a word beginning `mcp__<server>__`. Naming is the one act that connects a server —
+which is why discovery exists at all: without it the model cannot name what it was never told about.
+_Avoid_: referenced, requested
+
+**Eager layer**:
+What the first prompt carries about servers: the `mcp_servers` section, one line per server, connecting
+nothing. Its budget is pi's 4096 characters of inner text, and it sacrifices descriptions before names.
+_Avoid_: listing, catalogue (the catalogue is the cell's, `await tool()`)
+
+**On-demand detail**:
+What one call answers about a server — its tools with descriptions, the server's own `instructions`, and a
+ranked view of them when the inventory is large. The only layer that may connect anything.
+_Avoid_: lookup, inspection
+
+**One-liner**:
+The sentence that says what a server offers: its config `description`, else the first line of the
+`instructions` it sends when it connects, else nothing (a bare namespace).
+_Avoid_: summary line, blurb
+
+**Spawn witness**:
+The file a test MCP server writes when it starts — the evidence that an **unnamed** server never ran, which
+is the claim the whole lazy design is measured by.
+_Avoid_: start log, liveness check
+
+**Exposure**:
+pi's property of a server or a single tool — `codemode`, `deferred`, `direct`, `hidden` — saying how its
+tools may be reached. `direct` declares tools to the model and is **rewritten** before mcp-lazy registers a
+server, because this repo's cell surface has exactly one model-facing tool; `hidden` with nothing brought
+back is omitted from discovery altogether. Not to be confused with the eager layer's line, which carries no
+reach label.
+_Avoid_: visibility, reach (say *reach* for the route a call takes)
