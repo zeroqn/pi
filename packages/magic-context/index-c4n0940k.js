@@ -13,12 +13,12 @@ import {
 } from "./index-xkf1qyj1.js";
 import {
   LocalEmbeddingProvider
-} from "./index-32qfekbw.js";
+} from "./index-sdgdm92c.js";
 import {
   OpenAICompatibleEmbeddingProvider,
   getProjectEmbeddingSnapshot2,
   embedBatchForProject2
-} from "./index-vfpwqs37.js";
+} from "./index-1vesbrss.js";
 import {
   saveEmbeddingIfHashMatches
 } from "./index-yhzhdp3m.js";

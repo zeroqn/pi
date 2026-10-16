@@ -590,7 +590,7 @@ var importWasmOrtForRuntime = async () => {
   };
 };
 var importTransformersForRuntime = async () => {
-  return await importPluginModule(() => import("./transformers.node-4ydajnhd.js"));
+  return await importPluginModule(() => import("./transformers.node-f41z7avg.js"));
 };
 var importTransformersWasmFallbackForRuntime = async () => {
   const webEntry = new URL(new URL(import.meta.url).pathname.endsWith(".ts") ? "../../../../dist/transformers-web.js" : "./transformers-web.js", import.meta.url).href;

@@ -34,7 +34,7 @@ import {
   getProjectEmbeddingSnapshot2,
   embedTextForProject2,
   embedItemsForProject2
-} from "./index-vfpwqs37.js";
+} from "./index-1vesbrss.js";
 import {
   saveEmbeddingIfHashMatches,
   getProjectEmbeddings2
@@ -44,7 +44,7 @@ import {
   isEmbeddingEnabled,
   embedText,
   ensureMemoryEmbeddings2
-} from "./index-vnys1293.js";
+} from "./index-c4n0940k.js";
 import {
   getMemorySelectColumns2,
   isMemoryRow2,

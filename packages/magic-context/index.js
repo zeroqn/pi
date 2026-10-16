@@ -260,7 +260,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-ezf11ft4.js";
+} from "./index-6fhr2g6x.js";
 import {
   canonicalModelIdentity,
   piModelRefToCanonical,
@@ -665,7 +665,7 @@ import {
   embedSessionCompartmentChunks2,
   getEmbeddingCoverageStatus2,
   getAutoEmbeddingSessionCoverage2
-} from "./index-vfpwqs37.js";
+} from "./index-1vesbrss.js";
 import {
   V2_MEMORY_CATEGORIES
 } from "./index-135e8hvg.js";
@@ -727,7 +727,7 @@ import {
   normalizeVerificationFiles,
   indexCommitsForProject,
   embedUnembeddedCommits
-} from "./index-j9r9ggs0.js";
+} from "./index-hsftpq74.js";
 import {
   setEmbeddingSessionBusy2,
   isEmbeddingHostBusy2
@@ -758,10 +758,10 @@ import {
 import {
   pushNotification2
 } from "./index-q1yc6bs0.js";
-import"./index-32qfekbw.js";
+import"./index-sdgdm92c.js";
 import {
   cosineSimilarity
-} from "./index-vnys1293.js";
+} from "./index-c4n0940k.js";
 import"./index-g3600tpw.js";
 import {
   buildHiddenAgentRegistrations,
@@ -12497,7 +12497,7 @@ function getAsyncModule() {
     if (beforeModuleLoad)
       await beforeModuleLoad();
     const [{ default: singlefileAsyncifyVariant }, { newQuickJSAsyncWASMModuleFromVariant }] = await importPluginModule(() => Promise.all([
-      import("./index-fr3x6spx.js").then((m)=>__toESM(m.default,1)),
+      import("./index-jnhzwwgg.js").then((m)=>__toESM(m.default,1)),
       import("./index-69vas84q.js")
     ]));
     const module = await newQuickJSAsyncWASMModuleFromVariant(singlefileAsyncifyVariant);

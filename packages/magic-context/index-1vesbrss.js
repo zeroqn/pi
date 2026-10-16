@@ -53,7 +53,7 @@ import {
   getEmbeddingProviderIdentity,
   dominantEmbeddingFailure,
   LocalEmbeddingProvider
-} from "./index-32qfekbw.js";
+} from "./index-sdgdm92c.js";
 import {
   isUserHomeDirectory,
   setBootQuietPeriodForTests
