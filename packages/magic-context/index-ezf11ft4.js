@@ -8925,12 +8925,360 @@ function resolvePiHarnessKind() {
   return "pi";
 }
 
+// src/pi-child-mode.ts
+var CHILD_TOOL_ALLOWLIST = new Set([
+  "ctx_search",
+  "ctx_reduce",
+  "ctx_expand",
+  "todowrite"
+]);
+var CHILD_TAG_SENTENCE = "Messages and tool outputs are tagged with §N§ identifiers (e.g. §1§, §42§).";
+var CHILD_TAG_MARKER = "tagged with §N§ identifiers";
+function narrowCatalogueForChild(parentNames, isChild) {
+  return isChild ? parentNames.filter((name) => CHILD_TOOL_ALLOWLIST.has(name)) : [...parentNames];
+}
+var tagSentenceLogged = new Set;
+function shouldLogTagSentence(sessionId) {
+  if (typeof sessionId !== "string" || sessionId.length === 0)
+    return false;
+  if (tagSentenceLogged.has(sessionId))
+    return false;
+  tagSentenceLogged.add(sessionId);
+  return true;
+}
+function textOf(value) {
+  if (typeof value === "string")
+    return value;
+  if (Array.isArray(value)) {
+    let out = "";
+    for (const part of value) {
+      if (typeof part === "string")
+        out += part;
+      else if (part && typeof part === "object" && typeof part.text === "string") {
+        out += part.text;
+      }
+    }
+    return out;
+  }
+  return "";
+}
+function alreadyTold(messages) {
+  for (const message of messages) {
+    if (textOf(message?.content).includes(CHILD_TAG_MARKER))
+      return true;
+  }
+  return false;
+}
+function withAppendedText(message, text) {
+  const content = message.content;
+  if (typeof content === "string")
+    return { ...message, content: `${content}
+
+${text}` };
+  if (Array.isArray(content)) {
+    return { ...message, content: [...content, { type: "text", text }] };
+  }
+  return message;
+}
+function ensureChildTagSentence(result, reduced) {
+  if (!result || !Array.isArray(result.messages))
+    return result;
+  if (!reduced)
+    return result;
+  if (alreadyTold(result.messages))
+    return result;
+  for (let index = result.messages.length - 1;index >= 0; index -= 1) {
+    const message = result.messages[index];
+    if (message?.role !== "user")
+      continue;
+    const messages = result.messages.slice();
+    messages[index] = withAppendedText(message, CHILD_TAG_SENTENCE);
+    return { messages };
+  }
+  return result;
+}
+
+// src/pi-tool-publication.ts
+var BRIDGE_OWNERS_SYMBOL = Symbol.for("pi-tool-bridge:owners");
+var BRIDGE_API_VERSION = 1;
+var BRIDGE_OWNER = "magic-context";
+var BRIDGE_PUBLISHABLE_TOOL_NAMES = new Set([
+  "ctx_search",
+  "ctx_memory",
+  "ctx_note",
+  "ctx_expand",
+  "ctx_reduce",
+  "todowrite"
+]);
+function isBridgePublishable(name) {
+  return BRIDGE_PUBLISHABLE_TOOL_NAMES.has(name);
+}
+function bridgeSlot() {
+  const holder = globalThis;
+  const existing = holder[BRIDGE_OWNERS_SYMBOL];
+  if (existing instanceof Map)
+    return existing;
+  const created = new Map;
+  holder[BRIDGE_OWNERS_SYMBOL] = created;
+  return created;
+}
+function publishBridgeTools(key, publication) {
+  const slot = bridgeSlot();
+  slot.set(key, publication);
+  return () => {
+    if (slot.get(key) === publication)
+      slot.delete(key);
+  };
+}
+function bridgeToolEntries(definitions, names) {
+  const entries = [];
+  for (const name of names) {
+    if (!isBridgePublishable(name))
+      continue;
+    const definition = definitions.get(name);
+    if (!definition)
+      continue;
+    entries.push({
+      name,
+      description: definition.description,
+      snippet: definition.promptSnippet ?? definition.description,
+      parameters: definition.parameters
+    });
+  }
+  return entries;
+}
+
+// src/pi-registry.ts
+var REGISTRY_KEY = Symbol.for("@cortexkit/magic-context:pi-registry");
+var registrations = new Set;
+function sessionKeys(ctx) {
+  const sessionManager = ctx?.sessionManager;
+  const keys = [];
+  try {
+    const id = sessionManager?.getSessionId?.();
+    if (typeof id === "string" && id.length > 0)
+      keys.push(id);
+  } catch {}
+  try {
+    const file = sessionManager?.getSessionFile?.();
+    if (typeof file === "string" && file.length > 0)
+      keys.push(file);
+  } catch {}
+  return keys;
+}
+function isBoundChild(ctx) {
+  const keys = sessionKeys(ctx);
+  if (keys.length === 0)
+    return false;
+  for (const entry of registrations) {
+    for (const key of keys)
+      if (entry.bound.has(key))
+        return true;
+  }
+  return false;
+}
+function resolve5(ctx) {
+  const keys = sessionKeys(ctx);
+  for (const registration of registrations) {
+    if (keys.some((key) => registration.bound.has(key)))
+      return registration;
+  }
+  return registrations.size === 1 ? [...registrations][0] : undefined;
+}
+function bridgeRefusal(toolName, reason) {
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Error: '${toolName}' is not available — ${reason}.`
+      }
+    ],
+    details: undefined
+  };
+}
+function registerPiRegistry(options) {
+  const registration = {
+    dbPath: options.dbPath,
+    projectDir: options.projectDir,
+    registry: options.registry,
+    bound: new Set,
+    tools: options.tools ?? new Map
+  };
+  registrations.add(registration);
+  const facade = {
+    transformContext: async (event, ctx) => resolve5(ctx)?.registry.transformContext(event, ctx),
+    compact: async (ctx) => resolve5(ctx)?.registry.compact(ctx),
+    scrubMessage: (message) => {
+      for (const entry of registrations)
+        entry.registry.scrubMessage(message);
+    },
+    bindChild: (input) => {
+      const keys = [input.childSessionFile].filter((value) => typeof value === "string" && value.length > 0);
+      if (keys.length === 0)
+        return;
+      const matches = [...registrations].filter((entry) => input.cwd === undefined || entry.projectDir === input.cwd);
+      const targets = matches.length > 0 ? matches : registrations.size === 1 ? [...registrations] : [];
+      for (const entry of targets)
+        for (const key of keys)
+          entry.bound.add(key);
+      log2(`[magic-context][pi] bound child session ${keys[0]} to parent ${input.parentSessionFile ?? "(unknown)"} on ${targets.length} instance(s) — a bound session is served in reduced mode`);
+      log2(input.childSessionId ? `[magic-context][pi] child ${input.childSessionId} is served in reduced mode` : "[magic-context][pi] child bound WITHOUT a session id; reduced mode derives from the binding, so it is still served as a child");
+    },
+    runTool: async (toolName, params, ctx) => {
+      if (!CHILD_TOOL_ALLOWLIST.has(toolName)) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: '${toolName}' is not available in this session.`
+            }
+          ],
+          details: undefined
+        };
+      }
+      const definition = resolve5(ctx)?.tools.get(toolName);
+      if (!definition) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: '${toolName}' is not available — Magic Context has no instance serving this session.`
+            }
+          ],
+          details: undefined
+        };
+      }
+      return definition.execute(`child-${toolName}-${Date.now()}`, params, undefined, undefined, ctx);
+    },
+    clearSession: (sessionId, sessionFile) => {
+      for (const entry of registrations) {
+        entry.bound.delete(sessionId);
+        if (sessionFile !== undefined)
+          entry.bound.delete(sessionFile);
+        entry.registry.clearSession(sessionId);
+      }
+    }
+  };
+  globalThis[REGISTRY_KEY] = facade;
+  const bridge = options.bridge;
+  const grantedNames = (ctx) => (bridge?.publishableNames(ctx) ?? []).filter(isBridgePublishable);
+  const unpublishBridge = bridge ? publishBridgeTools(`${BRIDGE_OWNER}\x00${options.dbPath}\x00${options.projectDir}`, {
+    owner: BRIDGE_OWNER,
+    apiVersion: BRIDGE_API_VERSION,
+    catalogue: (ctx) => resolve5(ctx) === registration ? bridgeToolEntries(registration.tools, grantedNames(ctx)) : [],
+    execute: async (name, params, ctx) => {
+      if (resolve5(ctx) !== registration) {
+        return bridgeRefusal(name, "Magic Context has no instance serving this session");
+      }
+      if (!grantedNames(ctx).includes(name)) {
+        return bridgeRefusal(name, "not available in this session");
+      }
+      return bridge.execute(name, params, ctx);
+    }
+  }) : () => {};
+  return () => {
+    unpublishBridge();
+    registrations.delete(registration);
+    if (registrations.size === 0)
+      delete globalThis[REGISTRY_KEY];
+  };
+}
+
+// src/pi-todo-settle.ts
+import { createHash as createHash6 } from "node:crypto";
+var LIVE_WORK_SYMBOL = Symbol.for("pi-host-bridge:live-work");
+var wroteThisRun = new Set;
+var workedSinceWrite = new Set;
+var TODO_TOOL_NAME2 = "todowrite";
+var nudgedForDigest = new Map;
+function noteTodoWrite(sessionId) {
+  if (!sessionId)
+    return;
+  wroteThisRun.add(sessionId);
+  workedSinceWrite.delete(sessionId);
+}
+function noteToolCall(sessionId, name) {
+  if (!sessionId)
+    return;
+  if (name === TODO_TOOL_NAME2)
+    return;
+  workedSinceWrite.add(sessionId);
+}
+function noteRunStart(sessionId) {
+  if (!sessionId)
+    return;
+  wroteThisRun.delete(sessionId);
+  workedSinceWrite.delete(sessionId);
+}
+function forgetTodoSettleState(sessionId) {
+  wroteThisRun.delete(sessionId);
+  workedSinceWrite.delete(sessionId);
+  nudgedForDigest.delete(sessionId);
+}
+function readLiveWork(ctx) {
+  const reader = globalThis[LIVE_WORK_SYMBOL];
+  if (typeof reader !== "function")
+    return null;
+  try {
+    const answer = reader(ctx);
+    if (!answer || typeof answer !== "object")
+      return null;
+    const count = Number(answer.count);
+    if (!Number.isFinite(count) || count < 0)
+      return null;
+    const names = answer.names;
+    return {
+      count: Math.trunc(count),
+      names: Array.isArray(names) ? names.filter((name) => typeof name === "string") : []
+    };
+  } catch {
+    return null;
+  }
+}
+var TODO_SETTLE_EVENT = "agent_before_settle";
+function isOpen(status) {
+  return status === "pending" || status === "in_progress";
+}
+function digestOf(todos) {
+  const shape = JSON.stringify(todos.map((todo) => [
+    String(todo.content ?? ""),
+    String(todo.status ?? "")
+  ]));
+  return createHash6("sha256").update(shape).digest("hex").slice(0, 16);
+}
+function decideTodoSettle(input) {
+  if (input.outcome !== "completed")
+    return { nudge: false };
+  if (!input.sessionId)
+    return { nudge: false };
+  if (wroteThisRun.has(input.sessionId) && !workedSinceWrite.has(input.sessionId)) {
+    return { nudge: false };
+  }
+  const open = input.todos.filter((todo) => isOpen(todo.status));
+  if (open.length === 0)
+    return { nudge: false };
+  if (input.liveWork !== null && input.liveWork.count > 0)
+    return { nudge: false };
+  const digest = digestOf(input.todos);
+  if (nudgedForDigest.get(input.sessionId) === digest)
+    return { nudge: false };
+  nudgedForDigest.set(input.sessionId, digest);
+  return { nudge: true, text: nudgeText(input.todos, open.length) };
+}
+function nudgeText(todos, openCount) {
+  const completed = todos.filter((todo) => todo.status === "completed").length;
+  const cancelled = todos.filter((todo) => todo.status === "cancelled").length;
+  const plural = openCount === 1 ? "item" : "items";
+  return `[magic-context] This run ended with the task list still open: ${openCount} ${plural} not finished ` + `(${completed} completed, ${cancelled} cancelled of ${todos.length}), and nothing is running any more. ` + `The list is what the reader sees after the run, so reconcile it once more: if that work is done, ` + `write the list with those ${plural} completed (or cancelled); if it genuinely continues, write it ` + `as it stands.`;
+}
+
 // src/tools/todo-view-pi.ts
 import {
   truncateToWidth
 } from "@earendil-works/pi-tui";
 var TODO_TOOL_NAME = "todowrite";
 var TODOS_COMMAND_NAME = "todos";
+var TODO_REFRESH_CUSTOM_TYPE = "magic-context-todo-refresh";
 var WIDGET_KEY = "magic-context-todos";
 var MAX_TODO_CONTENT_ROWS = 12;
 var STATUS_GLYPH = {
@@ -9014,7 +9362,7 @@ function setTodoSnapshot(sessionId, todos) {
   const parsed = parseTodos(todos);
   if (parsed === null)
     return false;
-  snapshotsBySession.set(sessionId, { todos: parsed });
+  snapshotsBySession.set(sessionId, { todos: parsed, restored: false });
   return true;
 }
 function seedTodoSnapshotFromStateJson(sessionId, stateJson) {
@@ -9023,14 +9371,17 @@ function seedTodoSnapshotFromStateJson(sessionId, stateJson) {
     snapshotsBySession.delete(sessionId);
     return false;
   }
-  snapshotsBySession.set(sessionId, { todos: parsed });
+  snapshotsBySession.set(sessionId, { todos: parsed, restored: true });
   return true;
 }
 function getTodoSnapshot(sessionId) {
   if (!sessionId)
     return { todos: [] };
   const snapshot = snapshotsBySession.get(sessionId);
-  return { todos: snapshot ? cloneTodos(snapshot.todos) : [] };
+  return snapshot ? {
+    todos: cloneTodos(snapshot.todos),
+    restored: snapshot.restored === true
+  } : { todos: [] };
 }
 function clearTodoSnapshot(sessionId) {
   snapshotsBySession.delete(sessionId);
@@ -9131,11 +9482,22 @@ function renderTodowriteCall(args, theme, context) {
   const line = `${theme.fg("toolTitle", theme.bold("Todos"))} ${theme.fg("muted", "—")} ${theme.fg(activeColor, `${active} active`)}`;
   return lineComponent((width) => [truncateToWidth(line, width, "…")]);
 }
+function firstResultText(content) {
+  if (!Array.isArray(content))
+    return;
+  return content.find((part) => part !== null && typeof part === "object" && part.type === "text" && typeof part.text === "string")?.text;
+}
 function renderTodowriteResult(result, theme, context) {
+  if (result.isError === true) {
+    const text = firstResultText(result.content) ?? "the todo call failed";
+    return lineComponent((width) => [
+      truncateToWidth(theme.fg("error", text), width, "…")
+    ]);
+  }
   const detailsTodos = result.details?.todos;
   let todos = parseTodos(detailsTodos);
   if ((todos === null || todos.length === 0) && Array.isArray(result.content)) {
-    const text = result.content.find((part) => part !== null && typeof part === "object" && part.type === "text" && typeof part.text === "string")?.text;
+    const text = firstResultText(result.content);
     if (text) {
       try {
         const parsed = parseTodos(JSON.parse(text));
@@ -9312,7 +9674,8 @@ class TodoOverlay {
     const hasInProgress = counts.inProgress > 0;
     const headingColor = hasInProgress ? "accent" : "dim";
     const headingIcon = hasInProgress ? "●" : "○";
-    const heading = `${theme.fg(headingColor, headingIcon)} ${theme.fg(headingColor, "Todos")} ${theme.fg("muted", "—")} ${theme.fg("dim", formatCounts(counts))}`;
+    const restoredNote = getTodoSnapshot(this.sessionId).restored ? ` ${theme.fg("dim", "· restored")}` : "";
+    const heading = `${theme.fg(headingColor, headingIcon)} ${theme.fg(headingColor, "Todos")} ${theme.fg("muted", "—")} ${theme.fg("dim", formatCounts(counts))}${restoredNote}`;
     const truncate = (line) => truncateToWidth(line, width, "…");
     const lines = [truncate(heading)];
     const { visible, hiddenCount } = capTodoRows(overlayTodos);
@@ -9341,14 +9704,41 @@ function registerTodoOverlay(pi, deps) {
     overlay.setUICtx(sessionId, ctx.ui);
     overlay.update(sessionId);
   });
-  pi.on("agent_start", async () => {
+  pi.on("agent_start", async (_event, ctx) => {
+    noteRunStart(getSessionId(ctx) ?? "");
     overlay.hideCompletedTasksFromPreviousTurn();
+  });
+  pi.on(TODO_SETTLE_EVENT, (event, ctx) => {
+    const sessionId = getSessionId(ctx);
+    if (!sessionId || isBoundChild(ctx))
+      return;
+    const decision = decideTodoSettle({
+      sessionId,
+      outcome: event?.outcome,
+      todos: getTodoSnapshot(sessionId).todos,
+      liveWork: readLiveWork(ctx)
+    });
+    if (!decision.nudge)
+      return;
+    return {
+      entries: [
+        ...Array.isArray(event?.entries) ? event.entries : [],
+        {
+          type: "custom_message",
+          customType: TODO_REFRESH_CUSTOM_TYPE,
+          content: decision.text,
+          display: true
+        }
+      ],
+      continue: true
+    };
   });
   pi.on("session_shutdown", async (_event, ctx) => {
     clearTodowriteToolCallTodos();
     const sessionId = getSessionId(ctx);
     if (!sessionId)
       return;
+    forgetTodoSettleState(sessionId);
     clearTodoSnapshot(sessionId);
     overlay.disposeSession(sessionId);
   });
@@ -9357,6 +9747,7 @@ function registerTodoOverlay(pi, deps) {
     const sessionId = getSessionId(ctx);
     if (!sessionId)
       return;
+    forgetTodoSettleState(sessionId);
     clearTodoSnapshot(sessionId);
     overlay.disposeSession(sessionId);
   });
@@ -9727,6 +10118,25 @@ var TodowriteParams = _Object_({
   })
 });
 var PROMPT_SNIPPET = "Manage a task list to track multi-step progress";
+function incompatibleTodo(todos) {
+  if (!Array.isArray(todos))
+    return "`todos` is not an array";
+  for (const [index, todo] of todos.entries()) {
+    if (!todo || typeof todo !== "object")
+      return `todos[${index}] is not an object`;
+    const item = todo;
+    if (typeof item.content !== "string" || item.content.length === 0) {
+      return `todos[${index}].content is not a non-empty string`;
+    }
+    if (!TODO_STATUSES.includes(item.status)) {
+      return `todos[${index}].status is ${JSON.stringify(item.status)}, and the only statuses are ${TODO_STATUSES.join(", ")}`;
+    }
+    if (item.priority !== undefined && !TODO_PRIORITIES.includes(item.priority)) {
+      return `todos[${index}].priority is ${JSON.stringify(item.priority)}, and the only priorities are ${TODO_PRIORITIES.join(", ")} (or omit it)`;
+    }
+  }
+  return null;
+}
 var PROMPT_GUIDELINES = [
   "Use `todowrite` for non-trivial work spanning 3+ steps, when the user gives you multiple tasks, or when you need to track progress across a verify/fix loop. Skip it for single-shot answers or trivial one-step work.",
   "Pass the COMPLETE updated todo list every time. This tool replaces the prior list rather than appending to it, so include pending, in_progress, completed, and cancelled tasks that should remain visible.",
@@ -9743,6 +10153,19 @@ function createTodowriteTool() {
     parameters: TodowriteParams,
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
       const todos = params.todos ?? [];
+      const invalid = incompatibleTodo(todos);
+      if (invalid !== null) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${TODO_TOOL_NAME}: the list was NOT updated — ${invalid}. No state changed and the current list stands as it was. Each item is \`{content, status}\` with status one of ${TODO_STATUSES.join(", ")} and optional priority ${TODO_PRIORITIES.join(", ")}.`
+            }
+          ],
+          isError: true,
+          details: { todos, title: "todos rejected", truncated: false }
+        };
+      }
       const active = todos.filter((todo) => !TITLE_DONE_STATUSES.has(todo.status)).length;
       return {
         content: [
@@ -9970,7 +10393,7 @@ function resolveCtxExpandMode(args, domain) {
 }
 
 // ../plugin/src/tools/ctx-expand/render.ts
-import { createHash as createHash6 } from "node:crypto";
+import { createHash as createHash7 } from "node:crypto";
 function isRecord3(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -10045,7 +10468,7 @@ function asToolPart(part) {
   }
   return null;
 }
-function textOf(part) {
+function textOf2(part) {
   if (part.type === "text" && typeof part.text === "string")
     return part.text;
   return null;
@@ -10062,7 +10485,7 @@ function renderPartPreview(part, expandTools) {
   const expansion = expandToolPart(part, expandTools, true);
   if (expansion !== null)
     return `    • tool ${part.tool}: ${expansion}`;
-  const text = textOf(part);
+  const text = textOf2(part);
   if (text !== null) {
     const t = truncate(text, 200);
     return t.length > 0 ? `    • ${t}` : null;
@@ -10086,7 +10509,7 @@ function renderPartPreview(part, expandTools) {
 function renderPartFull(part) {
   if (!isRecord3(part))
     return null;
-  const text = textOf(part);
+  const text = textOf2(part);
   if (text !== null) {
     return text.trim().length > 0 ? `  [text]
 ${text}` : null;
@@ -10194,7 +10617,7 @@ function renderItemByTag(db, sessionId, number, textIndexDomain = "part") {
   const index = scoped ? Number(scoped[2]) : 0;
   const piText = message.parts.filter((part) => isRecord3(part) && part.type === "text");
   const part = message.parts[index];
-  const matching = derived ? piText.filter((part) => isRecord3(part) && typeof part.text === "string" && createHash6("sha256").update(part.text).digest("hex") === derived[3]) : [];
+  const matching = derived ? piText.filter((part) => isRecord3(part) && typeof part.text === "string" && createHash7("sha256").update(part.text).digest("hex") === derived[3]) : [];
   const selected = derived ? matching[Number(derived[4])] : textIndexDomain === "text" ? piText[index] : part;
   return selected ? renderPartFull(selected) ?? "" : `Tag ${number}'s original text part is no longer in stored history.`;
 }
@@ -10255,7 +10678,7 @@ function unwrapImitatedReducedArgs(args, primaryFields, schema) {
 }
 
 // src/read-session-pi.ts
-import { createHash as createHash7 } from "node:crypto";
+import { createHash as createHash8 } from "node:crypto";
 
 // src/cell-calls-pi.ts
 var BRIDGE_HOST_FN = "tool";
@@ -10330,7 +10753,7 @@ function piContentFallbackIds(messages, resolveReal) {
       return;
     const m = message;
     const role = typeof m.role === "string" ? m.role : "unknown";
-    const digest = createHash7("sha256").update(stableStringify([
+    const digest = createHash8("sha256").update(stableStringify([
       typeof m.responseId === "string" ? m.responseId : null,
       typeof m.timestamp === "number" || typeof m.timestamp === "string" ? m.timestamp : null,
       role,
@@ -11840,7 +12263,7 @@ import { isAbsolute as isAbsolute5 } from "node:path";
 // ../retina-local-fs/src/path-fence.ts
 import { lstat, realpath } from "node:fs/promises";
 import { homedir as homedir3 } from "node:os";
-import { basename as basename3, dirname as dirname6, isAbsolute as isAbsolute4, join as join5, relative, resolve as resolve5, sep } from "node:path";
+import { basename as basename3, dirname as dirname6, isAbsolute as isAbsolute4, join as join5, relative, resolve as resolve6, sep } from "node:path";
 
 // ../retina-local-fs/src/errors.ts
 class ProviderError extends Error {
@@ -11856,7 +12279,7 @@ class ProviderError extends Error {
 async function resolveAndFenceProviderPath(configuredPath, options) {
   const { home, dataDirectory, aliases } = await resolveFenceRoots(options);
   const expanded = configuredPath.startsWith("~/") ? join5(home, configuredPath.slice(2)) : configuredPath === "~" ? home : configuredPath;
-  const absolute = isAbsolute4(expanded) ? resolve5(expanded) : resolve5(options.cwd ?? process.cwd(), expanded);
+  const absolute = isAbsolute4(expanded) ? resolve6(expanded) : resolve6(options.cwd ?? process.cwd(), expanded);
   const canonical = await canonicalPath(absolute, options.allowMissing);
   if (fenceCandidates(canonical, aliases).some((candidate) => isFencedPath(candidate, home, dataDirectory))) {
     throw new ProviderError("fenced_path", `Refusing fenced path: ${canonical}`);
@@ -11865,14 +12288,14 @@ async function resolveAndFenceProviderPath(configuredPath, options) {
 }
 var FENCED_CORTEXKIT_ROOTS = ["plexus", "claustrum", "staging", "run", "magic-context"];
 async function resolveFenceRoots(options) {
-  const configuredHomePath = resolve5(options.homeDirectory ?? process.env.HOME ?? homedir3());
+  const configuredHomePath = resolve6(options.homeDirectory ?? process.env.HOME ?? homedir3());
   let home;
   try {
     home = await realpath(configuredHomePath);
   } catch (error) {
     throw fsError(configuredHomePath, error);
   }
-  const configuredDataDirectory = resolve5(options.dataDirectory ?? process.env.XDG_DATA_HOME ?? join5(home, ".local", "share"));
+  const configuredDataDirectory = resolve6(options.dataDirectory ?? process.env.XDG_DATA_HOME ?? join5(home, ".local", "share"));
   const dataDirectory = await canonicalPath(configuredDataDirectory, true);
   const aliases = [];
   const logicalCortexkit = join5(dataDirectory, "cortexkit");
@@ -11932,8 +12355,8 @@ async function canonicalPath(path, allowMissing) {
     }
   }
 }
-function isFencedPath(canonicalPath, homeDirectory, dataDirectory = process.env.XDG_DATA_HOME ?? join5(resolve5(homeDirectory), ".local", "share")) {
-  const cortexkitRoot = join5(resolve5(dataDirectory), "cortexkit");
+function isFencedPath(canonicalPath, homeDirectory, dataDirectory = process.env.XDG_DATA_HOME ?? join5(resolve6(homeDirectory), ".local", "share")) {
+  const cortexkitRoot = join5(resolve6(dataDirectory), "cortexkit");
   const relativeToCortexkit = relative(cortexkitRoot, canonicalPath);
   const insideCortexkit = relativeToCortexkit !== "" && relativeToCortexkit !== ".." && !relativeToCortexkit.startsWith(`..${sep}`) && !isAbsolute4(relativeToCortexkit);
   const parts = insideCortexkit ? relativeToCortexkit.split(sep) : [];
@@ -13075,7 +13498,7 @@ var SELF_TAG_GUIDANCE = 'Every user message, every text you write and every tool
 var CAVEMAN_COMPRESSION_WARNING = `
 **BEWARE**: History compression is on; older user AND assistant text — including your own earlier responses — has been deterministically rewritten in a terse caveman style (dropped articles, missing auxiliaries, \`//\` instead of connectives like \`because\`). This is automatic context compression that runs after the fact, not your actual prior wording or the user's. **DO NOT mimic this style in new turns.** Write fresh responses in normal prose. If you notice your output drifting into caveman cadence, that drift is in-context-learning bleeding from the compressed history — consciously revert to full sentences.`;
 var TODO_LIST_GUIDANCE = `
-When work spans three or more steps, when the user gives you several tasks, or when you are tracking progress across a verify/fix loop, keep a todo list and update it with \`await tool("todowrite", todos=[…])\` from a cell. Cadence is part of the discipline: call it as each step changes state — before starting one, right after finishing one, when a new task appears — not only when you open the list and when the work ends; the list is what the user watches while you work, and one that moves only at the end shows them nothing. Pass the COMPLETE updated list every time — it replaces the prior list rather than appending to it — including pending, in_progress, completed and cancelled items that should remain visible. Mark exactly one todo \`in_progress\` before starting it, mark items \`completed\` as soon as they are done, and use \`cancelled\` only for work that is no longer needed. Never mark a todo completed while verification is failing, the implementation is partial, or an unresolved blocker remains — keep it \`in_progress\` and add or update a todo for the blocker.`;
+When work spans three or more steps, when the user gives you several tasks, or when you are tracking progress across a verify/fix loop, keep a todo list and update it with \`await tool("todowrite", todos=[…])\` from a cell. Cadence is part of the discipline: call it as each step changes state — before starting one, right after finishing one, when a new task appears — not only when you open the list and when the work ends; the list is what the user watches while you work, and one that moves only at the end shows them nothing. A child session or a background job reporting that it finished is a step changing state: when the work a list item describes was done by a child or a background job, that report is what closes it (and if you handed the whole list to one child, one write at the end closes it). Nothing else will: the list shows the last thing you wrote, not the work that happened — a run that ends with items still open leaves them open on the reader's screen, however long ago they were actually finished. Pass the COMPLETE updated list every time — it replaces the prior list rather than appending to it — including pending, in_progress, completed and cancelled items that should remain visible. Mark exactly one todo \`in_progress\` before starting it, mark items \`completed\` as soon as they are done, and use \`cancelled\` only for work that is no longer needed. Never mark a todo completed while verification is failing, the implementation is partial, or an unresolved blocker remains — keep it \`in_progress\` and add or update a todo for the blocker.`;
 function buildMagicContextSection(_agent, _legacyProtectionCount, ctxReduceCallable = true, dreamerEnabled = false, temporalAwarenessEnabled = false, cavemanTextCompressionEnabled = false, subagentMode = false, language, memoryEnabled = true, preset = "full", primaryOverride, smartNotesEnabled = true, todoListCallable = false) {
   dreamerEnabled = dreamerEnabled && smartNotesEnabled;
   if (subagentMode) {
@@ -13160,7 +13583,7 @@ function compareMemorySelectionPriority(left, right) {
 }
 
 // ../plugin/src/features/magic-context/mural/render-trigger.ts
-import { createHash as createHash8 } from "node:crypto";
+import { createHash as createHash9 } from "node:crypto";
 
 // ../plugin/src/features/magic-context/mural/mural-selection.ts
 var DEFAULT_MURAL_MEMORY_BUDGET = 8000;
@@ -13849,7 +14272,7 @@ function ensureMuralRendered(db, projectIdentity, budgetTokens = DEFAULT_MURAL_M
     return { ...cached.result };
   }
   const plan = planMuralRender(entries);
-  const textHash = createHash8("sha256").update(plan.layout.text).digest("hex");
+  const textHash = createHash9("sha256").update(plan.layout.text).digest("hex");
   if (existing && existing.contentHash === textHash && existing.width === plan.width && existing.height === plan.height) {
     return rememberRender(db, projectIdentity, key, existing.image, {
       hasMural: true,
@@ -14038,14 +14461,14 @@ function parseUserMemoryRow(row) {
 }
 
 // ../plugin/src/features/magic-context/compaction-marker.ts
-import { createHash as createHash9 } from "node:crypto";
+import { createHash as createHash10 } from "node:crypto";
 import { existsSync as existsSync9 } from "node:fs";
 var BASE62_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 var ID_PREFIX_HEX_LENGTH = 12;
 var ID_SUFFIX_LENGTH = 14;
 var ID_PREFIX_MASK = (1n << BigInt(ID_PREFIX_HEX_LENGTH * 4)) - 1n;
 function deterministicBase62(seed, length) {
-  let value = BigInt(`0x${createHash9("sha256").update(seed).digest("hex")}`);
+  let value = BigInt(`0x${createHash10("sha256").update(seed).digest("hex")}`);
   const chars = Array(length);
   for (let index = length - 1;index >= 0; index -= 1) {
     chars[index] = BASE62_CHARS[Number(value % 62n)];
@@ -15461,4 +15884,4 @@ function registerMagicContextTools(pi, opts) {
   ]);
 }
 
-export { COMPACTION_ENABLED_PATH, isDreamerRunnable, isCompactionEnabled, formatConfigParseStatusLine, formatConfigParseNotice, claimConfigParseFailuresOnce, parseJsoncRecovering, detectConfigFile, MIN_PLAUSIBLE_CONTEXT_LIMIT, catalogOutputReserve, deriveWindowGeometry, hasTrustedAbsoluteWall, applyProvenInputFloor, formatWindowDerivationLine, formatWindowSource, isSaneLimit, resolveOutputReserve, getSdkWindowGeometry, getSdkContextLimit, getSdkOutputLimit, getSdkInputLimit, cortexKitUserConfigBasePath, cortexKitProjectConfigBasePath, migrateMagicContextConfigLocations, getProtectedTokensTierOverrides, rememberUnpublishedAutoSearchNoHint, getUnpublishedAutoSearchNoHint, forgetUnpublishedAutoSearchNoHint, registerAutoSearchWork, cancelAutoSearchWork, readSessionMeta, getOrCreateSessionMeta, updateSessionMeta, advanceToolReclaimWatermark, retryPendingSessionCleanups, retryPendingRustSessionCleanupsForProject, embedPauseBySession, embedRunStateBySession, autoEmbedAttemptedBySession, autoEmbedIdentityBySession, invalidateAutoEmbedSession, getEmbedDrainUiStatus, COMPARTMENT_LEASE_RENEWAL_MS, acquireCompartmentLease, renewCompartmentLease, releaseCompartmentLease, releaseCompartmentLeaseBestEffort, isCompartmentLeaseHeld, isNoContentCompartment, HAS_COMPARTMENT_CONTENT_SQL, queueM0Mutation, getMaxM0MutationId, getCompartments, getLastCompartmentEndMessage, getLastCompartmentEndMessageId, getCompartmentsByEndMessageId, appendCompartments, saveRecompStagingPass, getRecompStaging, clearRecompStaging, getRecompPartialRange, setRecompPartialRange, escapeXmlAttr, escapeXmlContent, getUncoveredCompartmentEndThrough, isPartialCompartmentEnd, readProjectDocsCanonical, providerResponseFailed, isSuccessfulProviderCompletion, requestPendingMaterialization, pendingMaterializationOrigin, clearPendingMaterialization, recordSystemRefreshOwnership, recordSystemPromptForRequest, recordHeldHeadForRequest, bindSystemPromptResponse, acknowledgeSystemPromptDelivery, deferDeliveredSystemRefresh, clearSystemPromptDelivery, saveLkgSlotToDb, loadPersistedLkgSlot, drainStaleLkgSlots, createDbLkgPersistence, replayLkg, registerLkgPersistence, LKG_SNAPSHOT_ARRAY, LKG_SNAPSHOT_OBJECT, LKG_SNAPSHOT_KEY, LKG_SNAPSHOT_STRING, LKG_SNAPSHOT_NUMBER, LKG_SNAPSHOT_BOOLEAN, LKG_SNAPSHOT_NULL, LKG_SNAPSHOT_UNDEFINED, contentSnapshotValue, signatureForFields, lkgContentFields, lkgContentDigestFromFields, isLegacyLkgDigest, legacyLkgDigestFromFields, lkgFieldsMatchDigest, exactReusablePrefix, incrementalLkgContentDigests, lkgSlotRejection, captureSlot, getInMemorySlot, getSlot, dropSlot, TOOL_SWEEP_SCOPED_MARKER, encodePiContentDecision, decodePiContentDecision, getPiContentDecisions, freezePiContentDecision, getNativeReplayState, saveNativeToolInputs, addNativeReasoningIds, copySessionStateForClone, externalHistorianFailureReason, subprocessExitHistorianFailureReason, countHistorianRuns, recordHistorianRun, summarizeImportance, tallyFactsByCategory, queueMemoryMutation, getMemoryMutationsForRender, getMemoryMutationsForRenderByProjects, getMaxMemoryMutationId, getMaxMemoryMutationIdForProjects, GLOBAL_USER_PROFILE_PROJECT_PATH, getProjectState, bumpProjectUserProfileVersion, saveSourceContent, getSourceContents, recordSubagentInvocation, getLatestHistorianInvocationId, noteTouchedAt, noteNudgePickIndex, formatNoteNudge, promptSurfaceHashMaterial, createPromptSurfaceRuntime, createPromptSurfaceGuidanceEpochCache, cellToolCalls, cellReduceFilingName, SYNTH_USER_ID_PREFIX, resolvePiStableId, resolvePiRealStableId, isPiContentFallbackId, isPiIndexFallbackId, piContentFallbackIds, readPiSessionSnapshot, readPiSessionMessages, readPiSessionMessagePage, findRestartModelSeedFromBranch, iterateEntriesToRawMessageRange, convertEntriesToRawMessages, convertPiAssistantEntryById, convertEntriesToRawMessagePage, countPiRawMessages, USER_MEMORY_CANDIDATE_TTL_MS, insertUserMemoryCandidates, getUserMemoryCandidates, deleteUserMemoryCandidates, pruneExpiredUserMemoryCandidates, insertUserMemory, getActiveUserMemories, updateUserMemoryContent, dismissUserMemory, getTaskScheduleState, getFailingDreamTasks, getSkippedDreamTasks, getMostRecentTaskRunAt, pruneNonCanonicalTaskRows, deleteTaskScheduleRowsForProject, seedTaskScheduleState, writeTaskScheduleState, isRetrospectiveWindowProcessed, recordRetrospectiveWindowProcessed, curateCategoryForMemoryCategory, peekCurateCategoryScope, beginCurateCategoryRun, curateTaskStateAfterSuccess, MEMORY_MURAL_BLOCK, buildMagicContextSection, resolveMuralWire, updateCompactionMarkerAfterPublication, COMPARTMENT_RENDER_EPOCH, MEMORY_RENDER_FORMAT_EPOCH, encodeCachedM0UpgradeIdentity, decodeCachedM0UpgradeIdentity, withCachedM0MemoryIds, readCachedM0MemoryIds, renderBudgetIdentityChanged, renderedBudgetSnapshot, renderedBudgetShrinkReason, DEFAULT_HISTORY_BUDGET_TOKENS, renderCompartmentAtTier, renderDecayedCompartments, extractM0Block, TEMPORAL_MARKER_PATTERN, TEMPORAL_MARKER_REPLAY_PATTERN, temporalMarkerPrefix, renderUserProfileContent, clearInjectionCache, getVisibleMemoryIds, orderHistorianMemories, renderHistorianMemoryBlock, DEFAULT_MEMORY_BUDGET_TOKENS, DEFAULT_USER_PROFILE_BUDGET_TOKENS, trimMemoriesToBudgetV2, trimWorkspaceMemoriesToBudgetV2, trimUserMemoriesToBudget, renderMemoryBlockV2, stripMemoryMuralBlock, resetPrefixTrimFallbackState, isDirectiveShapedProjectRule, takeCurateSafetyRefusalCount, wakePlaneStatus, loadPiConfig, loadPiConfigDetailed, unregisterPiProjectEmbeddings, ensureProjectRegisteredFromPiDirectory, resolvePiHarnessDetection, resolvePiHarnessKind, resolvePiOrdinalAlignment, piRawOrdinalOffsetSource, resolvePiOrdinalAlignmentForContext, isPiOrdinalAlignmentUnanchored, clearPiOrdinalAlignmentSession, TODO_TOOL_NAME, rememberTodowriteToolCallTodos, parseTodos, setTodoSnapshot, registerTodoOverlay, registerTodoStateLifecycle, createTodowriteTool, syncCtxMemoryToolEnabled, registerMagicContextTools };
+export { COMPACTION_ENABLED_PATH, isDreamerRunnable, isCompactionEnabled, formatConfigParseStatusLine, formatConfigParseNotice, claimConfigParseFailuresOnce, parseJsoncRecovering, detectConfigFile, MIN_PLAUSIBLE_CONTEXT_LIMIT, catalogOutputReserve, deriveWindowGeometry, hasTrustedAbsoluteWall, applyProvenInputFloor, formatWindowDerivationLine, formatWindowSource, isSaneLimit, resolveOutputReserve, getSdkWindowGeometry, getSdkContextLimit, getSdkOutputLimit, getSdkInputLimit, cortexKitUserConfigBasePath, cortexKitProjectConfigBasePath, migrateMagicContextConfigLocations, getProtectedTokensTierOverrides, rememberUnpublishedAutoSearchNoHint, getUnpublishedAutoSearchNoHint, forgetUnpublishedAutoSearchNoHint, registerAutoSearchWork, cancelAutoSearchWork, readSessionMeta, getOrCreateSessionMeta, updateSessionMeta, advanceToolReclaimWatermark, retryPendingSessionCleanups, retryPendingRustSessionCleanupsForProject, embedPauseBySession, embedRunStateBySession, autoEmbedAttemptedBySession, autoEmbedIdentityBySession, invalidateAutoEmbedSession, getEmbedDrainUiStatus, COMPARTMENT_LEASE_RENEWAL_MS, acquireCompartmentLease, renewCompartmentLease, releaseCompartmentLease, releaseCompartmentLeaseBestEffort, isCompartmentLeaseHeld, isNoContentCompartment, HAS_COMPARTMENT_CONTENT_SQL, queueM0Mutation, getMaxM0MutationId, getCompartments, getLastCompartmentEndMessage, getLastCompartmentEndMessageId, getCompartmentsByEndMessageId, appendCompartments, saveRecompStagingPass, getRecompStaging, clearRecompStaging, getRecompPartialRange, setRecompPartialRange, escapeXmlAttr, escapeXmlContent, getUncoveredCompartmentEndThrough, isPartialCompartmentEnd, readProjectDocsCanonical, providerResponseFailed, isSuccessfulProviderCompletion, requestPendingMaterialization, pendingMaterializationOrigin, clearPendingMaterialization, recordSystemRefreshOwnership, recordSystemPromptForRequest, recordHeldHeadForRequest, bindSystemPromptResponse, acknowledgeSystemPromptDelivery, deferDeliveredSystemRefresh, clearSystemPromptDelivery, saveLkgSlotToDb, loadPersistedLkgSlot, drainStaleLkgSlots, createDbLkgPersistence, replayLkg, registerLkgPersistence, LKG_SNAPSHOT_ARRAY, LKG_SNAPSHOT_OBJECT, LKG_SNAPSHOT_KEY, LKG_SNAPSHOT_STRING, LKG_SNAPSHOT_NUMBER, LKG_SNAPSHOT_BOOLEAN, LKG_SNAPSHOT_NULL, LKG_SNAPSHOT_UNDEFINED, contentSnapshotValue, signatureForFields, lkgContentFields, lkgContentDigestFromFields, isLegacyLkgDigest, legacyLkgDigestFromFields, lkgFieldsMatchDigest, exactReusablePrefix, incrementalLkgContentDigests, lkgSlotRejection, captureSlot, getInMemorySlot, getSlot, dropSlot, TOOL_SWEEP_SCOPED_MARKER, encodePiContentDecision, decodePiContentDecision, getPiContentDecisions, freezePiContentDecision, getNativeReplayState, saveNativeToolInputs, addNativeReasoningIds, copySessionStateForClone, externalHistorianFailureReason, subprocessExitHistorianFailureReason, countHistorianRuns, recordHistorianRun, summarizeImportance, tallyFactsByCategory, queueMemoryMutation, getMemoryMutationsForRender, getMemoryMutationsForRenderByProjects, getMaxMemoryMutationId, getMaxMemoryMutationIdForProjects, GLOBAL_USER_PROFILE_PROJECT_PATH, getProjectState, bumpProjectUserProfileVersion, saveSourceContent, getSourceContents, recordSubagentInvocation, getLatestHistorianInvocationId, noteTouchedAt, noteNudgePickIndex, formatNoteNudge, promptSurfaceHashMaterial, createPromptSurfaceRuntime, createPromptSurfaceGuidanceEpochCache, cellToolCalls, cellReduceFilingName, SYNTH_USER_ID_PREFIX, resolvePiStableId, resolvePiRealStableId, isPiContentFallbackId, isPiIndexFallbackId, piContentFallbackIds, readPiSessionSnapshot, readPiSessionMessages, readPiSessionMessagePage, findRestartModelSeedFromBranch, iterateEntriesToRawMessageRange, convertEntriesToRawMessages, convertPiAssistantEntryById, convertEntriesToRawMessagePage, countPiRawMessages, USER_MEMORY_CANDIDATE_TTL_MS, insertUserMemoryCandidates, getUserMemoryCandidates, deleteUserMemoryCandidates, pruneExpiredUserMemoryCandidates, insertUserMemory, getActiveUserMemories, updateUserMemoryContent, dismissUserMemory, getTaskScheduleState, getFailingDreamTasks, getSkippedDreamTasks, getMostRecentTaskRunAt, pruneNonCanonicalTaskRows, deleteTaskScheduleRowsForProject, seedTaskScheduleState, writeTaskScheduleState, isRetrospectiveWindowProcessed, recordRetrospectiveWindowProcessed, curateCategoryForMemoryCategory, peekCurateCategoryScope, beginCurateCategoryRun, curateTaskStateAfterSuccess, MEMORY_MURAL_BLOCK, buildMagicContextSection, resolveMuralWire, updateCompactionMarkerAfterPublication, COMPARTMENT_RENDER_EPOCH, MEMORY_RENDER_FORMAT_EPOCH, encodeCachedM0UpgradeIdentity, decodeCachedM0UpgradeIdentity, withCachedM0MemoryIds, readCachedM0MemoryIds, renderBudgetIdentityChanged, renderedBudgetSnapshot, renderedBudgetShrinkReason, DEFAULT_HISTORY_BUDGET_TOKENS, renderCompartmentAtTier, renderDecayedCompartments, extractM0Block, TEMPORAL_MARKER_PATTERN, TEMPORAL_MARKER_REPLAY_PATTERN, temporalMarkerPrefix, renderUserProfileContent, clearInjectionCache, getVisibleMemoryIds, orderHistorianMemories, renderHistorianMemoryBlock, DEFAULT_MEMORY_BUDGET_TOKENS, DEFAULT_USER_PROFILE_BUDGET_TOKENS, trimMemoriesToBudgetV2, trimWorkspaceMemoriesToBudgetV2, trimUserMemoriesToBudget, renderMemoryBlockV2, stripMemoryMuralBlock, resetPrefixTrimFallbackState, isDirectiveShapedProjectRule, takeCurateSafetyRefusalCount, wakePlaneStatus, loadPiConfig, loadPiConfigDetailed, unregisterPiProjectEmbeddings, ensureProjectRegisteredFromPiDirectory, resolvePiHarnessDetection, resolvePiHarnessKind, resolvePiOrdinalAlignment, piRawOrdinalOffsetSource, resolvePiOrdinalAlignmentForContext, isPiOrdinalAlignmentUnanchored, clearPiOrdinalAlignmentSession, narrowCatalogueForChild, shouldLogTagSentence, ensureChildTagSentence, isBoundChild, registerPiRegistry, noteTodoWrite, noteToolCall, TODO_TOOL_NAME, rememberTodowriteToolCallTodos, parseTodos, setTodoSnapshot, registerTodoOverlay, registerTodoStateLifecycle, createTodowriteTool, syncCtxMemoryToolEnabled, registerMagicContextTools };

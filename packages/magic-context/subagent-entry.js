@@ -27,7 +27,7 @@ import {
   ensureProjectRegisteredFromPiDirectory,
   resolvePiHarnessKind,
   registerMagicContextTools
-} from "./index-6aa6jt2n.js";
+} from "./index-ezf11ft4.js";
 import"./index-cyrnv16r.js";
 import"./index-xkf1qyj1.js";
 import"./index-jhw13tmp.js";
