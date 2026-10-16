@@ -26,12 +26,59 @@ import type { McpServerConfig } from "@earendil-works/pi-coding-agent";
 
 import type { LoadedServer } from "./config";
 
-/** How long to wait for a newly registered server's tools to appear. pi waits 10s at startup. */
-export const DEFAULT_TOOL_WAIT_MS = 10_000;
+/**
+ * How long to wait for a newly registered server's tools to appear. pi waits 10s at startup; this was
+ * raised to 30s by ticket 02, because a cold stdio server on a loaded host can take longer than a warm
+ * one and a false "did not answer" is worse than a slower true answer.
+ */
+export const DEFAULT_TOOL_WAIT_MS = 30_000;
 
 /** How often to re-read `pi.getAllTools()` while waiting. Cheap; only ever one wait at a time. */
 export const TOOL_POLL_MS = 25;
 
+
+/**
+ * The config with any `direct` exposure rewritten to the undisclosed reach (ticket 01).
+ *
+ * An entry configured `direct` has its tools activated on registration, which would put
+ * `mcp__<server>__<tool>` declarations in front of the model and break the one-tool surface. Rather than
+ * refuse the registration (which stops work for a reason nobody could guess) or silently honour it
+ * (which lies about the file), mcp-lazy registers it as `codemode` — pi's own undisclosed value — and
+ * tells the human once. `hidden` stays hidden, and `deferred`/`codemode` are already undisclosed.
+ *
+ * (`model-only` is a *pi tool* exposure, not an `mcp.json` value, so there is nothing to rewrite here;
+ * see ticket 13's Answer.)
+ */
+export function rewriteDisclosedExposure(config: McpServerConfig): {
+	config: McpServerConfig;
+	changed: boolean;
+} {
+	const record = config as unknown as { exposure?: unknown; toolExposure?: Record<string, unknown> };
+	let changed = false;
+	const next: Record<string, unknown> = { ...(config as unknown as Record<string, unknown>) };
+	if (record.exposure === "direct") {
+		next.exposure = "codemode";
+		changed = true;
+	}
+	if (record.toolExposure && typeof record.toolExposure === "object") {
+		const tools: Record<string, unknown> = {};
+		for (const [name, value] of Object.entries(record.toolExposure)) {
+			if (value === "direct") {
+				tools[name] = "codemode";
+				changed = true;
+			} else {
+				tools[name] = value;
+			}
+		}
+		next.toolExposure = tools;
+	}
+	return { config: next as unknown as McpServerConfig, changed };
+}
+
+/** The one notice a rewritten `direct` server produces, naming the server and where to change it. */
+export function exposureNotice(server: string): string {
+	return `mcp-lazy: MCP server "${server}" is configured exposure "direct", which would declare its tools to the model and break the one-tool surface; it was registered as "codemode" instead. Change the entry in mcp.json to silence this.`;
+}
 /** The namespace pi gives a server's tools: `mcp__<server>` with `-` rewritten to `_`. */
 export function mcpNamespace(server: string): string {
 	return `mcp__${server.replace(/-/g, "_")}`;
@@ -143,8 +190,10 @@ export async function registerReachedServers(code: string, input: RegisterInput)
 		input.registered.add(name);
 		const server = input.servers.find((candidate) => candidate.name === name);
 		if (!server) continue;
+		const prepared = rewriteDisclosedExposure(server.config);
+		if (prepared.changed) input.onProblem(exposureNotice(name));
 		try {
-			input.pi.registerMcpServer(name, server.config);
+			input.pi.registerMcpServer(name, prepared.config);
 		} catch (error) {
 			input.onProblem(
 				`mcp-lazy: cannot register MCP server "${name}": ${error instanceof Error ? error.message : String(error)}`,

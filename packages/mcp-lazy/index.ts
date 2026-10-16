@@ -15,6 +15,25 @@
  * residue is the startup warning that names this replacement, which the operator silences by disabling
  * the built-in (`"extensions": ["-builtin:mcp"]` in `~/.pi/agent/settings.json`; see the README).
  *
+ * ## The two discovery layers (map `.scratch/mcp-discovery/`)
+ *
+ * Since 2026-10-16 this package is also the discovery layer the map built. It contributes:
+ *
+ *  1. **An eager line per server** — its own `before_agent_start`, registered *after*
+ *     `createMcpExtension(...)(pi)` so its write survives the embedded instance's delete (section
+ *     ownership is load order). The section is `configured ∪ registered`, one line each, under pi's
+ *     4096-char cap with ticket 14's sacrifice order and ticket 12's fits-checked fill-in; it connects
+ *     nothing.
+ *  2. **A route** — one publication into tool-bridge's owners slot, so `await tool("mcp__<server>")`
+ *     answers that server's inventory (and only that call starts it) and `await tool("mcp__<server>__<tool>")`
+ *     falls through to code-mode's existing MCP dispatch.
+ *  3. **The teaching** — a `session` contribution whose guideline reaches the `python` tool's `<rules>`,
+ *     only when the session has a configured server; ticket 08's whole child answer, since a child's
+ *     loader already loads this factory.
+ *
+ * The model-facing surface is unchanged: no pi tool is registered, and `getActiveTools()` stays
+ * `["python"]`.
+ *
  * ## Why `loadConfig` returns nothing — and the reader lives here
  *
  * The MCP extension's `registeredServers()` skips a registered server whose name matches *any* entry its
@@ -44,30 +63,33 @@ import {
 	type ContributorRegistration,
 	registerContributor,
 } from "../host-bridge/src/convention";
-import { type LoadedServer, readMcpConfig } from "./src/config";
+import { type InventoryTool, namespaceInstructions, toolsOfNamespace } from "./src/inventory";
 import { registerReachedServers } from "./src/registrar";
+import { PUBLICATION_KEY, publishMcpRoute } from "./src/route";
+import { MCP_SERVERS_SECTION, type SectionEntry, firstLine, mcpNamespace, sectionText } from "./src/section";
+import { ensureServers, forgetSession, notePi, noticeOnce, stateFor } from "./src/state";
+import { sessionAnswer } from "./src/teaching";
 
 /** This package's instance key in host-bridge's contributor registry. Re-registering under it replaces. */
 const KEY = "pi-mcp-lazy";
+
+/** The section's intro, duplicated in the README's example. Ticket 03's S1. */
+export { SECTION_INTRO, ROUTE_GUIDELINE } from "./src/section";
 
 /**
  * Published at module load, like every contributor: a spawned child loads no ambient extensions, so its
  * composition is served by the registrations this process already holds (`host-bridge/src/compose.ts`,
  * `childFactories`).
  *
- * **`childFactories` is the only field this package needs**, and it is the whole point of registering:
- * a child's loader loads the kernel and every contributor's own factories, so without it a child would
- * never load this entry and a cell in a child could not connect an MCP server at all. Declaring
- * `session`/`hostFns`/`childEligible` would be wrong as well as unnecessary — this package contributes
- * nothing to the kernel's surface (a cell does not call a server *through* a host function) and holds
- * no pi tool of its own, so there is nothing to contribute, nothing to declare child-eligible, and no
- * system-prompt text to write. What a child needs is exactly what a root session needs: the registrar,
- * and a replacement MCP extension instance on its own `pi`.
+ * Declaring `session` is ticket 08's whole child answer: a child already loads this factory, so the
+ * child gets the guideline, the route and (from the factory) the section with no child-specific code.
+ * `childEligible` stays undeclared — this package holds no pi tool for a child's ceiling to carry.
  */
 export const mcpLazyRegistration: ContributorRegistration = {
 	key: KEY,
 	owner: "mcp-lazy",
 	apiVersion: API_VERSION,
+	session: (input) => sessionAnswer({ ctx: input.ctx }, { agentDir: getAgentDir() }),
 	childFactories: () => [(pi: unknown) => mcpLazy(pi as ExtensionAPI)],
 };
 
@@ -75,20 +97,17 @@ registerContributor(mcpLazyRegistration);
 
 /** The factory, on the root manifest's entry or the child loader's factory list. */
 export default function mcpLazy(pi: ExtensionAPI): void {
-	/** This session's config, read once on `session_start`; a session's `mcp.json` does not change under it. */
-	let servers: LoadedServer[] = [];
-	/** Servers this session has registered (or tried to), so a later cell does not register them again. */
-	const registered = new Set<string>();
+	const agentDir = getAgentDir();
+	const deps = { agentDir };
+	// The route must exist before tool-bridge gathers the owners' catalogues. A factory runs at load
+	// (before any session_start), so publishing here is in time for every session this instance serves.
+	notePi(pi);
+	publishMcpRoute(deps);
 
 	pi.on("session_start", (_event, ctx: ExtensionContext) => {
-		registered.clear();
-		const read = readMcpConfig({
-			agentDir: getAgentDir(),
-			cwd: ctx.cwd,
-			projectTrusted: ctx.isProjectTrusted(),
-		});
-		servers = read.servers;
-		for (const error of read.errors) notify(ctx, `mcp-lazy: ${error}`);
+		const state = stateFor(ctx, pi);
+		ensureServers(state, ctx, deps);
+		for (const error of state.configErrors) noticeOnce(state, ctx, `mcp-lazy: ${error}`);
 		return undefined;
 	});
 
@@ -98,12 +117,14 @@ export default function mcpLazy(pi: ExtensionAPI): void {
 		if (event.toolName !== "python") return undefined;
 		const code = (event.input as { code?: unknown }).code;
 		if (typeof code !== "string") return undefined;
+		const state = stateFor(ctx, pi);
+		ensureServers(state, ctx, deps);
 		await registerReachedServers(code, {
 			pi,
-			servers,
-			registered,
+			servers: state.servers ?? [],
+			registered: state.registered,
 			signal: ctx.signal,
-			onProblem: (text) => notify(ctx, text),
+			onProblem: (text) => noticeOnce(state, ctx, text),
 		});
 		return undefined;
 	});
@@ -111,14 +132,59 @@ export default function mcpLazy(pi: ExtensionAPI): void {
 	createMcpExtension({
 		loadConfig: () => ({ servers: [], errors: [], autoEnableCodemode: false }),
 	})(pi);
+
+	// **After** the embedded instance: section ownership is load order, and the embedded handler deletes
+	// `mcp_servers` in the same turn when its own (empty) list has nothing to say (map Fact 5).
+	pi.on("before_agent_start", (event, ctx: ExtensionContext) => {
+		writeServersSection(pi, ctx, event);
+		return undefined;
+	});
+
+	pi.on("session_shutdown", (_event, ctx: ExtensionContext) => {
+		forgetSession(ctx);
+		return undefined;
+	});
 }
 
-/** A notice the human reads; a disposed or UI-less ctx must never fail the cell it was reporting about. */
-function notify(ctx: ExtensionContext, text: string): void {
-	try {
-		ctx.ui.notify(text, "warning");
-	} catch {
-		/* best effort by definition */
+/** One entry of the section: the config's description, and the server's own instructions as the fill-in. */
+function sectionEntries(pi: ExtensionAPI, ctx: ExtensionContext): SectionEntry[] {
+	const state = stateFor(ctx, pi);
+	ensureServers(state, ctx, { agentDir: getAgentDir() });
+	const tools = pi.getAllTools() as InventoryTool[];
+	const configs = new Map<string, { description?: unknown }>();
+	for (const server of state.servers ?? []) configs.set(server.name, server.config as { description?: unknown });
+	for (const server of pi.getMcpServers?.() ?? []) {
+		if (!configs.has(server.name)) configs.set(server.name, server.config as { description?: unknown });
 	}
+	const entries: SectionEntry[] = [];
+	for (const [name, config] of [...configs.entries()].sort((a, b) => {
+		const an = mcpNamespace(a[0]);
+		const bn = mcpNamespace(b[0]);
+		return an < bn ? -1 : an > bn ? 1 : 0;
+	})) {
+		const namespace = mcpNamespace(name);
+		const base = firstLine(typeof config.description === "string" ? config.description : "");
+		const fill = base ? "" : namespaceInstructions(toolsOfNamespace(tools, namespace), namespace);
+		entries.push({ name, base, fill });
+	}
+	return entries;
 }
 
+/** Write (or clear) `mcp_servers`. mcp-lazy is its single writer. */
+function writeServersSection(pi: ExtensionAPI, ctx: ExtensionContext, event: unknown): void {
+	const sections = (event as { systemPromptOptions?: { sections?: Record<string, string> } } | undefined)
+		?.systemPromptOptions?.sections;
+	if (!sections || typeof sections !== "object") return;
+	const state = stateFor(ctx, pi);
+	const entries = sectionEntries(pi, ctx);
+	if (entries.length === 0) {
+		delete sections[MCP_SERVERS_SECTION];
+		return;
+	}
+	const text = sectionText(entries, state);
+	if (text) sections[MCP_SERVERS_SECTION] = text;
+	else delete sections[MCP_SERVERS_SECTION];
+}
+
+/** Exported for the rare caller that wants the publication key without importing the route. */
+export { PUBLICATION_KEY };

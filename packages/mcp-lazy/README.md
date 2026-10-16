@@ -51,6 +51,34 @@ Because it is loaded through the manifest — and, in a
 spawned child, through host-bridge's `childFactories` (`registerContributor` in `index.ts`) — the lazy
 registrar runs in root sessions and in children alike.
 
+## Discovery: names eagerly, detail on demand
+
+This package is also the discovery layer: the model learns that a server exists before it acts, and
+nothing connects until a cell names one.
+
+- **The eager section.** mcp-lazy's own `before_agent_start` writes pi's `mcp_servers` section with
+  ticket 03's intro and one line per server, `- mcp__<server>: <one-liner>`, alphabetical, for every
+  configured server plus any another extension registered. It is rendered under pi's own 4096-char cap
+  with the map's sacrifice order — descriptions before names, from roughly 183 servers — word- and
+  URL-aware truncation (`…`), and the tail omitted behind
+  `- ... K more servers; call tool() to list them all`. The handler is registered *after*
+  `createMcpExtension(...)`, because section ownership is load order and the embedded instance deletes
+  the key in the same turn when its own list is empty.
+- **The route.** One publication into `pi-tool-bridge`'s owners slot (a documented literal) gives a cell
+  `await tool()` to list servers, `await tool("mcp__<server>")` to fetch that server's inventory — and
+  only that call starts it, on a 30 s bound — and `await tool("mcp__docs_api", query="…")` to rank that
+  inventory (pi's own BM25). An `mcp__<server>__<tool>` call is not in the catalogue, so code-mode's
+  existing MCP dispatch takes it.
+- **The teaching.** A `session` contribution carries one guideline into the `python` tool's `<rules>`,
+  only when the session has a configured server. A child gets it too (a child loads this factory).
+- **A listing never connects anything.** `catalogue()` reads the same two config files the rest of the
+  package does and nothing else.
+
+A `direct` (or per-tool `direct`) exposure is rewritten to `codemode` at registration time — pi would
+otherwise declare those tools to the model and break the one-tool surface — with one warning naming the
+server. A server whose namespace is already a callable pi tool name is skipped in the catalogue, with
+one warning.
+
 ## The one operator step
 
 pi prints a startup warning naming this replacement. Silence it by disabling the built-in in
@@ -66,9 +94,9 @@ and nothing here does.
 
 ## What it is not
 
-- It does not publish MCP tools as kernel host functions, and it contributes nothing to the kernel
-  surface; it only decides *when* a server connects. The cell's call is what reports a server that is
-  slow, unreachable or misconfigured.
+- It does not publish MCP tools as *pi* tools (the model-facing surface stays `python`); the discovery
+  route above is a `tool(...)` call, and the cell's call is what reports a server that is slow,
+  unreachable or misconfigured.
 - It cannot make a `.pi/mcp.json` in an untrusted project take effect; that file is not read at all
   unless the project is trusted, exactly as upstream.
 - A malformed `mcp.json` is surfaced as a warning and contributes no servers; it never stops a session
