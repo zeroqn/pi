@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -113,7 +114,14 @@ describe("the vendored onnxruntime-node is the one that gets loaded", () => {
   });
 
   test("the member ships the binding, and nothing from the published package", () => {
-    const allowed = new Set([...vendoredFiles(), "README.md", "package.json", "vendor.sh", "test/vendored.test.ts"]);
+    const allowed = new Set([
+      ...vendoredFiles(),
+      "README.md",
+      "package.json",
+      "vendor.sh",
+      "test/vendored.test.ts",
+      ".gitignore", // re-includes dist/, which the root .gitignore ignores
+    ]);
     const extra = filesIn(member, ["node_modules"]).filter((rel) => !allowed.has(rel));
     expect(extra).toEqual([]);
     expect(forbidden(filesIn(member, ["node_modules"]))).toEqual([]);
@@ -137,6 +145,25 @@ describe("the vendored onnxruntime-node is the one that gets loaded", () => {
       readFileSync(join(member, "package.json")).length;
     expect(bytes).toBeLessThan(PAYLOAD_CAP);
     expect(bytes).toBeGreaterThan(300 * 1024); // the binding alone is 384,040 B
+  });
+
+  // The first version of this member shipped *without* its code: the repository's root
+  // .gitignore ignores `dist/` generally, so `git add packages/onnxruntime-node` took the
+  // manifest, the README and the 384 KB binding and silently left the JavaScript behind.
+  // Nothing noticed until Magic Context reported
+  // `Cannot find module '.../onnxruntime-node/dist/index.js'` at runtime and turned local
+  // embeddings off. The working tree looked perfect, which is exactly why this assertion
+  // reads git rather than the filesystem.
+  test("every vendored file is tracked in git, not hidden by the root .gitignore", () => {
+    const tracked = new Set(
+      execFileSync("git", ["-C", repoRoot, "ls-files", "packages/onnxruntime-node"], { encoding: "utf8" })
+        .split("\n")
+        .filter(Boolean),
+    );
+    const untracked = [...vendoredFiles(), "package.json", "README.md"]
+      .map((rel) => `packages/onnxruntime-node/${rel}`)
+      .filter((path) => !tracked.has(path));
+    expect(untracked).toEqual([]);
   });
 
   test("bun.lock has no registry form of the name", () => {

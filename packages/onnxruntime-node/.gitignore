@@ -1,0 +1,9 @@
+# This is vendored data, not a build output: the repository's root .gitignore ignores
+# `dist/` generally, and that rule silently kept this member's code out of the first
+# commit - the 384 KB binding was tracked, so nothing looked wrong until Magic Context
+# reported `Cannot find module '.../onnxruntime-node/dist/index.js'` at runtime and
+# disabled local embeddings. Re-include the directory here so a plain `git add` picks it
+# up (the guard test in test/vendored.test.ts also fails the build if any vendored file
+# is untracked, so a regression is loud rather than silent).
+!dist/
+!dist/**
