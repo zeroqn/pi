@@ -624,13 +624,18 @@ function directoryBytes(path) {
     return error.code === "ENOENT" ? 0 : null;
   }
 }
+function getLoadedLocalEmbeddingRuntimes() {
+  return [
+    ...new Set([...loadedLocalEmbeddingRuntimes.values()].map((entry) => entry.runtime))
+  ].sort();
+}
 function getLocalEmbeddingNativeMemoryStats() {
   const loaded = [...loadedLocalEmbeddingRuntimes.values()];
   return {
     loaded: loaded.length > 0,
     providerCount: loaded.length,
     models: [...new Set(loaded.map((entry) => entry.model))].sort(),
-    runtimes: [...new Set(loaded.map((entry) => entry.runtime))].sort(),
+    runtimes: getLoadedLocalEmbeddingRuntimes(),
     modelCacheBytes: loaded.length > 0 ? directoryBytes(modelCacheDirForRuntime()) : 0,
     rssDeltaAtLoad: loaded.reduce((sum, entry) => sum + entry.rssDeltaAtLoad, 0),
     externalDeltaAtLoad: loaded.reduce((sum, entry) => sum + entry.externalDeltaAtLoad, 0),
@@ -1165,4 +1170,4 @@ class LocalEmbeddingProvider {
   }
 }
 
-export { embeddingModelsMatch, resolveEmbeddingTextPrefixes, getEmbeddingProviderIdentity, dominantEmbeddingFailure, resolveLocalEmbeddingWorkerRuntime, getLocalEmbeddingNativeMemoryStats, LocalEmbeddingProvider };
+export { embeddingModelsMatch, resolveEmbeddingTextPrefixes, getEmbeddingProviderIdentity, dominantEmbeddingFailure, resolveLocalEmbeddingWorkerRuntime, getLoadedLocalEmbeddingRuntimes, getLocalEmbeddingNativeMemoryStats, LocalEmbeddingProvider };

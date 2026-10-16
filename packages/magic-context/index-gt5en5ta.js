@@ -53,7 +53,7 @@ import {
   getEmbeddingProviderIdentity,
   dominantEmbeddingFailure,
   LocalEmbeddingProvider
-} from "./index-sdgdm92c.js";
+} from "./index-xksvf3hj.js";
 import {
   isUserHomeDirectory,
   setBootQuietPeriodForTests
@@ -2356,6 +2356,14 @@ function getProjectEmbeddingSnapshot2(projectIdentity) {
   const registration = projectRegistrations.get(projectIdentity);
   return registration ? snapshotFor(registration) : null;
 }
+function getProjectLocalEmbeddingRuntime2(projectIdentity) {
+  const registration = projectRegistrations.get(projectIdentity);
+  if (!registration || registration.observationMode)
+    return null;
+  if (registration.config.provider !== "local")
+    return null;
+  return registration.config.local_runtime ?? "auto";
+}
 function installProjectEmbeddingSearchBridge2(snapshot, provider) {
   projectRegistrations.set(snapshot.projectIdentity, {
     projectIdentity: snapshot.projectIdentity,
@@ -3025,4 +3033,4 @@ function _resetProjectEmbeddingRegistryForTests2() {
   setBootQuietPeriodForTests(null);
 }
 
-export { recordSessionProjectIdentity, drainBackgroundBatches, recordEmbeddingMeasurement, OpenAICompatibleEmbeddingProvider, saveCommitEmbedding, loadProjectCommitEmbeddings, loadUnembeddedCommits, countEmbeddedCommits, upsertCommits, getLatestIndexedCommitSha, enforceProjectCap, GIT_SWEEP_LEASE_RENEWAL_MS, acquireGitSweepLease, renewGitSweepLease, markGitSweepSuccessAndRelease, parkGitSweepNonIndexable, releaseGitSweepLease, describeShadowBackfillWriteRefusal2, listShadowBackfillStalls2, getShadowBackfillStopReason2, markProjectLoadUntrusted2, contentSha2562, drainProjectEmbeddingIdentityMaintenance2, drainStaleEmbeddingIdentitiesForProject2, registerProjectEmbedding2, registerProjectShadowEmbedding2, getShadowEmbeddingMeasurementCohort2, getPrimaryEmbeddingMeasurementCohort2, embedShadowTextForProject2, enqueueShadowEmbeddingItems2, getShadowBackfillRemaining2, flushShadowEmbeddingBacklog2, registerProjectInObservationMode2, unregisterProjectShadowEmbedding2, unregisterProjectEmbedding2, getProjectEmbeddingSnapshot2, installProjectEmbeddingSearchBridge2, getProjectChunkEmbeddingModelId2, getProjectEmbeddingMaxInputTokens2, embedTextForProject2, embedBatchForProject2, embedItemsForProject2, embedUnembeddedMemoriesForProject2, drainCommitBacklogForProject2, embedUnembeddedCompartmentChunksForProject2, embedSessionCompartmentChunks2, getEmbeddingCoverageStatus2, getAutoEmbeddingSessionCoverage2, sweepAllRegisteredProjects2, _setTestProviderFactoryForProject2, _resetProjectEmbeddingRegistryForTests2 };
+export { recordSessionProjectIdentity, drainBackgroundBatches, recordEmbeddingMeasurement, OpenAICompatibleEmbeddingProvider, saveCommitEmbedding, loadProjectCommitEmbeddings, loadUnembeddedCommits, countEmbeddedCommits, upsertCommits, getLatestIndexedCommitSha, enforceProjectCap, GIT_SWEEP_LEASE_RENEWAL_MS, acquireGitSweepLease, renewGitSweepLease, markGitSweepSuccessAndRelease, parkGitSweepNonIndexable, releaseGitSweepLease, describeShadowBackfillWriteRefusal2, listShadowBackfillStalls2, getShadowBackfillStopReason2, markProjectLoadUntrusted2, contentSha2562, drainProjectEmbeddingIdentityMaintenance2, drainStaleEmbeddingIdentitiesForProject2, registerProjectEmbedding2, registerProjectShadowEmbedding2, getShadowEmbeddingMeasurementCohort2, getPrimaryEmbeddingMeasurementCohort2, embedShadowTextForProject2, enqueueShadowEmbeddingItems2, getShadowBackfillRemaining2, flushShadowEmbeddingBacklog2, registerProjectInObservationMode2, unregisterProjectShadowEmbedding2, unregisterProjectEmbedding2, getProjectEmbeddingSnapshot2, getProjectLocalEmbeddingRuntime2, installProjectEmbeddingSearchBridge2, getProjectChunkEmbeddingModelId2, getProjectEmbeddingMaxInputTokens2, embedTextForProject2, embedBatchForProject2, embedItemsForProject2, embedUnembeddedMemoriesForProject2, drainCommitBacklogForProject2, embedUnembeddedCompartmentChunksForProject2, embedSessionCompartmentChunks2, getEmbeddingCoverageStatus2, getAutoEmbeddingSessionCoverage2, sweepAllRegisteredProjects2, _setTestProviderFactoryForProject2, _resetProjectEmbeddingRegistryForTests2 };

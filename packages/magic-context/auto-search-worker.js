@@ -17,11 +17,11 @@ var [
   { setHarness },
   { Database }
 ] = await Promise.all([
-  import("./embedding-backfill-jazkqw0f.js"),
+  import("./embedding-backfill-0gcymy3f.js"),
   import("./embedding-cache-7rp4gqzr.js"),
   import("./storage-memory-1z20y55x.js"),
-  import("./project-embedding-registry-y1rqgygj.js"),
-  import("./search-6gdm3505.js"),
+  import("./project-embedding-registry-ds15c3tw.js"),
+  import("./search-h218x4ss.js"),
   import("./embedding-activity-ew6dshfd.js"),
   import("./harness-9872e0ym.js"),
   import("./sqlite-3yye76ht.js")

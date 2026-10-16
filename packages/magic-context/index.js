@@ -260,7 +260,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-6fhr2g6x.js";
+} from "./index-6xq9q7as.js";
 import {
   canonicalModelIdentity,
   piModelRefToCanonical,
@@ -655,6 +655,7 @@ import {
   drainStaleEmbeddingIdentitiesForProject2,
   enqueueShadowEmbeddingItems2,
   getProjectEmbeddingSnapshot2,
+  getProjectLocalEmbeddingRuntime2,
   getProjectChunkEmbeddingModelId2,
   getProjectEmbeddingMaxInputTokens2,
   embedTextForProject2,
@@ -665,7 +666,7 @@ import {
   embedSessionCompartmentChunks2,
   getEmbeddingCoverageStatus2,
   getAutoEmbeddingSessionCoverage2
-} from "./index-1vesbrss.js";
+} from "./index-gt5en5ta.js";
 import {
   V2_MEMORY_CATEGORIES
 } from "./index-135e8hvg.js";
@@ -727,7 +728,7 @@ import {
   normalizeVerificationFiles,
   indexCommitsForProject,
   embedUnembeddedCommits
-} from "./index-hsftpq74.js";
+} from "./index-x0kmye0f.js";
 import {
   setEmbeddingSessionBusy2,
   isEmbeddingHostBusy2
@@ -758,10 +759,13 @@ import {
 import {
   pushNotification2
 } from "./index-q1yc6bs0.js";
-import"./index-sdgdm92c.js";
+import {
+  resolveLocalEmbeddingWorkerRuntime,
+  getLoadedLocalEmbeddingRuntimes
+} from "./index-xksvf3hj.js";
 import {
   cosineSimilarity
-} from "./index-c4n0940k.js";
+} from "./index-2pgk0q2g.js";
 import"./index-g3600tpw.js";
 import {
   buildHiddenAgentRegistrations,
@@ -44460,7 +44464,6 @@ function setMagicContextRecompActive(sessionId, active) {
 }
 var lastRenderedBySession = new Map;
 function registerStatusLine(pi, deps) {
-  deps.projectIdentity;
   pi.on("session_start", async (_event, ctx) => updateStatusLine(ctx, deps, true));
   pi.on("agent_end", async (_event, ctx) => updateStatusLine(ctx, deps));
   pi.on("session_compact", async (_event, ctx) => updateStatusLine(ctx, deps, true));
@@ -44481,13 +44484,13 @@ function updateStatusLine(ctx, deps, force = false) {
   const sessionId = resolveSessionId3(ctx);
   if (!sessionId)
     return;
-  const text = renderStatusText(ctx, deps.db, sessionId);
+  const text = renderStatusText(ctx, deps.db, sessionId, resolveOnnxRuntimeStatus(deps.projectIdentity));
   if (!force && lastRenderedBySession.get(sessionId) === text)
     return;
   lastRenderedBySession.set(sessionId, text);
   ctx.ui.setStatus(STATUS_KEY, text);
 }
-function renderStatusText(ctx, db, sessionId) {
+function renderStatusText(ctx, db, sessionId, onnxRuntime = null) {
   const usage = ctx.getContextUsage?.();
   const meta = readSessionMetaStatus(db, sessionId);
   const providerInputLimit = piPressureEvidenceLimit(resolvePiWindowGeometry({
@@ -44525,7 +44528,20 @@ function renderStatusText(ctx, db, sessionId) {
   const inputTokens = pressure?.inputTokens;
   const pct = pressure?.percentage;
   const state = renderHistorianState(meta, recompSessions.has(sessionId));
-  return `mc: ${inputTokens === undefined ? "--" : fmt(inputTokens)} (${pct === undefined ? "--" : `${Math.round(pct)}%`}) · ${state}`;
+  const runtime = onnxRuntime ? ` · ${formatOnnxRuntime(onnxRuntime)}` : "";
+  return `mc: ${inputTokens === undefined ? "--" : fmt(inputTokens)} (${pct === undefined ? "--" : `${Math.round(pct)}%`}) · ${state}${runtime}`;
+}
+function resolveOnnxRuntimeStatus(projectIdentity) {
+  const preference = getProjectLocalEmbeddingRuntime2(projectIdentity);
+  if (!preference)
+    return null;
+  return { preference, loaded: getLoadedLocalEmbeddingRuntimes() };
+}
+function formatOnnxRuntime(status) {
+  const loaded = [...new Set(status.loaded)].sort();
+  const resolved = resolveLocalEmbeddingWorkerRuntime(status.preference);
+  const effective = loaded.length > 0 ? loaded.join("+") : resolved === "electron" ? "wasm" : resolved;
+  return `onnx ${status.preference}→${effective}`;
 }
 function renderHistorianState(meta, recompActive) {
   const failureCount = meta?.historian_failure_count ?? 0;

@@ -18,6 +18,7 @@ import {
   unregisterProjectShadowEmbedding2,
   unregisterProjectEmbedding2,
   getProjectEmbeddingSnapshot2,
+  getProjectLocalEmbeddingRuntime2,
   installProjectEmbeddingSearchBridge2,
   getProjectChunkEmbeddingModelId2,
   getProjectEmbeddingMaxInputTokens2,
@@ -33,11 +34,11 @@ import {
   sweepAllRegisteredProjects2,
   _setTestProviderFactoryForProject2,
   _resetProjectEmbeddingRegistryForTests2
-} from "./index-1vesbrss.js";
+} from "./index-gt5en5ta.js";
 import"./index-9p40dgkm.js";
 import"./index-jhw13tmp.js";
 import"./index-yhzhdp3m.js";
-import"./index-sdgdm92c.js";
+import"./index-xksvf3hj.js";
 import"./index-xkf1qyj1.js";
 import"./index-cyrnv16r.js";
 import"./index-fgabebe5.js";
@@ -70,6 +71,7 @@ export {
   getProjectChunkEmbeddingModelId2 as getProjectChunkEmbeddingModelId,
   getProjectEmbeddingMaxInputTokens2 as getProjectEmbeddingMaxInputTokens,
   getProjectEmbeddingSnapshot2 as getProjectEmbeddingSnapshot,
+  getProjectLocalEmbeddingRuntime2 as getProjectLocalEmbeddingRuntime,
   getShadowBackfillRemaining2 as getShadowBackfillRemaining,
   getShadowBackfillStopReason2 as getShadowBackfillStopReason,
   getShadowEmbeddingMeasurementCohort2 as getShadowEmbeddingMeasurementCohort,

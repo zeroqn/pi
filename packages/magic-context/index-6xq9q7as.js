@@ -142,7 +142,7 @@ import {
   unregisterProjectEmbedding2,
   getProjectEmbeddingSnapshot2,
   embedTextForProject2
-} from "./index-1vesbrss.js";
+} from "./index-gt5en5ta.js";
 import {
   getNoteByIdInScope,
   getNotes,
@@ -158,7 +158,7 @@ import {
   resolveMemoriesByIdsForSearch2,
   unifiedSearch2,
   formatSearchResults2
-} from "./index-hsftpq74.js";
+} from "./index-x0kmye0f.js";
 import {
   saveEmbedding,
   invalidateMemory2
