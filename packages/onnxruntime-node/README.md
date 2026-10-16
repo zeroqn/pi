@@ -21,13 +21,15 @@ matters for this directory.
 ## Provenance
 
 The bytes were extracted from the tarball npm itself downloaded on 2026-10-16, which
-is still in the local cache at
+sat in the local cache at
 
 ```
 /home/dev/.npm/_cacache/content-v2/sha512/24/7e/fe7336dcf002c0f35f6f95381c57e436d78ffe56319e0470e35fcd7e6420f43c254220518536d4f4578b171bfd495f2a4a3e049c41c0778a3fe19376274e
 ```
 
-and it is still there because that path *is* the sha512 of its contents. Registry
+(that path *is* the sha512 of its contents, so npm's own garbage collection can and
+did evict it — re-fetch the URL below and check it against the integrity to get the
+bytes back). Registry
 metadata, copied verbatim from the packument the same cache holds for
 `https://registry.npmjs.org/onnxruntime-node` (`versions["1.24.3"].dist`):
 
@@ -47,7 +49,7 @@ tarball and the metadata agree. (`sha256` of the tarball:
 ## What is vendored, and its sha256
 
 ```
-a7191fbfe8045d4d5d312e5ecd8f5dd6970e804dd340c98be8a0af8daf7908cc  bin/napi-v6/linux/x64/onnxruntime_binding.node   384040 B
+4d0332b6697214eca5563f6175a96316de8d2fc154fc7f9c7220c8811732c165  bin/napi-v6/linux/x64/onnxruntime_binding.node   384040 B  (patched: see below)
 23e65ad2c30827e0f2bfe2aadc2987b76d4619ae5e25aad36674ce618ed3df6d  dist/backend.d.ts                                  506 B
 2fb40405c5dad7aa88dcf1071ea4b8a0e49a3ad59def0a3f23b5dda8ff273d3e  dist/backend.js                                   6242 B
 5df69ea31983e5b6fcd0b297c736ff7a84ea3d92629f8feb347c8bf1d13da91b  dist/binding.d.ts                                1564 B
@@ -59,8 +61,22 @@ ffe525fbec3346d1e2addf2d792d8e355a26dd08df664d7617015f21dea0a534  dist/version.d
 ```
 
 That is the whole package: `dist/` (compiled JS plus the type declarations, the four
-`*.js.map` sourcemaps left behind) and one native artifact. Deliberately **not**
-vendored:
+`*.js.map` sourcemaps left behind) and one native artifact.
+
+Every file above is byte-identical to the tarball **except the binding**, which is
+patched in one place: its library name, `libonnxruntime.so.1`, is renamed to
+`libonnxrtabi24.so.1` — the name of the ABI shim in `shell/onnxruntime-shim/` (see
+[How the library is found](#how-the-library-is-found) for why the shim cannot use the
+real library's name). The substitution is the one occurrence of that 19-byte string
+in the binding's `.dynstr`, which both `DT_NEEDED` and the version need's `vn_file`
+point at, so the file's size and layout are unchanged; `vendor.sh` re-applies it and
+checks the result. `readelf -d` shows it:
+
+```
+ 0x0000000000000001 (NEEDED)             Shared library: [libonnxrtabi24.so.1]
+```
+
+Deliberately **not** vendored:
 
 * `libonnxruntime.so.1` (35,164,376 B in the tarball) — the library comes from the
   `onnxruntime-shim` flake output (`shell/onnxruntime-shim/`) through `LD_LIBRARY_PATH`,
@@ -79,22 +95,40 @@ the one entry the JS actually requires — `onnxruntime-common: 1.24.3`. `adm-zi
 
 ## How the library is found
 
-The binding's `NEEDED` is `libonnxruntime.so.1` with `RUNPATH $ORIGIN/`
+The binding's `NEEDED` is `libonnxrtabi24.so.1` with `RUNPATH $ORIGIN/`
 (= `bin/napi-v6/linux/x64/`, where nothing sits), so the loader falls through to
-`LD_LIBRARY_PATH`. That must name `shell/onnxruntime-shim`'s output directory — its
-`libonnxruntime.so.1` carries the SONAME the binding asks for and defines
-`OrtGetApiBase@@VERS_1.24.3`, forwarding to the nixpkgs 1.27.1 library. The devShell
-in `shell/flake.nix` puts it there (and defaults `ONNXRUNTIME_LIB_PATH` to the same
-directory, which is the shim's own override for *which* real library it forwards to).
+`LD_LIBRARY_PATH`. That must name `shell/onnxruntime-shim`'s output directory: its
+single file is `libonnxrtabi24.so.1`, which carries that SONAME and defines
+`OrtGetApiBase@@VERS_1.24.3`, forwarding the call to the real nixpkgs 1.27.1 library
+by absolute store path. The devShell in `shell/flake.nix` puts that directory on
+`LD_LIBRARY_PATH` and defaults `ONNXRUNTIME_LIB_PATH` to the *real* library's
+directory — the shim's own override for which ONNX Runtime it forwards to.
 
 `LD_LIBRARY_PATH` has to be set by whatever launches pi: glibc snapshots it at
 program start, so an in-process write is too late.
 
+**Why the shim's name is ours, and not `libonnxruntime.so.1`.** An `LD_LIBRARY_PATH`
+entry outranks a binary's own `RUNPATH`, so a file *named* `libonnxruntime.so.1` on
+that path becomes the ONNX Runtime for every process in the environment. The shim only
+defines `VERS_1.24.3`, while `zg` (zvec-grep) links the real library and asks for
+`OrtGetApiBase@VERS_1.27.1` — it died with
+
+```
+zg: /nix/store/…-onnxruntime-shim-…/lib/libonnxruntime.so.1: version `VERS_1.27.1' not found (required by zg)
+```
+
+the first time the shim was on the path under its old name. Renaming the shim (and the
+binding's request for it, above) keeps it answering for this binding alone: nothing
+else asks for `libonnxrtabi24.so.1`, so `zg` and every other consumer resolve the real
+library through its own `RUNPATH` again. The same naming freedom is why the shim can
+carry a version node — `VERS_1.24.3` — that no released ONNX Runtime ever had.
+
 ## Bumping
 
-Re-extract the tarball for the new version, diff the `dist/` tree, update the
-sha256 block above with `find . -type f -exec sha256sum {} +`, and change this
-`version` and `packages/magic-context/package.json`'s range **in the same commit**.
+Re-extract the tarball for the new version with `./vendor.sh <tarball>` (it applies
+the library rename and checks the result), diff the `dist/` tree, update the sha256
+block above from the script's output, and change this `version` and
+`packages/magic-context/package.json`'s range **in the same commit**.
 A version bump that moves the ORT release also moves `VERS_…`, which is what
 `shell/onnxruntime-shim/VERS_1.24.3.map` names — but the shim's version node only has
 to satisfy *this binding*, so it follows this package, not the shim's forward target.
