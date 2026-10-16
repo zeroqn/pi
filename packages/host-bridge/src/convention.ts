@@ -56,6 +56,23 @@ export const CONTRIBUTORS_SYMBOL = Symbol.for("pi-host-bridge:contributors");
 /** Where this package keeps what it did for a session, keyed by {@link sessionKey}. */
 export const SESSIONS_SYMBOL = Symbol.for("pi-host-bridge:sessions");
 
+/**
+ * The one question another extension asks this package: **is anything still running in this session?**
+ *
+ * Published at module load as a function taking pi's `ctx` ({@link publishLiveWork}), because a reader
+ * that owns neither this package, code mode nor rlm has to be able to ask it without importing
+ * anything — the same one-way rendezvous `pi-tool-bridge:owners` uses. Magic Context's todo-list
+ * refresh is the reader: it appends one line, and asks for one more provider request, exactly when a
+ * run ended `completed` with the list still holding open items and *nothing* left in flight.
+ */
+export const LIVE_WORK_SYMBOL = Symbol.for("pi-host-bridge:live-work");
+
+/**
+ * Where the per-session thunks are filed — beside the record rather than inside it, because a record is
+ * serialized into a transcript entry and a function is not.
+ */
+const LIVE_WORK_HOOKS_SYMBOL = Symbol.for("pi-host-bridge:live-work-hooks");
+
 /** This package's name in records, entries and the model's instructions. */
 export const READER = "pi-host-bridge";
 
@@ -107,7 +124,25 @@ export type ContributorAnswer = {
 	 * before: a name recorded too early strips a pi tool whose route never appeared).
 	 */
 	reaches?: string[];
+	/**
+	 * Whether the work **this contributor** started in this session is still running — a thunk, because
+	 * the answer matters at a later moment than the compose that filed it.
+	 *
+	 * rlm answers with its running children. A contributor that owns no work omits the field rather
+	 * than answering zero; the aggregate treats the two the same. The composition root adds what it can
+	 * see for itself (the kernel's background shells), so a contributor never reports code mode's work.
+	 */
+	liveWork?: () => LiveWork;
 };
+
+/**
+ * What one contributor answers when asked whether the work **it** started is still running.
+ *
+ * `count` is the gate a reader decides on — zero means everything this contributor started has ended —
+ * and `names` is what it can say out loud, one entry per live thing. Both live in the answer rather
+ * than in a record so a reader needs no vocabulary of its own beyond "is anything left".
+ */
+export type LiveWork = { count: number; names: string[] };
 
 /**
  * What a contributor may need to build a child's factories.
@@ -230,6 +265,42 @@ function contributorsSlot(): Map<string, ContributorRegistration> {
 
 function sessionsSlot(): Map<string, SessionRecord> {
 	return slot(SESSIONS_SYMBOL, () => new Map<string, SessionRecord>());
+}
+
+function liveWorkHooksSlot(): Map<string, () => LiveWork> {
+	return slot(LIVE_WORK_HOOKS_SYMBOL, () => new Map<string, () => LiveWork>());
+}
+
+/**
+ * File one session's live-work answer (the composition root, once per compose; a test, directly).
+ *
+ * Last write wins, like every other keyed slot here: a `/reload` recomposes the session and the fresh
+ * answer must replace the one filed against a session whose kernel no longer exists.
+ */
+export function setSessionLiveWork(key: string, read: () => LiveWork): void {
+	liveWorkHooksSlot().set(key, read);
+}
+
+/**
+ * Publish the reader under {@link LIVE_WORK_SYMBOL}. Idempotent, so both the entry and a child's
+ * factory may call it.
+ *
+ * The published function takes **pi's ctx** and answers `{count, names}`, or `null` when this process
+ * holds no answer for that session (no host-bridge in it, or a session it never composed). It applies
+ * {@link sessionKey} itself — the workspace's one derivation — so a reader never reimplements it, and
+ * it never throws: a reader asking between runs must not be able to fail a session.
+ */
+export function publishLiveWork(): void {
+	(globalThis as Record<symbol, unknown>)[LIVE_WORK_SYMBOL] = (
+		ctx: unknown,
+	): LiveWork | null => {
+		try {
+			const read = liveWorkHooksSlot().get(sessionKey(ctx));
+			return read ? read() : null;
+		} catch {
+			return null;
+		}
+	};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -427,6 +498,9 @@ export function sessionRecord(key: string): SessionRecord | undefined {
  */
 export function forgetSession(key: string): void {
 	sessionsSlot().delete(key);
+	// The live-work answer goes with the record: a session that ended must not keep answering "nothing
+	// running" (or worse, "three running") for a kernel and a manager that no longer exist.
+	liveWorkHooksSlot().delete(key);
 }
 
 /**
@@ -445,7 +519,10 @@ export function pruneSessions(isStale: (key: string, record: SessionRecord) => b
 		} catch {
 			stale = false;
 		}
-		if (stale && sessionsSlot().delete(key)) dropped.push(key);
+		if (stale && sessionsSlot().delete(key)) {
+			liveWorkHooksSlot().delete(key);
+			dropped.push(key);
+		}
 	}
 	return dropped;
 }
@@ -496,6 +573,7 @@ export function __clearChildDetectorForTests(): void {
 export function __resetHostBridgeForTests(): void {
 	contributorsSlot().clear();
 	sessionsSlot().clear();
+	liveWorkHooksSlot().clear();
 	detectorSlot().current = undefined;
 	nextUnpersisted = 0;
 	unpersistedStore = undefined;

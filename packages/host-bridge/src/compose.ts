@@ -26,6 +26,7 @@
  * inert package must not add one.
  */
 import {
+	type KernelBackground,
 	type KernelContribution,
 	type KernelHandle,
 	childExtensionFactories,
@@ -44,10 +45,17 @@ import {
 	contributors,
 	detectsChild,
 	forgetSession,
+	publishLiveWork,
 	recordSession,
 	sessionKey,
 	sessionRecord,
+	setSessionLiveWork,
 } from "./convention";
+
+// Published at module load, not per session: the reader outside this package (Magic Context's todo
+// refresh) asks between runs, and a session this process never composed answers `null` rather than
+// having no question to ask. Idempotent, so a child's own instance publishes the same reader.
+publishLiveWork();
 
 /** The child shapes live with the registration they belong to; re-exported for the entry's callers. */
 export type { ChildCeiling, ChildRequest } from "./convention";
@@ -75,6 +83,15 @@ function sessionFileOf(ctx: unknown): string | undefined {
 		return typeof file === "string" && file.length > 0 ? file : undefined;
 	} catch {
 		return undefined;
+	}
+}
+
+/** The kernel's own background shells, or none — an older code mode answers nothing (see the handle). */
+function backgroundsOf(handle: KernelHandle): KernelBackground[] {
+	try {
+		return handle.backgrounds?.() ?? [];
+	} catch {
+		return [];
 	}
 }
 
@@ -160,6 +177,39 @@ export async function composeSession(input: {
 			promptTexts.push({ name: answer.systemPromptSection ?? registration.key, text });
 		}
 	}
+
+	// The session's live-work answer: what each contributor says about the work it started (rlm's
+	// children), plus what only this composition root can see — the kernel's background shells, which
+	// belong to code mode rather than to a contributor. Filed as a thunk, because "is anything still
+	// running" is asked from a later moment than this one (Magic Context's todo refresh, at a run's
+	// final boundary).
+	const liveReads = answers.flatMap((answer) => (answer.liveWork ? [answer.liveWork] : []));
+	setSessionLiveWork(key, () => {
+		const names: string[] = [];
+		let count = 0;
+		for (const read of liveReads) {
+			try {
+				const answer = read();
+				if (!answer) continue;
+				const reported = Math.trunc(Number(answer.count));
+				if (Number.isFinite(reported) && reported > 0) count += reported;
+				if (Array.isArray(answer.names)) {
+					for (const name of answer.names) {
+						if (typeof name === "string" && name.length > 0) names.push(name);
+					}
+				}
+			} catch {
+				// A contributor that cannot answer says nothing: the gate stays on the others, and a
+				// live-work read must never be able to fail a session.
+			}
+		}
+		for (const shell of backgroundsOf(handle)) {
+			if (shell.status !== "running") continue;
+			count += 1;
+			names.push(shell.id ? `${shell.id} (${shell.command})` : shell.command);
+		}
+		return { count, names };
+	});
 
 	const report = contributeAll(
 		handle,

@@ -85,6 +85,25 @@ export function rlmAnswer(input: SessionInput): ContributorAnswer | null {
 			onNotice: deps.ownerDispatch,
 			provenance: deps.provenance,
 		}),
+		/**
+		 * rlm's half of the session's live-work answer — the composition root publishes the whole thing
+		 * under `Symbol.for("pi-host-bridge:live-work")`, and a reader outside this tree asks it at the
+		 * end of a run: one line appended, and one more provider request, exactly when the run finished
+		 * with its checklist still open and nothing left in flight.
+		 *
+		 * The session's own records, whichever list answers for this depth: a root reads its manager, a
+		 * child reads the registry through the context its spawner handed it (the manager it holds is the
+		 * root's, and `manager` is null for a spawned child's own instance).
+		 *
+		 * Named rather than counted away, because the reader says the names out loud — a line that could
+		 * not say *what* finished would leave the model guessing which child it is being told about.
+		 */
+		liveWork: () => {
+			const live = (deps.childContext ? deps.childContext.list() : (deps.manager?.list() ?? [])).filter(
+				(child) => child.status === "running",
+			);
+			return { count: live.length, names: live.map((child) => child.name) };
+		},
 	};
 }
 
