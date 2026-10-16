@@ -121,15 +121,22 @@ jobs:
           for f in "$src"/*.js; do
             cp "$f" "$dest"/
           done
-          # The singlefile quickjs bundle is CJS, and its emscripten wrapper does
-          # `typeof __filename < "u" ? _scriptName = __filename : ...`. Bundling it
-          # into ESM bakes in the build machine's absolute path, so make the literal
-          # relative instead of leaking /home/runner/... (or the builder's checkout)
-          # into every user's install. Nothing resolves against it: the wasm is
-          # inlined and the node branch of that wrapper uses require("fs").
-          sed -i -E 's|__filename = "/[^"]*/(node_modules/\.bun/@jitl\+quickjs-singlefile-cjs-release-asyncify[^"]*)"|__filename = "\1"|' "$dest"/index-*.js
-          if grep -rqE '__filename = "/' "$dest" ; then
+          # Bundling bakes the *builder's* absolute path into two globals:
+          #   - `var __dirname = "/home/runner/work/.../node_modules/.bun/
+          #     @huggingface+transformers@.../node_modules/@huggingface/transformers/src"`
+          #     (the bundled transformers `src/env.js`), in all three bundles;
+          #   - `__filename = "/home/runner/..."` in the quickjs singlefile CJS wrapper,
+          #     whose emscripten shim reads `typeof __filename < "u" ? ... : ...`.
+          # Nothing resolves against either - the model directory and `wasmPaths` are
+          # passed in explicitly - so keep them relative: the builder's checkout must not
+          # reach a user's install, and it would make every build differ by path alone.
+          sed -i -E 's#(__dirname|__filename) = "/[^"]*/(node_modules/\.bun/[^"]*)"#\1 = "\2"#g' "$dest"/*.js
+          if grep -rqE '(__dirname|__filename) = "/' "$dest" ; then
             echo "::error::an absolute build path survived normalization"
+            exit 1
+          fi
+          if grep -rq '/home/runner' "$dest" ; then
+            echo "::error::a CI runner path leaked into the staged package"
             exit 1
           fi
           echo "staged $(find "$dest" -name '*.js' | wc -l) files"
