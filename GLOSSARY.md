@@ -76,6 +76,39 @@ server's inventory, so `await tool("mcp__<server>")` is an owner call and `await
 falls through to code mode's own MCP dispatch.
 _Avoid_: contributor, publisher (of the tool bridge's slot)
 
+**Vendored member**:
+A tracked package in this repo whose whole purpose is to satisfy a *bare specifier* some prebuilt bundle
+imports — `packages/onnxruntime-node` answers the fork's `requireFromHere("onnxruntime-node")`. The
+package name is the contract (a member is found by its `name`), and the consumer names it by **path**
+(`file:../onnxruntime-node`) so the link is recorded rather than inferred from a version range a member's
+`version` happens to satisfy. It carries only the payload that is actually loaded — here the compiled JS
+and one 384 KB napi binding — and never the published package's own library, other platforms' binaries or
+install scripts.
+_Avoid_: vendored package (the whole published tarball), shim (that is the library, below)
+
+**ABI shim**:
+A small library that carries the symbol **version node** a prebuilt binary asks the loader for and forwards
+the call to the real library — `shell/onnxruntime-shim` defines `OrtGetApiBase@@VERS_1.24.3` over nixpkgs'
+ONNX Runtime, which exports `@@VERS_1.27.1`, because the version node is generated from the release tag and
+the loader checks it before any runtime negotiation. It is named after the *requester's* ABI
+(`libonnxrtabi24.so.1`), never after the library it stands in for: `LD_LIBRARY_PATH` outranks a binary's
+own `RUNPATH`, so a file named `libonnxruntime.so.1` on that path becomes the ONNX Runtime for every process
+in the environment, and a shim can only answer for the one version node it was built with (a stand-in named
+that way broke `zg`). The real library it forwards to is chosen by the environment
+(`ONNXRUNTIME_LIB_PATH`, defaulted to the pinned store path), and a self-reference is refused rather than
+absorbed.
+_Avoid_: stub, wrapper, loader shim (it does not resolve anything itself)
+
+**Version node**:
+The `VERS_x.y.z` name the loader attaches to a symbol — `OrtGetApiBase@VERS_1.24.3` — and checks *before* a
+binary runs, so it couples a prebuilt binding to an ONNX Runtime release **exactly**. ONNX Runtime generates
+it from the release tag while keeping `SOVERSION 1`, which is why every release ships the same file name
+(`libonnxruntime.so.1`) with a different node: the name cannot be a version check, so nothing can be
+substituted by symlink across releases, and a binding that asks for an older node needs an **ABI shim**.
+See `docs/adr/0011-a-prebuilt-packages-native-library-comes-from-the-environment.md`.
+_Avoid_: soname (the file name, `libonnxruntime.so.1`, stable across releases), API version (what
+`OrtApiBase::GetApi(N)` negotiates *after* the loader is satisfied)
+
 **Client** (of the registry):
 A package that reaches code mode's registry to mount a session's kernel and contribute — or only to
 hold the handle, which is what rsi does.

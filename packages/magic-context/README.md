@@ -9,23 +9,45 @@ everything else. A git install only ever runs `git clone` and `npm install`, and
 initialises submodules, so `vendor/magic-context` is an empty directory on a fresh clone — the
 built files have to live somewhere git actually delivers.
 
-## The wasm fallback is not included
+## The transformers bundles are all omitted, so local embeddings do not load here
 
-`dist/` here omits three files: `transformers-web.js`, `transformers-node-wasm.js` and
-`transformers.node-9egp1pp6.js`. They are bundled copies of `@huggingface/transformers`, and their
-model-class tables contain a 32-character model class name beginning with the vendor prefix
-"Mistral" — which GitHub's secret scanning reads as a Mistral API key, so committing them blocks
-the push. (This file deliberately does not spell the identifier out; the guard in the build
-workflow scans for that shape and would reject it.)
+`dist/` here omits *three* files — `transformers-web.js`, `transformers-node-wasm.js` and
+`transformers.node-<hash>.js`, the three bundled copies of `@huggingface/transformers` the plugin
+imports one of per runtime. Each one's model-class tables contain a 32-character model class name
+beginning with the vendor prefix "Mistral", which GitHub's secret scanning reads as a Mistral API
+key, so committing them blocks the push. (This file deliberately does not spell the identifier out;
+the guard in the build workflow scans for that shape and would reject it.)
 
-Without them local embeddings use the native path — `onnxruntime-node` and `sharp`, both installed
-by this package's own dependencies. What is lost is the wasm *fallback* for hosts where the native
-addon cannot load. The plugin logs which runtime it chose, and falls back to remote embeddings if
-neither works.
+The consequence is stronger than "the wasm fallback is missing": **all three** are gone, so the
+plugin's dynamic import of whichever one its resolver picked fails with `ERR_MODULE_NOT_FOUND`,
+which it classifies as a *stale build* rather than a missing runtime — so it neither loads a local
+runtime nor falls back to wasm. Local embeddings reach the remote provider in this package, and the
+native runtime — the whole subject below — is only exercised when the plugin is loaded from a
+locally built tree, i.e. `vendor/magic-context/packages/pi-plugin/dist/`, which has the same
+`index-32qfekbw.js` and the three chunks beside it. Restoring them needs one of: an allowlist entry
+for the identifier in the repository's secret scanning, committing the files transformed (gzipped,
+decompressed at stage time), or rewriting the identifiers at stage time. Measured 2026-10-16, in
+`.scratch/mc-payload/research/cpu-only-ort.md`.
 
 ## Dependencies
 
 `@earendil-works/pi-coding-agent` and `@earendil-works/pi-tui` are `peerDependencies` — pi provides
-them through its loader. `onnxruntime-node`, `onnxruntime-web`, `sharp` and `ai-tokenizer` are
-dependencies so local embeddings keep working; they are heavy (~470 MB unpacked), which is Magic
-Context's own cost, not this packaging's.
+them through its loader.
+
+Local embeddings need a native ONNX Runtime and nothing else from the registry. `onnxruntime-node`
+is **not** a dependency here in the ordinary sense: `optionalDependencies` names it as
+`file:../onnxruntime-node`, a workspace member of this repository that vendors the npm package's
+`dist/` and its one 384 KB napi binding and nothing else — no 35 MB `libonnxruntime.so.1`, no
+179 MB of Windows/macOS/arm64 binaries, no `postinstall` that fetches 301 MB of CUDA/TensorRT
+providers from NuGet. The library it loads is the nixpkgs ONNX Runtime this workspace already pins,
+reached through the `libonnxrtabi24.so.1` ABI shim in `shell/onnxruntime-shim` (the loader is
+pointed at it by `LD_LIBRARY_PATH` from the devshell; `ONNXRUNTIME_LIB_PATH` picks which ONNX
+Runtime the shim forwards to). `packages/onnxruntime-node/test/vendored.test.ts` enforces that the
+member — and never a registry copy — is what a consumer resolves, and `packages/onnxruntime-node/README.md`
+carries the provenance. `docs/adr/0011-the-native-dependency-a-prebuilt-package-loads.md` is the
+decision and its trade-offs.
+
+What remains heavy is the *web* side of the same library and the image codec: `onnxruntime-web`
+(130 MB unpacked, the wasm path this build cannot reach anyway), `sharp` with
+`@img/sharp-libvips-linux-x64` (~19 MB) and `ai-tokenizer` (31 MB). Those are still registry
+dependencies, and the same question is open for them.
