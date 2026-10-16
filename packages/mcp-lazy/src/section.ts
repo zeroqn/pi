@@ -31,9 +31,16 @@ export const MCP_SERVERS_SECTION = "mcp_servers";
 /** Ticket 03's section intro, verbatim. */
 export const SECTION_INTRO = "MCP servers this session may reach; none is started until a cell calls it.";
 
-/** Ticket 03's guideline, verbatim. It lands in the `python` tool's `<rules>`. */
+/**
+ * Ticket 03's guideline, shortened by ticket 16 to what only *this* package can say.
+ *
+ * Tool-bridge writes one guideline per publishing owner that names every published entry and the call
+ * form already (`tool-bridge/src/adapter.ts`, `bridgeGuidelines`), so this line carries the two facts
+ * that are ours alone: what the call answers, and that the call is what starts the server. Measured
+ * 2026-10-16: 79 characters against the previous 131, i.e. 59 bytes cheaper in `<rules>` every turn.
+ */
 export const ROUTE_GUIDELINE =
-	'await tool() lists the MCP servers this session may reach; await tool("mcp__<server>") shows what one offers and is what starts it.';
+	'await tool("mcp__<server>") shows what a server offers and is what starts it.';
 
 /** Ticket 14's omission line. `K` is the number of servers not shown. */
 export function omissionLine(count: number): string {

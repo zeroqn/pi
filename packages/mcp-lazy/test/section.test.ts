@@ -6,6 +6,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
 	MAX_SERVERS_SECTION_CHARS,
+	ROUTE_GUIDELINE,
 	SECTION_INTRO,
 	type SectionEntry,
 	omissionLine,
@@ -125,5 +126,15 @@ describe("ticket 12's fits-check", () => {
 		expect(text).toContain("- mcp__docs_api: Docs API");
 		expect(text.split("\n").includes("- mcp__huge")).toBe(true);
 		expect(state.acceptedFills.has("huge")).toBe(false);
+	});
+});
+
+describe("the guideline (tickets 03, 16)", () => {
+	it("stays inside the budget ticket 16 set, carrying only what is ours", () => {
+		// Tool-bridge already names the servers and the call form; this line carries the two facts that
+		// are mcp-lazy's alone, and ticket 16 capped it at 90 characters.
+		expect(ROUTE_GUIDELINE.length).toBeLessThanOrEqual(90);
+		expect(ROUTE_GUIDELINE).toContain("mcp__<server>");
+		expect(ROUTE_GUIDELINE).toContain("starts");
 	});
 });

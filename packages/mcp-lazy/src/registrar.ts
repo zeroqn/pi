@@ -52,6 +52,8 @@ export const TOOL_POLL_MS = 25;
 export function rewriteDisclosedExposure(config: McpServerConfig): {
 	config: McpServerConfig;
 	changed: boolean;
+	/** The `toolExposure` keys rewritten, in config order — what the per-tool notice names. */
+	tools: string[];
 } {
 	const record = config as unknown as { exposure?: unknown; toolExposure?: Record<string, unknown> };
 	let changed = false;
@@ -60,24 +62,60 @@ export function rewriteDisclosedExposure(config: McpServerConfig): {
 		next.exposure = "codemode";
 		changed = true;
 	}
+	const tools: string[] = [];
 	if (record.toolExposure && typeof record.toolExposure === "object") {
-		const tools: Record<string, unknown> = {};
+		const rewritten: Record<string, unknown> = {};
 		for (const [name, value] of Object.entries(record.toolExposure)) {
 			if (value === "direct") {
-				tools[name] = "codemode";
+				rewritten[name] = "codemode";
+				tools.push(name);
 				changed = true;
 			} else {
-				tools[name] = value;
+				rewritten[name] = value;
 			}
 		}
-		next.toolExposure = tools;
+		next.toolExposure = rewritten;
 	}
-	return { config: next as unknown as McpServerConfig, changed };
+	return { config: next as unknown as McpServerConfig, changed, tools };
 }
 
-/** The one notice a rewritten `direct` server produces, naming the server and where to change it. */
-export function exposureNotice(server: string): string {
+/**
+ * The one notice a rewritten `direct` server produces, naming the server and where to change it.
+ *
+ * `tools` is empty for a server-level `direct`; for a **per-tool** override (ticket 17) it names the
+ * tools, because that is the entry the human has to find in `mcp.json` — and because a per-tool override
+ * can leave the server itself undisclosed, which the server-level sentence would misdescribe.
+ */
+export function exposureNotice(server: string, tools: readonly string[] = []): string {
+	if (tools.length > 0) {
+		const list = tools.map((tool) => `"${tool}"`).join(", ");
+		return `mcp-lazy: MCP server "${server}" sets toolExposure ${tools.length === 1 ? "direct" : "direct"} for ${list}, which would declare ${tools.length === 1 ? "it" : "them"} to the model and break the one-tool surface; it was registered as "codemode" instead. Change the entry in mcp.json to silence this.`;
+	}
 	return `mcp-lazy: MCP server "${server}" is configured exposure "direct", which would declare its tools to the model and break the one-tool surface; it was registered as "codemode" instead. Change the entry in mcp.json to silence this.`;
+}
+
+/**
+ * Whether a server config can put **any** tool in front of a cell — ticket 17's `hidden` decision.
+ *
+ * pi's rule: `exposure: "hidden"` removes a server's tools, and per-tool overrides select an exposure
+ * for a name (exact name first, then `*` patterns); a server whose effective exposure leaves nothing
+ * reachable contributes nothing to the model, so mcp-lazy omits it from both layers instead of naming a
+ * server that can only answer "no tools" — `hidden` is the human asking for it to be invisible.
+ *
+ * The test is deliberately coarse because we do not know a server's tool names before it connects: a
+ * server is reachable if the config selects a reachable exposure for **something** —
+ *   - any `toolExposure` value that is not `hidden` (an exact name or a pattern), or
+ *   - the server-level exposure, unless a catch-all `"*": "hidden"` override removes everything and no
+ *     other override brings some tool back.
+ */
+export function hasReachableTool(config: McpServerConfig): boolean {
+	const record = config as unknown as { exposure?: unknown; toolExposure?: Record<string, unknown> };
+	const overrides = record.toolExposure ?? {};
+	if (Object.values(overrides).some((value) => value !== "hidden")) return true;
+	const serverExposure = record.exposure ?? "codemode";
+	if (serverExposure === "hidden") return false;
+	// A reachable default still reaches nothing when a catch-all override hides every tool.
+	return overrides["*"] === undefined;
 }
 /** The namespace pi gives a server's tools: `mcp__<server>` with `-` rewritten to `_`. */
 export function mcpNamespace(server: string): string {
@@ -191,7 +229,7 @@ export async function registerReachedServers(code: string, input: RegisterInput)
 		const server = input.servers.find((candidate) => candidate.name === name);
 		if (!server) continue;
 		const prepared = rewriteDisclosedExposure(server.config);
-		if (prepared.changed) input.onProblem(exposureNotice(name));
+		if (prepared.changed) input.onProblem(exposureNotice(name, prepared.tools));
 		try {
 			input.pi.registerMcpServer(name, prepared.config);
 		} catch (error) {

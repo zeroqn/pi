@@ -18,7 +18,14 @@ import type { McpServerConfig } from "@earendil-works/pi-coding-agent";
 import { type BridgePublication, type BridgeToolEntry } from "../../tool-bridge/src/convention";
 import { type McpConfigRead } from "./config";
 import { type InventoryTool, inventoryText, rankedText, toolsOfNamespace } from "./inventory";
-import { DEFAULT_TOOL_WAIT_MS, exposureNotice, mcpNamespace, rewriteDisclosedExposure, waitForTools } from "./registrar";
+import {
+	DEFAULT_TOOL_WAIT_MS,
+	exposureNotice,
+	hasReachableTool,
+	mcpNamespace,
+	rewriteDisclosedExposure,
+	waitForTools,
+} from "./registrar";
 import { type SessionState, type StatePi, ensureServers, lastPi, noticeOnce, stateFor } from "./state";
 
 /** tool-bridge's owners slot, as a literal both sides agree on. */
@@ -85,14 +92,23 @@ function oneLiner(config: McpServerConfig, tools: readonly InventoryTool[]): str
 	return "";
 }
 
-/** Every server this session may name: the configured ones plus the ones another extension registered. */
+/**
+ * Every server this session may name: the configured ones plus the ones another extension registered.
+ *
+ * A config that leaves no reachable tool is left out (ticket 17's `hidden` decision): naming it would
+ * invite a call that can only answer "no tools", and `hidden` is the human asking for exactly that. Both
+ * layers use this one function, so they always name the same set.
+ */
 function knownServers(state: SessionState, pi: StatePi | undefined): KnownServer[] {
 	const known = new Map<string, KnownServer>();
-	for (const server of state.servers ?? []) known.set(server.name, { name: server.name, config: server.config, configured: true });
+	for (const server of state.servers ?? []) {
+		if (!hasReachableTool(server.config)) continue;
+		known.set(server.name, { name: server.name, config: server.config, configured: true });
+	}
 	for (const server of safeRegistered(pi)) {
-		if (!known.has(server.name)) {
-			known.set(server.name, { name: server.name, config: server.config as McpServerConfig, configured: false });
-		}
+		if (known.has(server.name)) continue;
+		if (!hasReachableTool(server.config as McpServerConfig)) continue;
+		known.set(server.name, { name: server.name, config: server.config as McpServerConfig, configured: false });
 	}
 	return [...known.values()];
 }
@@ -147,7 +163,7 @@ export function createPublication(deps: RouteDeps): BridgePublication {
 			if (server.configured && !state.registered.has(server.name)) {
 				state.registered.add(server.name);
 				const prepared = rewriteDisclosedExposure(server.config);
-				if (prepared.changed) noticeOnce(state, ctx, exposureNotice(server.name));
+				if (prepared.changed) noticeOnce(state, ctx, exposureNotice(server.name, prepared.tools));
 				try {
 					pi.registerMcpServer?.(server.name, prepared.config);
 				} catch (error) {

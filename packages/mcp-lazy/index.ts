@@ -54,6 +54,7 @@
 import {
 	type ExtensionAPI,
 	type ExtensionContext,
+	type McpServerConfig,
 	createMcpExtension,
 	getAgentDir,
 } from "@earendil-works/pi-coding-agent";
@@ -64,7 +65,7 @@ import {
 	registerContributor,
 } from "../host-bridge/src/convention";
 import { type InventoryTool, namespaceInstructions, toolsOfNamespace } from "./src/inventory";
-import { registerReachedServers } from "./src/registrar";
+import { hasReachableTool, registerReachedServers } from "./src/registrar";
 import { PUBLICATION_KEY, publishMcpRoute } from "./src/route";
 import { MCP_SERVERS_SECTION, type SectionEntry, firstLine, mcpNamespace, sectionText } from "./src/section";
 import { ensureServers, forgetSession, notePi, noticeOnce, stateFor } from "./src/state";
@@ -146,15 +147,24 @@ export default function mcpLazy(pi: ExtensionAPI): void {
 	});
 }
 
-/** One entry of the section: the config's description, and the server's own instructions as the fill-in. */
+/**
+ * One entry of the section: the config's description, and the server's own instructions as the fill-in.
+ *
+ * A config that leaves no reachable tool is omitted here as well (ticket 17), so the section and the
+ * catalogue name exactly the same set.
+ */
 function sectionEntries(pi: ExtensionAPI, ctx: ExtensionContext): SectionEntry[] {
 	const state = stateFor(ctx, pi);
 	ensureServers(state, ctx, { agentDir: getAgentDir() });
 	const tools = pi.getAllTools() as InventoryTool[];
 	const configs = new Map<string, { description?: unknown }>();
-	for (const server of state.servers ?? []) configs.set(server.name, server.config as { description?: unknown });
+	for (const server of state.servers ?? []) {
+		if (hasReachableTool(server.config)) configs.set(server.name, server.config as { description?: unknown });
+	}
 	for (const server of pi.getMcpServers?.() ?? []) {
-		if (!configs.has(server.name)) configs.set(server.name, server.config as { description?: unknown });
+		if (configs.has(server.name)) continue;
+		if (!hasReachableTool(server.config as McpServerConfig)) continue;
+		configs.set(server.name, server.config as { description?: unknown });
 	}
 	const entries: SectionEntry[] = [];
 	for (const [name, config] of [...configs.entries()].sort((a, b) => {

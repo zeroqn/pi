@@ -201,3 +201,42 @@ describe("the ranked form (ticket 15)", () => {
 		expect(blank).toBe(full);
 	});
 });
+
+describe("the exposure guard reaches both layers (ticket 17)", () => {
+	it("omits a server that is hidden and hides every tool", () => {
+		const pi = makePi();
+		notePi(pi);
+		const hidden = { name: "secret", config: { command: "true", exposure: "hidden" } };
+		const entries = createPublication(makeDeps([DOCS, hidden])).catalogue(makeCtx());
+		expect(entries.map((entry) => entry.name)).toEqual(["mcp__docs_api"]);
+	});
+
+	it("keeps a hidden server whose per-tool override exposes one tool", () => {
+		const pi = makePi();
+		notePi(pi);
+		const partly = {
+			name: "secret",
+			config: { command: "true", exposure: "hidden", toolExposure: { search: "codemode" } },
+		};
+		const entries = createPublication(makeDeps([DOCS, partly])).catalogue(makeCtx());
+		expect(entries.map((entry) => entry.name)).toEqual(["mcp__docs_api", "mcp__secret"]);
+	});
+
+	it("names the rewritten tools when only a per-tool override was disclosed", async () => {
+		const pi = makePi((_name, config) => [toolFor("docs-api", "search", "Search the docs")]);
+		notePi(pi);
+		const server = {
+			name: "docs-api",
+			config: { command: "true", exposure: "codemode", toolExposure: { search: "direct" } },
+		};
+		const publication = createPublication(makeDeps([server], { connectTimeoutMs: 50, pollMs: 5 }));
+		const ctx = makeCtx();
+		await publication.execute("mcp__docs_api", {}, ctx);
+		expect(pi.registered[0].config.toolExposure).toEqual({ search: "codemode" });
+		// The notice the human reads names the tool the entry disclosed, not the whole server.
+		const notices = (ctx.ui as { notices: string[] }).notices;
+		expect(notices.length).toBe(1);
+		expect(notices[0]).toContain("toolExposure");
+		expect(notices[0]).toContain('"search"');
+	});
+});
