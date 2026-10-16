@@ -1,6 +1,6 @@
 import {
   TOKEN_BUDGET_TOOL_REFUSAL
-} from "./index-vjvb89qt.js";
+} from "./index-s1bev2xq.js";
 import {
   setHarness2
 } from "./index-0h2mkab2.js";
@@ -9,14 +9,15 @@ import {
 } from "./index-x3dcnxh0.js";
 import {
   resolveProjectIdentityForSession
-} from "./index-041ex0cj.js";
-import {
-  openDatabase
-} from "./index-8m86dmhb.js";
+} from "./index-fgabebe5.js";
+import"./index-kgd6t63g.js";
 import"./index-3cgbv47m.js";
 import"./index-fapenpch.js";
-import"./index-r024r8da.js";
-import"./index-405dq1gq.js";
+import {
+  openDatabase
+} from "./index-35sd5btx.js";
+import"./index-knxngpvf.js";
+import"./index-krhpcm6f.js";
 import"./index-nmsb3x01.js";
 import"./index-135e8hvg.js";
 import"./index-8976mezv.js";
@@ -26,24 +27,26 @@ import {
   ensureProjectRegisteredFromPiDirectory,
   resolvePiHarnessKind,
   registerMagicContextTools
-} from "./index-004spr0j.js";
-import"./index-eb3n6ysg.js";
-import"./index-bgmv2kaf.js";
+} from "./index-6aa6jt2n.js";
+import"./index-cyrnv16r.js";
 import"./index-xkf1qyj1.js";
-import"./index-ddfbvmg3.js";
-import"./index-02kw8dfx.js";
+import"./index-jhw13tmp.js";
+import"./index-32qfekbw.js";
+import"./index-vfpwqs37.js";
 import"./index-9p40dgkm.js";
 import"./index-yhzhdp3m.js";
-import"./index-q04p2kkb.js";
-import"./index-3bc8wf03.js";
-import"./index-wj9v2eh7.js";
-import"./index-vakawmbc.js";
-import"./index-k3y5wmaq.js";
+import"./index-vnys1293.js";
+import"./index-sv5yv3gc.js";
+import"./index-2s0s8mca.js";
+import"./index-399p688g.js";
+import"./index-2apf1afe.js";
+import"./index-j9r9ggs0.js";
 import"./index-xjqheg7a.js";
+import"./index-g3600tpw.js";
 import"./index-0vrkp1jq.js";
 import {
   setStoragePrivatePermissionEnforcement
-} from "./index-vf38qhee.js";
+} from "./index-81nthk8j.js";
 
 // src/subagent-entry.ts
 import { readFileSync } from "node:fs";

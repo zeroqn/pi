@@ -27,9 +27,6 @@ import {
   detectConfigFile,
   MIN_PLAUSIBLE_CONTEXT_LIMIT,
   catalogOutputReserve,
-  reloadWindowOverlay,
-  getWindowOverlay,
-  resolveWindowOverlayFacts,
   deriveWindowGeometry,
   hasTrustedAbsoluteWall,
   applyProvenInputFloor,
@@ -45,6 +42,274 @@ import {
   cortexKitProjectConfigBasePath,
   migrateMagicContextConfigLocations,
   getProtectedTokensTierOverrides,
+  rememberUnpublishedAutoSearchNoHint,
+  getUnpublishedAutoSearchNoHint,
+  forgetUnpublishedAutoSearchNoHint,
+  registerAutoSearchWork,
+  cancelAutoSearchWork,
+  readSessionMeta,
+  getOrCreateSessionMeta,
+  updateSessionMeta,
+  advanceToolReclaimWatermark,
+  retryPendingSessionCleanups,
+  retryPendingRustSessionCleanupsForProject,
+  embedPauseBySession,
+  embedRunStateBySession,
+  autoEmbedAttemptedBySession,
+  autoEmbedIdentityBySession,
+  invalidateAutoEmbedSession,
+  getEmbedDrainUiStatus,
+  COMPARTMENT_LEASE_RENEWAL_MS,
+  acquireCompartmentLease,
+  renewCompartmentLease,
+  releaseCompartmentLease,
+  releaseCompartmentLeaseBestEffort,
+  isCompartmentLeaseHeld,
+  isNoContentCompartment,
+  HAS_COMPARTMENT_CONTENT_SQL,
+  queueM0Mutation,
+  getMaxM0MutationId,
+  getCompartments,
+  getLastCompartmentEndMessage,
+  getLastCompartmentEndMessageId,
+  getCompartmentsByEndMessageId,
+  appendCompartments,
+  saveRecompStagingPass,
+  getRecompStaging,
+  clearRecompStaging,
+  getRecompPartialRange,
+  setRecompPartialRange,
+  escapeXmlAttr,
+  escapeXmlContent,
+  getUncoveredCompartmentEndThrough,
+  isPartialCompartmentEnd,
+  readProjectDocsCanonical,
+  providerResponseFailed,
+  isSuccessfulProviderCompletion,
+  requestPendingMaterialization,
+  pendingMaterializationOrigin,
+  clearPendingMaterialization,
+  recordSystemRefreshOwnership,
+  recordSystemPromptForRequest,
+  recordHeldHeadForRequest,
+  bindSystemPromptResponse,
+  acknowledgeSystemPromptDelivery,
+  deferDeliveredSystemRefresh,
+  clearSystemPromptDelivery,
+  saveLkgSlotToDb,
+  loadPersistedLkgSlot,
+  drainStaleLkgSlots,
+  createDbLkgPersistence,
+  replayLkg,
+  registerLkgPersistence,
+  LKG_SNAPSHOT_ARRAY,
+  LKG_SNAPSHOT_OBJECT,
+  LKG_SNAPSHOT_KEY,
+  LKG_SNAPSHOT_STRING,
+  LKG_SNAPSHOT_NUMBER,
+  LKG_SNAPSHOT_BOOLEAN,
+  LKG_SNAPSHOT_NULL,
+  LKG_SNAPSHOT_UNDEFINED,
+  contentSnapshotValue,
+  signatureForFields,
+  lkgContentFields,
+  lkgContentDigestFromFields,
+  isLegacyLkgDigest,
+  legacyLkgDigestFromFields,
+  lkgFieldsMatchDigest,
+  exactReusablePrefix,
+  incrementalLkgContentDigests,
+  lkgSlotRejection,
+  captureSlot,
+  getInMemorySlot,
+  getSlot,
+  dropSlot,
+  TOOL_SWEEP_SCOPED_MARKER,
+  encodePiContentDecision,
+  decodePiContentDecision,
+  getPiContentDecisions,
+  freezePiContentDecision,
+  getNativeReplayState,
+  saveNativeToolInputs,
+  addNativeReasoningIds,
+  copySessionStateForClone,
+  externalHistorianFailureReason,
+  subprocessExitHistorianFailureReason,
+  countHistorianRuns,
+  recordHistorianRun,
+  summarizeImportance,
+  tallyFactsByCategory,
+  queueMemoryMutation,
+  getMemoryMutationsForRender,
+  getMemoryMutationsForRenderByProjects,
+  getMaxMemoryMutationId,
+  getMaxMemoryMutationIdForProjects,
+  GLOBAL_USER_PROFILE_PROJECT_PATH,
+  getProjectState,
+  bumpProjectUserProfileVersion,
+  saveSourceContent,
+  getSourceContents,
+  recordSubagentInvocation,
+  getLatestHistorianInvocationId,
+  noteTouchedAt,
+  noteNudgePickIndex,
+  formatNoteNudge,
+  promptSurfaceHashMaterial,
+  createPromptSurfaceRuntime,
+  createPromptSurfaceGuidanceEpochCache,
+  cellToolCalls,
+  cellReduceFilingName,
+  SYNTH_USER_ID_PREFIX,
+  resolvePiStableId,
+  resolvePiRealStableId,
+  isPiContentFallbackId,
+  isPiIndexFallbackId,
+  piContentFallbackIds,
+  readPiSessionSnapshot,
+  readPiSessionMessages,
+  readPiSessionMessagePage,
+  findRestartModelSeedFromBranch,
+  iterateEntriesToRawMessageRange,
+  convertEntriesToRawMessages,
+  convertPiAssistantEntryById,
+  convertEntriesToRawMessagePage,
+  countPiRawMessages,
+  USER_MEMORY_CANDIDATE_TTL_MS,
+  insertUserMemoryCandidates,
+  getUserMemoryCandidates,
+  deleteUserMemoryCandidates,
+  pruneExpiredUserMemoryCandidates,
+  insertUserMemory,
+  getActiveUserMemories,
+  updateUserMemoryContent,
+  dismissUserMemory,
+  getTaskScheduleState,
+  getFailingDreamTasks,
+  getSkippedDreamTasks,
+  getMostRecentTaskRunAt,
+  pruneNonCanonicalTaskRows,
+  deleteTaskScheduleRowsForProject,
+  seedTaskScheduleState,
+  writeTaskScheduleState,
+  isRetrospectiveWindowProcessed,
+  recordRetrospectiveWindowProcessed,
+  curateCategoryForMemoryCategory,
+  peekCurateCategoryScope,
+  beginCurateCategoryRun,
+  curateTaskStateAfterSuccess,
+  MEMORY_MURAL_BLOCK,
+  buildMagicContextSection,
+  resolveMuralWire,
+  updateCompactionMarkerAfterPublication,
+  COMPARTMENT_RENDER_EPOCH,
+  MEMORY_RENDER_FORMAT_EPOCH,
+  encodeCachedM0UpgradeIdentity,
+  decodeCachedM0UpgradeIdentity,
+  withCachedM0MemoryIds,
+  readCachedM0MemoryIds,
+  renderBudgetIdentityChanged,
+  renderedBudgetSnapshot,
+  renderedBudgetShrinkReason,
+  DEFAULT_HISTORY_BUDGET_TOKENS,
+  renderCompartmentAtTier,
+  renderDecayedCompartments,
+  extractM0Block,
+  TEMPORAL_MARKER_PATTERN,
+  TEMPORAL_MARKER_REPLAY_PATTERN,
+  temporalMarkerPrefix,
+  renderUserProfileContent,
+  clearInjectionCache,
+  getVisibleMemoryIds,
+  orderHistorianMemories,
+  renderHistorianMemoryBlock,
+  DEFAULT_MEMORY_BUDGET_TOKENS,
+  DEFAULT_USER_PROFILE_BUDGET_TOKENS,
+  trimMemoriesToBudgetV2,
+  trimWorkspaceMemoriesToBudgetV2,
+  trimUserMemoriesToBudget,
+  renderMemoryBlockV2,
+  stripMemoryMuralBlock,
+  resetPrefixTrimFallbackState,
+  isDirectiveShapedProjectRule,
+  takeCurateSafetyRefusalCount,
+  wakePlaneStatus,
+  loadPiConfig,
+  loadPiConfigDetailed,
+  unregisterPiProjectEmbeddings,
+  ensureProjectRegisteredFromPiDirectory,
+  resolvePiHarnessDetection,
+  resolvePiHarnessKind,
+  resolvePiOrdinalAlignment,
+  piRawOrdinalOffsetSource,
+  resolvePiOrdinalAlignmentForContext,
+  isPiOrdinalAlignmentUnanchored,
+  clearPiOrdinalAlignmentSession,
+  TODO_TOOL_NAME,
+  rememberTodowriteToolCallTodos,
+  parseTodos,
+  setTodoSnapshot,
+  registerTodoOverlay,
+  registerTodoStateLifecycle,
+  createTodowriteTool,
+  syncCtxMemoryToolEnabled,
+  registerMagicContextTools
+} from "./index-6aa6jt2n.js";
+import {
+  canonicalModelIdentity,
+  piModelRefToCanonical,
+  resolveModelRefForPi,
+  modelRefLookupOrder,
+  ompModelRefToCanonical,
+  resolveModelRefForOmp,
+  isValidLanguageCode,
+  withContentLanguageDirective,
+  parseCron,
+  nextOccurrence,
+  nextDueAtMs,
+  resolveModelConfigValue,
+  DEFAULT_HISTORIAN_TIMEOUT_MS,
+  DREAM_TASK_PROMOTION_DEFAULTS,
+  LIVE_RELOAD_CONFIG_PATHS
+} from "./index-cyrnv16r.js";
+import {
+  FAIL_CLOSED_DOCTOR_COMMAND,
+  formatFailClosedBlockingMessage,
+  createFailClosedBlockingError,
+  isFailClosedBlockingError,
+  shouldBypassFailClosedBlock,
+  createFailClosedController,
+  getErrorMessage,
+  describeError,
+  startBootDeadline,
+  getSchemaFenceRejection,
+  getMigrationOnOpenRefusal,
+  LATEST_SUPPORTED_VERSION,
+  getDatabasePath,
+  getPersistedSchemaVersion,
+  setSqlitePragmaConfig,
+  applySqliteTuningPragmas,
+  runSqliteOptimize,
+  openDatabase,
+  openCurrentDatabase,
+  openDatabaseAsync,
+  closeDatabase
+} from "./index-35sd5btx.js";
+import {
+  setHomeProjectPermission,
+  ProjectIdentityError,
+  resolveProjectIdentityStrict,
+  isUserHomeDirectory,
+  resolveProjectIdentity,
+  isUsableProjectIdentity,
+  resolveProjectIdentityForSession,
+  beginBootQuietPeriod,
+  scheduleAfterBootQuiet
+} from "./index-fgabebe5.js";
+import {
+  detectThinkingBindingMismatch,
+  detectLatestTurnThinkingMismatch,
+  isPrefixBoundThinkingModel,
+  detectOverflow,
   MAX_EXECUTE_THRESHOLD,
   escalationBands,
   decodeMergedReasoningParts,
@@ -57,11 +322,11 @@ import {
   ensureSessionMetaRow,
   persistCachedM0,
   clearCachedM0M1,
-  isRustMarkerAdmissionFenced,
   ReplayDocumentError,
   readReplayEnvelope,
   updateReplayDocument,
   isProviderOverflowFailClosedProven,
+  getEmergencyRecoveryArmedAt,
   describeProtectedTailDrainBudgetSkip,
   loadProtectedTailMeta,
   markProtectedTailPolicyV3Seeded,
@@ -75,6 +340,7 @@ import {
   resolveCompactionModeRecord,
   getCompactionModeRecord,
   setCompactionModeRecord,
+  EMERGENCY_DRAIN_FAILURE_BACKOFF_MS,
   getProtectedTailDrainBudgetSkip,
   reserveProtectedTailDrainTokens,
   clearEmergencyDrainLatch,
@@ -140,262 +406,6 @@ import {
   setSessionWorkMetrics,
   getSessionWorkMetrics,
   resolveEpochFloorForPass,
-  rememberUnpublishedAutoSearchNoHint,
-  getUnpublishedAutoSearchNoHint,
-  forgetUnpublishedAutoSearchNoHint,
-  registerAutoSearchWork,
-  cancelAutoSearchWork,
-  readSessionMeta,
-  getOrCreateSessionMeta,
-  updateSessionMeta,
-  advanceToolReclaimWatermark,
-  retryPendingSessionCleanups,
-  retryPendingRustSessionCleanupsForProject,
-  embedPauseBySession,
-  embedRunStateBySession,
-  autoEmbedAttemptedBySession,
-  autoEmbedIdentityBySession,
-  invalidateAutoEmbedSession,
-  getEmbedDrainUiStatus,
-  COMPARTMENT_LEASE_RENEWAL_MS,
-  acquireCompartmentLease,
-  renewCompartmentLease,
-  releaseCompartmentLease,
-  releaseCompartmentLeaseBestEffort,
-  isCompartmentLeaseHeld,
-  isNoContentCompartment,
-  HAS_COMPARTMENT_CONTENT_SQL,
-  queueM0Mutation,
-  getMaxM0MutationId,
-  getCompartments,
-  getLastCompartmentEndMessage,
-  getLastCompartmentEndMessageId,
-  getCompartmentsByEndMessageId,
-  appendCompartments,
-  saveRecompStagingPass,
-  getRecompStaging,
-  clearRecompStaging,
-  getRecompPartialRange,
-  setRecompPartialRange,
-  escapeXmlAttr,
-  escapeXmlContent,
-  getUncoveredCompartmentEndThrough,
-  isPartialCompartmentEnd,
-  readProjectDocsCanonical,
-  BoundedSessionMap,
-  providerResponseFailed,
-  isSuccessfulProviderCompletion,
-  registerLkgPersistence,
-  LKG_SNAPSHOT_ARRAY,
-  LKG_SNAPSHOT_OBJECT,
-  LKG_SNAPSHOT_KEY,
-  LKG_SNAPSHOT_STRING,
-  LKG_SNAPSHOT_NUMBER,
-  LKG_SNAPSHOT_BOOLEAN,
-  LKG_SNAPSHOT_NULL,
-  LKG_SNAPSHOT_UNDEFINED,
-  contentSnapshotValue,
-  signatureForFields,
-  lkgContentFields,
-  lkgContentDigestFromFields,
-  isLegacyLkgDigest,
-  legacyLkgDigestFromFields,
-  lkgFieldsMatchDigest,
-  exactReusablePrefix,
-  incrementalLkgContentDigests,
-  lkgSlotRejection,
-  captureSlot,
-  getInMemorySlot,
-  getSlot,
-  dropSlot,
-  noteEntry,
-  TOOL_SWEEP_SCOPED_MARKER,
-  encodePiContentDecision,
-  decodePiContentDecision,
-  getPiContentDecisions,
-  freezePiContentDecision,
-  getNativeReplayState,
-  saveNativeToolInputs,
-  addNativeReasoningIds,
-  copySessionStateForClone,
-  countHistorianRuns,
-  recordHistorianRun,
-  summarizeImportance,
-  tallyFactsByCategory,
-  queueMemoryMutation,
-  getMemoryMutationsForRender,
-  getMemoryMutationsForRenderByProjects,
-  getMaxMemoryMutationId,
-  getMaxMemoryMutationIdForProjects,
-  GLOBAL_USER_PROFILE_PROJECT_PATH,
-  getProjectState,
-  bumpProjectUserProfileVersion,
-  saveSourceContent,
-  getSourceContents,
-  recordSubagentInvocation,
-  getLatestHistorianInvocationId,
-  noteTouchedAt,
-  noteNudgePickIndex,
-  formatNoteNudge,
-  promptSurfaceHashMaterial,
-  createPromptSurfaceRuntime,
-  createPromptSurfaceGuidanceEpochCache,
-  cellToolCalls,
-  cellReduceFilingName,
-  SYNTH_USER_ID_PREFIX,
-  resolvePiStableId,
-  resolvePiRealStableId,
-  isPiContentFallbackId,
-  isPiIndexFallbackId,
-  piContentFallbackIds,
-  readPiSessionSnapshot,
-  readPiSessionMessages,
-  readPiSessionMessagePage,
-  findRestartModelSeedFromBranch,
-  iterateEntriesToRawMessageRange,
-  convertEntriesToRawMessages,
-  convertPiAssistantEntryById,
-  convertEntriesToRawMessagePage,
-  countPiRawMessages,
-  USER_MEMORY_CANDIDATE_TTL_MS,
-  insertUserMemoryCandidates,
-  getUserMemoryCandidates,
-  deleteUserMemoryCandidates,
-  pruneExpiredUserMemoryCandidates,
-  insertUserMemory,
-  getActiveUserMemories,
-  updateUserMemoryContent,
-  dismissUserMemory,
-  getTaskScheduleState,
-  getFailingDreamTasks,
-  getSkippedDreamTasks,
-  getMostRecentTaskRunAt,
-  pruneNonCanonicalTaskRows,
-  deleteTaskScheduleRowsForProject,
-  seedTaskScheduleState,
-  writeTaskScheduleState,
-  isRetrospectiveWindowProcessed,
-  recordRetrospectiveWindowProcessed,
-  curateCategoryForMemoryCategory,
-  peekCurateCategoryScope,
-  beginCurateCategoryRun,
-  curateTaskStateAfterSuccess,
-  isDirectiveShapedProjectRule,
-  takeCurateSafetyRefusalCount,
-  wakePlaneStatus,
-  loadPiConfig,
-  loadPiConfigDetailed,
-  unregisterPiProjectEmbeddings,
-  ensureProjectRegisteredFromPiDirectory,
-  resolvePiHarnessDetection,
-  resolvePiHarnessKind,
-  MEMORY_MURAL_BLOCK,
-  buildMagicContextSection,
-  resolveMuralWire,
-  updateCompactionMarkerAfterPublication,
-  COMPARTMENT_RENDER_EPOCH,
-  MEMORY_RENDER_FORMAT_EPOCH,
-  encodeCachedM0UpgradeIdentity,
-  decodeCachedM0UpgradeIdentity,
-  withCachedM0MemoryIds,
-  readCachedM0MemoryIds,
-  renderBudgetIdentityChanged,
-  renderedBudgetSnapshot,
-  renderedBudgetShrinkReason,
-  DEFAULT_HISTORY_BUDGET_TOKENS,
-  renderCompartmentAtTier,
-  renderDecayedCompartments,
-  extractM0Block,
-  TEMPORAL_MARKER_PATTERN,
-  TEMPORAL_MARKER_REPLAY_PATTERN,
-  temporalMarkerPrefix,
-  renderUserProfileContent,
-  clearInjectionCache,
-  getVisibleMemoryIds,
-  orderHistorianMemories,
-  renderHistorianMemoryBlock,
-  DEFAULT_MEMORY_BUDGET_TOKENS,
-  DEFAULT_USER_PROFILE_BUDGET_TOKENS,
-  trimMemoriesToBudgetV2,
-  trimWorkspaceMemoriesToBudgetV2,
-  trimUserMemoriesToBudget,
-  renderMemoryBlockV2,
-  stripMemoryMuralBlock,
-  resolvePiOrdinalAlignment,
-  piRawOrdinalOffsetSource,
-  resolvePiOrdinalAlignmentForContext,
-  isPiOrdinalAlignmentUnanchored,
-  clearPiOrdinalAlignmentSession,
-  TODO_TOOL_NAME,
-  rememberTodowriteToolCallTodos,
-  parseTodos,
-  setTodoSnapshot,
-  registerTodoOverlay,
-  registerTodoStateLifecycle,
-  createTodowriteTool,
-  syncCtxMemoryToolEnabled,
-  registerMagicContextTools
-} from "./index-004spr0j.js";
-import {
-  isValidLanguageCode,
-  withContentLanguageDirective,
-  parseCron,
-  nextOccurrence,
-  nextDueAtMs,
-  resolveModelConfigValue,
-  DEFAULT_HISTORIAN_TIMEOUT_MS,
-  DREAM_TASK_PROMOTION_DEFAULTS,
-  LIVE_RELOAD_CONFIG_PATHS
-} from "./index-eb3n6ysg.js";
-import {
-  canonicalModelIdentity,
-  piModelRefToCanonical,
-  resolveModelRefForPi,
-  modelRefLookupOrder,
-  ompModelRefToCanonical,
-  resolveModelRefForOmp
-} from "./index-bgmv2kaf.js";
-import {
-  FAIL_CLOSED_DOCTOR_COMMAND,
-  formatFailClosedBlockingMessage,
-  createFailClosedBlockingError,
-  isFailClosedBlockingError,
-  shouldBypassFailClosedBlock,
-  createFailClosedController,
-  piHarnessKindFromExecutable,
-  getErrorMessage,
-  describeError,
-  startBootDeadline,
-  getSchemaFenceRejection,
-  getMigrationOnOpenRefusal,
-  LATEST_SUPPORTED_VERSION,
-  getDatabasePath,
-  getPersistedSchemaVersion,
-  setSqlitePragmaConfig,
-  applySqliteTuningPragmas,
-  runSqliteOptimize,
-  openDatabase,
-  openCurrentDatabase,
-  openDatabaseAsync,
-  closeDatabase
-} from "./index-8m86dmhb.js";
-import {
-  sameProjectDirectory,
-  setHomeProjectPermission,
-  ProjectIdentityError,
-  resolveProjectIdentityStrict,
-  isUserHomeDirectory,
-  resolveProjectIdentity,
-  isUsableProjectIdentity,
-  resolveProjectIdentityForSession,
-  beginBootQuietPeriod,
-  scheduleAfterBootQuiet
-} from "./index-041ex0cj.js";
-import {
-  detectThinkingBindingMismatch,
-  detectLatestTurnThinkingMismatch,
-  isPrefixBoundThinkingModel,
-  detectOverflow,
   retreatPastHostUnservedRows,
   completedToolArcCrossesBoundary,
   estimateTrueRawMessageTokens,
@@ -420,6 +430,16 @@ import {
   modelAcceptsEmptyContent,
   isAnthropicFamilyRoute,
   variantChangeBustsProviderCache,
+  isInActiveAnthropicTurn,
+  activeAnthropicTurnStart,
+  hasAnthropicReasoning,
+  findLatestAssistantReasoningMutationExemptMessage,
+  DEFAULT_KEEP_REASONING_TOKENS,
+  resolveKeepReasoningTokens,
+  reasoningStepCost,
+  reasoningBudgetCutoff,
+  reasoningTextAndOpaque,
+  opaqueThinkingCost,
   SKELETON_REAL_INPUT_MAX_BYTES,
   toolInputStringBytes,
   setRawMessageProvider2,
@@ -439,7 +459,7 @@ import {
   getRawSessionTagKeysThrough2,
   getLegacyProtectedTailStartOrdinal2,
   readSessionChunk2
-} from "./index-vjvb89qt.js";
+} from "./index-s1bev2xq.js";
 import {
   UNKNOWN_FIT_RATIO,
   hasMeasuredDecisionCalibration,
@@ -458,6 +478,7 @@ import {
   prependTag,
   isRecord,
   TEXT_TAG_IDENTITY_MARKER,
+  PI_FALLBACK_PREFIXES_JSON,
   contentTagOwnerMessageId,
   estimateImageTokensFromDataUrl,
   normalizeTodoStateJson,
@@ -521,7 +542,7 @@ import {
   getToolTagNumberByOwner2,
   getNullOwnerToolTag2,
   adoptNullOwnerToolTag2
-} from "./index-wj9v2eh7.js";
+} from "./index-2s0s8mca.js";
 import {
   textMentionsRecentCommit,
   hasMeaningfulUserText2,
@@ -566,14 +587,43 @@ import {
   clearOpenCodeDbReadFailure,
   claimOpenCodeDbDiagnosticOnce
 } from "./index-8976mezv.js";
+import"./index-399p688g.js";
 import {
   runSessionWarmupWorker,
   RAW_SUMMARY_TEXT_MAX_CHARS2
-} from "./index-vakawmbc.js";
+} from "./index-2apf1afe.js";
+import {
+  piHarnessKindFromExecutable
+} from "./index-kgd6t63g.js";
+import {
+  BoundedSessionMap,
+  LkgRecoveryFenceError,
+  clearLkgFenceProcessState,
+  lkgFenceRequiresRebuild,
+  lkgRecoveryFenceUnclean,
+  ownsLkgDirtyFence,
+  invalidateCleanLkgRecoveryFence,
+  markLkgRecoveryDirty,
+  readSessionActivity,
+  observeSessionActivity,
+  backfillSessionActivity,
+  clearCompressionDepth,
+  clearCompressionDepthRange,
+  getMessageIndexSourceIdentity2,
+  isMessageIndexSourceCurrent2,
+  getLastIndexedOrdinal2,
+  getMessageIndexReconciliationStartOrdinal2,
+  isMessageIndexReconciledThrough2,
+  indexSingleMessage2,
+  indexMessagesAfterOrdinal2,
+  sweepOrphanedOpenCodeMessageIndexes2
+} from "./index-sv5yv3gc.js";
 import {
   formatSynapseLaneDescriptor
 } from "./index-xkf1qyj1.js";
-import"./index-r024r8da.js";
+import {
+  sameProjectDirectory
+} from "./index-knxngpvf.js";
 import {
   buildCanonicalChunkTextFromFts,
   buildCompartmentSummaryFallbackText,
@@ -583,25 +633,9 @@ import {
   replaceCompartmentChunkEmbeddings,
   deleteChunkEmbedBackoffForSession,
   chunkWindowSourceKey
-} from "./index-ddfbvmg3.js";
-import {
-  readSessionActivity,
-  observeSessionActivity,
-  backfillSessionActivity,
-  clearCompressionDepth,
-  clearCompressionDepthRange,
-  getMessageIndexSourceIdentity,
-  isMessageIndexSourceCurrent,
-  getLastIndexedOrdinal,
-  getMessageIndexReconciliationStartOrdinal,
-  isMessageIndexReconciledThrough,
-  indexSingleMessage,
-  indexMessagesAfterOrdinal,
-  sweepOrphanedOpenCodeMessageIndexes
-} from "./index-3bc8wf03.js";
+} from "./index-jhw13tmp.js";
 import {
   recordSessionProjectIdentity,
-  drainBackgroundBatches,
   GIT_SWEEP_LEASE_RENEWAL_MS,
   acquireGitSweepLease,
   renewGitSweepLease,
@@ -624,21 +658,19 @@ import {
   embedSessionCompartmentChunks2,
   getEmbeddingCoverageStatus2,
   getAutoEmbeddingSessionCoverage2
-} from "./index-02kw8dfx.js";
+} from "./index-vfpwqs37.js";
 import {
   V2_MEMORY_CATEGORIES
 } from "./index-135e8hvg.js";
 import {
   unescapeXml,
   parseCompartmentOutput,
-  layoutLkgPrefix,
-  assembleLkgPrefix,
   resolveWorkspaceShareCategories,
   resolveWorkspaceIdentitySet,
   expandWorkspaceIdentitySetWithAliases,
   sourceNameForMemory,
   computeWorkspaceEpochFingerprint
-} from "./index-405dq1gq.js";
+} from "./index-krhpcm6f.js";
 import {
   configureContextDatabasePragmas2
 } from "./index-fapenpch.js";
@@ -688,7 +720,7 @@ import {
   normalizeVerificationFiles,
   indexCommitsForProject,
   embedUnembeddedCommits
-} from "./index-k3y5wmaq.js";
+} from "./index-j9r9ggs0.js";
 import {
   setEmbeddingSessionBusy2,
   isEmbeddingHostBusy2
@@ -719,9 +751,11 @@ import {
 import {
   pushNotification2
 } from "./index-q1yc6bs0.js";
+import"./index-32qfekbw.js";
 import {
   cosineSimilarity
-} from "./index-q04p2kkb.js";
+} from "./index-vnys1293.js";
+import"./index-g3600tpw.js";
 import {
   buildHiddenAgentRegistrations,
   logTemperatureDecision,
@@ -737,6 +771,9 @@ import {
   computeNormalizedHash
 } from "./index-9x1f96r8.js";
 import {
+  normalizeProtectedToolName
+} from "./index-674f6qs2.js";
+import {
   logSlowWriteTransaction,
   WriteTransactionSteps
 } from "./index-0vrkp1jq.js";
@@ -745,10 +782,7 @@ import {
   ensureStorageDirectorySync,
   writeStorageFileSync,
   writeStorageFileAtomicSync
-} from "./index-vf38qhee.js";
-import {
-  normalizeProtectedToolName
-} from "./index-674f6qs2.js";
+} from "./index-81nthk8j.js";
 
 // src/index.ts
 import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
@@ -2577,6 +2611,24 @@ function shouldKeepSubagents() {
   return keepSubagents;
 }
 
+// ../plugin/src/standalone-plugin-marker.ts
+var markerSymbol = Symbol.for("cortexkit.standalone-plugins");
+function registerStandalonePluginMarker(version) {
+  try {
+    const globals = globalThis;
+    let registry = globals[markerSymbol];
+    if (registry === undefined) {
+      registry = new Map;
+      globals[markerSymbol] = registry;
+    }
+    registry.set("magic-context", { version });
+  } catch (error) {
+    try {
+      log2("could not register the standalone plugin marker", error);
+    } catch {}
+  }
+}
+
 // ../plugin/src/shared/host-stall-profiler.ts
 import * as path7 from "node:path";
 
@@ -3370,10 +3422,129 @@ function startHostStallProfilerSwitch() {
     log2("[magic-context] host stall profiler: could not start the enable-file switch", error);
   }
 }
+// package.json
+var package_default = {
+  name: "@cortexkit/pi-magic-context",
+  version: "0.49.4",
+  type: "module",
+  description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
+  main: "dist/index.js",
+  license: "MIT",
+  author: "ualtinok",
+  keywords: [
+    "pi",
+    "pi-coding-agent",
+    "omp",
+    "oh-my-pi",
+    "extension",
+    "context",
+    "memory",
+    "magic-context",
+    "ai",
+    "llm"
+  ],
+  repository: {
+    type: "git",
+    url: "https://github.com/cortexkit/magic-context",
+    directory: "packages/pi-plugin"
+  },
+  files: [
+    "dist",
+    "README.md"
+  ],
+  "//": "The build intentionally bundles typebox (no --external typebox) and keeps it a regular dependency. OMP's extension loader rewrites every bare `typebox` import to its own omptype-based shim, whose schemas are callable objects rather than JSON Schema; they fail structuredClone during tool registration, so an external typebox import stops Magic Context loading on OMP. src/typebox-bundling.test.ts guards this.",
+  scripts: {
+    build: "bun ../../scripts/check-bun.mjs && tsc -p ../retina-local-fs/tsconfig.build.json && bun ../../scripts/clean-dist-chunks.mjs dist index.js subagent-entry.js historian-calibration-extension.js embedding-worker-process.js raw-ordinal-warmup-worker.js transformers-web.js transformers-node-wasm.js && bun build ../plugin/src/features/magic-context/memory/transformers-web-entry.ts --outfile dist/transformers-web.js --target browser --format esm --external onnxruntime-web && bun ../plugin/scripts/build-transformers-node-wasm.ts dist && bun build src/index.ts src/subagent-entry.ts src/historian-calibration-extension.ts ../plugin/src/features/magic-context/memory/embedding-worker.ts ../plugin/src/features/magic-context/memory/embedding-worker-process.ts ../plugin/src/features/magic-context/migration-worker.ts ../plugin/src/hooks/magic-context/auto-search-worker.ts ../plugin/src/hooks/magic-context/raw-ordinal-warmup-worker.ts ../plugin/src/features/magic-context/compaction-marker-candidates-worker.ts --outdir dist --entry-naming '[name].[ext]' --target node --format esm --splitting --external @earendil-works/pi-coding-agent --external @oh-my-pi/pi-coding-agent --external @earendil-works/pi-tui --external onnxruntime-node --external onnxruntime-web --external sharp --external bun:ffi --external node:sqlite",
+    "build:e2e-argv": `bun ../../scripts/clean-dist-chunks.mjs ../../tests/docker/.generated subagent-runner-e2e.mjs && bun build src/subagent-runner.ts --outdir ../../tests/docker/.generated --entry-naming 'subagent-runner-e2e.mjs' --splitting --target node --format esm --external node:sqlite && node --input-type=module -e 'const { __test } = await import("../../tests/docker/.generated/subagent-runner-e2e.mjs"); if (typeof __test.buildArgs !== "function" || typeof __test.resolvePiInvocation !== "function") throw new Error("argv renderer exports missing"); console.log("Node argv renderer: 2 exports loaded")'`,
+    typecheck: "tsc -p ../retina-local-fs/tsconfig.build.json && tsc --noEmit",
+    test: "bun ../../scripts/check-bun.mjs && bun install --frozen-lockfile && BUN_JSC_useOMGJIT=0 bun test --parallel=4 --timeout 30000",
+    "test:serial": "bun ../../scripts/check-bun.mjs && bun install --frozen-lockfile && BUN_JSC_useOMGJIT=0 bun test --parallel=1 --timeout 30000",
+    lint: "bun ../../scripts/check-bun.mjs && biome check src",
+    "lint:fix": "biome check --write src",
+    format: "biome format --write src",
+    "format:check": "biome format src",
+    clean: "bun ../../scripts/clean-dist-chunks.mjs dist index.js subagent-entry.js historian-calibration-extension.js embedding-worker.js embedding-worker-process.js migration-worker.js raw-ordinal-warmup-worker.js transformers-web.js transformers-node-wasm.js",
+    prepublishOnly: "bun run build"
+  },
+  "//test": "Test runs cap file-isolated workers at four (one for test:serial) and disable JSC's optimizing WebAssembly tier so per-file isolation does not pay its compilation cost on every file. These are not production settings and do not change host process engine options.",
+  dependencies: {
+    "@cortexkit/subc-client": "0.11.1",
+    "@jitl/quickjs-singlefile-cjs-release-asyncify": "0.32.0",
+    "ai-tokenizer": "^1.0.6",
+    "comment-json": "^5.0.0",
+    "onnxruntime-web": "1.26.0-dev.20260416-b7804b056c",
+    "quickjs-emscripten": "^0.32.0",
+    zod: "^4.1.8"
+  },
+  optionalDependencies: {
+    "onnxruntime-node": "1.30.0",
+    sharp: "^0.35.0"
+  },
+  devDependencies: {
+    "@biomejs/biome": "^2.5.1",
+    "@earendil-works/pi-ai": "0.83.0",
+    "@earendil-works/pi-coding-agent": "0.83.0",
+    "@earendil-works/pi-tui": "0.83.0",
+    "@huggingface/transformers": "^4.3.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/bun": "^1.3.10",
+    "@types/node": "^22.20.0",
+    "pi-agent-core-087": "npm:@earendil-works/pi-agent-core@0.87.1",
+    "pi-ai-086": "npm:@earendil-works/pi-ai@0.86.0",
+    "pi-coding-agent-086": "npm:@earendil-works/pi-coding-agent@0.86.0",
+    "pi-coding-agent-087": "npm:@earendil-works/pi-coding-agent@0.87.1",
+    typebox: "^1.3.1",
+    typescript: "^5.8.0"
+  },
+  peerDependencies: {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    typebox: "*"
+  },
+  peerDependenciesMeta: {
+    "@earendil-works/pi-coding-agent": {
+      optional: true
+    },
+    "@earendil-works/pi-tui": {
+      optional: true
+    },
+    typebox: {
+      optional: true
+    }
+  },
+  exports: {
+    ".": {
+      import: "./dist/index.js"
+    }
+  },
+  pi: {
+    extensions: [
+      "./dist/index.js"
+    ]
+  },
+  omp: {
+    extensions: [
+      "./dist/index.js"
+    ]
+  }
+};
 
 // src/clone-inheritance.ts
-import { readFile } from "node:fs/promises";
+import { open, stat } from "node:fs/promises";
 var CONTENT_ID_SUFFIX = /:(?:p|file)\d+$/;
+var BARE_SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+var loggedCloneStartFailures = new Set;
+function logCloneStartFailureOnce(sessionId, write) {
+  if (loggedCloneStartFailures.has(sessionId))
+    return;
+  if (loggedCloneStartFailures.size >= 1024) {
+    const oldest = loggedCloneStartFailures.values().next().value;
+    if (oldest !== undefined)
+      loggedCloneStartFailures.delete(oldest);
+  }
+  loggedCloneStartFailures.add(sessionId);
+  write();
+}
 function entryId(entry) {
   if (entry === null || typeof entry !== "object")
     return null;
@@ -3456,20 +3627,63 @@ function createCloneFilter(entries) {
   };
 }
 async function readPiSessionIdFromFile(filePath) {
-  const contents = await readFile(filePath, "utf8");
-  const newline = contents.indexOf(`
-`);
-  const headerText = newline >= 0 ? contents.slice(0, newline) : contents;
-  const header = JSON.parse(headerText);
-  if (header.type !== "session" || typeof header.id !== "string" || header.id.length === 0) {
-    throw new Error("previous session file has no valid session header");
+  const file = await open(filePath, "r");
+  try {
+    const prefix = Buffer.alloc(64 * 1024);
+    const { bytesRead } = await file.read(prefix, 0, prefix.length, 0);
+    for (const line of prefix.subarray(0, bytesRead).toString("utf8").split(`
+`)) {
+      if (!line.trim())
+        continue;
+      let header;
+      try {
+        header = JSON.parse(line);
+      } catch {
+        break;
+      }
+      if (header?.type === "title")
+        continue;
+      if (header?.type === "session" && typeof header.id === "string" && header.id.length > 0)
+        return header.id;
+      break;
+    }
+  } finally {
+    await file.close();
   }
-  return header.id;
+  throw new Error("previous session file has no valid session header");
+}
+async function resolveStartupParentSessionId(parent) {
+  try {
+    if ((await stat(parent)).isFile())
+      return await readPiSessionIdFromFile(parent);
+  } catch (error) {
+    const code = error?.code;
+    if (code !== "ENOENT" && code !== "ENOTDIR")
+      throw error;
+  }
+  if (!/[\\/]/.test(parent) && BARE_SESSION_ID.test(parent))
+    return parent;
+  throw new Error("parentSession is neither an existing session file nor a bare session UUID");
 }
 async function handlePiCloneSessionStart(event, ctx, deps) {
-  if (event.reason !== "fork" || typeof event.previousSessionFile !== "string") {
+  const isStartup = event.reason === "startup" || event.reason === undefined;
+  if (event.reason !== "fork" && !isStartup)
     return null;
-  }
+  return inheritPiCloneSession(event, ctx, deps, isStartup);
+}
+function registerPiCloneSessionTransitions(on, deps) {
+  on("session_switch", async (event, ctx) => {
+    if (event.reason !== "fork")
+      return;
+    await inheritPiCloneSession(event, ctx, deps, false);
+  });
+  on("session_branch", async (event, ctx) => {
+    if (event.reason !== "fork" && event.reason !== "branch" && event.reason !== "btw")
+      return;
+    await inheritPiCloneSession(event, ctx, deps, false);
+  });
+}
+async function inheritPiCloneSession(event, ctx, deps, isStartup) {
   let stage = "resolve-destination";
   let sourceSessionId = "unknown";
   let destinationSessionId = "unknown";
@@ -3483,8 +3697,15 @@ async function handlePiCloneSessionStart(event, ctx, deps) {
     if (destinationSessionId.length === 0) {
       throw new Error("Pi clone session id is empty");
     }
+    const sourceReference = isStartup ? manager.getHeader?.()?.parentSession : event.previousSessionFile;
+    if (isStartup && sourceReference === undefined)
+      return null;
+    if (typeof sourceReference !== "string" || sourceReference.length === 0) {
+      logCloneStartFailureOnce(destinationSessionId, () => writeLog(`[magic-context][pi] clone-inheritance: skipped dest=${destinationSessionId} reason=missing-parent`));
+      return null;
+    }
     stage = "read-source-header";
-    sourceSessionId = await readPiSessionIdFromFile(event.previousSessionFile);
+    sourceSessionId = isStartup ? await resolveStartupParentSessionId(sourceReference) : await readPiSessionIdFromFile(sourceReference);
     stage = "read-clone-branch";
     if (typeof manager.getBranch !== "function") {
       throw new Error("Pi session manager does not expose getBranch");
@@ -3494,7 +3715,10 @@ async function handlePiCloneSessionStart(event, ctx, deps) {
       throw new Error("Pi clone branch is unavailable");
     }
     stage = "copy-state";
-    const result = copySessionStateForClone(deps.db, sourceSessionId, destinationSessionId, createCloneFilter(branchEntries));
+    const result = copySessionStateForClone(deps.db, sourceSessionId, destinationSessionId, {
+      ...createCloneFilter(branchEntries),
+      requireEmptyDestinationMeta: isStartup
+    });
     if (result.kind === "destination-not-empty") {
       writeLog(`[magic-context][pi] clone-inheritance: skipped source=${sourceSessionId} dest=${destinationSessionId} stage=destination-guard reason=destination-not-empty`);
       return result;
@@ -3503,10 +3727,10 @@ async function handlePiCloneSessionStart(event, ctx, deps) {
     if (result.pendingMarkerMigrated) {
       deps.signalPendingMarker(destinationSessionId);
     }
-    writeLog(`[magic-context][pi] clone-inheritance: migrated compartments=${result.compartmentsCopied} tags=${result.tagsCopied} notes=${result.notesCopied} facts=${result.factsCopied} source=${sourceSessionId} dest=${destinationSessionId} reason=fork`);
+    writeLog(`[magic-context][pi] clone-inheritance: migrated compartments=${result.compartmentsCopied} tags=${result.tagsCopied} notes=${result.notesCopied} facts=${result.factsCopied} source=${sourceSessionId} dest=${destinationSessionId} reason=${isStartup ? "startup" : event.reason}`);
     return result;
   } catch (error) {
-    writeLog(`[magic-context][pi] clone-inheritance: failed source=${sourceSessionId} dest=${destinationSessionId} stage=${stage} error=${error instanceof Error ? error.message : String(error)}; run /ctx-wrapup to rebuild, or re-clone`);
+    logCloneStartFailureOnce(destinationSessionId, () => writeLog(`[magic-context][pi] clone-inheritance: failed source=${sourceSessionId} dest=${destinationSessionId} stage=${stage} error=${error instanceof Error ? error.message : String(error)}; run /ctx-wrapup to rebuild, or re-clone`));
     return null;
   }
 }
@@ -6700,6 +6924,1979 @@ function producerPromptFailureReason(input) {
   return tokens <= limit ? null : `producer_prompt_exceeds_window calibrated_tokens=${tokens} limit=${limit} estimator_margin=0.03`;
 }
 
+// ../plugin/src/hooks/magic-context/reference-seeds.generated.ts
+var REFERENCE_SEEDS = [
+  {
+    importance: 96,
+    block: `<compartment start="1" end="14" title="Fail-closed tenant context" episode_type="design,feature" importance="96">
+<p1>
+U: "no cross-tenant read should ever get 'best effort' -- fail closed, even in dev"
+
+We rewired Acorn Suite's tenant boundary in apps/api/src/middleware/tenantBoundary.ts and packages/auth/src/sessionClaims.ts. The old path let dashboard routes recover a missing JWT tenant_id from orgSlug or X-Org-Slug, which made stale bookmarked URLs dangerous. U: "if the header lies, don't heal it with orgSlug"
+
+The first patch kept a compatibility fallback for old dashboard links, but the user pushed back and we changed requireTenantContext(req) to treat JWT tenant_id as the only tenant authority. REST route wrappers and GraphQL createContext now share the same helper, Prisma filters receive tenantId only from that context, and platform_support is modeled as a service actor instead of a wildcard tenant. Added apps/api/test/tenant-boundary/rest.spec.ts and graphql.spec.ts using acme_lab and beta_works fixtures. Commit a91f2c8.
+</p1>
+<p2>
+Acorn Suite tenant isolation now fails closed: U: "no cross-tenant read should ever get 'best effort' -- fail closed, even in dev". requireTenantContext(req) is the shared REST/GraphQL entry point and rejects missing JWT tenant_id instead of recovering from orgSlug or X-Org-Slug.
+</p2>
+<p3>
+Acorn Suite made JWT tenant_id the single tenant authority across REST, GraphQL, and Prisma; slug/header fallback was removed to prevent cross-tenant reads.
+</p3>
+<p4>requireTenantContext; JWT tenant_id only; acme_lab beta_works</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* All tenant-scoped Acorn Suite handlers must call requireTenantContext(req) and fail closed; do not recover missing tenant_id from orgSlug or X-Org-Slug.
+* Acorn Suite auth changes must include both REST and GraphQL tenant-boundary tests before merge.
+</PROJECT_RULES>
+<ARCHITECTURE>
+* Acorn Suite uses JWT tenant_id as the single tenant authority so REST, GraphQL, and Prisma filters share one isolation model.
+* Platform support bypass is modeled as a service actor, not as a tenant wildcard.
+</ARCHITECTURE>
+<CONSTRAINTS>
+* X-Org-Slug and route orgSlug are presentation hints only; using them as tenant authority can produce cross-tenant reads when cached dashboard URLs are stale.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* Acorn Suite tenant-boundary fixtures live under apps/api/test/tenant-boundary/ and use seed tenants acme_lab and beta_works.
+</CONFIG_VALUES>
+<NAMING>
+* The shared auth helper is named requireTenantContext; "resolveTenantMaybe" was rejected because it implied fallback behavior.
+</NAMING>
+</facts>
+<events>
+<trajectory_correction at_compartment="1">
+  <summary>Removed tenant fallback after user rejected compatibility recovery.</summary>
+  <before_strategy>Keep an orgSlug/X-Org-Slug fallback for old dashboard links when JWT tenant_id was absent.</before_strategy>
+  <correction_source>user</correction_source>
+  <correction_signal>U: "if the header lies, don't heal it with orgSlug"</correction_signal>
+  <after_strategy>Require JWT tenant_id everywhere and return 403 when it is absent or inconsistent.</after_strategy>
+  <evidence>The final implementation made requireTenantContext(req) the only REST/GraphQL tenant entry point.</evidence>
+</trajectory_correction>
+</events>
+<user_observations>
+* User states security boundaries as hard constraints and prefers conservative fail-closed behavior over compatibility fallback.
+</user_observations>`
+  },
+  {
+    importance: 95,
+    block: `<compartment start="155" end="201" title="Chorus: op-log-as-source-of-truth architecture established" episode_type="design,infra" importance="95">
+<p1>
+Major architecture session for the Chorus CRDT sync engine. Initial implementation stored materialized document state as the source of truth; the op log was an audit trail appended after each mutation. Under concurrent editing from 3+ clients, three-way merge conflicts produced divergent materialized states that couldn't be reconciled without replaying the log anyway — the materialized state was losing the information needed for conflict resolution.
+
+U: "every time we have a 3-way merge we end up replaying the log to fix it anyway, maybe the log should just BE the truth"
+
+Pivoted to op-log-as-source-of-truth: a document is defined by its full sequence of operations in causal order. Materialized snapshots are derived on-read, cached in SnapshotCache (backed by Redis, keyed by document_id + vector_clock_hash), and invalidated synchronously when new ops arrive. Synchronous invalidation is critical — an earlier async prototype let fast-editing clients read stale snapshots for up to 200 ms, which caused visible cursor jumps in the collaboration UI.
+
+U: "how large does the log get before we need to compact"
+
+Compaction triggers at max_ops_before_compact=10000 per document. Below that threshold, full replay from the earliest checkpoint is fast enough (<50 ms in benchmarks). Above it, a compaction job creates a new checkpoint snapshot and tombstones older ops. Vector clocks used for causal ordering across clients, not wall clock.
+
+U: "ok, let's commit to this model"
+
+Decision documented in docs/arch/op-log.md. Core implementation in crates/chorus-core/src/log.rs and crates/chorus-core/src/snapshot.rs. Commit 7e3d4c2.
+</p1>
+<p2>
+Chorus uses op-log-as-source-of-truth: document is its causal op sequence (vector clocks). Snapshots derived on-read, cached in SnapshotCache (Redis, document_id + vector_clock_hash), invalidated synchronously on new op arrival — async caused stale reads under concurrent edit load. Compaction at max_ops_before_compact=10000. U: "every time we have a 3-way merge we end up replaying the log to fix it anyway" — this was the pivot signal. docs/arch/op-log.md.
+</p2>
+<p3>
+Chorus op log is the source of truth; snapshots derived on-read and cached; compaction at 10 k ops/document; synchronous cache invalidation required.
+</p3>
+<p4>
+OpLog; SnapshotCache; vector_clock; max_ops_before_compact=10000; crates/chorus-core; synchronous invalidation
+</p4>
+</compartment>
+<facts>
+<ARCHITECTURE>
+* Chorus document state is defined by the op log in causal order (vector clocks); materialized snapshots are derived-on-read cache entries, not the source of truth.
+</ARCHITECTURE>
+<CONSTRAINTS>
+* Chorus SnapshotCache invalidation must be synchronous on new op arrival; async invalidation causes stale reads visible to concurrent editing clients (observed: up to 200 ms staleness in async prototype).
+</CONSTRAINTS>
+<PROJECT_RULES>
+* Never mutate a Chorus materialized snapshot directly; always append an op to the log and re-derive the snapshot.
+</PROJECT_RULES>
+<NAMING>
+* Chorus core types: OpLog (crates/chorus-core/src/log.rs), SnapshotCache (crates/chorus-core/src/snapshot.rs).
+</NAMING>
+<CONFIG_VALUES>
+* Chorus compaction threshold: max_ops_before_compact=10000 per document.
+</CONFIG_VALUES>
+</facts>
+<events>
+<trajectory_correction at_compartment="7">
+  <summary>Pivoted from materialized-state-as-source-of-truth to op-log-as-source-of-truth after merge conflict failures</summary>
+  <before_strategy>Materialized document state stored as authoritative; op log appended as audit trail after each mutation</before_strategy>
+  <correction_source>self_review</correction_source>
+  <correction_signal>"every time we have a 3-way merge we end up replaying the log to fix it anyway, maybe the log should just BE the truth"</correction_signal>
+  <after_strategy>Op log is authoritative and defines the document; materialized snapshots derived on-read from log, cached in SnapshotCache with synchronous invalidation</after_strategy>
+  <evidence>Under concurrent editing from 3+ clients, three-way merge conflicts produced divergent materialized states that couldn't be reconciled without replaying the log anyway.</evidence>
+</trajectory_correction>
+</events>
+<user_observations>
+* User frames architectural pivots as casual hypotheses ("maybe X should just be Y") rather than directives; treat these as actionable proposals, not idle musing.
+</user_observations>`
+  },
+  {
+    importance: 95,
+    block: `<compartment start="46" end="60" title="Standby-safe status writer" episode_type="design,infra,feature" importance="95">
+<p1>
+Did the deeper controller pass for WorkspaceMesh after finding that read-only standby replicas still had code paths that could mutate status during a race. The user constraint was explicit.
+U: one cluster, many control planes; never let a standby write status.
+U: deletes can lag, status can't lie.
+
+In controllers/workspacemesh_controller.go I split reconcile into observe, plan, and commit stages. Observe and plan run before lease acquisition, so standby replicas can still do the expensive graph walk and diff calculation. Commit is now wrapped by pkg/lease/lease_guard.go and is the only place allowed to write status, finalizers, or child mutations. That let us keep fast reads without letting a standby fake health by racing the active leader. Commit c8b1e44.
+
+I also changed api/v1alpha1/workspacemesh_types.go so status carries observedPlan, a stable hash of the rendered child set, and delayed finalizer removal until the ServiceExport cleanup confirms from the API server. Envtest coverage now exercises leader handoff, stale standby loops, and delete timing, because the real problem here was not feature behavior but truthful status under partial failover.
+</p1>
+<p2>
+Reworked the WorkspaceMesh controller around a hard write boundary.
+U: one cluster, many control planes; never let a standby write status.
+U: deletes can lag, status can't lie.
+
+controllers/workspacemesh_controller.go now separates observe, plan, and commit. Standbys may read and compute, but pkg/lease/lease_guard.go is required for any status or finalizer write. status.observedPlan was added so drift is visible without child diffs, and finalizer removal now waits for ServiceExport cleanup confirmation.
+</p2>
+<p3>
+The durable decision was to allow standby replicas to do read-heavy reconcile work while centralizing every mutating step behind a lease-guarded commit boundary. Status truth won over delete speed.
+</p3>
+<p4>LeaseGuard; observe/plan/commit; status.observedPlan; finalizer waits for ServiceExport cleanup</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* Reconciler code may compute desired state before lease acquisition, but every status or finalizer write must pass through LeaseGuard.
+* Any new cleanup step must be idempotent across repeated reconcile loops before it is attached to finalizer removal.
+</PROJECT_RULES>
+<ARCHITECTURE>
+* The controller is split into observe, plan, and commit so standby replicas can do expensive reads without risking conflicting writes.
+* Status carries an observedPlan hash so downstream tools can detect desired-versus-applied drift without diffing child resources.
+</ARCHITECTURE>
+<CONSTRAINTS>
+* In a multi-control-plane cluster, standby reconciles can race with the active leader; unrestricted status writes make object health lie even when spec is unchanged.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* Leader election lease name: workspacemesh-controller-lock.
+* Drift hash status field: status.observedPlan.
+</CONFIG_VALUES>
+<NAMING>
+* The controller write gate wrapper is named LeaseGuard.
+</NAMING>
+</facts>`
+  },
+  {
+    importance: 94,
+    block: '<compartment start="415" end="612" title="Tenant isolation: chose Postgres RLS over schema-per-tenant" episode_type="design" importance="94">\n<p1>\nWorked through the tenant isolation model for the new control plane. Three candidates on the table: (a) schema-per-tenant with `search_path` switching, (b) database-per-tenant, (c) shared schema with Postgres Row-Level Security policies keyed on `tenant_id`. Spent the morning sketching how each interacts with our migration tooling, connection pooling (pgbouncer in transaction mode), and the analytics replica.\n\nU: I keep getting pulled toward schema-per-tenant because it feels "more isolated" but I want to be talked out of it if RLS holds up\n\nSchema-per-tenant blows up under pgbouncer transaction-pooling — `SET search_path` is session-state and gets lost between transactions; the per-tenant search_path either has to be set on every transaction (expensive, race-prone) or we drop pgbouncer (kills our connection economy). Database-per-tenant solves isolation cleanly but our migration tooling (sqlx) doesn\'t have a clean fan-out story and we\'d need to build one. Also onboarding latency goes from ~50ms to ~30s because we\'d need to provision a DB.\n\nLanded on RLS. Every tenant-scoped table gets `tenant_id uuid not null`, an `ENABLE ROW LEVEL SECURITY` declaration, and a policy `USING (tenant_id = current_setting(\'app.current_tenant\')::uuid)`. The current tenant is set via `SET LOCAL app.current_tenant = \'...\'` at the start of every request transaction — `SET LOCAL` is transaction-scoped so it survives pgbouncer transaction mode cleanly. Wrote a middleware in `internal/db/tenant.go` that wraps every request in a transaction and sets the value.\n\nU: what about the analytics replica, does RLS work the same there\n\nYes — RLS policies replicate via logical replication; the analytics service connects with a separate role that also has RLS enforced. The escape hatch for cross-tenant analytics is a dedicated `analytics_admin` role with `BYPASSRLS`, used only by the scheduled aggregation job, never by interactive code paths.\n\nU: ok and write down that if anyone ever calls SET ROLE to escape RLS in app code i\'m going to lose my mind\n\nDocumented. Added a lint rule in `tools/sqllint/` that flags `SET ROLE`, `BYPASSRLS`, and unqualified table access in `internal/handlers/`.\n</p1>\n<p2>\nTenant isolation decision: Postgres RLS keyed on `tenant_id`, set per-transaction via `SET LOCAL app.current_tenant`. Rejected schema-per-tenant (breaks pgbouncer transaction mode) and database-per-tenant (sqlx migration fan-out cost + 30s onboarding latency). Analytics uses a separate role with BYPASSRLS for the scheduled aggregator only. U: "if anyone ever calls SET ROLE to escape RLS in app code i\'m going to lose my mind." Lint rule added in `tools/sqllint/`.\n</p2>\n<p3>\nChose RLS with `tenant_id` and `SET LOCAL app.current_tenant` per request. BYPASSRLS reserved for the scheduled analytics aggregator role only; app code is lint-enforced to never bypass.\n</p3>\n<p4>\nRLS on tenant_id; SET LOCAL app.current_tenant; BYPASSRLS = analytics_admin only\n</p4>\n</compartment>\n<facts>\n<ARCHITECTURE>\n* Tenant isolation is enforced at the database layer via Postgres RLS keyed on `tenant_id`, not via schema separation. Chosen because `SET LOCAL` is transaction-scoped and survives pgbouncer transaction-mode pooling, where session-scoped `search_path` switching does not.\n</ARCHITECTURE>\n<PROJECT_RULES>\n* Every tenant-scoped table must declare `tenant_id uuid not null` and `ENABLE ROW LEVEL SECURITY` with a policy referencing `current_setting(\'app.current_tenant\')`.\n* Application code must never call `SET ROLE` or use `BYPASSRLS` roles. `tools/sqllint/` enforces this in CI.\n</PROJECT_RULES>\n<CONSTRAINTS>\n* `SET search_path` is session-scoped and is silently lost between transactions when running behind pgbouncer in transaction pooling mode — making schema-per-tenant impractical for our deployment.\n</CONSTRAINTS>\n<CONFIG_VALUES>\n* Per-request tenant context is set via `SET LOCAL app.current_tenant = \'<uuid>\'` inside the request transaction opened by `internal/db/tenant.go`.\n</CONFIG_VALUES>\n<NAMING>\n* The privileged analytics role is `analytics_admin` (the only role with `BYPASSRLS`); used exclusively by the scheduled aggregation job.\n</NAMING>\n</facts>\n<events>\n<trajectory_correction at_compartment="3">\n  <summary>Considered and rejected schema-per-tenant in favor of RLS after realizing it was incompatible with the existing pgbouncer setup.</summary>\n  <before_strategy>Lean toward schema-per-tenant for "stronger" isolation feel.</before_strategy>\n  <correction_source>self_review</correction_source>\n  <correction_signal>Realized `SET search_path` is session-scoped and doesn\'t survive pgbouncer transaction-mode pooling.</correction_signal>\n  <after_strategy>Adopt RLS with `SET LOCAL app.current_tenant` per transaction.</after_strategy>\n  <evidence>"I keep getting pulled toward schema-per-tenant... I want to be talked out of it if RLS holds up"</evidence>\n</trajectory_correction>\n</events>\n<user_observations>\n* User asks to be argued out of intuitive-but-weakly-supported design preferences rather than rubber-stamped on them.\n* User pre-emptively codifies "rules to avoid future temptation" — translating decisions into lint rules and written prohibitions in the same session.\n</user_observations>'
+  },
+  {
+    importance: 92,
+    block: `<compartment start="1" end="12" title="Tenant context from membership" episode_type="design,feature" importance="92">
+<p1>
+Worked through the tenant-auth boundary in LedgerLeaf after the API still accepted orgId from the browser on a couple of older endpoints.
+U: never trust orgId from the browser.
+U: membership can change mid-session; revocation has to bite immediately.
+
+In apps/api/src/middleware/tenant-context.ts I added TenantContextResolver.resolveFromSession(), changed services/auth/src/session.ts to sign active_membership_id instead of tenant_id, and removed the last direct req.body.orgId reads from apps/api/src/routes/projects.ts and apps/api/src/routes/billing.ts. Internal fan-out calls now forward x-ledgerleaf-tenant-id after middleware resolution rather than letting downstream services re-parse cookies. Commit a14c9e2.
+
+Closed it with integration coverage in apps/api/test/tenant-guard.revocation.test.ts: user loses membership, refreshes nothing, and the next request is denied because the middleware rehydrates tenant and role from membership state. Also named the new boundary pieces TenantGuard and TenantContextResolver so future auth work lands in one place.
+</p1>
+<p2>
+Moved LedgerLeaf auth to server-resolved tenant context in apps/api/src/middleware/tenant-context.ts and stopped trusting browser-provided orgId on the remaining old endpoints.
+U: never trust orgId from the browser.
+U: membership can change mid-session; revocation has to bite immediately.
+
+Sessions now carry active_membership_id, middleware rebuilds tenant and role per request, and downstream services consume x-ledgerleaf-tenant-id only after TenantGuard resolution. Added revocation coverage so stale tabs stop working immediately after membership removal.
+</p2>
+<p3>
+Tenant authorization now flows from membership state rather than browser-selected tenant IDs. The durable decision was to keep tenant and role out of client-controlled request surfaces and rebuild them server-side on each authenticated hop.
+</p3>
+<p4>active_membership_id; TenantGuard; TenantContextResolver; x-ledgerleaf-tenant-id</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* New authenticated handlers must derive tenant access from server-resolved membership state, never from request body, query, or cookie tenant IDs.
+* Any endpoint bypassing TenantGuard needs an explicit integration test covering membership revocation.
+</PROJECT_RULES>
+<ARCHITECTURE>
+* Session tokens carry user_id and active_membership_id; tenant and role are rehydrated server-side so revocation and membership changes apply without waiting for session expiry.
+* Billing, files, and audit services consume a middleware-built TenantContext instead of parsing auth material independently.
+</ARCHITECTURE>
+<CONSTRAINTS>
+* Browser-supplied orgId values are unsafe for tenant authorization because users can belong to multiple tenants and stale tabs can replay old selections.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* Internal tenant hop header: x-ledgerleaf-tenant-id.
+* Auth claim name: active_membership_id.
+</CONFIG_VALUES>
+<NAMING>
+* The auth boundary middleware is named TenantGuard and the resolver behind it is TenantContextResolver.
+</NAMING>
+</facts>
+<user_observations>
+* User frames security questions as trust-boundary rules and wants the unsafe source named explicitly.
+</user_observations>`
+  },
+  {
+    importance: 91,
+    block: `<compartment start="142" end="287" title="Leader election thrash from leases held across pod terminations" episode_type="investigation,bug,refactor" importance="91">
+<p1>
+Operator pods kept losing the leader lease every ~45s in the staging cluster and the reconciler queue would back up behind a thundering-herd resync. Traced through controller-runtime's leader election: the lease was being held by pods that had already been terminated by the rolling restart, and the lease duration (60s) plus retry period (15s) meant that during a routine deploy we'd routinely have 90+ seconds where no live pod could acquire.
+
+U: this has been happening since the v1.31 cluster upgrade right? feels related
+
+Pulled \`kubectl get lease -n loom-system loom-operator-leader -o yaml\` over a deploy and confirmed — holderIdentity stuck pointing at a pod whose Node was already gone. Root cause turned out to be that we'd written a custom \`ReleaseLease\` shim in \`internal/leaderelection/release.go\` that suppressed errors during shutdown so the SIGTERM handler wouldn't log noise. The suppression also swallowed the actual lease-release HTTP call when the kube-apiserver was momentarily slow.
+
+Fix landed in 4a9c1f2: removed the shim entirely, let controller-runtime's own release path run, and added a 5s \`PreStop\` hook so kube has time to ack the release before the container dies. Also dropped lease duration to 30s and retry period to 5s — the old values were copied from a 2021 blog post and never tuned for our pod count.
+
+U: ok but write down somewhere that we never touch the leader-election internals again, that's the second time this exact thing has bitten us
+
+Added a CODEOWNERS entry on \`internal/leaderelection/\` requiring two reviewers and a comment at the top of the package telling future devs to extend via controller-runtime config, not by wrapping.
+</p1>
+<p2>
+Operator leader-election thrash during rolling deploys. Our \`internal/leaderelection/release.go\` shim suppressed shutdown errors and ate the actual lease-release call, so terminated pods kept "holding" the lease for 60s+. Removed the shim (4a9c1f2), added a 5s PreStop hook, reduced lease duration 60→30s and retry 15→5s. U: "we never touch the leader-election internals again." CODEOWNERS lock + package-level warning comment added.
+</p2>
+<p3>
+Operator leader-election bug: custom shutdown-error suppression shim swallowed lease releases, leaving stale leaders for ~90s after rolling restarts. Removed the wrapper, retuned lease/retry timings, locked the package behind CODEOWNERS.
+</p3>
+<p4>
+internal/leaderelection/release.go shim removed; PreStop hook; lease 30s / retry 5s
+</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* Do not wrap or shim controller-runtime leader-election internals — extend via its config surface only. Package \`internal/leaderelection/\` is CODEOWNERS-locked for this reason.
+</PROJECT_RULES>
+<ARCHITECTURE>
+* Leader-election release path must run unobstructed during SIGTERM so the kube-apiserver can transfer the lease before the pod's Node disappears.
+</ARCHITECTURE>
+<CONSTRAINTS>
+* Suppressing errors during graceful shutdown can mask actual API calls in flight; the suppression boundary must be drawn around logging, not around the network call itself.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* Operator leader-election: lease duration 30s, retry period 5s, PreStop hook 5s.
+</CONFIG_VALUES>
+</facts>
+<events>
+<trajectory_correction at_compartment="1">
+  <summary>Stopped trying to "harden" shutdown by wrapping controller-runtime; reverted to library defaults and tuned only its config.</summary>
+  <before_strategy>Custom ReleaseLease wrapper that suppressed errors during SIGTERM to keep shutdown logs clean.</before_strategy>
+  <correction_source>user</correction_source>
+  <correction_signal>"write down somewhere that we never touch the leader-election internals again, that's the second time this exact thing has bitten us"</correction_signal>
+  <after_strategy>Delete the wrapper, use library's native release path, configure timings via standard options, lock the package under CODEOWNERS.</after_strategy>
+  <evidence>holderIdentity in \`kubectl get lease\` pointed at pods whose Nodes were already gone, for 90+ seconds during every rolling deploy.</evidence>
+</trajectory_correction>
+</events>`
+  },
+  {
+    importance: 91,
+    block: `<compartment start="472" end="509" title="Luminary: run_id idempotency model established for all pipeline runs" episode_type="design,feature" importance="91">
+<p1>
+Established the idempotency model for all Luminary ETL pipeline runs. Previously runs were not idempotent — retrying a failed run could double-count rows or leave partial loads in target tables. After two incidents in staging where retried runs corrupted the staging data warehouse, we committed to a run_id–based deduplication model across all 37 pipelines.
+
+U: "we had another corrupted staging run overnight, we need to fix retries properly not band-aid it again"
+
+Every pipeline run now generates a run_id before any writes begin: format {pipeline_name}_{YYYYMMDD}_{uuid4_prefix8} (e.g., orders_daily_20250523_a3f92c11). The run_id is written to the pipeline_run table at start. All target load steps carry the run_id as a deduplication key enforced by a unique constraint on (target_table, run_id) at the DB layer. If a run_id is retried, the write fails with IntegrityError and the caller detects and skips — the first attempt's data is already committed under that run_id.
+
+U: "so retrying the same run_id is always safe?"
+
+Yes: all data from the first attempt already committed under that run_id; the retry's writes fail harmlessly via IntegrityError. Retry logic in orchestrator/runner.py catches IntegrityError and treats it as already-complete. Full run replay is safe.
+
+Implemented across all 37 pipeline configs. Test coverage in tests/test_idempotency.py. Committed across b1d38e7 + c4a82f9.
+</p1>
+<p2>
+Luminary ETL runs are fully idempotent via run_id deduplication. run_id format: {pipeline_name}_{YYYYMMDD}_{uuid4_prefix8}. Unique constraint on (target_table, run_id) at DB; retry raises IntegrityError treated as already-complete by orchestrator/runner.py. U: "retrying the same run_id is always safe?" — confirmed by design. Applies to all 37 pipelines (b1d38e7 + c4a82f9).
+</p2>
+<p3>
+All Luminary ETL loads idempotent via run_id; DB-enforced deduplication; any run can be safely retried.
+</p3>
+<p4>
+run_id; pipeline_run; IntegrityError; idempotent retry; {pipeline_name}_{YYYYMMDD}_{uuid4_prefix8}; orchestrator/runner.py
+</p4>
+</compartment>
+<facts>
+<ARCHITECTURE>
+* All Luminary ETL pipeline loads are idempotent via run_id deduplication; any run can be safely retried without risk of double-counting or partial loads.
+</ARCHITECTURE>
+<PROJECT_RULES>
+* Every Luminary pipeline run must generate and log a run_id to the pipeline_run table before any target writes begin.
+</PROJECT_RULES>
+<CONSTRAINTS>
+* Luminary run_id uniqueness is enforced by a DB unique constraint on (target_table, run_id); a duplicate run_id raises IntegrityError, not a silent skip — retry logic must catch IntegrityError explicitly.
+</CONSTRAINTS>
+<NAMING>
+* Luminary idempotency primitives: run_id (string dedup key), pipeline_run (dedup table), orchestrator/runner.py (retry logic with IntegrityError handling).
+</NAMING>
+<CONFIG_VALUES>
+* Luminary run_id format: {pipeline_name}_{YYYYMMDD}_{uuid4_prefix8} (e.g., orders_daily_20250523_a3f92c11).
+</CONFIG_VALUES>
+</facts>`
+  },
+  {
+    importance: 91,
+    block: `<compartment start="37" end="52" title="Per-namespace QueueShard leases" episode_type="design,infra,feature" importance="91">
+<p1>
+U: "this operator is allowed to be boring, not clever"
+
+Started Harborlight operator sharding with a single global leader-election loop in controllers/queueshard_controller.go. That worked in envtest but made every namespace fail over together, which defeated the tenant isolation story. U: "don't make one leader own the world; namespace failover is the point"
+
+Reworked the design around one controller process with per-namespace Lease objects named harborlight-queueshard. Each QueueShard reconciler records status.observedLeaseUID, and spec stays pure user intent. We stopped comparing renewTime to local wall clock after tests showed skew between kind nodes; the reconciler now treats holderIdentity plus Lease UID transitions as authority. Generated CRDs, deepcopy, RBAC, and envtest fixtures. Commit e7c5a90.
+</p1>
+<p2>
+Harborlight QueueShard uses per-namespace Lease objects because, per U: "don't make one leader own the world; namespace failover is the point". status.observedLeaseUID records the active lease identity; spec remains user intent.
+</p2>
+<p3>
+Harborlight sharding is namespace-scoped: one operator binary can run cluster-wide, but failover is isolated by per-namespace QueueShard leases.
+</p3>
+<p4>QueueShard; observedLeaseUID; harborlight-queueshard Lease</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* Harborlight CRD changes must regenerate manifests, deepcopy code, RBAC, and envtest fixtures before merge.
+</PROJECT_RULES>
+<ARCHITECTURE>
+* Harborlight uses one controller process with per-namespace Lease objects so failover does not move unrelated tenants.
+* QueueShard.status.observedLeaseUID records reconciler-observed lease identity; QueueShard.spec remains user intent only.
+</ARCHITECTURE>
+<CONSTRAINTS>
+* Kubernetes Lease renewTime is unreliable for Harborlight ownership decisions under node clock skew.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* Harborlight QueueShard lease timing is duration 18s, renew deadline 12s, retry period 3s.
+</CONFIG_VALUES>
+<NAMING>
+* The Harborlight CRD kind is QueueShard; "WorkPartition" was rejected as too generic.
+</NAMING>
+</facts>
+<events>
+<trajectory_correction at_compartment="5">
+  <summary>Changed Harborlight from global leader ownership to per-namespace leases.</summary>
+  <before_strategy>Use one global leader-election loop for all QueueShard reconciliation.</before_strategy>
+  <correction_source>user</correction_source>
+  <correction_signal>U: "don't make one leader own the world; namespace failover is the point"</correction_signal>
+  <after_strategy>Use per-namespace Lease objects and record observed lease UID in QueueShard status.</after_strategy>
+  <evidence>The implementation now names one harborlight-queueshard Lease per namespace and avoids global failover.</evidence>
+</trajectory_correction>
+</events>
+<user_observations>
+* User is willing to reject working code when it changes operational blast radius.
+</user_observations>`
+  },
+  {
+    importance: 88,
+    block: `<compartment start="23" end="29" title="Moved CAN notify out of ISR" episode_type="bug,infra" importance="88">
+<p1>
+U: "no malloc in the ISR path, I mean none"
+
+Pawprint firmware was hard-resetting under CAN bus saturation on the nRF52840 board. The CAN RX interrupt called ble_notify_can_frame(), which built a heap-backed Vec before SoftDevice had released the radio lock. Replaced that path with a fixed can_rx_ring in firmware/src/can/isr.rs and deferred BLE notification to can_notify_work in firmware/src/ble/can_notify.rs. The ISR now drops with can_rx_ring_overrun when the ring is full instead of allocating. Commit 0fd92ab.
+</p1>
+<p2>
+Pawprint firmware now follows U: "no malloc in the ISR path, I mean none". CAN RX enqueues into can_rx_ring and BLE notification runs from can_notify_work outside interrupt context.
+</p2>
+<p3>
+CAN RX no longer allocates or sends BLE notifications inside the ISR; frames are buffered and flushed by deferred work.
+</p3>
+<p4>can_rx_ring; can_notify_work; nRF52840 SoftDevice</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* Pawprint firmware ISR paths must not allocate; enqueue to can_rx_ring and wake deferred work instead.
+</PROJECT_RULES>
+<CONSTRAINTS>
+* nRF52840 BLE notification from IRQ context can trigger supervisor reset when SoftDevice holds the radio lock.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* Pawprint can_rx_ring depth is 32 frames, with overflow counted by can_rx_ring_overrun.
+</CONFIG_VALUES>
+</facts>
+<events>
+<causal_incident at_compartment="3">
+  <summary>CAN saturation resets came from heap allocation inside the interrupt path.</summary>
+  <affected_surface>environment</affected_surface>
+  <symptom>Pawprint firmware hard-reset under CAN bus saturation.</symptom>
+  <cause_summary>The CAN RX ISR built a heap-backed Vec and attempted BLE notification while SoftDevice held the radio lock.</cause_summary>
+  <disposition>fixed</disposition>
+  <evidence>The failing path was ble_notify_can_frame() called from the CAN RX interrupt.</evidence>
+  <fix_summary>Moved frames into a fixed ring buffer and deferred BLE notification to can_notify_work.</fix_summary>
+</causal_incident>
+</events>`
+  },
+  {
+    importance: 87,
+    block: `<compartment start="301" end="402" title="NaN in mixed-precision training traced to clip_grad_norm_ before scaler.unscale_" episode_type="investigation,bug" importance="87">
+<p1>
+Distributed training run for the 1.3B retrieval model went to NaN at step 18,420 — second time this week. Replayed deterministically with seed=42 and reproduced at the same step. The loss spiked at 18,419 (a known noisy shard) then NaN'd on the next backward.
+
+Walked the training loop in \`trainer/loop.py\`. We were calling \`torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)\` BEFORE \`scaler.unscale_(optimizer)\`. With fp16 grads still scaled (~65536x), the clip norm computation overflows silently — grad norms above ~3e4 saturate to inf, the clip ratio becomes 0, and parameters get nuked on the optimizer step.
+
+Fix is one-line: swap the order so unscale happens first, then clip on the true grad magnitudes. Verified by reproducing the bad step with the new order — clip activates correctly at 1.0, no NaN.
+</p1>
+<p2>
+1.3B retrieval model NaN'd at step 18,420 across two runs. Cause: \`clip_grad_norm_\` was called before \`scaler.unscale_\`, so fp16-scaled grads overflowed during norm computation, clip ratio went to 0, params zeroed. Reordered in \`trainer/loop.py\`. Confirmed via deterministic replay.
+</p2>
+<p3>
+Mixed-precision NaN root cause: gradient clipping must run after the GradScaler unscale, never before.
+</p3>
+<p4>
+unscale_ → clip_grad_norm_ → step
+</p4>
+</compartment>
+<facts>
+<CONSTRAINTS>
+* \`torch.nn.utils.clip_grad_norm_\` called on still-scaled fp16 gradients overflows silently, returns inf, drives the clip ratio to 0, and zeros parameters on the next optimizer step.
+</CONSTRAINTS>
+<ARCHITECTURE>
+* In mixed-precision training, gradient clipping is computed against TRUE gradient magnitudes — \`scaler.unscale_(optimizer)\` must run before any norm-based clipping.
+</ARCHITECTURE>
+</facts>
+<events>
+<causal_incident at_compartment="2">
+  <summary>Repeated NaN divergence in the 1.3B retrieval training run.</summary>
+  <affected_surface>provider_sdk</affected_surface>
+  <symptom>Training loss became NaN at step 18,420 on two consecutive runs with the same seed.</symptom>
+  <cause_summary>Gradient clipping was applied before the GradScaler unscale; fp16-scaled norms overflowed and produced a zero clip ratio.</cause_summary>
+  <disposition>fixed</disposition>
+  <evidence>Deterministic replay with seed=42 reproduced NaN at the identical step; reordering unscale before clip eliminated the divergence.</evidence>
+  <fix_summary>Reorder operations in \`trainer/loop.py\` so unscale_ precedes clip_grad_norm_.</fix_summary>
+</causal_incident>
+</events>`
+  },
+  {
+    importance: 86,
+    block: `<compartment start="630" end="744" title="CRDT merge ordering: hybrid logical clocks over wall-clock LWW" episode_type="design,feature" importance="86">
+<p1>
+Designed the conflict-resolution layer for the collaborative document model. Two writers can edit the same text node concurrently across regions; the question is how we order their writes so all replicas converge.
+
+Pure wall-clock last-write-wins is unsafe — laptops can be 60+ seconds skewed, and we've seen clock drift on iPad clients that pause+resume. Pure Lamport clocks converge but produce visually wrong results (a stale-but-higher-Lamport write wins over a fresh edit).
+
+Settled on hybrid logical clocks (HLC): \`(physical_ms, logical_counter, node_id)\`. Physical component is wall-clock, but on receive we take \`max(local_physical, remote_physical)\` and bump the logical counter when ties happen. Bounded skew tolerance: we reject any incoming HLC whose physical component is more than 300s ahead of local — that's the "your clock is too broken to participate" line.
+
+Per-character ops use Yjs internally (we'd evaluated Automerge but its merge cost scales worse for our 50k-char doc size). Yjs's \`Y.Doc\` is wrapped by our \`LoomDoc\` so the HLC sits on top of Yjs's own ordering — Yjs handles concurrent insertion positioning, HLC handles cross-region conflict resolution at the structural level (block moves, deletions of whole nodes).
+</p1>
+<p2>
+CRDT layer: Yjs for per-character ops wrapped by \`LoomDoc\`, hybrid logical clocks \`(physical_ms, logical, node_id)\` for structural-op ordering. Reject any incoming HLC more than 300s ahead of local. Yjs chosen over Automerge for merge-cost scaling at 50k-char docs.
+</p2>
+<p3>
+Conflict resolution is HLC-based with a 300s skew cap; per-character editing uses Yjs.
+</p3>
+<p4>
+LoomDoc wraps Y.Doc; HLC (physical_ms, logical, node_id); skew cap 300s
+</p4>
+</compartment>
+<facts>
+<ARCHITECTURE>
+* Document conflict resolution uses a two-layer model: Yjs handles concurrent per-character positioning, while a hybrid logical clock on top orders structural operations across regions. The split exists because Yjs's intrinsic ordering doesn't carry cross-region semantics for whole-node operations.
+</ARCHITECTURE>
+<CONSTRAINTS>
+* Incoming HLC values whose physical component is more than 300 seconds ahead of local are rejected — clients with worse skew can't participate in collaboration until they correct.
+</CONSTRAINTS>
+<NAMING>
+* CRDT library: Yjs (rejected Automerge for merge-cost scaling on ~50k-char documents). Our wrapper type is \`LoomDoc\`.
+</NAMING>
+</facts>`
+  },
+  {
+    importance: 86,
+    block: `<compartment start="79" end="94" title="Auditable proration credit ledger" episode_type="design,feature,release" importance="86">
+<p1>
+U: "credits are money; don't hide them in metadata"
+
+Built Billetto's proration credit flow around real ledger entries instead of Stripe invoice metadata. The new billing/src/credits/proration.ts calculates unused-time and downgrade credits against subscription_version, then writes account_credit_entries tied to invoice_line_id. U: "we need ledger lines you can audit in six months"
+
+Retries reuse the same idempotency key and detect existing ledger entries instead of minting another credit. Added migration 202605101422_add_account_credit_entries.sql, rollback dry-run fixtures, and a release check that compares Stripe invoice totals against the local ledger. Commit 6c2d8ef.
+</p1>
+<p2>
+Billetto proration credits are ledger entries because U: "credits are money; don't hide them in metadata". account_credit_entries ties credits to invoice_line_id and subscription_version for auditable retries.
+</p2>
+<p3>
+Billetto made proration credits auditable by storing them in its own ledger table rather than Stripe metadata.
+</p3>
+<p4>account_credit_entries; subscription_version; proration idempotency key</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* Billetto billing migrations must include a rollback dry-run against test/fixtures/billing-ledger/.
+</PROJECT_RULES>
+<ARCHITECTURE>
+* Billetto represents credits as account_credit_entries tied to invoice_line_id, not as Stripe metadata.
+* Billetto proration calculation is idempotent around subscription_version and reuses existing ledger entries on retry.
+</ARCHITECTURE>
+<CONSTRAINTS>
+* Stripe invoice metadata is not a durable Billetto credit ledger because dashboard edits can mutate it outside the app.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* Billetto credit_kind enum values are unused_time, plan_downgrade, and manual_adjustment.
+* Billetto Stripe idempotency key format for proration is proration:{account_id}:{subscription_version}:{invoice_id}.
+</CONFIG_VALUES>
+<NAMING>
+* The Billetto credit ledger table is named account_credit_entries; "negative_invoice_lines" was rejected.
+</NAMING>
+</facts>`
+  },
+  {
+    importance: 82,
+    block: `<compartment start="15" end="22" title="Stopped contrastive loss cliff" episode_type="investigation,bug" importance="82">
+<p1>
+U: "can you chase the loss cliff, not tune around it"
+
+Investigated Nereid's contrastive trainer after loss jumped from 0.42 to 3.8 around step 17.8k on A100 runs. The tempting path was LR tuning, but crop-hash logging showed duplicated augmentations across dataloader workers after worker_init_fn was dropped in 6fb2d90. Restored per-worker seeding in training/data/seed.py, added epoch_seed to the run manifest, and reran runs/2026-05-08/a100-bf16-rerun through 52k steps without the cliff. Commit c8e4a11.
+</p1>
+<p2>
+Nereid's loss cliff was caused by shared augmentation seeds across dataloader workers, not optimizer settings. training/data/seed.py now derives worker seeds from base seed, worker id, and epoch.
+</p2>
+<p3>
+Nereid contrastive training stabilized after restoring per-worker augmentation seeds.
+</p3>
+<p4>worker_init_fn; augmentation_seed; runs/2026-05-08/a100-bf16-rerun</p4>
+</compartment>
+<facts>
+<CONSTRAINTS>
+* Nereid's contrastive trainer can diverge if augmentation_seed is shared across dataloader workers.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* Nereid worker augmentation seed formula is base_seed + worker_id + epoch * 1009.
+</CONFIG_VALUES>
+</facts>
+<events>
+<causal_incident at_compartment="2">
+  <summary>Training loss cliff traced to duplicated augmentation seeds.</summary>
+  <affected_surface>other</affected_surface>
+  <symptom>Contrastive loss jumped from 0.42 to 3.8 around step 17.8k on A100 runs.</symptom>
+  <cause_summary>worker_init_fn had been removed, causing dataloader workers to reuse augmentation seeds.</cause_summary>
+  <disposition>fixed</disposition>
+  <evidence>Crop-hash logging showed duplicated augmentations across dataloader workers.</evidence>
+  <fix_summary>Restored per-worker seed derivation in training/data/seed.py and recorded epoch_seed in run manifests.</fix_summary>
+</causal_incident>
+</events>`
+  },
+  {
+    importance: 79,
+    block: `<compartment start="1058" end="1187" title="Idempotency strategy for Stripe webhook handlers" episode_type="design,bug" importance="79">
+<p1>
+Duplicate charge events from Stripe were producing duplicate invoice rows in our system. Root issue: we'd been keying our internal idempotency on the request signature header, but Stripe's docs are clear that signature is per-DELIVERY, not per-EVENT — Stripe retries the same event with a fresh signature and timestamp.
+
+Redesigned. Idempotency now keys on the Stripe \`event.id\` itself (format: \`evt_*\`). New table \`stripe_event_idempotency(event_id text primary key, first_seen_at timestamptz, response_body bytea, response_status int)\`. Handler flow: open transaction → INSERT ... ON CONFLICT DO NOTHING → if no row inserted, return the stored response; else process and store the response inside the same transaction. TTL on rows is 90 days (Stripe's documented retry-then-give-up window is 3 days, so 90 is generous).
+
+U: don't be clever about the TTL, just set it long enough that we never see a Stripe replay miss
+
+The handler is wrapped in \`internal/billing/webhooks/idempotent.go\` and the table lives in the \`billing\` schema. Removed the old signature-based dedup entirely — keeping both would mask routing bugs.
+</p1>
+<p2>
+Stripe webhook idempotency rebuilt around \`event.id\` (not delivery signature). Table \`billing.stripe_event_idempotency\` stores event_id, first_seen, response body+status. Inside one transaction: INSERT ON CONFLICT DO NOTHING, replay stored response if not inserted, else process+store. 90-day TTL. U: "don't be clever about the TTL, just set it long enough that we never see a Stripe replay miss." Old signature-based dedup deleted.
+</p2>
+<p3>
+Stripe webhook idempotency keys on event.id with stored response replay; old signature-based dedup removed.
+</p3>
+<p4>
+billing.stripe_event_idempotency; key = event.id; TTL 90d
+</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* Idempotency for any external webhook source must key on the provider's event identifier (e.g. Stripe \`event.id\`), never on delivery-level signatures or timestamps. Stored response body+status is returned on duplicate.
+</PROJECT_RULES>
+<CONSTRAINTS>
+* Stripe webhook signatures and timestamps are regenerated per delivery attempt — they CANNOT be used as idempotency keys because retries of the same event produce different signatures.
+</CONSTRAINTS>
+<ARCHITECTURE>
+* Webhook idempotency uses a write-through pattern: the handler's full response is captured inside the same transaction that records the event_id, so replays return byte-identical responses without re-executing side effects.
+</ARCHITECTURE>
+<CONFIG_VALUES>
+* \`billing.stripe_event_idempotency\` table; primary key on \`event_id\`; row TTL 90 days; wrapper in \`internal/billing/webhooks/idempotent.go\`.
+</CONFIG_VALUES>
+<NAMING>
+* Webhook idempotency table is \`billing.stripe_event_idempotency\`. Future provider-specific tables follow the pattern \`<provider>_event_idempotency\`.
+</NAMING>
+</facts>
+<events>
+<causal_incident at_compartment="8">
+  <summary>Duplicate invoices were being created when Stripe retried webhook deliveries.</summary>
+  <affected_surface>provider_sdk</affected_surface>
+  <symptom>Customer support reported multiple customers seeing duplicate invoices for the same charge event.</symptom>
+  <cause_summary>Our dedup keyed on the webhook signature header, but Stripe regenerates that per delivery attempt — retries bypassed dedup.</cause_summary>
+  <disposition>fixed</disposition>
+  <evidence>Stripe dashboard event log showed multiple delivery attempts of the same \`evt_*\` ID, each producing a new invoice row in our DB.</evidence>
+  <fix_summary>Reimplemented idempotency on \`event.id\`; added write-through response storage; deleted signature-based dedup.</fix_summary>
+</causal_incident>
+</events>`
+  },
+  {
+    importance: 78,
+    block: `<compartment start="361" end="392" title="Tethys: JWT refresh not re-fetching tenant roles after role change" episode_type="investigation,bug,refactor" importance="78">
+<p1>
+Bug report: a user whose tenant admin role was revoked could still access admin-only endpoints for up to 15 minutes after revocation. Investigation showed JWT access tokens carry tenant_roles claim at issue time; revoking a role in the DB doesn't invalidate existing tokens, which remain valid until TTL expiry.
+
+U: "this is a security issue, not a UX issue — we need role changes to propagate faster than 15 minutes"
+
+The clean fix was the refresh path: on token refresh, re-query tenant membership and embed fresh claims. But the refresh endpoint (auth/token/refresh.go) was only re-issuing basic claims (sub, iat, exp) and copying TenantRoles verbatim from the incoming token. One-line omission: refreshedClaims.TenantRoles was never populated from a fresh DB lookup.
+
+Fixed by pulling tenant membership at refresh time and embedding in the new token. Added an integration test: revoke a role, trigger a refresh, assert the refreshed token does not carry the revoked role.
+
+U: "what's the max lag now"
+
+Max lag is bounded by access_token_ttl=900 s for clients that never call refresh. Any client that refreshes (which the SDK does automatically on 401) gets updated claims immediately. Acceptable under current threat model. Committed 9d7ca2c.
+</p1>
+<p2>
+Tethys JWT refresh was copying tenant_roles from old token instead of re-fetching; revoked roles persisted for up to access_token_ttl=900 s. Fixed in auth/token/refresh.go: fresh tenant membership fetched at refresh time (9d7ca2c). U: "this is a security issue" — treated as immediate priority. Max lag now bounded by TTL for clients that never refresh.
+</p2>
+<p3>
+Tethys token refresh now embeds freshly-fetched tenant_roles; revoked role lag bounded by access_token_ttl=900 s.
+</p3>
+<p4>
+JWT refresh; tenant_roles; access_token_ttl=900s; refresh_token_ttl=86400s; auth/token/refresh.go
+</p4>
+</compartment>
+<facts>
+<CONSTRAINTS>
+* Tethys JWT access tokens carry tenant_roles at issue time; role changes do not invalidate existing tokens — a revoked role remains usable until token expiry (up to access_token_ttl=900 s for clients that don't refresh).
+</CONSTRAINTS>
+<PROJECT_RULES>
+* Tethys token refresh must always re-fetch tenant_roles from the DB; never carry role claims forward from the incoming token.
+</PROJECT_RULES>
+<CONFIG_VALUES>
+* Tethys token TTLs: access_token_ttl=900 s, refresh_token_ttl=86400 s.
+</CONFIG_VALUES>
+</facts>
+<events>
+<causal_incident at_compartment="15">
+  <summary>Revoked tenant admin role remained usable via JWT for up to 15 minutes after DB revocation</summary>
+  <affected_surface>other</affected_surface>
+  <symptom>User with revoked admin role could access admin-only endpoints for up to access_token_ttl duration after revocation</symptom>
+  <cause_summary>Token refresh endpoint copied TenantRoles claim verbatim from incoming token instead of re-fetching from DB; refreshed tokens perpetuated stale role grants indefinitely</cause_summary>
+  <disposition>fixed</disposition>
+  <evidence>the refresh endpoint was only re-issuing basic claims (sub, iat, exp) and copying TenantRoles verbatim from the incoming token — one-line omission</evidence>
+  <fix_summary>Pull fresh tenant membership from DB at refresh time; embed updated TenantRoles in new token; integration test added</fix_summary>
+</causal_incident>
+</events>
+<user_observations>
+* User explicitly labels security issues ("this is a security issue, not a UX issue") and expects immediate escalated priority separate from normal bug triage.
+</user_observations>`
+  },
+  {
+    importance: 74,
+    block: '<compartment start="760" end="848" title="HLS segment numbering migration from 5-digit to 9-digit indices" episode_type="refactor,infra" importance="74">\n<p1>\nThe transcoder\'s HLS output was using `segment_%05d.ts` — five digits, max 99,999 segments. For a 24/7 live channel at 6s segments that\'s ~7 days before wraparound, and we just hit a wraparound on `channel-news-east` Friday night that broke the playlist sliding window for ~40 minutes before paging on-call noticed.\n\nMigrated to `segment_%09d.ts` everywhere. Touched `transcoder/hls/segmenter.go` for the writer, `transcoder/hls/playlist.go` for the manifest builder, and the CDN purge job\'s glob in `ops/purge-stale-segments.sh`. The CDN cache config didn\'t need changes — the glob was already `segment_*.ts`. Backfill is a no-op because old playlists naturally roll off the sliding window within an hour.\n\nCodified in the writer: any future segment-index format change must keep monotonic ordering AND must always be lexicographically sortable. The 5-digit choice was actually fine lexicographically until wraparound — the failure mode was running out of namespace, not ordering.\n</p1>\n<p2>\nHLS segment naming widened from `%05d` to `%09d` after a live-channel wraparound broke playlist sliding-window on `channel-news-east`. Changes in `transcoder/hls/segmenter.go` and `transcoder/hls/playlist.go`. Naming rule documented: segment indices must always be zero-padded to remain lexicographically sortable, with enough digits for a year of continuous segments at our minimum segment duration.\n</p2>\n<p3>\nHLS segment indices widened after a live-channel index wraparound.\n</p3>\n<p4>\nsegment_%09d.ts; transcoder/hls/\n</p4>\n</compartment>\n<facts>\n<CONFIG_VALUES>\n* HLS segment filename format: `segment_%09d.ts` (writer in `transcoder/hls/segmenter.go`, manifest builder in `transcoder/hls/playlist.go`).\n</CONFIG_VALUES>\n<PROJECT_RULES>\n* HLS segment indices must be zero-padded to a width sufficient for at least one year of continuous output at the minimum supported segment duration. Lexicographic sortability is required for CDN purge globbing.\n</PROJECT_RULES>\n</facts>\n<events>\n<causal_incident at_compartment="5">\n  <summary>Live channel playback window broke for ~40 minutes after HLS segment index wrapped from 99,999 back to 0.</summary>\n  <affected_surface>edit_pipeline</affected_surface>\n  <symptom>Playlist sliding window on `channel-news-east` stopped advancing; viewers saw frozen live feed for ~40 minutes.</symptom>\n  <cause_summary>5-digit segment index namespace exhausted on a continuously-running channel; new segments lexicographically sorted before old ones, breaking the manifest builder\'s ordering assumption.</cause_summary>\n  <disposition>fixed</disposition>\n  <evidence>On-call paged on viewer drop in channel-news-east; logs showed segment files alternating between `segment_99998.ts` and `segment_00000.ts` in the same directory.</evidence>\n  <fix_summary>Widened format to `segment_%09d.ts` across writer, manifest builder, and CDN purge glob.</fix_summary>\n</causal_incident>\n</events>'
+  },
+  {
+    importance: 74,
+    block: `<compartment start="115" end="126" title="Partition stats invalidation fence" episode_type="investigation,bug" importance="74">
+<p1>
+Went after the planner regression in BirchDB where a detach and reattach burst on a partitioned table could push the optimizer toward a seq scan even though the SQL and schema stayed the same. The hot path was src/planner/stats_cache.rs: NDV and selectivity estimates survived child-map churn because the cache key only looked at parent identity and predicate shape. Commit d91fe63.
+
+I added partition_epoch in src/catalog/partition_map.rs, bumped it on attach and detach commit, and keyed cached stats on that epoch so topology changes invalidate only the affected estimates. tests/sql/partition_pruning_regress.slt now exercises the exact detach, reattach, and replan sequence instead of just checking fresh planner state.
+</p1>
+<p2>
+BirchDB's planner cache was too coarse for partition topology changes. src/planner/stats_cache.rs now includes partition_epoch from src/catalog/partition_map.rs so attach and detach churn invalidates stale selectivity data without flushing everything.
+</p2>
+<p3>
+Partition membership changes now fence planner statistics through partition_epoch. The durable point is that topology changes can invalidate estimates even when table schema and query text are unchanged.
+</p3>
+<p4>Partition topology changes now fence planner stats through partition_epoch instead of relying on coarse cache clears.</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* Any catalog change affecting partition membership needs a planner regression under tests/sql/partition_pruning_regress.slt.
+</PROJECT_RULES>
+<ARCHITECTURE>
+* Planner stats cache keys include partition_epoch so partition topology changes invalidate selectivity estimates without clearing the whole cache.
+</ARCHITECTURE>
+<CONSTRAINTS>
+* Child partition attach and detach can make NDV and selectivity data unsafe even when the parent table schema is unchanged.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* New planner cache key field: partition_epoch.
+</CONFIG_VALUES>
+</facts>
+<events>
+<causal_incident at_compartment="13">
+  <summary>Partition churn led the planner toward seq scans because cached selectivity estimates outlived topology changes.</summary>
+  <affected_surface>other</affected_surface>
+  <symptom>After detach and reattach activity, identical queries could switch from expected partition-pruned plans to broader seq scans.</symptom>
+  <cause_summary>The stats cache keyed estimates too loosely and did not notice child partition membership changes.</cause_summary>
+  <disposition>fixed</disposition>
+  <evidence>Repro in tests/sql/partition_pruning_regress.slt showed stale NDV surviving detach and reattach until the new epoch field was added.</evidence>
+  <fix_summary>Added partition_epoch to the cache key and bumped it on partition topology commits.</fix_summary>
+</causal_incident>
+</events>`
+  },
+  {
+    importance: 72,
+    block: `<compartment start="95" end="110" title="CRDT ordering by Lamport site" episode_type="design,refactor,investigation" importance="72">
+<p1>
+Started CollabPad reconnect handling by sorting incoming ops with server receivedAt. U: "server time feels simpler; prove it doesn't lie"
+
+The offline-client replay test proved it did lie: a browser tab could reconnect over WebRTC with buffered edits older than a websocket ack, and the server would assign a later receivedAt that inverted causality. U: "ok, make the doc clock the story, not the transport"
+
+Refactored packages/collab/src/oplog.ts and packages/collab/src/sync/replay.ts to order by (lamport, site_id), with receivedAt kept only for telemetry. Renamed clientId to site_id in the wire schema because tabs, workers, and imported offline bundles are separate editing sites even when they share an account. Commit b44e0d9.
+</p1>
+<p2>
+CollabPad abandoned receivedAt ordering after the reconnect test showed it inverted offline edits. U: "make the doc clock the story, not the transport"; ops now order by (lamport, site_id).
+</p2>
+<p3>
+CollabPad CRDT ordering now follows document clocks rather than server receive time.
+</p3>
+<p4>lamport site_id; receivedAt telemetry only; reconnect replay</p4>
+</compartment>
+<facts>
+<ARCHITECTURE>
+* CollabPad orders CRDT operations by (lamport, site_id); server receivedAt is telemetry only.
+</ARCHITECTURE>
+<CONSTRAINTS>
+* WebRTC reconnect can deliver buffered CollabPad ops older than a websocket ack, so receivedAt cannot be used as causal order.
+</CONSTRAINTS>
+<NAMING>
+* CollabPad's editing-site field is named site_id rather than clientId because multiple browser contexts can share one account.
+</NAMING>
+</facts>
+<events>
+<trajectory_correction at_compartment="10">
+  <summary>Changed CollabPad op ordering from server time to document clocks.</summary>
+  <before_strategy>Sort reconnect replay operations by server receivedAt.</before_strategy>
+  <correction_source>test_result</correction_source>
+  <correction_signal>The offline-client replay test showed receivedAt inverted edits buffered over WebRTC.</correction_signal>
+  <after_strategy>Order operations by lamport and site_id, keeping receivedAt only for telemetry.</after_strategy>
+  <evidence>The final patch refactored oplog.ts and replay.ts around (lamport, site_id).</evidence>
+</trajectory_correction>
+</events>
+<user_observations>
+* User asks for simple designs but accepts added machinery when a test demonstrates the simpler model is false.
+</user_observations>`
+  },
+  {
+    importance: 71,
+    block: `<compartment start="861" end="943" title="BLE bonding records lost across firmware OTA — bond table erase fix" episode_type="bug,feature" importance="71">
+<p1>
+Customer reported that after every OTA update, paired phones had to re-bond with the wearable. Tracked to the OTA pre-image-swap routine in \`boot/dfu/swap.c\` doing a full sector erase of the flash region from 0x70000–0x7FFFF, which (per the partition map we'd "verified" in 2023) is supposed to be free space. Except the nRF SDK 2.6.0 bond manager parks the bond table at 0x7E000–0x7FFFF when \`NRF_FSTORAGE_API_FDS\` is enabled, and it doesn't honor the partition manifest.
+
+Fix: defined a dedicated \`bond_table\` partition at 0x7E000–0x7FFFF in \`pm_static.yml\`, narrowed the OTA pre-swap erase to 0x70000–0x7DFFF, and verified across an OTA cycle that bonds survive. Bond table capacity stays at 8 entries (SDK default) — we'll revisit if customers complain about that ceiling.
+</p1>
+<p2>
+OTA pre-swap erase was clobbering the nRF SDK bond table (parked at 0x7E000–0x7FFFF when FDS is enabled, despite our partition manifest claiming the region was free). Carved out a \`bond_table\` partition in \`pm_static.yml\` and narrowed the erase range. Bond capacity unchanged at 8 entries.
+</p2>
+<p3>
+OTA was erasing the SDK bond table; carved a dedicated partition to protect it.
+</p3>
+<p4>
+bond_table partition 0x7E000–0x7FFFF; pm_static.yml
+</p4>
+</compartment>
+<facts>
+<CONSTRAINTS>
+* nRF SDK 2.6.0 bond manager (with \`NRF_FSTORAGE_API_FDS\`) writes its bond table to the top 8KB of flash regardless of the partition manifest — the SDK does not consult \`pm_static.yml\`.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* \`bond_table\` partition reserved at 0x7E000–0x7FFFF in \`pm_static.yml\`. OTA pre-swap erase range narrowed to 0x70000–0x7DFFF.
+</CONFIG_VALUES>
+</facts>
+<events>
+<causal_incident at_compartment="6">
+  <summary>Paired phones lost their bond with the wearable after every OTA update.</summary>
+  <affected_surface>environment</affected_surface>
+  <symptom>Customers had to re-pair their phones after each firmware update.</symptom>
+  <cause_summary>OTA pre-image-swap erased flash 0x70000–0x7FFFF, which overlapped the nRF SDK's bond table at 0x7E000–0x7FFFF — the SDK ignores the partition manifest and writes there unconditionally.</cause_summary>
+  <disposition>fixed</disposition>
+  <evidence>Flash dump after OTA showed all bond records zeroed.</evidence>
+  <fix_summary>Reserved a \`bond_table\` partition and narrowed the OTA erase range to avoid it.</fix_summary>
+</causal_incident>
+</events>`
+  },
+  {
+    importance: 71,
+    block: `<compartment start="58" end="74" title="Vesper: controller leader election via Kubernetes Lease" episode_type="feature,infra" importance="71">
+<p1>
+Implemented controller leader election for Vesper using a Kubernetes Lease resource in the operator's own namespace. Only the replica holding the lease processes reconciliation events; others run health probes only and skip the reconcile loop entirely. Lease parameters exposed as env vars: VESPER_LEASE_DURATION_S (default 30), VESPER_RENEW_INTERVAL_S (default 10), VESPER_ACQUIRE_DEADLINE_S (default 8). Implementation in internal/controller/leader.go using controller-runtime's leaderelection package. Non-holders log at DEBUG when skipping reconcile, making it easy to confirm only one is active.
+
+U: "ship multi-replica support today if possible, we've had two operators conflict on the same resource this week"
+
+Tested with 3 replicas; leader loss triggers handoff within one renew interval. Committed b9e14c3.
+</p1>
+<p2>
+Vesper controller leader election via Kubernetes Lease: only the lease holder reconciles, others skip. VESPER_LEASE_DURATION_S=30, VESPER_RENEW_INTERVAL_S=10, VESPER_ACQUIRE_DEADLINE_S=8. internal/controller/leader.go (b9e14c3).
+</p2>
+<p3>
+Vesper uses Lease-based leader election; only one replica reconciles at a time; handoff within one renew interval on leader loss.
+</p3>
+<p4>
+leader election; Lease resource; VESPER_LEASE_DURATION_S; VESPER_RENEW_INTERVAL_S; VESPER_ACQUIRE_DEADLINE_S; internal/controller/leader.go
+</p4>
+</compartment>
+<facts>
+<ARCHITECTURE>
+* Vesper controller uses Kubernetes Lease-based leader election; non-holder replicas skip the reconcile loop entirely and only run health probes.
+</ARCHITECTURE>
+<CONFIG_VALUES>
+* Vesper leader election defaults: VESPER_LEASE_DURATION_S=30, VESPER_RENEW_INTERVAL_S=10, VESPER_ACQUIRE_DEADLINE_S=8 (all overridable via env).
+</CONFIG_VALUES>
+</facts>`
+  },
+  {
+    importance: 68,
+    block: `<compartment start="418" end="452" title="boltpkg: plugin lifecycle hook API design and documentation" episode_type="design,docs" importance="68">
+<p1>
+Designed and documented the plugin lifecycle hook API for boltpkg. Initially prototyped an EventEmitter model where plugins subscribe to named events (install:pre, install:post, remove). Load testing with 4 plugins all subscribing to install:pre showed non-deterministic execution order depending on which plugin was registered first — registration order is load-order-dependent and not something plugin authors can control reliably.
+
+U: "plugins need predictable ordering or we'll be chasing user-reported race conditions forever"
+
+Pivoted to explicit lifecycle hooks: plugins export a manifest with declared hook functions (onPreInstall, onPostInstall, onRemove). Hooks fire in dependency-declaration order — if plugin B declares a dependency on plugin A, A's hooks run first. This is deterministic and matches user intuition about dependency ordering.
+
+U: "what if a plugin doesn't implement a hook — do we error or skip"
+
+Skip silently; missing hooks are optional. Unknown hooks in the manifest are ignored (forward-compatible). Manifest must include schema_version; loader rejects manifests with unrecognized schema versions to prevent silently running incompatible plugins.
+
+Documented in docs/plugin-api.md. Interfaces in src/plugin/types.ts. Committed e9a3b81.
+</p1>
+<p2>
+boltpkg plugin API uses explicit lifecycle hooks (onPreInstall, onPostInstall, onRemove) firing in dependency-declaration order. EventEmitter model dropped due to non-deterministic registration-order dependency. U: "plugins need predictable ordering" drove the pivot. Manifest must declare schema_version; loader rejects unknown versions. docs/plugin-api.md; src/plugin/types.ts.
+</p2>
+<p3>
+boltpkg plugin lifecycle uses explicit ordered hooks in dependency-declaration order; schema_version in manifest required; EventEmitter rejected.
+</p3>
+<p4>
+onPreInstall; onPostInstall; onRemove; schema_version; dependency-declaration order; EventEmitter rejected
+</p4>
+</compartment>
+<facts>
+<ARCHITECTURE>
+* boltpkg plugin hooks execute in plugin dependency-declaration order, not registration order; deterministic and matches user expectations about dependency sequencing.
+</ARCHITECTURE>
+<NAMING>
+* boltpkg plugin lifecycle hooks: onPreInstall, onPostInstall, onRemove (src/plugin/types.ts).
+</NAMING>
+<PROJECT_RULES>
+* boltpkg plugin manifests must include schema_version; the loader rejects manifests with unrecognized schema versions to prevent silently running mismatched plugins.
+</PROJECT_RULES>
+</facts>
+<events>
+<trajectory_correction at_compartment="17">
+  <summary>EventEmitter plugin model dropped in favor of explicit lifecycle hooks after ordering non-determinism discovered</summary>
+  <before_strategy>EventEmitter model: plugins subscribe to named events (install:pre, install:post, remove); order determined by registration</before_strategy>
+  <correction_source>test_result</correction_source>
+  <correction_signal>Load test with 4 plugins all subscribing to install:pre showed non-deterministic execution order dependent on plugin registration sequence</correction_signal>
+  <after_strategy>Explicit lifecycle hook functions declared in plugin manifest; executed in dependency-declaration order (deterministic)</after_strategy>
+  <evidence>Load testing with 4 plugins all subscribing to install:pre showed non-deterministic execution order depending on which plugin was registered first.</evidence>
+</trajectory_correction>
+</events>`
+  },
+  {
+    importance: 68,
+    block: `<compartment start="30" end="36" title="Added subscription day fact table" episode_type="feature,infra" importance="68">
+<p1>
+U: "I want finance to answer 'what was MRR on Tuesday' without replaying the universe"
+
+Added warehouse/models/marts/fct_subscription_day.sql in Northstar DW as an incremental dbt model. It snapshots subscription state per account per day from stg_billing_events and dims it through dim_plan, so finance can query historical MRR without replaying all billing events. Added a backfill macro in warehouse/macros/backfill_subscription_day.sql and documented the windowed rerun in warehouse/README.md. Commit d4b13f0.
+</p1>
+<p2>
+Northstar DW now has fct_subscription_day as the daily subscription/MRR snapshot, with a dbt backfill macro for controlled date-window reruns.
+</p2>
+<p3>
+Subscription MRR history moved into a daily fact table instead of being reconstructed from raw billing events at query time.
+</p3>
+<p4>fct_subscription_day; dbt incremental; MRR daily snapshot</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* Northstar DW subscription backfills should use the backfill_subscription_day dbt macro instead of ad hoc DELETE and INSERT queries.
+</PROJECT_RULES>
+<ARCHITECTURE>
+* Northstar DW answers historical MRR from fct_subscription_day daily snapshots rather than replaying raw billing events at query time.
+</ARCHITECTURE>
+<CONFIG_VALUES>
+* fct_subscription_day is materialized incrementally with unique key account_id, subscription_id, and date_day.
+</CONFIG_VALUES>
+<NAMING>
+* The subscription daily snapshot model is named fct_subscription_day.
+</NAMING>
+</facts>`
+  },
+  {
+    importance: 67,
+    block: `<compartment start="958" end="1042" title="Matchmaking bucket calibration after season-3 player distribution shift" episode_type="feature" importance="67">
+<p1>
+Season 3 introduced ranked-restricted heroes which compressed the high-skill distribution — the top decile now sits in a much narrower MMR band. Old matchmaking buckets (width=100 MMR, K-factor=32) produced lopsided lobbies for top-500 players because the bucket frequently spanned the entire competitive range.
+
+Recalibrated. New bucket width 50, K-factor dropped to 24 across the board for stability. Bucket expansion is now asymmetric: a player waits up to 60s in their native bucket, then expands DOWN-only for the next 60s (top players never get matched UP into a bucket that doesn't exist), and only after 120s do we expand symmetrically.
+
+U: keep it asymmetric, the symmetric expansion was producing those "rank-1 vs gold" clips that made the front page of the subreddit
+
+Numbers came from sweeping a replay of the last 7 days of queue history; the new params land us at 89% balanced-lobby rate (was 71%).
+</p1>
+<p2>
+Matchmaking recalibrated for Season 3's compressed top-decile distribution: bucket width 100→50, K-factor 32→24, asymmetric bucket expansion (down-only for the first 60s after the initial wait). Validated via replay sweep on the last 7 days of queue history: 89% balanced-lobby rate, up from 71%.
+</p2>
+<p3>
+Matchmaking buckets narrowed and bucket expansion made asymmetric to stop top-skill players from getting matched into empty upper buckets.
+</p3>
+<p4>
+bucket width 50; K=24; asymmetric expansion down-only first 60s
+</p4>
+</compartment>
+<facts>
+<CONFIG_VALUES>
+* Matchmaking: bucket width 50 MMR, K-factor 24, native-bucket wait 60s, down-only expansion phase 60s, symmetric expansion after 120s.
+</CONFIG_VALUES>
+<ARCHITECTURE>
+* Matchmaking expands the candidate bucket asymmetrically (down-only first) for high-rank players because the skill distribution is right-truncated — there are no buckets above them to expand into, and expanding symmetrically produces visible mismatches.
+</ARCHITECTURE>
+</facts>
+<user_observations>
+* User cites public/community signal (subreddit, social) as concrete evidence when arguing for a design choice, treating it as a real constraint rather than noise.
+</user_observations>`
+  },
+  {
+    importance: 61,
+    block: `<compartment start="70" end="78" title="Preserved PDF rotation before OCR" episode_type="investigation,bug" importance="61">
+<p1>
+QuillOCR misread several rotated county tax forms after the Poppler path landed. The symptom was columns transposed only on pages using JBIG2 image masks. The raster path in workers/pdf/rasterize.ts trusted pdfimages output, but pdfimages dropped page rotation for those masks; Tesseract then deskewed from the wrong orientation. Fixed by reading rotation from pdfinfo before rasterization and applying it in normalizePageBitmap(). Added fixtures under test/fixtures/county-tax-rotated/. Commit f0a6d2b.
+</p1>
+<p2>
+QuillOCR now reads page rotation from pdfinfo before rasterizing Poppler image output, fixing rotated JBIG2-mask tax forms.
+</p2>
+<p3>
+PDF page rotation is captured before OCR rasterization so Tesseract sees the correct orientation.
+</p3>
+<p4>pdfinfo rotation; JBIG2 masks; normalizePageBitmap</p4>
+</compartment>
+<facts>
+<CONSTRAINTS>
+* QuillOCR cannot rely on pdfimages output for page rotation when Poppler emits JBIG2 masks; rotation must be read from pdfinfo before rasterization.
+</CONSTRAINTS>
+</facts>
+<events>
+<causal_incident at_compartment="8">
+  <summary>Rotated tax forms were misread because Poppler image extraction lost rotation.</summary>
+  <affected_surface>other</affected_surface>
+  <symptom>OCR transposed columns on rotated county tax-form pages using JBIG2 masks.</symptom>
+  <cause_summary>The pdfimages path dropped page rotation, so Tesseract deskewed from the wrong orientation.</cause_summary>
+  <disposition>fixed</disposition>
+  <evidence>The failure reproduced only on rotated JBIG2-mask fixtures.</evidence>
+  <fix_summary>Read rotation from pdfinfo before rasterization and applied it in normalizePageBitmap().</fix_summary>
+</causal_incident>
+</events>`
+  },
+  {
+    importance: 58,
+    block: `<compartment start="138" end="146" title="Moved synonym rollout to shadow index" episode_type="infra,refactor" importance="58">
+<p1>
+Reworked how the Atlas search stack ships synonym changes after the last in-place reload caused a lunchtime latency spike. search/indexer/src/synonyms/reload.ts no longer patches the hot index directly; instead it builds a shadow index, loads the synonym set there, warms the query cache, and then swaps aliases. terraform/opensearch/synonym_sets.tf and docs/search/release.md were updated to treat synonym changes the same way schema promotions already work. Commit 73ce4ad.
+</p1>
+<p2>
+Atlas search now rolls out synonym changes through a shadow-index promotion instead of mutating the live index in place. That keeps synonym updates on the same safer path as schema changes.
+</p2>
+<p3>
+Synonym edits are now shipped by building and promoting a shadow index, not by reloading the hot one.
+</p3>
+<p4>products_live; products_next; shadow-index synonym rollout</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* Search schema changes and synonym changes ship through the same shadow-index promotion workflow.
+</PROJECT_RULES>
+<ARCHITECTURE>
+* Synonym changes are applied by building a shadow index and swapping aliases, not by reloading the hot index in place.
+</ARCHITECTURE>
+<NAMING>
+* The paired search aliases are products_live and products_next.
+</NAMING>
+</facts>`
+  },
+  {
+    importance: 54,
+    block: `<compartment start="65" end="69" title="Kept ranked parties intact" episode_type="feature" importance="54">
+<p1>
+U: "keep duos together even if it adds 30s; don't split the party for math"
+
+Updated Arcade Relay matchmaking in services/matchmaker/src/ranked_duo.rs so party_id is a hard constraint. The ranked_duo queue now widens MMR windows over time before considering cross-region fallback, and the solver rejects any candidate lobby that splits a party. Added simulations in services/matchmaker/test/fixtures/duo_wait_curves.json. Commit 5b1e7aa.
+</p1>
+<p2>
+Arcade Relay ranked_duo matchmaking treats party_id as non-splittable and widens MMR windows before relaxing anything else.
+</p2>
+<p3>
+Ranked duo matchmaking now preserves parties even when it increases queue time.
+</p3>
+<p4>ranked_duo; party_id hard constraint; duo_wait_curves</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* Arcade Relay matchmaker must not split a party_id across ranked lobbies; widen match criteria before breaking party constraints.
+</PROJECT_RULES>
+<CONFIG_VALUES>
+* Arcade Relay ranked_duo MMR window widens by 75 every 15s up to 450.
+</CONFIG_VALUES>
+</facts>`
+  },
+  {
+    importance: 52,
+    block: '<compartment start="1201" end="1264" title="Slowly-changing-dim fix in dim_customer dbt model" episode_type="refactor,bug" importance="52">\n<p1>\n`dim_customer` was implementing a hand-rolled Type-2 SCD with `valid_from`/`valid_to` columns and a `is_current` flag, updated by a UDF that fired on row change. The UDF had a race window where two concurrent upstream loads could both stamp `is_current=true` on overlapping rows for the same customer_id.\n\nMigrated to dbt snapshots (`snapshots/dim_customer.sql`) with `strategy=\'timestamp\'` on `updated_at`. Snapshot runs single-threaded by design; no race window. Backfilled the snapshot from the existing dim — diffed against the old table, 14 customers had overlapping `is_current` windows, all resolved by taking the latest by `updated_at`. Old UDF and trigger removed.\n</p1>\n<p2>\n`dim_customer` SCD reimplemented as a dbt snapshot (timestamp strategy on `updated_at`) replacing a hand-rolled trigger+UDF that had a concurrent-update race. Backfill resolved 14 customers with overlapping is_current windows.\n</p2>\n<p3>\nCustomer SCD moved from custom triggers to dbt snapshots.\n</p3>\n<p4>\nsnapshots/dim_customer.sql; strategy=timestamp on updated_at\n</p4>\n</compartment>\n<facts>\n<PROJECT_RULES>\n* Type-2 SCD modeling uses dbt snapshots with the `timestamp` strategy. Hand-rolled SCD via triggers/UDFs is not permitted because it has no race-free coordination across concurrent upstream loads.\n</PROJECT_RULES>\n</facts>'
+  },
+  {
+    importance: 48,
+    block: `<compartment start="1402" end="1456" title="CSP nonce missing on injected MV3 content script" episode_type="bug" importance="48">
+<p1>
+Content script in the browser extension was silently no-op'd on Stripe checkout pages — the page's CSP includes \`script-src 'self' 'nonce-...'\` and Chrome MV3 doesn't propagate the page nonce to extension-injected scripts. Switched the injection path from \`chrome.scripting.executeScript({ files: [...] })\` to \`world: 'ISOLATED'\` (was 'MAIN'), since the script doesn't need to reach into the page's JS context — it only needs DOM read access, which works fine from the isolated world without needing the nonce.
+
+Verified across the three CSP-heavy sites we'd seen reports on. No behavior change on non-CSP pages.
+</p1>
+<p2>
+Extension content script switched from \`world: 'MAIN'\` to \`world: 'ISOLATED'\` to bypass page CSP nonce requirements. Isolated world has the DOM access we need.
+</p2>
+<p3>
+Content script moved to the isolated world to sidestep page CSP.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 46,
+    block: `<compartment start="1278" end="1389" title="Tesseract pinned to 5.3.3 after multi-column regression in 5.3.4" episode_type="bug,infra" importance="46">
+<p1>
+Document OCR accuracy dropped from ~96% to ~71% on bank-statement-shaped PDFs after the weekly base-image rebuild. Diff'd the rebuild — only relevant change was tesseract bumped from 5.3.3 to 5.3.4 by the apt source. Ran golden-set evaluation against both: 5.3.4 regresses badly on multi-column layouts (column-detection heuristic in LSTM postprocessing changed). Single-column docs unaffected.
+
+Pinned tesseract to 5.3.3 in \`docker/ocr/Dockerfile\` via explicit apt version and SHA pin, opened upstream issue #4117 with a minimal repro. Will revisit on next minor.
+</p1>
+<p2>
+Tesseract 5.3.4 introduced a regression in multi-column layout detection that dropped our OCR accuracy from 96% to 71% on bank statements. Pinned to 5.3.3 in \`docker/ocr/Dockerfile\`. Upstream issue #4117 filed.
+</p2>
+<p3>
+Tesseract pinned to 5.3.3 due to a multi-column regression in 5.3.4.
+</p3>
+<p4>
+tesseract=5.3.3; docker/ocr/Dockerfile; upstream #4117
+</p4>
+</compartment>
+<facts>
+<CONFIG_VALUES>
+* \`docker/ocr/Dockerfile\` pins \`tesseract-ocr=5.3.3\` with apt version + SHA pin. Unpin only after upstream #4117 resolves.
+</CONFIG_VALUES>
+<CONSTRAINTS>
+* Tesseract 5.3.4 regresses multi-column layout detection (column-detection heuristic in LSTM postprocessing changed). Single-column accuracy is unaffected.
+</CONSTRAINTS>
+</facts>
+<events>
+<causal_incident at_compartment="10">
+  <summary>OCR accuracy dropped sharply after weekly base-image rebuild.</summary>
+  <affected_surface>environment</affected_surface>
+  <symptom>OCR accuracy on multi-column bank statements dropped from 96% to 71%.</symptom>
+  <cause_summary>Weekly base-image rebuild pulled tesseract 5.3.4 from apt; the new version's column-detection heuristic regressed on multi-column inputs.</cause_summary>
+  <disposition>workaround</disposition>
+  <evidence>Golden-set evaluation reproduced the regression isolated to tesseract version with all other deps held constant.</evidence>
+  <fix_summary>Pin tesseract to 5.3.3 in \`docker/ocr/Dockerfile\` until upstream #4117 is resolved.</fix_summary>
+</causal_incident>
+</events>`
+  },
+  {
+    importance: 41,
+    block: `<compartment start="125" end="132" title="Added Snapbench record examples" episode_type="feature,docs" importance="41">
+<p1>
+U: "show me the command somebody would paste, not a paragraph"
+
+Added runnable examples for the Snapbench CLI in docs/recording.md and examples/basic/snapbench.toml. The new snapbench record flow writes snapshots into .snapbench/ by default, honors --config for alternate TOML files, and prints a copy-pasteable re-run command after capture. Commit e3b4c77.
+</p1>
+<p2>
+Snapbench docs now show pasteable snapbench record commands and the default snapshot/config locations.
+</p2>
+<p3>
+Snapbench recording examples became runnable instead of descriptive only.
+</p3>
+<p4>snapbench record; .snapbench/; snapbench.toml</p4>
+</compartment>
+<facts>
+<CONFIG_VALUES>
+* Snapbench's default snapshot directory is .snapbench/.
+</CONFIG_VALUES>
+<NAMING>
+* The Snapbench capture subcommand is named snapbench record.
+</NAMING>
+</facts>
+<user_observations>
+* User prefers runnable commands over prose-only explanations when validating developer tooling.
+</user_observations>`
+  },
+  {
+    importance: 38,
+    block: '<compartment start="1471" end="1518" title="Add --json output flag to status command" episode_type="feature" importance="38">\n<p1>\nAdded `--json` flag to `loomctl status` so downstream automation can parse the output cleanly. Shape mirrors the existing human output: `{"connected": bool, "tenant": "...", "endpoint": "...", "version": "...", "warnings": [...]}`. When `--json` is set, errors also serialize as JSON: `{"error": "..."}` to stderr. Tests in `cmd/loomctl/status_test.go` cover both human and JSON modes.\n</p1>\n<p2>\n`loomctl status --json` emits a structured status object; errors also JSON-shaped to stderr when the flag is set.\n</p2>\n<p3>\nStatus command gained a `--json` output mode.\n</p3>\n<p4/>\n</compartment>'
+  },
+  {
+    importance: 38,
+    block: `<compartment start="208" end="219" title="Meridian: fix HLS segment pts discontinuity causing playback stutters" episode_type="bug" importance="38">
+<p1>
+Meridian HLS segmenter was producing ~40 ms playback stutters at every segment join. Traced to presentation timestamp (pts) discontinuity: the first frame of each new segment had a pts slightly ahead of the previous segment's final pts + frame_duration, creating a gap the player absorbed via buffer stall.
+
+U: "we're getting stutters on every segment join in the player, this is a regression from last week's segmenter refactor"
+
+Root cause: segment timestamp wasn't anchored to the previous segment's final pts at the boundary. Each segment started a fresh pts sequence from 0 and relied on the muxer to reconcile — which it didn't under all codec configurations. Fixed by tracking last_pts per output stream in segmenter state and forcing continuity at segment start. Also added -copyts to ffmpeg mux flags to prevent pts rescaling during remux. Patch in services/segmenter/hls.go, commit 6a1bc3f.
+</p1>
+<p2>
+Fixed Meridian HLS segment pts discontinuity: ~40 ms gaps at segment joins caused by each segment restarting pts from 0. Fix: track last_pts per output stream; force continuity at segment start; add -copyts to mux flags. services/segmenter/hls.go (6a1bc3f).
+</p2>
+<p3>
+HLS segment boundary pts continuity enforced; -copyts required in Meridian mux args.
+</p3>
+<p4>
+HLS; pts discontinuity; last_pts; -copyts; hls.go
+</p4>
+</compartment>
+<facts>
+<CONSTRAINTS>
+* Meridian's ffmpeg HLS mux requires the -copyts flag when chaining segments; without it pts is rescaled per-segment and playback gaps appear at boundaries under some codec configurations.
+</CONSTRAINTS>
+</facts>
+<events>
+<causal_incident at_compartment="8">
+  <summary>HLS playback stutters at every segment join traced to pts discontinuity in segmenter</summary>
+  <affected_surface>other</affected_surface>
+  <symptom>~40 ms playback stutter at every HLS segment join; regression from segmenter refactor</symptom>
+  <cause_summary>Each segment reset pts to 0 with no anchoring to previous segment's final pts + frame_duration; muxer did not reconcile under all codec configurations</cause_summary>
+  <disposition>fixed</disposition>
+  <evidence>first frame of each new segment had a pts slightly ahead of the previous segment's final pts + frame_duration, creating a gap the player absorbed via buffer stall</evidence>
+  <fix_summary>Track last_pts per output stream; force segment-start pts continuity; add -copyts to mux flags in hls.go</fix_summary>
+</causal_incident>
+</events>`
+  },
+  {
+    importance: 36,
+    block: '<compartment start="1533" end="1617" title="Statistics-refresh hook on bulk-load completion in query planner integration" episode_type="feature,refactor" importance="36">\n<p1>\nThe embedded analytics DB\'s query planner uses table statistics that get stale after large bulk loads (>1M rows), causing the next query against the loaded table to pick a sequential scan even when a covering index would crush it. Added a `post_bulk_load` hook in `internal/storage/loader.go` that triggers an asynchronous `ANALYZE` against the affected tables. The hook is opt-in per loader because some flows already know they\'ll be followed by a manual ANALYZE; default is on.\n\nVerified the planner picks the index on the post-load query in the affected analytics benchmark — query went from 18s to 240ms.\n</p1>\n<p2>\nBulk loader (`internal/storage/loader.go`) now fires an async `ANALYZE` via a `post_bulk_load` hook after >1M-row loads to keep planner stats fresh. Affected benchmark: 18s → 240ms.\n</p2>\n<p3>\nBulk loader triggers asynchronous statistics refresh on large loads to keep the planner from picking sequential scans.\n</p3>\n<p4>\npost_bulk_load hook; internal/storage/loader.go\n</p4>\n</compartment>\n<facts>\n<ARCHITECTURE>\n* Bulk-load paths are responsible for refreshing planner statistics on the tables they touch — the planner does not auto-trigger ANALYZE on bulk-loaded tables, and stale stats cause it to choose sequential scans over covering indexes.\n</ARCHITECTURE>\n</facts>'
+  },
+  {
+    importance: 36,
+    block: `<compartment start="111" end="115" title="Removed Electron pane jitter" episode_type="bug" importance="36">
+<p1>
+Fixed a small but visible jitter in LumenClip's Electron helper pane. The right-pinned pane bounced by one pixel on fractional-scale monitors because app/shell/windowBounds.ts rounded width before x. Reordered the rounding so x derives from the final integer width and added a regression case for scaleFactor 1.25. Commit d20a7f4.
+</p1>
+<p2>
+LumenClip's pinned helper pane no longer jitters on fractional-scale monitors; bounds rounding now derives x from the final integer width.
+</p2>
+<p3>
+Electron pane positioning was made stable under fractional display scaling.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 33,
+    block: `<compartment start="399" end="411" title="Polaris: extract dataset preprocessing into offline cached stage" episode_type="refactor" importance="33">
+<p1>
+Extracted inline dataset preprocessing (normalization, tokenization, augmentation) from the training loop into a standalone preprocessing stage that writes cached outputs to data/preprocessed/. Training loop now reads from the cache on startup. Reduces training startup time from ~8 minutes (preprocessing on-the-fly) to ~20 seconds (cache hit). Cache keyed by dataset name + SHA256 of preprocessing config. Changed src/data/dataset.py; added src/data/preprocessor.py. Preprocessing stage triggered separately via python -m polaris.preprocess --config configs/preprocess.yaml. No logic changes — mechanical extraction only.
+</p1>
+<p2>
+Polaris dataset preprocessing moved offline; outputs cached at data/preprocessed/ keyed by dataset name + config hash. Training startup 8 min → 20 sec. src/data/preprocessor.py added; triggered via python -m polaris.preprocess.
+</p2>
+<p3>
+Polaris has a separate preprocessing stage; training loop reads from data/preprocessed/ cache.
+</p3>
+<p4>
+Polaris; data/preprocessed/; preprocessor.py; polaris.preprocess; preprocess.yaml
+</p4>
+</compartment>
+<facts>
+<CONFIG_VALUES>
+* Polaris preprocessed dataset cache dir: data/preprocessed/; triggered via python -m polaris.preprocess --config configs/preprocess.yaml; cache key: dataset name + SHA256 of preprocessing config.
+</CONFIG_VALUES>
+</facts>`
+  },
+  {
+    importance: 31,
+    block: `<compartment start="130" end="137" title="SKU import defaults to preview" episode_type="feature,docs" importance="31">
+<p1>
+Adjusted the warehouse SKU importer so the new ERP feed lands in a safer operational shape.
+U: no, make it dry-run first or I won't let ops touch it.
+
+The first pass of tools/sku-import/main.go had apply semantics too close to the happy path, which was fine for local testing and bad for a warehouse runbook. I flipped the command so preview is the default, added an explicit --apply gate for mutations, and rewrote docs/runbooks/sku-import.md to show the diff summary operators should review before committing changes. Commit a92d6f1.
+</p1>
+<p2>
+Changed tools/sku-import/main.go so preview is the default and destructive writes require --apply. docs/runbooks/sku-import.md now assumes operators review the diff summary before running a live import.
+</p2>
+<p3>
+The SKU importer now defaults to a safe preview workflow instead of assuming live writes. The durable memory is the operational default, not the specific feed.
+</p3>
+<p4>sku-import; preview default; --apply</p4>
+</compartment>
+<facts>
+<PROJECT_RULES>
+* New operational import commands should default to preview mode unless an explicit apply flag is present.
+</PROJECT_RULES>
+<CONFIG_VALUES>
+* Destructive execution flag: --apply; preview mode is the default when it is absent.
+</CONFIG_VALUES>
+</facts>
+<events>
+<trajectory_correction at_compartment="15">
+  <summary>Shifted the SKU importer from live-first behavior to preview-first operation.</summary>
+  <before_strategy>Expose the ERP feed through a command that effectively applies changes on the normal execution path.</before_strategy>
+  <correction_source>user</correction_source>
+  <correction_signal>U: no, make it dry-run first or I won't let ops touch it.</correction_signal>
+  <after_strategy>Require an explicit apply flag and treat preview output as the standard operator workflow.</after_strategy>
+  <evidence>The final command behavior in tools/sku-import/main.go makes preview the default and docs/runbooks/sku-import.md leads with the diff-review step.</evidence>
+</trajectory_correction>
+</events>
+<user_observations>
+* User prefers operational tooling to fail safe and make irreversible actions opt-in.
+</user_observations>`
+  },
+  {
+    importance: 29,
+    block: `<compartment start="138" end="143" title="Routed malformed telemetry to DLQ" episode_type="infra" importance="29">
+<p1>
+Updated BeaconMesh ingestion so malformed device payloads go to a dead-letter Kafka topic instead of being dropped after parse failure. The change touched ingest/src/parser.rs and deploy/helm/values-prod.yaml, added a sampled log line with device_id hash, and kept the hot path unchanged for valid payloads. Commit c1129af.
+</p1>
+<p2>
+BeaconMesh malformed telemetry now lands in telemetry.raw.dlq.v2 with sampled parse-failure logs.
+</p2>
+<p3>
+Invalid IoT telemetry is retained in a DLQ instead of silently disappearing.
+</p3>
+<p4>telemetry.raw.dlq.v2; parse_failure_sample_rate</p4>
+</compartment>
+<facts>
+<CONFIG_VALUES>
+* BeaconMesh malformed raw telemetry is routed to Kafka topic telemetry.raw.dlq.v2.
+</CONFIG_VALUES>
+</facts>`
+  },
+  {
+    importance: 27,
+    block: `<compartment start="158" end="163" title="Scoped mobile offline sync MVP" episode_type="feature,design" importance="27">
+<p1>
+U: "do the dumb version first; notes only, attachments can wait"
+
+Scoped Harbor Notes mobile offline sync to note title and body fields. mobile/src/sync/offlineScope.ts now rejects attachment blobs and comment threads during queue creation, and the settings screen labels them online-only instead of silently skipping them. Commit 7a2f0de.
+</p1>
+<p2>
+Harbor Notes offline sync MVP covers notes only; attachments and comment threads are explicitly online-only.
+</p2>
+<p3>
+Mobile offline sync shipped with a narrow notes-only scope.
+</p3>
+<p4>offlineScope.ts; notes only; attachments online-only</p4>
+</compartment>
+<facts>
+<CONFIG_VALUES>
+* Harbor Notes offline sync MVP includes note title and body only; attachments and comment threads remain online-only.
+</CONFIG_VALUES>
+</facts>`
+  },
+  {
+    importance: 27,
+    block: `<compartment start="160" end="168" title="Manual page rotation escape hatch" episode_type="feature,bug" importance="27">
+<p1>
+Started by trying to auto-rotate ugly multi-scan uploads in the docket OCR intake, then backed away from making low-confidence guesses.
+U: if confidence is fuzzy, give support a knob instead of guessing.
+
+ingest/api/src/routes/upload.ts now stores an optional per-page rotation override alongside the upload manifest, and web/src/components/PageRotationOverride.tsx gives support a manual control in triage. Automatic rotation only applies when the OCR angle model is confidently right; the rest stay untouched until a human steps in. docs/support/scan-triage.md covers when to use the override. Commit 7ab2c54.
+</p1>
+<p2>
+The rotation fix became a support-side escape hatch, not aggressive automation.
+U: if confidence is fuzzy, give support a knob instead of guessing.
+
+ingest/api/src/routes/upload.ts persists per-page overrides, web/src/components/PageRotationOverride.tsx exposes them in triage, and auto-rotation stays gated behind a high confidence threshold.
+</p2>
+<p3>
+Low-confidence scan rotation is now handled through a manual override path, with automation reserved for only the most certain OCR angle predictions.
+</p3>
+<p4>PageRotationOverride; upload manifest override; angle_confidence threshold</p4>
+</compartment>
+<facts>
+<CONSTRAINTS>
+* OCR angle predictions below a high confidence threshold are not reliable enough for unattended page rotation on messy multi-scan uploads.
+</CONSTRAINTS>
+<CONFIG_VALUES>
+* Automatic rotation threshold: angle_confidence 0.98 or higher.
+</CONFIG_VALUES>
+</facts>
+<events>
+<trajectory_correction at_compartment="19">
+  <summary>Changed scan rotation from auto-fix ambition to manual override with high-confidence automation only.</summary>
+  <before_strategy>Use OCR angle predictions to auto-rotate problematic scans broadly during ingest.</before_strategy>
+  <correction_source>user</correction_source>
+  <correction_signal>U: if confidence is fuzzy, give support a knob instead of guessing.</correction_signal>
+  <after_strategy>Persist per-page rotation overrides and reserve automatic rotation for only high-confidence predictions.</after_strategy>
+  <evidence>The final implementation added PageRotationOverride in triage UI and left ingest auto-rotation behind a strict confidence gate.</evidence>
+</trajectory_correction>
+</events>
+<user_observations>
+* User accepts deterministic manual escape hatches faster than vague low-confidence automation when support burden is obvious.
+</user_observations>`
+  },
+  {
+    importance: 24,
+    block: `<compartment start="1631" end="1672" title="Cut v2.4.1 patch release for the segment-wraparound fix" episode_type="release" importance="24">
+<p1>
+Cut v2.4.1 off main containing only the HLS segment-naming widening (commit 7a3e210). Tagged, pushed, release pipeline went green, artifacts uploaded to the artifact bucket. Release notes point at the existing incident postmortem for context.
+</p1>
+<p2>
+Cut v2.4.1 patch release with only the segment-naming widening (7a3e210).
+</p2>
+<p3>
+Patch release 2.4.1.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 24,
+    block: `<compartment start="295" end="318" title="Ferrite: write amplification spike investigation — inconclusive" episode_type="investigation" importance="24">
+<p1>
+Investigated a write amplification spike in Ferrite under sequential key write workloads. Metrics showed write amplification ratio jumping from ~4x to ~12x during certain write patterns on the benchmark cluster. Initial hypothesis: L0 compaction trigger threshold too low, causing premature level merges.
+
+U: "WA is spiking under sequential writes, worth looking into before we tune anything"
+
+Traced through the compaction scheduler in src/compaction/scheduler.rs. The spike correlates with L0→L1 level-merge events when L0 accumulates to max_l0_sst_count=8 SSTs. This is expected LSM-tree behavior: write amplification increases transiently during level merges by design and returns to baseline immediately after the merge completes. Existing defaults (l0_compaction_trigger=4, max_l0_sst_count=8) appear appropriate for the current workload; lowering them would increase compaction frequency without reducing peak WA.
+
+No action taken. If WA becomes a sustained concern under heavier write load, adjusting max_bytes_for_level_base is the next lever.
+</p1>
+<p2>
+Ferrite write amplification spike investigated: transient WA increase during L0→L1 level merge is expected LSM behavior, not a misconfiguration. Defaults (l0_compaction_trigger=4, max_l0_sst_count=8) are correct. No action taken.
+</p2>
+<p3>
+Ferrite WA spike is expected LSM behavior during level merges; no fix needed; defaults appropriate.
+</p3>
+<p4>
+Ferrite; write amplification; L0 compaction; LSM; inconclusive; max_l0_sst_count
+</p4>
+</compartment>`
+  },
+  {
+    importance: 22,
+    block: `<compartment start="39" end="45" title="Narrowed May orders replay" episode_type="infra,investigation" importance="22">
+<p1>
+Started from a revenue mismatch between Stripe exports and the warehouse and was about to re-run the whole 2025 orders model.
+U: don't touch closed months if the hole is just that May gap.
+
+After checking dags/reconcile_orders.py and the landed_at partitions feeding sql/marts/fct_orders.sql, it turned out the drift was isolated to four ingestion days after a connector retry loop. I changed the repair plan to replay only raw.orders_ingest for 2025-05-11 through 2025-05-14, documented the partition command in runbook/backfills.md, and left the rest of the year alone. Commit 2e7af53.
+</p1>
+<p2>
+The warehouse repair stopped being a full-year rebuild once the mismatch traced back to a four-day ingest gap. Replayed only the landed_at partitions for 2025-05-11 through 2025-05-14 and documented the repair command in runbook/backfills.md.
+</p2>
+<p3>
+This was a scoped replay, not a lasting data-model change: the useful outcome was knowing the repair should target landed_at partitions instead of rebuilding closed months.
+</p3>
+<p4>reconcile_orders.py; landed_at; 2025-05-11..2025-05-14</p4>
+</compartment>
+<facts>
+<CONFIG_VALUES>
+* The orders repair workflow is keyed off landed_at partitions rather than invoice_date.
+</CONFIG_VALUES>
+</facts>
+<events>
+<trajectory_correction at_compartment="5">
+  <summary>Shifted from a full-year warehouse rebuild to a four-day targeted replay.</summary>
+  <before_strategy>Re-run the full 2025 orders reconciliation to eliminate the revenue mismatch.</before_strategy>
+  <correction_source>user</correction_source>
+  <correction_signal>U: don't touch closed months if the hole is just that May gap.</correction_signal>
+  <after_strategy>Trace the mismatch to its ingestion window and replay only the affected landed_at partitions.</after_strategy>
+  <evidence>The investigation isolated the issue to raw.orders_ingest for 2025-05-11 through 2025-05-14, and the final repair command targeted only that range.</evidence>
+</trajectory_correction>
+</events>`
+  },
+  {
+    importance: 21,
+    block: `<compartment start="133" end="137" title="Collapsed package harness helpers" episode_type="refactor" importance="21">
+<p1>
+Cleaned FinchPkg's resolver test harness by merging three nearly identical temp-registry helpers into tests/support/registry.ts. No resolver behavior changed; the diff mostly removed duplicated fixture setup and updated imports in lockfile and peer-dependency tests. Commit aa19d02.
+</p1>
+<p2>
+FinchPkg resolver tests now share one temp-registry helper instead of three duplicated setup paths.
+</p2>
+<p3>
+Package resolver test setup was deduplicated without behavior changes.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 20,
+    block: `<compartment start="1686" end="1720" title="README install path correction for darwin-arm64" episode_type="docs" importance="20">
+<p1>
+README's quick-install snippet still pointed at \`/usr/local/bin\` for darwin-arm64; Homebrew on Apple Silicon installs to \`/opt/homebrew/bin\`. Updated the snippet and the troubleshooting "binary not found" entry to reflect both paths.
+</p1>
+<p2>
+README install path corrected for darwin-arm64 (Homebrew puts the binary in \`/opt/homebrew/bin\`, not \`/usr/local/bin\`).
+</p2>
+<p3>
+README install path fixed for Apple Silicon.
+</p3>
+<p4/>
+</compartment>
+<facts>
+<NAMING>
+* On darwin-arm64 (Apple Silicon), the installed binary path is \`/opt/homebrew/bin/loomctl\`. On darwin-x86_64 and Linux, it remains \`/usr/local/bin/loomctl\`.
+</NAMING>
+</facts>`
+  },
+  {
+    importance: 17,
+    block: '<compartment start="1734" end="1768" title="Rename internal `bilUtil` helper to `invoiceMath`" episode_type="refactor" importance="17">\n<p1>\nThe `bilUtil` package in the billing service was a holdover name from a partial rename — `bil` was the original short prefix before we standardized on `invoice`. Renamed to `invoiceMath` since that\'s what the package actually does (rounding, proration, tax-base math). No behavior change. Updated callers, ran tests, done.\n</p1>\n<p2>\nRenamed `bilUtil` package to `invoiceMath` to match its actual responsibility.\n</p2>\n<p3>\nNaming cleanup in the billing service.\n</p3>\n<p4/>\n</compartment>\n<facts>\n<NAMING>\n* Billing math helpers live in package `invoiceMath` (rounding, proration, tax-base computation). The prior name `bilUtil` is deprecated.\n</NAMING>\n</facts>'
+  },
+  {
+    importance: 14,
+    block: `<compartment start="1781" end="1854" title="Inconclusive investigation into nightly training throughput drift" episode_type="investigation" importance="14">
+<p1>
+Nightly training runs have been ~7% slower on Tue/Wed for the last three weeks but back to baseline Thu–Mon. No code changes correlate. Looked at GPU utilization (steady), dataloader throughput (steady), network egress (unremarkable), shared-filesystem latency (no signal in our metrics), and cluster autoscaler activity (no correlation).
+
+U: probably some other team's job is contending on the same nodes those days but I don't want to spend more time on it right now
+
+Parking. If it gets worse or starts hitting Thu, revisit.
+</p1>
+<p2>
+Investigated a recurring Tue/Wed ~7% training throughput drift; no signal in obvious metrics. Parked pending escalation.
+</p2>
+<p3>
+Inconclusive performance investigation, parked.
+</p3>
+<p4/>
+</compartment>
+<user_observations>
+* User comfortably parks inconclusive investigations rather than forcing closure, but tags conditions under which to revisit.
+</user_observations>`
+  },
+  {
+    importance: 14,
+    block: `<compartment start="459" end="466" title="Vesper: add kind cluster to CI integration test pipeline" episode_type="infra" importance="14">
+<p1>
+Set up a local kind cluster in the Vesper CI pipeline for integration tests. Tests previously ran against a mocked Kubernetes API (envtest), which missed controller-runtime edge cases around watch reconnection and leader election handoff. kind cluster config at ci/kind-config.yaml, node image kindest/node:v1.29.2. Integration test job added to .github/workflows/integration.yml. CI run time increased by ~3 minutes.
+</p1>
+<p2>
+kind cluster added to Vesper CI for integration tests; config ci/kind-config.yaml, node image kindest/node:v1.29.2. CI time +3 min. .github/workflows/integration.yml updated.
+</p2>
+<p3>
+Vesper CI now runs integration tests against a real kind cluster instead of envtest mock.
+</p3>
+<p4>
+kind; ci/kind-config.yaml; kindest/node:v1.29.2; integration.yml
+</p4>
+</compartment>
+<facts>
+<CONFIG_VALUES>
+* Vesper CI kind cluster: config ci/kind-config.yaml, node image kindest/node:v1.29.2.
+</CONFIG_VALUES>
+</facts>`
+  },
+  {
+    importance: 12,
+    block: `<compartment start="76" end="82" title="Dropped table-detector detour" episode_type="investigation,docs" importance="12">
+<p1>
+Spent a short pass checking whether the vendor table detector would rescue the weird invoice-header cases in the OCR pipeline.
+U: if it only helps 3 invoices, skip it.
+
+The sample in notebooks/vendorbbox-check.ipynb only improved 3 of 40 documents and made 5 worse because the detector over-merged header boxes. I left the current bbox heuristics alone and added the dead-end note to docs/ocr/field-mapping.md so we do not re-run the same experiment next week. Commit 1c9d5fe.
+</p1>
+<p2>
+Tested the vendor table detector against a small bad-invoice set and it was not worth adopting. The only lasting output was a docs note in docs/ocr/field-mapping.md that this path regressed more samples than it helped.
+</p2>
+<p3>
+This was a discarded OCR detour: table detection did not improve enough documents to justify replacing the current bbox heuristics.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 9,
+    block: `<compartment start="858" end="866" title="CLI nightly dry run" episode_type="release" importance="9">
+<p1>
+Ran the developer CLI nightly release dry run for \`0.14.0-next.20260523\` and confirmed it produced tarballs without publishing. The generated artifacts were deleted from \`dist/\`.
+</p1>
+<p2>
+CLI nightly release dry run succeeded without publishing; temporary artifacts were removed.
+</p2>
+<p3>
+A CLI nightly dry run passed and left no artifacts.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 8,
+    block: `<compartment start="1869" end="1928" title="Tried replacing controller-runtime cache with informer-direct; reverted" episode_type="refactor" importance="8">
+<p1>
+Speculated that bypassing controller-runtime's cache and going directly to informers would cut reconcile latency. Spent two hours wiring it up in a scratch branch — turned out the cache was already informer-backed and the "bypass" was just moving the same indirection around. Latency unchanged in the microbench.
+
+U: yeah let's not, this was a bad idea
+
+Branch deleted, no commit landed on main.
+</p1>
+<p2>
+Tried bypassing controller-runtime cache for direct informer access; learned the cache is already informer-backed. Branch deleted.
+</p2>
+<p3>
+False start: attempted-and-reverted controller-runtime cache bypass.
+</p3>
+<p4/>
+</compartment>
+<facts>
+<CONSTRAINTS>
+* controller-runtime's cache is itself informer-backed; "going direct to informers" doesn't remove any indirection and gives no latency benefit.
+</CONSTRAINTS>
+</facts>
+<events>
+<trajectory_correction at_compartment="18">
+  <summary>Abandoned a refactor after the underlying assumption (that the cache was a meaningful extra layer) was falsified.</summary>
+  <before_strategy>Rewrite the reconciler against raw informers to skip controller-runtime's cache layer.</before_strategy>
+  <correction_source>self_review</correction_source>
+  <correction_signal>Microbenchmark showed no latency change; realized controller-runtime cache is informer-backed.</correction_signal>
+  <after_strategy>Delete the scratch branch; keep the existing setup.</after_strategy>
+  <evidence>"yeah let's not, this was a bad idea"</evidence>
+</trajectory_correction>
+</events>`
+  },
+  {
+    importance: 7,
+    block: `<compartment start="224" end="231" title="Ledger: invoice_status column rename reversed after reporting breakage" episode_type="bug" importance="7">
+<p1>
+Renamed invoice_status column to status in the invoices table as cosmetic cleanup (migration 0047_rename_invoice_status.sql). Two hours later all scheduled overnight reports came back empty.
+
+U: "why are all the reports empty this morning"
+
+Traced to the reporting service using raw SQL with column name invoice_status — not through the ORM. Missed in review because the reporting service lives in a separate repo. Reverted via migration 0048_revert_rename.sql, commit 1f0e52a. Rename deferred until the reporting service can be updated in the same coordinated changeset.
+</p1>
+<p2>
+Attempted rename of Ledger invoice_status → status; reverted same day when reporting service (separate repo, raw SQL) silently broke overnight reports. Rename deferred pending cross-repo coordination.
+</p2>
+<p3>
+Column rename reverted; reporting service has raw SQL dependency on invoice_status that must be updated before rename can land.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 7,
+    block: `<compartment start="164" end="166" title="Discarded Percy baseline theory" episode_type="investigation" importance="7">
+<p1>
+Checked whether Quasar UI's Percy diffs came from the Playwright 1.45 bump, then abandoned the theory after the same baseline mismatch reproduced on main. No code was kept from the branch except the investigation note in the PR thread.
+</p1>
+<p2>
+Percy baseline mismatch was not caused by the Playwright bump; the test branch was discarded.
+</p2>
+<p3>
+A false Playwright/Percy lead was ruled out.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 7,
+    block: `<compartment start="562" end="564" title="Added --dry-run flag to transcode CLI" episode_type="feature" importance="7">
+<p1>
+Added --dry-run to transcode command. Validates preset and queue submission without calling ffmpeg.
+</p1>
+<p2>
+--dry-run flag for transcode CLI; validates without executing.
+</p2>
+<p3>
+Added dry-run mode to video transcode CLI.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 7,
+    block: `<compartment start="874" end="881" title="Upload button spacing" episode_type="bug" importance="7">
+<p1>
+Adjusted the upload button margin in \`apps/web/src/routes/upload/UploadDropzone.tsx\` from \`mt-3\` to \`mt-4\` after the icon looked cramped on the empty state.
+</p1>
+<p2>
+Changed upload empty-state button spacing from \`mt-3\` to \`mt-4\`.
+</p2>
+<p3>
+Minor upload empty-state spacing tweak.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 5,
+    block: `<compartment start="1942" end="1968" title="Aborted feature flag tweak — wrong env" episode_type="feature" importance="5">
+<p1>
+Toggled the \`mm_async_lobby_v2\` flag in what I thought was staging; it was prod-shadow. No traffic impact (shadow is read-only) but reverted immediately. Note to self: read the flag-env banner in LaunchDarkly before clicking.
+</p1>
+<p2>
+Toggled a flag in the wrong env; no impact, reverted.
+</p2>
+<p3>
+Flag-toggle misfire, reverted.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 5,
+    block: `<compartment start="352" end="353" title="Canopy: popup container width CSS typo (300 px → 400 px)" episode_type="bug" importance="5">
+<p1>
+Fixed popup.css: .popup-container width was 300px (typo) instead of intended 400px. One-line change, commit f2a017e.
+</p1>
+<p2>
+Popup width corrected to 400 px in popup.css.
+</p2>
+<p3>
+CSS typo fixed.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 4,
+    block: `<compartment start="571" end="578" title="Noted CAN bus arbitration failure under high load" episode_type="infra" importance="4">
+<p1>
+Bus load test at 85% showed arbitration collapse on the MCU. U: bus load test showed arbitration collapse at 85%, driver needs fix
+Added note in driver README; no code change this session. Commit 8f3d1a9.
+</p1>
+<p2>
+Documented CAN arbitration collapse above 80% bus load.
+</p2>
+<p3>
+Captured high-load CAN bus limitation in firmware docs.
+</p3>
+<p4>can-driver; 80% bus load; arbitration collapse</p4>
+</compartment>
+<facts>
+<CONSTRAINTS>
+* CAN bus arbitration on the current MCU fails under >80% bus load; requires priority inversion mitigation in the driver.
+</CONSTRAINTS>
+</facts>`
+  },
+  {
+    importance: 3,
+    block: `<compartment start="1981" end="1994" title="Typo fix in CRDT conflict error message" episode_type="bug" importance="3">
+<p1>
+\`recieved\` → \`received\` in \`loomdoc/conflict.go\` error string. That's the whole change.
+</p1>
+<p2>
+Typo fix in a conflict error message.
+</p2>
+<p3>
+Typo fix.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 3,
+    block: `<compartment start="45" end="46" title="boltpkg: fix 'dependancy' typo in resolver error message" episode_type="bug" importance="3">
+<p1>
+Fixed spelling error in src/resolver/errors.go:114: "could not resolve dependancy" → "dependency". One-line patch, commit 3c02a1d.
+</p1>
+<p2>
+Typo fix in resolver error message (src/resolver/errors.go:114).
+</p2>
+<p3>
+Typo fixed.
+</p3>
+<p4/>
+</compartment>`
+  },
+  {
+    importance: 3,
+    block: `<compartment start="167" end="168" title="Renamed docs Recipes to Cookbook" episode_type="docs" importance="3">
+<p1>
+Changed the AstraKit docs sidebar label from "Recipes" to "Cookbook" in docs/sidebar.ts. Commit 1db0ac3.
+</p1>
+<p2>
+AstraKit docs now label examples as Cookbook.
+</p2>
+<p3>
+Docs examples section was renamed.
+</p3>
+<p4/>
+</compartment>
+<facts>
+<NAMING>
+* AstraKit's docs navigation label for examples is "Cookbook", not "Recipes".
+</NAMING>
+</facts>`
+  }
+];
+
+// ../plugin/src/hooks/magic-context/reference-retrieval.ts
+var SEED_FLOOR = 3;
+var SESSION_REF_WINDOW = 4;
+var SESSION_REF_DIVERSE = 3;
+var SESSION_REF_LIMIT = SESSION_REF_WINDOW + SESSION_REF_DIVERSE;
+var SEED_BANDS = [
+  [85, 100],
+  [60, 84],
+  [30, 59],
+  [10, 29],
+  [1, 9]
+];
+function seedBandIndex(importance) {
+  for (let i = 0;i < SEED_BANDS.length; i++) {
+    const [lo, hi] = SEED_BANDS[i];
+    if (importance >= lo && importance <= hi)
+      return i;
+  }
+  return importance > 100 ? 0 : SEED_BANDS.length - 1;
+}
+function seedsByBand() {
+  const bands = SEED_BANDS.map(() => []);
+  for (const seed of REFERENCE_SEEDS) {
+    bands[seedBandIndex(seed.importance)].push(seed);
+  }
+  return bands;
+}
+function fnv1a(input) {
+  let h = 2166136261;
+  for (let i = 0;i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24)) >>> 0;
+  }
+  return h >>> 0;
+}
+function selectSeeds(sessionId, chunkStart, count = SEED_FLOOR) {
+  const bands = seedsByBand();
+  const seed = fnv1a(`${sessionId}:${chunkStart}`);
+  const picks = [];
+  const bandOrder = [];
+  for (let i = 0;i < SEED_BANDS.length; i++) {
+    bandOrder.push((i + seed % SEED_BANDS.length) % SEED_BANDS.length);
+  }
+  let bi = 0;
+  let guard = 0;
+  while (picks.length < count && guard < SEED_BANDS.length * 4) {
+    const band = bands[bandOrder[bi % bandOrder.length]];
+    bi++;
+    guard++;
+    if (band.length === 0)
+      continue;
+    const idx = (seed + picks.length) % band.length;
+    const candidate = band[idx];
+    if (!picks.includes(candidate))
+      picks.push(candidate);
+  }
+  for (let i = 0;picks.length < count && i < REFERENCE_SEEDS.length; i++) {
+    const candidate = REFERENCE_SEEDS[(seed + i) % REFERENCE_SEEDS.length];
+    if (!picks.includes(candidate))
+      picks.push(candidate);
+  }
+  return picks;
+}
+function renderSeedExamplesBlock(seeds) {
+  if (seeds.length === 0)
+    return "";
+  const body = seeds.map((s) => s.block).join(`
+
+`);
+  return `<compartment_examples_from_other_projects>
+${body}
+</compartment_examples_from_other_projects>`;
+}
+function renderSessionRefCompartment(c, showImportance) {
+  const importance = c.importance ?? 50;
+  const attrs = `start="${c.startMessage}" end="${c.endMessage}" title="${escapeXmlAttr(c.title)}"` + (c.episodeType ? ` episode_type="${escapeXmlAttr(c.episodeType)}"` : "") + (showImportance ? ` importance="${importance}"` : "");
+  if (typeof c.p1 === "string" && c.p1.length > 0) {
+    const p4 = c.p4 && c.p4.length > 0 ? `<p4>
+${escapeXmlContent(c.p4)}
+</p4>` : "<p4/>";
+    return [
+      `<compartment ${attrs}>`,
+      `<p1>
+${escapeXmlContent(c.p1)}
+</p1>`,
+      `<p2>
+${escapeXmlContent(c.p2 ?? "")}
+</p2>`,
+      `<p3>
+${escapeXmlContent(c.p3 ?? "")}
+</p3>`,
+      p4,
+      `</compartment>`
+    ].join(`
+`);
+  }
+  return `<compartment ${attrs}>
+${escapeXmlContent(c.content)}
+</compartment>`;
+}
+function selectSessionReferences(allCompartments, seeds, sessionId, chunkStart) {
+  const eligible = allCompartments.filter((c) => !isNoContentCompartment(c));
+  const olderCount = Math.max(0, eligible.length - SESSION_REF_WINDOW);
+  const recent = eligible.slice(olderCount);
+  const bands = SEED_BANDS.map(() => []);
+  const counts = SEED_BANDS.map(() => 0);
+  for (const c of seeds)
+    counts[seedBandIndex(c.importance)]++;
+  for (let i = 0;i < olderCount; i++) {
+    bands[seedBandIndex(eligible[i].importance ?? 50)].push(i);
+  }
+  const hash = fnv1a(`${sessionId}:${chunkStart}`);
+  const bandOrder = SEED_BANDS.map((_, i) => (i + hash % SEED_BANDS.length) % SEED_BANDS.length);
+  const picks = [];
+  while (picks.length < SESSION_REF_DIVERSE) {
+    let best = -1;
+    for (const bi of bandOrder) {
+      if (bands[bi].length > 0 && (best < 0 || counts[bi] < counts[best]))
+        best = bi;
+    }
+    if (best < 0)
+      break;
+    const band = bands[best];
+    const [pick] = band.splice((hash + picks.length) % band.length, 1);
+    picks.push(pick);
+    counts[best]++;
+  }
+  picks.sort((a, b) => a - b);
+  return [...picks.map((i) => eligible[i]), ...recent];
+}
+function renderSessionReferencesBlock(selected, window = SESSION_REF_LIMIT) {
+  selected = selected.filter((c) => !isNoContentCompartment(c));
+  const count = Math.max(0, Math.min(SESSION_REF_LIMIT, Math.floor(window)));
+  if (selected.length === 0 || count === 0)
+    return "";
+  const recentStart = Math.max(0, selected.length - SESSION_REF_WINDOW);
+  const trimStart = Math.max(0, selected.length - count);
+  const body = selected.slice(trimStart).map((c, i) => renderSessionRefCompartment(c, i + trimStart < recentStart)).join(`
+
+`);
+  return `<session_references>
+${body}
+</session_references>`;
+}
+
+// ../plugin/src/hooks/magic-context/historian-prompt-fit.ts
+var HISTORIAN_MIN_FIT_CHUNK_TOKENS = 1000;
+var FIT_SLACK_TOKENS = 64;
+var PRODUCER_PROMPT_FIT_FAILURE_PATTERN = /producer_prompt_(?:exceeds_window|fit_unavailable|unfit)/;
+function resolveHistorianProducerWindow(modelKey, configuredMaxOutputTokens, fallbackContextLimit) {
+  const limits = resolveHistorianProducerLimits(modelKey);
+  const context = limits.context ?? (limits.input === undefined ? fallbackContextLimit : undefined);
+  const slash = modelKey?.indexOf("/") ?? -1;
+  const catalogOutput = modelKey && slash > 0 ? getSdkOutputLimit(modelKey.slice(0, slash), modelKey.slice(slash + 1)) : undefined;
+  return {
+    modelKey,
+    contextLimitTokens: context,
+    inputLimitTokens: limits.input,
+    maxOutputTokens: historianProducerReserve(context, configuredMaxOutputTokens, catalogOutput)
+  };
+}
+function fitRecompHistorianPrompt(args) {
+  const modelKey = toModelEntry(args.model)?.model ?? args.fallbackModelId;
+  return fitHistorianPrompt({
+    window: resolveHistorianProducerWindow(modelKey, undefined),
+    systemPrompt: withContentLanguageDirective(COMPARTMENT_AGENT_SYSTEM_PROMPT, args.language),
+    requestedChunkTokens: args.requestedChunkTokens,
+    sessionId: args.sessionId,
+    chunkStart: Math.max(1, args.chunkStart),
+    lastOrdinal: args.lastOrdinal,
+    sessionCompartments: args.sessionCompartments,
+    memories: [],
+    memoryEnabled: false,
+    extractionFree: true
+  });
+}
+function describeHistorianPromptTrim(fit) {
+  const { kept } = fit;
+  return `chunkTokens=${fit.chunkTokens} sessionReferences=${kept.sessionReferences} memories=${kept.memories}/${kept.memoriesTotal} seeds=${kept.seeds}/${kept.seedsTotal}`;
+}
+function fitHistorianPrompt(args) {
+  const requested = Math.max(0, Math.floor(args.requestedChunkTokens));
+  const seeds = selectSeeds(args.sessionId, args.chunkStart);
+  const references = selectSessionReferences(args.sessionCompartments, seeds, args.sessionId, args.chunkStart);
+  const memories = orderHistorianMemories(args.memories);
+  const render = (refs, memoryCount, seedCount) => ({
+    seedExamples: renderSeedExamplesBlock(seeds.slice(0, seedCount)),
+    sessionReferences: renderSessionReferencesBlock(references, refs),
+    projectMemory: renderHistorianMemoryBlock(memories.slice(0, memoryCount)) ?? ""
+  });
+  const kept = (refs, memoryCount, seedCount) => ({
+    sessionReferences: refs,
+    memories: memoryCount,
+    memoriesTotal: memories.length,
+    seeds: seedCount,
+    seedsTotal: seeds.length
+  });
+  const limit = producerInputTokenLimit(args.window.contextLimitTokens, args.window.maxOutputTokens, args.window.inputLimitTokens);
+  if (limit === undefined) {
+    return {
+      ok: true,
+      guarded: false,
+      chunkTokens: requested,
+      ...render(references.length, memories.length, seeds.length),
+      trimmed: false,
+      kept: kept(references.length, memories.length, seeds.length)
+    };
+  }
+  const calibration = calibrationForModelKey(args.window.modelKey);
+  const systemLocal = estimateFixedPromptTokens(args.systemPrompt);
+  const mass = (proseLocal) => providerMass({ prose: proseLocal, system: systemLocal }, calibration, true);
+  if (!Number.isFinite(mass(0)) || mass(0) <= 0) {
+    return {
+      ok: false,
+      reason: `producer_prompt_fit_unavailable model=${args.window.modelKey ?? "unknown"}`
+    };
+  }
+  const chunkHeader = `Messages ${args.chunkStart}-${args.lastOrdinal}:
+
+`;
+  const counted = new Map;
+  const fixedLocal = (blocks, header = chunkHeader) => {
+    const text = buildCompartmentAgentPrompt({
+      ...blocks,
+      inputSource: header,
+      memoryEnabled: args.memoryEnabled,
+      extractionFree: args.extractionFree
+    });
+    let tokens = counted.get(text);
+    if (tokens === undefined) {
+      tokens = estimateFixedPromptTokens(text);
+      counted.set(text, tokens);
+    }
+    return tokens;
+  };
+  const roomFor = (blocks) => {
+    const fixed = fixedLocal(blocks);
+    if (mass(fixed) > limit)
+      return -1;
+    let lo = 0;
+    let hi = 1;
+    while (mass(fixed + hi) <= limit) {
+      lo = hi;
+      hi *= 2;
+    }
+    while (hi - lo > 1) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (mass(fixed + mid) <= limit)
+        lo = mid;
+      else
+        hi = mid;
+    }
+    return Math.max(0, lo - FIT_SLACK_TOKENS);
+  };
+  const accept = (refs, memoryCount, seedCount, chunkTokens) => ({
+    ok: true,
+    guarded: true,
+    chunkTokens,
+    roomTokens: Math.max(chunkTokens, roomFor(render(refs, memoryCount, seedCount))),
+    ...render(refs, memoryCount, seedCount),
+    trimmed: refs < references.length || memoryCount < memories.length || seedCount < seeds.length,
+    kept: kept(refs, memoryCount, seedCount)
+  });
+  for (let refs = references.length;refs >= 0; refs -= 1) {
+    if (roomFor(render(refs, memories.length, seeds.length)) >= requested) {
+      return accept(refs, memories.length, seeds.length, requested);
+    }
+  }
+  if (memories.length > 0 && roomFor(render(0, 0, seeds.length)) >= requested) {
+    let lo = 0;
+    let hi = memories.length;
+    while (hi - lo > 1) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (roomFor(render(0, mid, seeds.length)) >= requested)
+        lo = mid;
+      else
+        hi = mid;
+    }
+    return accept(0, lo, seeds.length, requested);
+  }
+  for (let seedCount = seeds.length;seedCount >= 0; seedCount -= 1) {
+    if (roomFor(render(0, 0, seedCount)) >= requested) {
+      return accept(0, 0, seedCount, requested);
+    }
+  }
+  const floor = Math.min(requested, HISTORIAN_MIN_FIT_CHUNK_TOKENS);
+  const room = roomFor(render(0, 0, 0));
+  if (room >= floor && room > 0)
+    return accept(0, 0, 0, Math.min(requested, room));
+  const fixedTokens = mass(fixedLocal(render(0, 0, 0), `Messages 1-1:
+
+`));
+  return {
+    ok: false,
+    reason: `producer_prompt_unfit model=${args.window.modelKey ?? "unknown"} limit=${limit} fixed_tokens=${fixedTokens} min_chunk_tokens=${floor}`
+  };
+}
+
 // ../plugin/src/hooks/magic-context/compartment-runner-historian.ts
 function historianResponseDumpDir(directory) {
   return getProjectMagicContextHistorianDir(directory);
@@ -6847,11 +9044,16 @@ async function runValidatedHistorianPass(args) {
   });
   if (!firstRun.ok || !firstRun.result) {
     if (firstRun.refusal?.terminal)
-      return { ok: false, error: firstRun.error ?? firstRun.refusal.message };
+      return {
+        ok: false,
+        error: firstRun.error ?? firstRun.refusal.message,
+        failureReason: firstRun.failureReason ?? "provider_error"
+      };
     return runFallbackHistorianPass({
       ...args,
       prompt: args.prompt,
       error: firstRun.error ?? "historian run failed",
+      failureReason: firstRun.failureReason ?? "provider_error",
       dumpPaths: [firstRun.dumpPath]
     });
   }
@@ -6878,11 +9080,16 @@ async function runValidatedHistorianPass(args) {
   });
   if (!repairRun.ok || !repairRun.result) {
     if (repairRun.refusal?.terminal)
-      return { ok: false, error: repairRun.error ?? repairRun.refusal.message };
+      return {
+        ok: false,
+        error: repairRun.error ?? repairRun.refusal.message,
+        failureReason: repairRun.failureReason ?? "provider_error"
+      };
     return runFallbackHistorianPass({
       ...args,
       prompt: repairPrompt,
       error: repairRun.error ?? "historian repair run failed",
+      failureReason: repairRun.failureReason ?? "provider_error",
       dumpPaths: [firstRun.dumpPath, repairRun.dumpPath]
     });
   }
@@ -6902,6 +9109,7 @@ async function runValidatedHistorianPass(args) {
     ...args,
     prompt: repairPrompt,
     error: repairValidation.error ?? "invalid compartment output",
+    failureReason: repairValidation.error ?? "parse_failed",
     dumpPaths: [firstRun.dumpPath, repairRun.dumpPath]
   });
 }
@@ -6997,7 +9205,8 @@ async function runHistorianPrompt(args) {
     sessionLog2(parentSessionId, `historian: prompt refused before opening a child session: ${preOpenFailure}`);
     return {
       ok: false,
-      error: `Historian failed while processing this session: ${preOpenFailure}`
+      error: `Historian failed while processing this session: ${preOpenFailure}`,
+      failureReason: preOpenFailure
     };
   }
   try {
@@ -7026,7 +9235,11 @@ async function runHistorianPrompt(args) {
         status: "failed",
         error: "Historian could not create its child session."
       });
-      return { ok: false, error: "Historian could not create its child session." };
+      return {
+        ok: false,
+        error: "Historian could not create its child session.",
+        failureReason: "provider_error"
+      };
     }
     for (let retryIndex = 0;retryIndex <= MAX_HISTORIAN_RETRIES; retryIndex += 1) {
       try {
@@ -7089,13 +9302,19 @@ async function runHistorianPrompt(args) {
       error: emptyError
     });
     if (emptyError && (!reasoningResult || lengthCapped)) {
-      return { ok: false, error: emptyError, invocationId: invocationId ?? undefined };
+      return {
+        ok: false,
+        error: emptyError,
+        failureReason: "empty_output",
+        invocationId: invocationId ?? undefined
+      };
     }
     const result = textResult ?? reasoningResult;
     if (result == null) {
       return {
         ok: false,
         error: emptyError ?? "Historian returned no assistant output.",
+        failureReason: "empty_output",
         invocationId: invocationId ?? undefined
       };
     }
@@ -7108,9 +9327,11 @@ async function runHistorianPrompt(args) {
       status: failedInvocationStatus(modelError),
       error: modelError
     });
+    const failureMessage = getErrorMessage(modelError);
     return {
       ok: false,
       error: `Historian failed while processing this session: ${desc.brief}`,
+      failureReason: PRODUCER_PROMPT_FIT_FAILURE_PATTERN.test(failureMessage) ? failureMessage : externalHistorianFailureReason(modelError, "exception"),
       ...modelError instanceof HiddenCompletionRefusal ? { refusal: modelError } : {}
     };
   } finally {
@@ -7143,9 +9364,14 @@ async function runFallbackHistorianPass(args) {
     chain.push(candidate);
   }
   if (chain.length === 0) {
-    return { ok: false, error: args.error };
+    return {
+      ok: false,
+      error: args.error,
+      failureReason: args.failureReason ?? "provider_error"
+    };
   }
   let lastError = args.error;
+  let lastFailureReason = args.failureReason ?? "provider_error";
   for (let i = 0;i < chain.length; i += 1) {
     const modelOverride = chain[i];
     const modelId = modelOverride.model;
@@ -7171,6 +9397,7 @@ async function runFallbackHistorianPass(args) {
     });
     if (!fallbackRun.ok || !fallbackRun.result) {
       lastError = fallbackRun.error ?? lastError;
+      lastFailureReason = fallbackRun.failureReason ?? "provider_error";
       continue;
     }
     const fallbackValidation = validateHistorianOutput(fallbackRun.result, args.parentSessionId, args.chunk, args.priorCompartments, args.sequenceOffset);
@@ -7179,8 +9406,9 @@ async function runFallbackHistorianPass(args) {
       return { ...fallbackValidation, invocationId: fallbackRun.invocationId ?? null };
     }
     lastError = fallbackValidation.error ?? lastError;
+    lastFailureReason = fallbackValidation.error ?? "parse_failed";
   }
-  return { ok: false, error: lastError };
+  return { ok: false, error: lastError, failureReason: lastFailureReason };
 }
 function historianPromptAdmissionFailure(args) {
   const selected = args.model;
@@ -9532,13 +11760,13 @@ var SMART_NOTE_COMPILER_AGENT = "smart-note-compiler";
 // ../plugin/src/features/magic-context/smart-notes/capabilities.ts
 import { execFile } from "node:child_process";
 import { constants as fsConstants2 } from "node:fs";
-import { lstat, open as open2, realpath } from "node:fs/promises";
+import { lstat, open as open3, realpath } from "node:fs/promises";
 import path9 from "node:path";
 import { promisify } from "node:util";
 
 // ../plugin/src/features/magic-context/smart-notes/github-token.ts
 import { constants as fsConstants } from "node:fs";
-import { open } from "node:fs/promises";
+import { open as open2 } from "node:fs/promises";
 import path8 from "node:path";
 var OWNER_ONLY_MODE = 384;
 var INSECURE_FILE_WARNING = "[magic-context] ignoring GitHub token file because it must have owner-only permissions (0600)";
@@ -9548,7 +11776,7 @@ async function readSmartNoteGithubToken(options = {}) {
   const nonBlock = typeof fsConstants.O_NONBLOCK === "number" ? fsConstants.O_NONBLOCK : 0;
   let handle;
   try {
-    handle = await open(filePath, fsConstants.O_RDONLY | noFollow | nonBlock);
+    handle = await open2(filePath, fsConstants.O_RDONLY | noFollow | nonBlock);
     const stat = await handle.stat();
     if (!stat.isFile() || (stat.mode & 511) !== OWNER_ONLY_MODE) {
       (options.warn ?? log2)(INSECURE_FILE_WARNING);
@@ -10117,7 +12345,7 @@ async function guardedReadFileBody(projectRoot, repoRelativePath, signal, fileLi
     return null;
   const noFollow = typeof fsConstants2.O_NOFOLLOW === "number" ? fsConstants2.O_NOFOLLOW : 0;
   const nonBlock = typeof fsConstants2.O_NONBLOCK === "number" ? fsConstants2.O_NONBLOCK : 0;
-  const openPromise = open2(canonicalTarget, fsConstants2.O_RDONLY | noFollow | nonBlock).catch((error) => {
+  const openPromise = open3(canonicalTarget, fsConstants2.O_RDONLY | noFollow | nonBlock).catch((error) => {
     if (isNoFollowOrMissing(error))
       return null;
     throw error;
@@ -10263,7 +12491,7 @@ function getAsyncModule() {
       await beforeModuleLoad();
     const [{ default: singlefileAsyncifyVariant }, { newQuickJSAsyncWASMModuleFromVariant }] = await importPluginModule(() => Promise.all([
       import("./index-fr3x6spx.js").then((m)=>__toESM(m.default,1)),
-      import("./index-5prbx026.js")
+      import("./index-69vas84q.js")
     ]));
     const module = await newQuickJSAsyncWASMModuleFromVariant(singlefileAsyncifyVariant);
     return module;
@@ -16135,282 +18363,279 @@ function clearDreamerTickFailure(db) {
   db.prepare("DELETE FROM schema_migrations_meta WHERE key = ?").run(DREAMER_TICK_FAILURE_KEY);
 }
 
-// ../plugin/src/hooks/magic-context/lkg-persist.ts
-import { createHash as createHash11 } from "node:crypto";
-function parseStringArray(value) {
-  if (typeof value !== "string")
-    return null;
-  let parsed;
-  try {
-    parsed = JSON.parse(value);
-  } catch {
-    return null;
-  }
-  if (!Array.isArray(parsed))
-    return null;
-  const result = [];
-  for (const entry of parsed) {
-    if (typeof entry !== "string" || entry.length === 0)
-      return null;
-    result.push(entry);
-  }
-  return result;
-}
-function parseNullableString(value) {
-  if (value === null || value === undefined)
-    return null;
-  return typeof value === "string" ? value : undefined;
-}
-function parseNullableInteger(value) {
-  if (value === null || value === undefined)
-    return;
-  return typeof value === "number" && Number.isSafeInteger(value) ? value : undefined;
-}
-function parsePersistedLkgSlot(row) {
-  if (!row || typeof row !== "object")
-    return;
-  const record = row;
-  const jsonPrefix = record.json_prefix;
-  const lastInputMessageId = record.last_input_message_id;
-  const capturedAt = record.captured_at;
-  let inputIdsRaw = record.input_id_seq;
-  let piOutputEntryIds;
-  if (typeof inputIdsRaw === "string") {
-    try {
-      const metadata = JSON.parse(inputIdsRaw);
-      if (metadata && !Array.isArray(metadata) && metadata.version === 1 && Array.isArray(metadata.piOutputEntryIds)) {
-        if (!metadata.piOutputEntryIds.every((id) => id === null || typeof id === "string" && id.length > 0))
-          return;
-        piOutputEntryIds = metadata.piOutputEntryIds;
-        inputIdsRaw = JSON.stringify(metadata.inputIds);
-      }
-    } catch {
-      return;
-    }
-  }
-  const inputIdSeq = parseStringArray(inputIdsRaw);
-  const inputContentDigests = parseStringArray(record.input_content_digests);
-  const modelKey = parseNullableString(record.model_key);
-  const providerKey = parseNullableString(record.provider_key);
-  if (typeof jsonPrefix !== "string" || typeof lastInputMessageId !== "string" || lastInputMessageId.length === 0 || typeof capturedAt !== "number" || !Number.isFinite(capturedAt) || inputIdSeq === null || inputContentDigests === null || inputContentDigests.length !== inputIdSeq.length || modelKey === undefined || providerKey === undefined) {
-    return;
-  }
-  if (piOutputEntryIds) {
-    try {
-      const output = JSON.parse(jsonPrefix);
-      const inputs = new Set(inputIdSeq);
-      if (!Array.isArray(output) || output.length !== piOutputEntryIds.length || piOutputEntryIds.some((id) => id !== null && !inputs.has(id)))
-        return;
-    } catch {
-      return;
-    }
-  }
-  let inputContentSignatures;
-  if (record.input_content_signatures !== null && record.input_content_signatures !== undefined) {
-    const parsed = parseStringArray(record.input_content_signatures);
-    if (parsed === null || parsed.length !== inputIdSeq.length)
-      return;
-    inputContentSignatures = parsed;
-  }
-  const slot = {
-    jsonPrefix,
-    inputIdSeq,
-    inputContentDigests,
-    lastInputMessageId,
-    modelKey,
-    providerKey,
-    capturedAt
-  };
-  if (inputContentSignatures)
-    slot.inputContentSignatures = inputContentSignatures;
-  if (piOutputEntryIds)
-    slot.piOutputEntryIds = piOutputEntryIds;
-  const rowVersion = parseNullableInteger(record.row_version);
-  if (rowVersion !== undefined)
-    slot.rowVersion = rowVersion;
-  const captureSequence = parseNullableInteger(record.capture_sequence);
-  if (captureSequence !== undefined)
-    slot.captureSequence = captureSequence;
-  return slot;
-}
-var persistedFingerprints = new WeakMap;
-var PERSISTED_FINGERPRINT_MAX_SESSIONS = 1000;
-function rememberFingerprint(db, sessionId, fingerprint) {
-  let saved = persistedFingerprints.get(db);
-  if (!saved) {
-    saved = new Map;
-    persistedFingerprints.set(db, saved);
-  }
-  saved.delete(sessionId);
-  if (saved.size >= PERSISTED_FINGERPRINT_MAX_SESSIONS) {
-    const oldest = saved.keys().next().value;
-    if (oldest !== undefined)
-      saved.delete(oldest);
-  }
-  saved.set(sessionId, fingerprint);
-}
-function slotFingerprint(slot) {
-  return createHash11("sha256").update(JSON.stringify([
-    slot.jsonPrefix,
-    slot.inputIdSeq,
-    slot.inputContentDigests,
-    slot.inputContentSignatures,
-    slot.piOutputEntryIds,
-    slot.lastInputMessageId,
-    slot.modelKey,
-    slot.providerKey,
-    slot.rowVersion,
-    slot.captureSequence
-  ])).digest("hex");
-}
-function saveLkgSlotToDb(db, sessionId, slot, publishMetadata) {
-  const fingerprint = slotFingerprint(slot);
-  if (!publishMetadata && persistedFingerprints.get(db)?.get(sessionId) === fingerprint)
-    return true;
-  const layout = layoutLkgPrefix(slot.jsonPrefix);
-  try {
-    db.transaction(() => {
-      const storedHashes = new Map;
-      for (const row of db.prepare("SELECT chunk, hash FROM lkg_slot_chunks WHERE session_id = ?").all(sessionId)) {
-        storedHashes.set(row.chunk, row.hash);
-      }
-      const upsertChunk = db.prepare(`INSERT INTO lkg_slot_chunks (session_id, chunk, hash, body) VALUES (?, ?, ?, ?)
-                ON CONFLICT(session_id, chunk) DO UPDATE SET hash = excluded.hash, body = excluded.body`);
-      for (let index = 0;index < layout.chunks.length; index += 1) {
-        if (storedHashes.get(index) === layout.chunkHashes[index])
-          continue;
-        upsertChunk.run(sessionId, index, layout.chunkHashes[index], layout.chunks[index]);
-      }
-      db.prepare("DELETE FROM lkg_slot_chunks WHERE session_id = ? AND chunk >= ?").run(sessionId, layout.chunks.length);
-      db.prepare(`INSERT INTO lkg_slots (
-                    session_id, json_prefix_chars, json_prefix_chunks, json_prefix_hash,
-                    input_id_seq, input_content_digests, input_content_signatures,
-                    last_input_message_id, model_key, provider_key,
-                    captured_at, row_version, capture_sequence
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(session_id) DO UPDATE SET
-                    json_prefix_chars = excluded.json_prefix_chars,
-                    json_prefix_chunks = excluded.json_prefix_chunks,
-                    json_prefix_hash = excluded.json_prefix_hash,
-                    input_id_seq = excluded.input_id_seq,
-                    input_content_digests = excluded.input_content_digests,
-                    input_content_signatures = excluded.input_content_signatures,
-                    last_input_message_id = excluded.last_input_message_id,
-                    model_key = excluded.model_key,
-                    provider_key = excluded.provider_key,
-                    captured_at = excluded.captured_at,
-                    row_version = excluded.row_version,
-                    capture_sequence = excluded.capture_sequence`).run(sessionId, layout.chars, layout.chunks.length, layout.hash, JSON.stringify(slot.piOutputEntryIds ? {
-        version: 1,
-        inputIds: slot.inputIdSeq,
-        piOutputEntryIds: slot.piOutputEntryIds
-      } : slot.inputIdSeq), JSON.stringify(slot.inputContentDigests), slot.inputContentSignatures ? JSON.stringify(slot.inputContentSignatures) : null, slot.lastInputMessageId, slot.modelKey, slot.providerKey, slot.capturedAt, slot.rowVersion ?? null, slot.captureSequence ?? null);
-      publishMetadata?.();
-    }).immediate();
-    rememberFingerprint(db, sessionId, fingerprint);
-    return true;
-  } catch (error) {
-    if (!publishMetadata)
-      sessionLog2(sessionId, "LKG snapshot persistence failed (in-memory slot retained):", error);
+// ../plugin/src/features/magic-context/message-index-async.ts
+var indexCancellations = new Map;
+var sessionEpochs = new Map;
+var workerMeasurements = new WeakMap;
+function isDatabaseLockedError(error) {
+  if (!error || typeof error !== "object")
     return false;
+  const e = error;
+  if (typeof e.code === "string") {
+    if (e.code === "SQLITE_BUSY" || e.code === "SQLITE_LOCKED")
+      return true;
   }
+  if (typeof e.message === "string") {
+    if (/database is locked/i.test(e.message))
+      return true;
+    if (/sqlite_(busy|locked)/i.test(e.message))
+      return true;
+  }
+  return false;
 }
-function clearPersistedLkgSlot(db, sessionId) {
+var INCREMENTAL_DEBOUNCE_MS = 100;
+var RECONCILIATION_BATCH_SIZE = 100;
+
+class MagicContextMessageIndexHeapHolder {
+  reconciledSessions = new Set;
+  reconciliationScheduledSessions = new Set;
+  clearAndReindexScheduledSessions = new Map;
+  sessionLocks = new Map;
+  incrementalTimers = new Map;
+  pendingIncrementalKeys = new Set;
+  completedIncrementalKeys = new Set;
+  activeReconcilerBuffers = new Map;
+}
+var heapHolder = new MagicContextMessageIndexHeapHolder;
+var PREPARE_RETRY_MS = 60000;
+async function sourceReady(source, sessionId) {
+  const prepare = source?.prepare;
+  return typeof prepare === "function" ? prepare(sessionId) : true;
+}
+function defer(fn) {
+  const immediate = globalThis.setImmediate;
+  if (typeof immediate === "function") {
+    immediate(fn);
+    return;
+  }
+  setTimeout(fn, 0);
+}
+function yieldToEventLoop() {
+  return new Promise((resolve) => defer(resolve));
+}
+function runWithSessionLock(sessionId, operation) {
+  const previous = heapHolder.sessionLocks.get(sessionId) ?? Promise.resolve();
+  const run = previous.catch(() => {
+    return;
+  }).then(async () => {
+    await operation();
+  });
+  heapHolder.sessionLocks.set(sessionId, run);
+  run.finally(() => {
+    if (heapHolder.sessionLocks.get(sessionId) === run) {
+      heapHolder.sessionLocks.delete(sessionId);
+    }
+  }).catch(() => {
+    return;
+  });
+  return run;
+}
+function logIndexingError(sessionId, action, error) {
+  if (isDatabaseLockedError(error)) {
+    sessionLog2(sessionId, `message FTS async ${action} skipped (database busy; will retry on next reconciliation)`);
+    return;
+  }
+  sessionLog2(sessionId, `message FTS async ${action} failed: ${error instanceof Error ? error.message : String(error)}`);
+  log2(`[message-index-async] ${action} failed for ${sessionId}:`, error);
+}
+async function reconcileSessionIndex(db, sessionId, readMessages) {
+  if (!await sourceReady(readMessages, sessionId))
+    return false;
+  await runWithSessionLock(sessionId, async () => {
+    if (heapHolder.reconciledSessions.has(sessionId))
+      return;
+    let fallbackSnapshot = null;
+    try {
+      const fullReader = typeof readMessages === "function" ? readMessages : null;
+      const finalWatermark = readMessages.getCount ? readMessages.getCount(sessionId) : (fallbackSnapshot = fullReader?.(sessionId) ?? []).length;
+      let cursor = getMessageIndexReconciliationStartOrdinal2(db, sessionId);
+      let after;
+      while (cursor < finalWatermark) {
+        const pageEnd = Math.min(finalWatermark, cursor + RECONCILIATION_BATCH_SIZE);
+        const messages = readMessages.readPage ? readMessages.readPage(sessionId, cursor, RECONCILIATION_BATCH_SIZE, finalWatermark, after) : (fallbackSnapshot ?? []).filter((message) => message.ordinal > cursor && message.ordinal <= pageEnd);
+        const retainedMessages = fallbackSnapshot ?? messages;
+        heapHolder.activeReconcilerBuffers.set(sessionId, retainedMessages);
+        withSqliteBackgroundWriter2(() => indexMessagesAfterOrdinal2(db, sessionId, messages, cursor, pageEnd));
+        const nextCursor = getMessageIndexReconciliationStartOrdinal2(db, sessionId);
+        if (nextCursor <= cursor)
+          break;
+        cursor = nextCursor;
+        const last = messages.at(-1);
+        after = last?.ordinal === cursor && typeof last.createdAt === "number" ? { timeCreated: last.createdAt, id: last.id } : undefined;
+        if (cursor < finalWatermark) {
+          await yieldToEventLoop();
+        }
+      }
+      if (isMessageIndexReconciledThrough2(db, sessionId, finalWatermark)) {
+        heapHolder.reconciledSessions.add(sessionId);
+      }
+    } finally {
+      heapHolder.activeReconcilerBuffers.delete(sessionId);
+    }
+  });
+  return true;
+}
+function scheduleReconciliation(db, sessionId, readMessages) {
+  if (heapHolder.reconciledSessions.has(sessionId) || heapHolder.reconciliationScheduledSessions.has(sessionId)) {
+    return;
+  }
+  heapHolder.reconciliationScheduledSessions.add(sessionId);
+  scheduleAfterBootQuiet(() => {
+    defer(() => {
+      reconcileSessionIndex(db, sessionId, readMessages).then((ran) => {
+        if (ran)
+          return;
+        setTimeout(() => {
+          heapHolder.reconciliationScheduledSessions.delete(sessionId);
+          scheduleReconciliation(db, sessionId, readMessages);
+        }, PREPARE_RETRY_MS).unref?.();
+      }).catch((error) => {
+        logIndexingError(sessionId, "reconciliation", error);
+        if (isDatabaseLockedError(error))
+          setTimeout(() => scheduleReconciliation(db, sessionId, readMessages), 1000).unref();
+      }).finally(() => {
+        heapHolder.reconciliationScheduledSessions.delete(sessionId);
+      });
+    });
+  });
+}
+function scheduleIncrementalIndex(db, sessionId, messageId, messageSource) {
+  const schedulingKey = `${sessionId}\x00${messageId}`;
+  const epoch = sessionEpochs.get(sessionId) ?? 0;
+  if (heapHolder.pendingIncrementalKeys.has(schedulingKey))
+    return;
+  const activeTimer = heapHolder.incrementalTimers.get(schedulingKey);
+  if (activeTimer)
+    clearTimeout(activeTimer);
+  const timer = setTimeout(() => {
+    heapHolder.incrementalTimers.delete(schedulingKey);
+    heapHolder.pendingIncrementalKeys.add(schedulingKey);
+    const indexMessage = async () => {
+      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch || !heapHolder.pendingIncrementalKeys.has(schedulingKey))
+        return;
+      const message = typeof messageSource === "function" ? messageSource(sessionId, messageId) : messageSource;
+      if (!message)
+        return;
+      const revisionKey = `${schedulingKey}\x00${getMessageIndexSourceIdentity2(message)}`;
+      if (heapHolder.completedIncrementalKeys.has(revisionKey))
+        return;
+      const currentWatermark = getLastIndexedOrdinal2(db, sessionId);
+      if (message.ordinal <= currentWatermark && isMessageIndexSourceCurrent2(db, sessionId, message)) {
+        heapHolder.completedIncrementalKeys.add(revisionKey);
+        return;
+      }
+      const wasReconciled = heapHolder.reconciledSessions.delete(sessionId);
+      await indexSingleMessageOffThread(db, sessionId, message);
+      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch || !heapHolder.pendingIncrementalKeys.has(schedulingKey))
+        return;
+      const finalWatermark = getLastIndexedOrdinal2(db, sessionId);
+      if (wasReconciled && isMessageIndexReconciledThrough2(db, sessionId, finalWatermark)) {
+        heapHolder.reconciledSessions.add(sessionId);
+      }
+      heapHolder.completedIncrementalKeys.add(revisionKey);
+    };
+    sourceReady(messageSource, sessionId).then((ready) => {
+      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch)
+        return;
+      if (ready)
+        return runWithSessionLock(sessionId, indexMessage);
+      setTimeout(() => scheduleIncrementalIndex(db, sessionId, messageId, messageSource), PREPARE_RETRY_MS).unref?.();
+    }).catch((error) => {
+      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch)
+        return;
+      heapHolder.reconciledSessions.delete(sessionId);
+      logIndexingError(sessionId, `incremental index for ${messageId}`, error);
+      if (isDatabaseLockedError(error))
+        setTimeout(() => scheduleIncrementalIndex(db, sessionId, messageId, messageSource), 1000).unref();
+    }).finally(() => {
+      if ((sessionEpochs.get(sessionId) ?? 0) === epoch)
+        heapHolder.pendingIncrementalKeys.delete(schedulingKey);
+    });
+  }, INCREMENTAL_DEBOUNCE_MS);
+  heapHolder.incrementalTimers.set(schedulingKey, timer);
+}
+async function indexSingleMessageOffThread(db, sessionId, message) {
+  const path = getSqliteDatabasePath2(db);
+  if (!path)
+    return withSqliteBackgroundWriter2(() => indexSingleMessage2(db, sessionId, message));
+  const cancellation = new Int32Array(new SharedArrayBuffer(4));
+  const active = indexCancellations.get(sessionId) ?? new Set;
+  active.add(cancellation);
+  indexCancellations.set(sessionId, active);
+  const result = await runSessionWarmupWorker({
+    path,
+    sessionId,
+    indexMessage: message,
+    harness: getHarness2(),
+    indexCancellation: cancellation.buffer,
+    ...indexCoordinationInput2()
+  }, {}).finally(() => {
+    active.delete(cancellation);
+    if (active.size === 0)
+      indexCancellations.delete(sessionId);
+  });
+  if (!("inserted" in result))
+    throw new Error("failure" in result ? result.detail : "unexpected indexing worker reply");
+  if (result.measurements) {
+    const sessions = workerMeasurements.get(db) ?? new Map;
+    sessions.set(sessionId, result.measurements);
+    workerMeasurements.set(db, sessions);
+    if (result.measurements.skipped)
+      log2(`[magic-context] incremental FTS skipped oversized source ${message.id} (${result.measurements.sourceBytes} bytes); identity and progress persisted`);
+  }
+  return result.inserted;
+}
+async function sweepOrphanedOpenCodeMessageIndexesOffThread(db, openSource, options = {}) {
+  const path = getSqliteDatabasePath2(db);
+  if (!path || getHarness2() !== "opencode")
+    return sweepOrphanedOpenCodeMessageIndexes2(db, openSource, options);
+  let source = null;
+  let sourcePath = null;
   try {
-    clearPersistedLkgSlotStrict(db, sessionId);
-  } catch (error) {
-    sessionLog2(sessionId, "LKG snapshot durable clear failed:", error);
+    source = openSource();
+    if (source)
+      sourcePath = getSqliteDatabasePath2(source);
+  } catch {} finally {
+    if (sourcePath)
+      source?.close();
   }
+  if (!sourcePath)
+    return sweepOrphanedOpenCodeMessageIndexes2(db, () => source, options);
+  const reply = await runSessionWarmupWorker({
+    path,
+    sessionId: "",
+    harness: getHarness2(),
+    orphanSweep: { sourcePath, options }
+  }, {});
+  if (!("orphanSweep" in reply))
+    throw new Error("message history orphan sweep worker failed");
+  return reply.orphanSweep;
 }
-function clearPersistedLkgSlotStrict(db, sessionId) {
-  db.transaction(() => {
-    db.prepare("DELETE FROM lkg_slot_chunks WHERE session_id = ?").run(sessionId);
-    db.prepare("DELETE FROM lkg_slots WHERE session_id = ?").run(sessionId);
-  }).immediate();
-  persistedFingerprints.get(db)?.delete(sessionId);
-}
-function loadPersistedLkgSlot(db, sessionId) {
-  if (isRustMarkerAdmissionFenced(db, sessionId))
-    return;
-  let row;
-  let chunkRows;
-  try {
-    ({ row, chunkRows } = db.transaction(() => {
-      const slotRow = db.prepare("SELECT * FROM lkg_slots WHERE session_id = ?").get(sessionId);
-      if (!slotRow)
-        return { row: undefined, chunkRows: [] };
-      const slices = db.prepare("SELECT chunk, hash, body FROM lkg_slot_chunks WHERE session_id = ? ORDER BY chunk").all(sessionId);
-      return { row: slotRow, chunkRows: slices };
-    }).deferred());
-  } catch (error) {
-    sessionLog2(sessionId, "LKG snapshot durable load failed:", error);
-    return;
+function clearSessionTracking(sessionId) {
+  sessionEpochs.set(sessionId, (sessionEpochs.get(sessionId) ?? 0) + 1);
+  for (const cancellation of indexCancellations.get(sessionId) ?? [])
+    Atomics.store(cancellation, 0, 1);
+  heapHolder.clearAndReindexScheduledSessions.delete(sessionId);
+  heapHolder.reconciledSessions.delete(sessionId);
+  heapHolder.reconciliationScheduledSessions.delete(sessionId);
+  heapHolder.sessionLocks.delete(sessionId);
+  heapHolder.activeReconcilerBuffers.delete(sessionId);
+  const prefix = `${sessionId}\x00`;
+  for (const [key, timer] of heapHolder.incrementalTimers) {
+    if (key.startsWith(prefix)) {
+      clearTimeout(timer);
+      heapHolder.incrementalTimers.delete(key);
+    }
   }
-  if (!row)
-    return;
-  const prefix = assembleLkgPrefix({
-    chars: row.json_prefix_chars,
-    chunks: row.json_prefix_chunks,
-    hash: row.json_prefix_hash
-  }, chunkRows);
-  const slot = prefix ? parsePersistedLkgSlot({ ...row, json_prefix: prefix.jsonPrefix }) : undefined;
-  if (!prefix || !slot) {
-    if (!prefix)
-      sessionLog2(sessionId, "LKG snapshot slices failed verification; slot cleared");
-    clearPersistedLkgSlot(db, sessionId);
-    return;
+  for (const key of heapHolder.pendingIncrementalKeys) {
+    if (key.startsWith(prefix)) {
+      heapHolder.pendingIncrementalKeys.delete(key);
+    }
   }
-  return slot;
-}
-function pruneStaleLkgSlotsBatch(db, now) {
-  const previousTimeout = db.prepare("PRAGMA busy_timeout").get();
-  const cutoff = now - 7 * 24 * 60 * 60 * 1000;
-  const stale = `captured_at < ? AND NOT EXISTS (
-        SELECT 1 FROM session_projects sp
-        WHERE sp.session_id = lkg_slots.session_id AND sp.updated_at >= ?
-    )`;
-  const slot = db.prepare(`SELECT session_id FROM lkg_slots WHERE ${stale} LIMIT 1`).get(cutoff, cutoff);
-  const chunks = db.prepare(`SELECT rowid FROM lkg_slot_chunks c WHERE
-        session_id = ? OR NOT EXISTS (SELECT 1 FROM lkg_slots s WHERE s.session_id = c.session_id)
-        LIMIT 25`).all(slot?.session_id ?? "");
-  if (!slot && chunks.length === 0)
-    return { slots: 0, chunks: 0 };
-  try {
-    db.exec("PRAGMA busy_timeout = 0");
-    let transactionStartedAt = 0;
-    const changes = db.transaction(() => {
-      transactionStartedAt = performance.now();
-      const removed = slot ? db.prepare(`DELETE FROM lkg_slots WHERE session_id = ? AND ${stale}`).run(slot.session_id, cutoff, cutoff).changes : 0;
-      const removeChunk = db.prepare(`DELETE FROM lkg_slot_chunks WHERE rowid = ? AND NOT EXISTS (
-                SELECT 1 FROM lkg_slots s WHERE s.session_id = lkg_slot_chunks.session_id
-            )`);
-      let removedChunks = 0;
-      for (const { rowid } of chunks)
-        removedChunks += removeChunk.run(rowid).changes;
-      return { slots: removed, chunks: removedChunks };
-    }).immediate();
-    logSlowWriteTransaction("lkg_stale_gc", transactionStartedAt);
-    if (changes.slots && slot)
-      persistedFingerprints.get(db)?.delete(slot.session_id);
-    return changes;
-  } finally {
-    db.exec(`PRAGMA busy_timeout = ${Number(previousTimeout.timeout) || 0}`);
+  for (const key of heapHolder.completedIncrementalKeys) {
+    if (key.startsWith(prefix))
+      heapHolder.completedIncrementalKeys.delete(key);
   }
-}
-async function drainStaleLkgSlots(db, now = Date.now(), budgetMs = 2000) {
-  let removed = 0;
-  await drainBackgroundBatches(() => {
-    const batch = pruneStaleLkgSlotsBatch(db, now);
-    removed += batch.slots;
-    return batch.slots + batch.chunks > 0;
-  }, { budgetMs });
-  return removed;
-}
-function createDbLkgPersistence(db) {
-  return {
-    load: (sessionId) => loadPersistedLkgSlot(db, sessionId),
-    clear: (sessionId) => clearPersistedLkgSlot(db, sessionId)
-  };
 }
 
 // ../plugin/src/plugin/dream-timer.ts
@@ -16605,7 +18830,7 @@ async function runMessageHistoryMaintenance(db) {
       log2(`[message-index] pending Rust session cleanup: cleared=${rustCleanup.cleared} failed=${rustCleanup.failedSessionIds.length}`);
     }
   }
-  const sweep = sweepOrphanedOpenCodeMessageIndexes(db, openOpenCodeDb);
+  const sweep = await sweepOrphanedOpenCodeMessageIndexesOffThread(db, openOpenCodeDb);
   if (sweep.reason)
     log2(`[message-index] orphan sweep parked: ${sweep.reason}`);
   if (sweep.deleted > 0) {
@@ -17304,13 +19529,33 @@ function resolveModelRefForTarget(ref, targetHarness) {
   return targetHarness === "omp" ? resolveModelRefForOmp(ref) : resolveModelRefForPi(ref);
 }
 var configuredSubagentExtensions;
+var PI_NON_LOCAL_EXTENSION_PREFIXES = [
+  "npm:",
+  "git:",
+  "github:",
+  "http:",
+  "https:",
+  "ssh:",
+  "builtin:"
+];
 function configurePiSubagentExtensions(extensions) {
   configuredSubagentExtensions = extensions?.slice();
 }
 function resolveSubagentExtensionEntry(entry, targetHarness) {
   const trimmed = entry.trim();
   const isNpmSource = trimmed.startsWith("npm:");
-  return !isNpmSource && !isAbsolute(trimmed) ? resolvePath(getHostAgentSettingsDir(targetHarness), trimmed) : trimmed;
+  const isPiSource = PI_NON_LOCAL_EXTENSION_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
+  if (isNpmSource || targetHarness === "pi" && isPiSource)
+    return trimmed;
+  let normalized = trimmed;
+  if (normalized === "~") {
+    normalized = homedir();
+  } else if (normalized.startsWith("~/") || process.platform === "win32" && normalized.startsWith("~\\")) {
+    normalized = join10(homedir(), normalized.slice(2));
+  } else if (/^file:\/\//.test(normalized)) {
+    normalized = fileURLToPath(normalized);
+  }
+  return isAbsolute(normalized) ? normalized : resolvePath(getHostAgentSettingsDir(targetHarness), normalized);
 }
 var PI_READ_ONLY_BUILTINS = ["read", "grep", "find", "ls"];
 var PI_AFT_READ_TOOLS = ["aft_outline", "aft_zoom", "aft_search"];
@@ -20191,255 +22436,6 @@ function commitPiCompactionModeRecord(db, sessionId, record) {
 // src/context-handler.ts
 import * as crypto3 from "node:crypto";
 
-// ../plugin/src/features/magic-context/message-index-async.ts
-var indexCancellations = new Map;
-var sessionEpochs = new Map;
-var workerMeasurements = new WeakMap;
-function isDatabaseLockedError(error) {
-  if (!error || typeof error !== "object")
-    return false;
-  const e = error;
-  if (typeof e.code === "string") {
-    if (e.code === "SQLITE_BUSY" || e.code === "SQLITE_LOCKED")
-      return true;
-  }
-  if (typeof e.message === "string") {
-    if (/database is locked/i.test(e.message))
-      return true;
-    if (/sqlite_(busy|locked)/i.test(e.message))
-      return true;
-  }
-  return false;
-}
-var INCREMENTAL_DEBOUNCE_MS = 100;
-var RECONCILIATION_BATCH_SIZE = 100;
-
-class MagicContextMessageIndexHeapHolder {
-  reconciledSessions = new Set;
-  reconciliationScheduledSessions = new Set;
-  clearAndReindexScheduledSessions = new Map;
-  sessionLocks = new Map;
-  incrementalTimers = new Map;
-  pendingIncrementalKeys = new Set;
-  completedIncrementalKeys = new Set;
-  activeReconcilerBuffers = new Map;
-}
-var heapHolder = new MagicContextMessageIndexHeapHolder;
-var PREPARE_RETRY_MS = 60000;
-async function sourceReady(source, sessionId) {
-  const prepare = source?.prepare;
-  return typeof prepare === "function" ? prepare(sessionId) : true;
-}
-function defer(fn) {
-  const immediate = globalThis.setImmediate;
-  if (typeof immediate === "function") {
-    immediate(fn);
-    return;
-  }
-  setTimeout(fn, 0);
-}
-function yieldToEventLoop() {
-  return new Promise((resolve) => defer(resolve));
-}
-function runWithSessionLock(sessionId, operation) {
-  const previous = heapHolder.sessionLocks.get(sessionId) ?? Promise.resolve();
-  const run = previous.catch(() => {
-    return;
-  }).then(async () => {
-    await operation();
-  });
-  heapHolder.sessionLocks.set(sessionId, run);
-  run.finally(() => {
-    if (heapHolder.sessionLocks.get(sessionId) === run) {
-      heapHolder.sessionLocks.delete(sessionId);
-    }
-  }).catch(() => {
-    return;
-  });
-  return run;
-}
-function logIndexingError(sessionId, action, error) {
-  if (isDatabaseLockedError(error)) {
-    sessionLog2(sessionId, `message FTS async ${action} skipped (database busy; will retry on next reconciliation)`);
-    return;
-  }
-  sessionLog2(sessionId, `message FTS async ${action} failed: ${error instanceof Error ? error.message : String(error)}`);
-  log2(`[message-index-async] ${action} failed for ${sessionId}:`, error);
-}
-async function reconcileSessionIndex(db, sessionId, readMessages) {
-  if (!await sourceReady(readMessages, sessionId))
-    return false;
-  await runWithSessionLock(sessionId, async () => {
-    if (heapHolder.reconciledSessions.has(sessionId))
-      return;
-    let fallbackSnapshot = null;
-    try {
-      const fullReader = typeof readMessages === "function" ? readMessages : null;
-      const finalWatermark = readMessages.getCount ? readMessages.getCount(sessionId) : (fallbackSnapshot = fullReader?.(sessionId) ?? []).length;
-      let cursor = getMessageIndexReconciliationStartOrdinal(db, sessionId);
-      let after;
-      while (cursor < finalWatermark) {
-        const pageEnd = Math.min(finalWatermark, cursor + RECONCILIATION_BATCH_SIZE);
-        const messages = readMessages.readPage ? readMessages.readPage(sessionId, cursor, RECONCILIATION_BATCH_SIZE, finalWatermark, after) : (fallbackSnapshot ?? []).filter((message) => message.ordinal > cursor && message.ordinal <= pageEnd);
-        const retainedMessages = fallbackSnapshot ?? messages;
-        heapHolder.activeReconcilerBuffers.set(sessionId, retainedMessages);
-        withSqliteBackgroundWriter2(() => indexMessagesAfterOrdinal(db, sessionId, messages, cursor, pageEnd));
-        const nextCursor = getMessageIndexReconciliationStartOrdinal(db, sessionId);
-        if (nextCursor <= cursor)
-          break;
-        cursor = nextCursor;
-        const last = messages.at(-1);
-        after = last?.ordinal === cursor && typeof last.createdAt === "number" ? { timeCreated: last.createdAt, id: last.id } : undefined;
-        if (cursor < finalWatermark) {
-          await yieldToEventLoop();
-        }
-      }
-      if (isMessageIndexReconciledThrough(db, sessionId, finalWatermark)) {
-        heapHolder.reconciledSessions.add(sessionId);
-      }
-    } finally {
-      heapHolder.activeReconcilerBuffers.delete(sessionId);
-    }
-  });
-  return true;
-}
-function scheduleReconciliation(db, sessionId, readMessages) {
-  if (heapHolder.reconciledSessions.has(sessionId) || heapHolder.reconciliationScheduledSessions.has(sessionId)) {
-    return;
-  }
-  heapHolder.reconciliationScheduledSessions.add(sessionId);
-  scheduleAfterBootQuiet(() => {
-    defer(() => {
-      reconcileSessionIndex(db, sessionId, readMessages).then((ran) => {
-        if (ran)
-          return;
-        setTimeout(() => {
-          heapHolder.reconciliationScheduledSessions.delete(sessionId);
-          scheduleReconciliation(db, sessionId, readMessages);
-        }, PREPARE_RETRY_MS).unref?.();
-      }).catch((error) => {
-        logIndexingError(sessionId, "reconciliation", error);
-        if (isDatabaseLockedError(error))
-          setTimeout(() => scheduleReconciliation(db, sessionId, readMessages), 1000).unref();
-      }).finally(() => {
-        heapHolder.reconciliationScheduledSessions.delete(sessionId);
-      });
-    });
-  });
-}
-function scheduleIncrementalIndex(db, sessionId, messageId, messageSource) {
-  const schedulingKey = `${sessionId}\x00${messageId}`;
-  const epoch = sessionEpochs.get(sessionId) ?? 0;
-  if (heapHolder.pendingIncrementalKeys.has(schedulingKey))
-    return;
-  const activeTimer = heapHolder.incrementalTimers.get(schedulingKey);
-  if (activeTimer)
-    clearTimeout(activeTimer);
-  const timer = setTimeout(() => {
-    heapHolder.incrementalTimers.delete(schedulingKey);
-    heapHolder.pendingIncrementalKeys.add(schedulingKey);
-    const indexMessage = async () => {
-      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch || !heapHolder.pendingIncrementalKeys.has(schedulingKey))
-        return;
-      const message = typeof messageSource === "function" ? messageSource(sessionId, messageId) : messageSource;
-      if (!message)
-        return;
-      const revisionKey = `${schedulingKey}\x00${getMessageIndexSourceIdentity(message)}`;
-      if (heapHolder.completedIncrementalKeys.has(revisionKey))
-        return;
-      const currentWatermark = getLastIndexedOrdinal(db, sessionId);
-      if (message.ordinal <= currentWatermark && isMessageIndexSourceCurrent(db, sessionId, message)) {
-        heapHolder.completedIncrementalKeys.add(revisionKey);
-        return;
-      }
-      const wasReconciled = heapHolder.reconciledSessions.delete(sessionId);
-      await indexSingleMessageOffThread(db, sessionId, message);
-      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch || !heapHolder.pendingIncrementalKeys.has(schedulingKey))
-        return;
-      const finalWatermark = getLastIndexedOrdinal(db, sessionId);
-      if (wasReconciled && isMessageIndexReconciledThrough(db, sessionId, finalWatermark)) {
-        heapHolder.reconciledSessions.add(sessionId);
-      }
-      heapHolder.completedIncrementalKeys.add(revisionKey);
-    };
-    sourceReady(messageSource, sessionId).then((ready) => {
-      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch)
-        return;
-      if (ready)
-        return runWithSessionLock(sessionId, indexMessage);
-      setTimeout(() => scheduleIncrementalIndex(db, sessionId, messageId, messageSource), PREPARE_RETRY_MS).unref?.();
-    }).catch((error) => {
-      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch)
-        return;
-      heapHolder.reconciledSessions.delete(sessionId);
-      logIndexingError(sessionId, `incremental index for ${messageId}`, error);
-      if (isDatabaseLockedError(error))
-        setTimeout(() => scheduleIncrementalIndex(db, sessionId, messageId, messageSource), 1000).unref();
-    }).finally(() => {
-      if ((sessionEpochs.get(sessionId) ?? 0) === epoch)
-        heapHolder.pendingIncrementalKeys.delete(schedulingKey);
-    });
-  }, INCREMENTAL_DEBOUNCE_MS);
-  heapHolder.incrementalTimers.set(schedulingKey, timer);
-}
-async function indexSingleMessageOffThread(db, sessionId, message) {
-  const path = getSqliteDatabasePath2(db);
-  if (!path)
-    return withSqliteBackgroundWriter2(() => indexSingleMessage(db, sessionId, message));
-  const cancellation = new Int32Array(new SharedArrayBuffer(4));
-  const active = indexCancellations.get(sessionId) ?? new Set;
-  active.add(cancellation);
-  indexCancellations.set(sessionId, active);
-  const result = await runSessionWarmupWorker({
-    path,
-    sessionId,
-    indexMessage: message,
-    harness: getHarness2(),
-    indexCancellation: cancellation.buffer,
-    ...indexCoordinationInput2()
-  }, {}).finally(() => {
-    active.delete(cancellation);
-    if (active.size === 0)
-      indexCancellations.delete(sessionId);
-  });
-  if (!("inserted" in result))
-    throw new Error("failure" in result ? result.detail : "unexpected indexing worker reply");
-  if (result.measurements) {
-    const sessions = workerMeasurements.get(db) ?? new Map;
-    sessions.set(sessionId, result.measurements);
-    workerMeasurements.set(db, sessions);
-    if (result.measurements.skipped)
-      log2(`[magic-context] incremental FTS skipped oversized source ${message.id} (${result.measurements.sourceBytes} bytes); identity and progress persisted`);
-  }
-  return result.inserted;
-}
-function clearSessionTracking(sessionId) {
-  sessionEpochs.set(sessionId, (sessionEpochs.get(sessionId) ?? 0) + 1);
-  for (const cancellation of indexCancellations.get(sessionId) ?? [])
-    Atomics.store(cancellation, 0, 1);
-  heapHolder.clearAndReindexScheduledSessions.delete(sessionId);
-  heapHolder.reconciledSessions.delete(sessionId);
-  heapHolder.reconciliationScheduledSessions.delete(sessionId);
-  heapHolder.sessionLocks.delete(sessionId);
-  heapHolder.activeReconcilerBuffers.delete(sessionId);
-  const prefix = `${sessionId}\x00`;
-  for (const [key, timer] of heapHolder.incrementalTimers) {
-    if (key.startsWith(prefix)) {
-      clearTimeout(timer);
-      heapHolder.incrementalTimers.delete(key);
-    }
-  }
-  for (const key of heapHolder.pendingIncrementalKeys) {
-    if (key.startsWith(prefix)) {
-      heapHolder.pendingIncrementalKeys.delete(key);
-    }
-  }
-  for (const key of heapHolder.completedIncrementalKeys) {
-    if (key.startsWith(prefix))
-      heapHolder.completedIncrementalKeys.delete(key);
-  }
-}
-
 // ../plugin/src/hooks/magic-context/event-resolvers.ts
 var DEFAULT_CONTEXT_LIMIT = 200000;
 var clampWarnSeen = new Set;
@@ -21017,6 +23013,15 @@ var canonicalReasons = new Set([
   "project_memory_epoch",
   "ttl_idle",
   "explicit_flush",
+  "user_flush",
+  "fit_retry",
+  "pending_materialization",
+  "variant_change",
+  "recomp",
+  "boundary_repair",
+  "host_history_change",
+  "thinking_hold",
+  "mutation_drift",
   "max_mutation_id",
   "first_render",
   "pressure_refold",
@@ -22030,7 +24035,7 @@ function resolveProtectedTailBoundary(ctx) {
   const offset = Math.max(1, ctx.lastCompartmentEndOrdinal + 1);
   const absoluteMessageCount = getCachedAbsoluteMessageCount2(ctx.sessionId) ?? getRawSessionMessageOrdinalCount2(ctx.sessionId);
   const messages = readRawSessionMessageRange2(ctx.sessionId, Math.max(1, offset - 1), absoluteMessageCount);
-  const storedTotals = ctx.storedTokenTotals;
+  const storedTotals = ctx.storedTokenTotalsForMessages?.(messages.map((m) => m.id)) ?? ctx.storedTokenTotals;
   const index = buildTrueRawTokenIndex(ctx.sessionId, messages, {
     providerShapeVersion: ctx.providerShapeVersion,
     cacheNamespace: ctx.cacheNamespace,
@@ -22273,12 +24278,14 @@ function resolveBoundaryContext(args) {
     migrationFloorActive = seedResult.seeded;
   }
   const calibration = sessionDecisionCalibration(args.db, args.sessionId);
-  let storedTokenTotals;
-  try {
-    storedTokenTotals = getAllStatusTagTokenTotalsFlat2(args.db, args.sessionId, args.taggerFloor ?? 0, calibration).totals;
-  } catch (error) {
-    sessionLog2(args.sessionId, "protected-tail stored-token map unavailable (live fallback):", error);
-  }
+  const storedTokenTotalsForMessages = (messageIds) => {
+    try {
+      return getAllStatusTagTokenTotalsFlat2(args.db, args.sessionId, args.taggerFloor ?? 0, calibration, messageIds).totals;
+    } catch (error) {
+      sessionLog2(args.sessionId, "protected-tail stored-token map unavailable (live fallback):", error);
+      return;
+    }
+  };
   return {
     sessionId: args.sessionId,
     mode: args.mode,
@@ -22295,7 +24302,7 @@ function resolveBoundaryContext(args) {
     emergencyTailScale: args.emergencyTailScale,
     providerShapeVersion: args.providerShapeVersion ?? "opencode-v1",
     cacheNamespace: args.cacheNamespace ?? `opencode:${args.sessionId}`,
-    storedTokenTotals,
+    storedTokenTotalsForMessages,
     calibration
   };
 }
@@ -22308,13 +24315,14 @@ function resolveWrapupProtectedTailBoundary(args) {
   const offset = Math.max(1, ctx.lastCompartmentEndOrdinal + 1);
   const absoluteMessageCount = getCachedAbsoluteMessageCount2(ctx.sessionId) ?? getRawSessionMessageOrdinalCount2(ctx.sessionId);
   const messages = readRawSessionMessageRange2(ctx.sessionId, Math.max(1, offset - 1), absoluteMessageCount);
+  const storedTotals = ctx.storedTokenTotalsForMessages?.(messages.map((m) => m.id)) ?? ctx.storedTokenTotals;
   const index = buildTrueRawTokenIndex(ctx.sessionId, messages, {
     providerShapeVersion: ctx.providerShapeVersion,
     cacheNamespace: ctx.cacheNamespace,
     calibration: ctx.calibration,
     absoluteMessageCount,
-    storedTotalForMessage: ctx.storedTokenTotals ? (m) => {
-      const value = ctx.storedTokenTotals?.get(m.id);
+    storedTotalForMessage: storedTotals ? (m) => {
+      const value = storedTotals?.get(m.id);
       return value === undefined ? null : value;
     } : undefined
   });
@@ -22551,168 +24559,6 @@ function isHistorianDrainBudgetSpent(args) {
     sessionLog2(args.sessionId, `historian skip: internal drain budget spent (${state.spentTokens}/${state.limitTokens} tokens); next eligible at ${new Date(state.nextEligibleAt).toISOString()}`);
   }
   return true;
-}
-
-// ../plugin/src/hooks/magic-context/active-anthropic-turn.ts
-function isInActiveAnthropicTurn(messages, index, anthropic) {
-  const start = activeAnthropicTurnStart(messages, anthropic);
-  return start !== undefined && index >= start;
-}
-function activeAnthropicTurnStart(messages, anthropic) {
-  if (!anthropic)
-    return;
-  for (let user = messages.length - 1;user >= 0; user--) {
-    const message = messages[user];
-    if (!isRecord(message))
-      continue;
-    const info = isRecord(message.info) ? message.info : message;
-    if (info.role !== "user" || info.synthetic === true || message.synthetic === true)
-      continue;
-    const id = typeof info.id === "string" ? info.id : "";
-    if (id.startsWith("synth-user-"))
-      continue;
-    const parts = Array.isArray(message.parts) ? message.parts : Array.isArray(message.content) ? message.content : [];
-    if (parts.length > 0 && parts.every((part) => isRecord(part) && (part.synthetic === true || part.ignored === true || ["tool_result", "toolResult", "tool-result"].includes(String(part.type)))))
-      continue;
-    return user + 1;
-  }
-  return;
-}
-function hasAnthropicReasoning(messages) {
-  return messages.some((message) => {
-    if (!isRecord(message))
-      return false;
-    const info = isRecord(message.info) ? message.info : message;
-    if (isAnthropicFamilyRoute(typeof info.providerID === "string" ? info.providerID : typeof info.provider === "string" ? info.provider : undefined, typeof info.modelID === "string" ? info.modelID : typeof info.model === "string" ? info.model : undefined))
-      return true;
-    const parts = Array.isArray(message.parts) ? message.parts : [];
-    return parts.some((part) => isRecord(part) && isRecord(part.metadata) && isRecord(part.metadata.anthropic));
-  });
-}
-
-// ../plugin/src/hooks/magic-context/strip-content.ts
-var METADATA_PART_TYPES = new Set([
-  "step-start",
-  "step-finish",
-  "snapshot",
-  "patch",
-  "agent",
-  "retry",
-  "subtask",
-  "compaction"
-]);
-var CLEARED_REASONING_TYPES = new Set(["thinking", "reasoning"]);
-var REASONING_IGNORED_PART_TYPES = new Set([
-  "step-start",
-  "step-finish",
-  "snapshot",
-  "patch",
-  "agent",
-  "retry",
-  "subtask",
-  "compaction"
-]);
-var REASONING_PART_TYPES = new Set(["reasoning", "thinking", "redacted_thinking"]);
-function hasReasoningReplayContent(message) {
-  return message.parts.some((part) => {
-    if (!isRecord(part) || part.ignored === true)
-      return false;
-    const type = typeof part.type === "string" ? part.type : "";
-    if (REASONING_IGNORED_PART_TYPES.has(type))
-      return false;
-    return type !== "text" || typeof part.text !== "string" || part.text.trim().length > 0;
-  });
-}
-function findLatestAssistantReasoningMutationExemptMessage(messages) {
-  for (let index = messages.length - 1;index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.info.role === "assistant" && hasReasoningReplayContent(message))
-      return message;
-  }
-  return;
-}
-
-// ../plugin/src/hooks/magic-context/reasoning-budget.ts
-var DEFAULT_KEEP_REASONING_TOKENS = 1e4;
-var UNKNOWN_REASONING_STEP_TOKENS = 1000;
-function resolveKeepReasoningTokens(config, modelKey) {
-  const values = config && typeof config === "object" ? Object.assign(Object.create(null), config) : undefined;
-  return typeof config === "number" ? config : resolveModelConfigValue(values, modelKey)?.value ?? values?.default ?? DEFAULT_KEEP_REASONING_TOKENS;
-}
-function reasoningStepCost(reported, textEstimate, opaque) {
-  if (reported !== undefined && Number.isFinite(reported) && reported > 0)
-    return reported;
-  if (textEstimate > 0)
-    return Math.ceil(textEstimate);
-  return opaque ? UNKNOWN_REASONING_STEP_TOKENS : 0;
-}
-function reasoningBudgetCutoff(steps, budget) {
-  const cost = (step) => step.alreadyRemoved ? 0 : typeof step.cost === "function" ? step.cost() : step.cost;
-  let kept = 0;
-  let upperBound = Number.POSITIVE_INFINITY;
-  for (const step of steps) {
-    if (!step.exempt)
-      continue;
-    kept += cost(step);
-    if (step.tag > 0)
-      upperBound = Math.min(upperBound, step.tag - 1);
-  }
-  for (let index = steps.length - 1;index >= 0; index--) {
-    const step = steps[index];
-    if (step.exempt || step.alreadyRemoved)
-      continue;
-    const tokens = cost(step);
-    if (kept + tokens <= budget) {
-      kept += tokens;
-      if (step.tag > 0)
-        upperBound = Math.min(upperBound, step.tag - 1);
-      continue;
-    }
-    let tag = step.tag;
-    for (let older = index - 1;tag <= 0 && older >= 0; older--)
-      tag = steps[older].tag;
-    return Math.max(0, Math.min(tag, upperBound));
-  }
-  return 0;
-}
-function reasoningTextAndOpaque(parts) {
-  let text = "";
-  let inlineText = "";
-  let opaque = false;
-  let hasReasoning = false;
-  const detailText = new Set;
-  for (const part of parts) {
-    if (!isRecord(part))
-      continue;
-    if (part.ignored === true)
-      continue;
-    if (isRecord(part.metadata)) {
-      const router = part.metadata.openrouter;
-      if (isRecord(router) && Array.isArray(router.reasoning_details) && router.reasoning_details.length > 0) {
-        hasReasoning = true;
-        opaque = true;
-        for (const detail of router.reasoning_details) {
-          if (!isRecord(detail))
-            continue;
-          if (detail.type === "reasoning.text" && typeof detail.text === "string")
-            detailText.add(detail.text);
-          if (detail.type === "reasoning.summary" && typeof detail.summary === "string")
-            detailText.add(detail.summary);
-        }
-      }
-    }
-    if (["reasoning", "thinking", "redacted_thinking"].includes(String(part.type))) {
-      hasReasoning = true;
-      const visible = part.type === "redacted_thinking" || part.redacted === true ? "" : typeof part.thinking === "string" ? part.thinking : typeof part.text === "string" ? part.text : "";
-      if (visible !== "[cleared]")
-        text += visible;
-      opaque ||= part.type === "redacted_thinking" || part.redacted === true || visible === "" && (part.metadata !== undefined || part.signature !== undefined || part.thinkingSignature !== undefined);
-    } else if (part.type === "text" && typeof part.text === "string") {
-      for (const match of part.text.matchAll(/<(?:thinking|think)>([\s\S]*?)<\/(?:thinking|think)>/gi))
-        inlineText += match[1];
-    }
-  }
-  return { text: text || [...detailText].join(""), inlineText, opaque, hasReasoning };
 }
 
 // ../plugin/src/hooks/magic-context/compartment-trigger.ts
@@ -23659,9 +25505,9 @@ function advanceToolReclaimWatermarkToCurrentMax(db, sessionId) {
 }
 
 // ../plugin/src/shared/tag-transcript.ts
-import { createHash as createHash12 } from "node:crypto";
+import { createHash as createHash11 } from "node:crypto";
 function textIdentityDigest(value) {
-  return createHash12("sha256").update(value).digest("hex");
+  return createHash11("sha256").update(value).digest("hex");
 }
 function buildContentDerivedTextIds(messageId, parts) {
   const sources = parts.filter((part) => part.kind === "text").map((part) => stripTagPrefix(part.getText() ?? ""));
@@ -24228,6 +26074,8 @@ function buildAggregateTarget(tagId, occurrences, requiresToolArcSkeleton, conve
   const role = occurrences[0]?.message.info.role ?? "user";
   const messageId = occurrences[0]?.message.info.id;
   const truncate = () => {
+    if (!complete())
+      return "incomplete";
     const sentinel = `[dropped §${tagId}§]`;
     let any = false;
     for (const occ of occurrences) {
@@ -25206,1979 +27054,6 @@ function queueDropsForCompartmentalizedMessages(db, sessionId, upToMessageIndex,
   queuePreparedCompartmentDrops(db, prepareCompartmentDrops(db, sessionId, upToMessageIndex, observedKeys, fromMessageIndex));
 }
 
-// ../plugin/src/hooks/magic-context/reference-seeds.generated.ts
-var REFERENCE_SEEDS = [
-  {
-    importance: 96,
-    block: `<compartment start="1" end="14" title="Fail-closed tenant context" episode_type="design,feature" importance="96">
-<p1>
-U: "no cross-tenant read should ever get 'best effort' -- fail closed, even in dev"
-
-We rewired Acorn Suite's tenant boundary in apps/api/src/middleware/tenantBoundary.ts and packages/auth/src/sessionClaims.ts. The old path let dashboard routes recover a missing JWT tenant_id from orgSlug or X-Org-Slug, which made stale bookmarked URLs dangerous. U: "if the header lies, don't heal it with orgSlug"
-
-The first patch kept a compatibility fallback for old dashboard links, but the user pushed back and we changed requireTenantContext(req) to treat JWT tenant_id as the only tenant authority. REST route wrappers and GraphQL createContext now share the same helper, Prisma filters receive tenantId only from that context, and platform_support is modeled as a service actor instead of a wildcard tenant. Added apps/api/test/tenant-boundary/rest.spec.ts and graphql.spec.ts using acme_lab and beta_works fixtures. Commit a91f2c8.
-</p1>
-<p2>
-Acorn Suite tenant isolation now fails closed: U: "no cross-tenant read should ever get 'best effort' -- fail closed, even in dev". requireTenantContext(req) is the shared REST/GraphQL entry point and rejects missing JWT tenant_id instead of recovering from orgSlug or X-Org-Slug.
-</p2>
-<p3>
-Acorn Suite made JWT tenant_id the single tenant authority across REST, GraphQL, and Prisma; slug/header fallback was removed to prevent cross-tenant reads.
-</p3>
-<p4>requireTenantContext; JWT tenant_id only; acme_lab beta_works</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* All tenant-scoped Acorn Suite handlers must call requireTenantContext(req) and fail closed; do not recover missing tenant_id from orgSlug or X-Org-Slug.
-* Acorn Suite auth changes must include both REST and GraphQL tenant-boundary tests before merge.
-</PROJECT_RULES>
-<ARCHITECTURE>
-* Acorn Suite uses JWT tenant_id as the single tenant authority so REST, GraphQL, and Prisma filters share one isolation model.
-* Platform support bypass is modeled as a service actor, not as a tenant wildcard.
-</ARCHITECTURE>
-<CONSTRAINTS>
-* X-Org-Slug and route orgSlug are presentation hints only; using them as tenant authority can produce cross-tenant reads when cached dashboard URLs are stale.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* Acorn Suite tenant-boundary fixtures live under apps/api/test/tenant-boundary/ and use seed tenants acme_lab and beta_works.
-</CONFIG_VALUES>
-<NAMING>
-* The shared auth helper is named requireTenantContext; "resolveTenantMaybe" was rejected because it implied fallback behavior.
-</NAMING>
-</facts>
-<events>
-<trajectory_correction at_compartment="1">
-  <summary>Removed tenant fallback after user rejected compatibility recovery.</summary>
-  <before_strategy>Keep an orgSlug/X-Org-Slug fallback for old dashboard links when JWT tenant_id was absent.</before_strategy>
-  <correction_source>user</correction_source>
-  <correction_signal>U: "if the header lies, don't heal it with orgSlug"</correction_signal>
-  <after_strategy>Require JWT tenant_id everywhere and return 403 when it is absent or inconsistent.</after_strategy>
-  <evidence>The final implementation made requireTenantContext(req) the only REST/GraphQL tenant entry point.</evidence>
-</trajectory_correction>
-</events>
-<user_observations>
-* User states security boundaries as hard constraints and prefers conservative fail-closed behavior over compatibility fallback.
-</user_observations>`
-  },
-  {
-    importance: 95,
-    block: `<compartment start="155" end="201" title="Chorus: op-log-as-source-of-truth architecture established" episode_type="design,infra" importance="95">
-<p1>
-Major architecture session for the Chorus CRDT sync engine. Initial implementation stored materialized document state as the source of truth; the op log was an audit trail appended after each mutation. Under concurrent editing from 3+ clients, three-way merge conflicts produced divergent materialized states that couldn't be reconciled without replaying the log anyway — the materialized state was losing the information needed for conflict resolution.
-
-U: "every time we have a 3-way merge we end up replaying the log to fix it anyway, maybe the log should just BE the truth"
-
-Pivoted to op-log-as-source-of-truth: a document is defined by its full sequence of operations in causal order. Materialized snapshots are derived on-read, cached in SnapshotCache (backed by Redis, keyed by document_id + vector_clock_hash), and invalidated synchronously when new ops arrive. Synchronous invalidation is critical — an earlier async prototype let fast-editing clients read stale snapshots for up to 200 ms, which caused visible cursor jumps in the collaboration UI.
-
-U: "how large does the log get before we need to compact"
-
-Compaction triggers at max_ops_before_compact=10000 per document. Below that threshold, full replay from the earliest checkpoint is fast enough (<50 ms in benchmarks). Above it, a compaction job creates a new checkpoint snapshot and tombstones older ops. Vector clocks used for causal ordering across clients, not wall clock.
-
-U: "ok, let's commit to this model"
-
-Decision documented in docs/arch/op-log.md. Core implementation in crates/chorus-core/src/log.rs and crates/chorus-core/src/snapshot.rs. Commit 7e3d4c2.
-</p1>
-<p2>
-Chorus uses op-log-as-source-of-truth: document is its causal op sequence (vector clocks). Snapshots derived on-read, cached in SnapshotCache (Redis, document_id + vector_clock_hash), invalidated synchronously on new op arrival — async caused stale reads under concurrent edit load. Compaction at max_ops_before_compact=10000. U: "every time we have a 3-way merge we end up replaying the log to fix it anyway" — this was the pivot signal. docs/arch/op-log.md.
-</p2>
-<p3>
-Chorus op log is the source of truth; snapshots derived on-read and cached; compaction at 10 k ops/document; synchronous cache invalidation required.
-</p3>
-<p4>
-OpLog; SnapshotCache; vector_clock; max_ops_before_compact=10000; crates/chorus-core; synchronous invalidation
-</p4>
-</compartment>
-<facts>
-<ARCHITECTURE>
-* Chorus document state is defined by the op log in causal order (vector clocks); materialized snapshots are derived-on-read cache entries, not the source of truth.
-</ARCHITECTURE>
-<CONSTRAINTS>
-* Chorus SnapshotCache invalidation must be synchronous on new op arrival; async invalidation causes stale reads visible to concurrent editing clients (observed: up to 200 ms staleness in async prototype).
-</CONSTRAINTS>
-<PROJECT_RULES>
-* Never mutate a Chorus materialized snapshot directly; always append an op to the log and re-derive the snapshot.
-</PROJECT_RULES>
-<NAMING>
-* Chorus core types: OpLog (crates/chorus-core/src/log.rs), SnapshotCache (crates/chorus-core/src/snapshot.rs).
-</NAMING>
-<CONFIG_VALUES>
-* Chorus compaction threshold: max_ops_before_compact=10000 per document.
-</CONFIG_VALUES>
-</facts>
-<events>
-<trajectory_correction at_compartment="7">
-  <summary>Pivoted from materialized-state-as-source-of-truth to op-log-as-source-of-truth after merge conflict failures</summary>
-  <before_strategy>Materialized document state stored as authoritative; op log appended as audit trail after each mutation</before_strategy>
-  <correction_source>self_review</correction_source>
-  <correction_signal>"every time we have a 3-way merge we end up replaying the log to fix it anyway, maybe the log should just BE the truth"</correction_signal>
-  <after_strategy>Op log is authoritative and defines the document; materialized snapshots derived on-read from log, cached in SnapshotCache with synchronous invalidation</after_strategy>
-  <evidence>Under concurrent editing from 3+ clients, three-way merge conflicts produced divergent materialized states that couldn't be reconciled without replaying the log anyway.</evidence>
-</trajectory_correction>
-</events>
-<user_observations>
-* User frames architectural pivots as casual hypotheses ("maybe X should just be Y") rather than directives; treat these as actionable proposals, not idle musing.
-</user_observations>`
-  },
-  {
-    importance: 95,
-    block: `<compartment start="46" end="60" title="Standby-safe status writer" episode_type="design,infra,feature" importance="95">
-<p1>
-Did the deeper controller pass for WorkspaceMesh after finding that read-only standby replicas still had code paths that could mutate status during a race. The user constraint was explicit.
-U: one cluster, many control planes; never let a standby write status.
-U: deletes can lag, status can't lie.
-
-In controllers/workspacemesh_controller.go I split reconcile into observe, plan, and commit stages. Observe and plan run before lease acquisition, so standby replicas can still do the expensive graph walk and diff calculation. Commit is now wrapped by pkg/lease/lease_guard.go and is the only place allowed to write status, finalizers, or child mutations. That let us keep fast reads without letting a standby fake health by racing the active leader. Commit c8b1e44.
-
-I also changed api/v1alpha1/workspacemesh_types.go so status carries observedPlan, a stable hash of the rendered child set, and delayed finalizer removal until the ServiceExport cleanup confirms from the API server. Envtest coverage now exercises leader handoff, stale standby loops, and delete timing, because the real problem here was not feature behavior but truthful status under partial failover.
-</p1>
-<p2>
-Reworked the WorkspaceMesh controller around a hard write boundary.
-U: one cluster, many control planes; never let a standby write status.
-U: deletes can lag, status can't lie.
-
-controllers/workspacemesh_controller.go now separates observe, plan, and commit. Standbys may read and compute, but pkg/lease/lease_guard.go is required for any status or finalizer write. status.observedPlan was added so drift is visible without child diffs, and finalizer removal now waits for ServiceExport cleanup confirmation.
-</p2>
-<p3>
-The durable decision was to allow standby replicas to do read-heavy reconcile work while centralizing every mutating step behind a lease-guarded commit boundary. Status truth won over delete speed.
-</p3>
-<p4>LeaseGuard; observe/plan/commit; status.observedPlan; finalizer waits for ServiceExport cleanup</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* Reconciler code may compute desired state before lease acquisition, but every status or finalizer write must pass through LeaseGuard.
-* Any new cleanup step must be idempotent across repeated reconcile loops before it is attached to finalizer removal.
-</PROJECT_RULES>
-<ARCHITECTURE>
-* The controller is split into observe, plan, and commit so standby replicas can do expensive reads without risking conflicting writes.
-* Status carries an observedPlan hash so downstream tools can detect desired-versus-applied drift without diffing child resources.
-</ARCHITECTURE>
-<CONSTRAINTS>
-* In a multi-control-plane cluster, standby reconciles can race with the active leader; unrestricted status writes make object health lie even when spec is unchanged.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* Leader election lease name: workspacemesh-controller-lock.
-* Drift hash status field: status.observedPlan.
-</CONFIG_VALUES>
-<NAMING>
-* The controller write gate wrapper is named LeaseGuard.
-</NAMING>
-</facts>`
-  },
-  {
-    importance: 94,
-    block: '<compartment start="415" end="612" title="Tenant isolation: chose Postgres RLS over schema-per-tenant" episode_type="design" importance="94">\n<p1>\nWorked through the tenant isolation model for the new control plane. Three candidates on the table: (a) schema-per-tenant with `search_path` switching, (b) database-per-tenant, (c) shared schema with Postgres Row-Level Security policies keyed on `tenant_id`. Spent the morning sketching how each interacts with our migration tooling, connection pooling (pgbouncer in transaction mode), and the analytics replica.\n\nU: I keep getting pulled toward schema-per-tenant because it feels "more isolated" but I want to be talked out of it if RLS holds up\n\nSchema-per-tenant blows up under pgbouncer transaction-pooling — `SET search_path` is session-state and gets lost between transactions; the per-tenant search_path either has to be set on every transaction (expensive, race-prone) or we drop pgbouncer (kills our connection economy). Database-per-tenant solves isolation cleanly but our migration tooling (sqlx) doesn\'t have a clean fan-out story and we\'d need to build one. Also onboarding latency goes from ~50ms to ~30s because we\'d need to provision a DB.\n\nLanded on RLS. Every tenant-scoped table gets `tenant_id uuid not null`, an `ENABLE ROW LEVEL SECURITY` declaration, and a policy `USING (tenant_id = current_setting(\'app.current_tenant\')::uuid)`. The current tenant is set via `SET LOCAL app.current_tenant = \'...\'` at the start of every request transaction — `SET LOCAL` is transaction-scoped so it survives pgbouncer transaction mode cleanly. Wrote a middleware in `internal/db/tenant.go` that wraps every request in a transaction and sets the value.\n\nU: what about the analytics replica, does RLS work the same there\n\nYes — RLS policies replicate via logical replication; the analytics service connects with a separate role that also has RLS enforced. The escape hatch for cross-tenant analytics is a dedicated `analytics_admin` role with `BYPASSRLS`, used only by the scheduled aggregation job, never by interactive code paths.\n\nU: ok and write down that if anyone ever calls SET ROLE to escape RLS in app code i\'m going to lose my mind\n\nDocumented. Added a lint rule in `tools/sqllint/` that flags `SET ROLE`, `BYPASSRLS`, and unqualified table access in `internal/handlers/`.\n</p1>\n<p2>\nTenant isolation decision: Postgres RLS keyed on `tenant_id`, set per-transaction via `SET LOCAL app.current_tenant`. Rejected schema-per-tenant (breaks pgbouncer transaction mode) and database-per-tenant (sqlx migration fan-out cost + 30s onboarding latency). Analytics uses a separate role with BYPASSRLS for the scheduled aggregator only. U: "if anyone ever calls SET ROLE to escape RLS in app code i\'m going to lose my mind." Lint rule added in `tools/sqllint/`.\n</p2>\n<p3>\nChose RLS with `tenant_id` and `SET LOCAL app.current_tenant` per request. BYPASSRLS reserved for the scheduled analytics aggregator role only; app code is lint-enforced to never bypass.\n</p3>\n<p4>\nRLS on tenant_id; SET LOCAL app.current_tenant; BYPASSRLS = analytics_admin only\n</p4>\n</compartment>\n<facts>\n<ARCHITECTURE>\n* Tenant isolation is enforced at the database layer via Postgres RLS keyed on `tenant_id`, not via schema separation. Chosen because `SET LOCAL` is transaction-scoped and survives pgbouncer transaction-mode pooling, where session-scoped `search_path` switching does not.\n</ARCHITECTURE>\n<PROJECT_RULES>\n* Every tenant-scoped table must declare `tenant_id uuid not null` and `ENABLE ROW LEVEL SECURITY` with a policy referencing `current_setting(\'app.current_tenant\')`.\n* Application code must never call `SET ROLE` or use `BYPASSRLS` roles. `tools/sqllint/` enforces this in CI.\n</PROJECT_RULES>\n<CONSTRAINTS>\n* `SET search_path` is session-scoped and is silently lost between transactions when running behind pgbouncer in transaction pooling mode — making schema-per-tenant impractical for our deployment.\n</CONSTRAINTS>\n<CONFIG_VALUES>\n* Per-request tenant context is set via `SET LOCAL app.current_tenant = \'<uuid>\'` inside the request transaction opened by `internal/db/tenant.go`.\n</CONFIG_VALUES>\n<NAMING>\n* The privileged analytics role is `analytics_admin` (the only role with `BYPASSRLS`); used exclusively by the scheduled aggregation job.\n</NAMING>\n</facts>\n<events>\n<trajectory_correction at_compartment="3">\n  <summary>Considered and rejected schema-per-tenant in favor of RLS after realizing it was incompatible with the existing pgbouncer setup.</summary>\n  <before_strategy>Lean toward schema-per-tenant for "stronger" isolation feel.</before_strategy>\n  <correction_source>self_review</correction_source>\n  <correction_signal>Realized `SET search_path` is session-scoped and doesn\'t survive pgbouncer transaction-mode pooling.</correction_signal>\n  <after_strategy>Adopt RLS with `SET LOCAL app.current_tenant` per transaction.</after_strategy>\n  <evidence>"I keep getting pulled toward schema-per-tenant... I want to be talked out of it if RLS holds up"</evidence>\n</trajectory_correction>\n</events>\n<user_observations>\n* User asks to be argued out of intuitive-but-weakly-supported design preferences rather than rubber-stamped on them.\n* User pre-emptively codifies "rules to avoid future temptation" — translating decisions into lint rules and written prohibitions in the same session.\n</user_observations>'
-  },
-  {
-    importance: 92,
-    block: `<compartment start="1" end="12" title="Tenant context from membership" episode_type="design,feature" importance="92">
-<p1>
-Worked through the tenant-auth boundary in LedgerLeaf after the API still accepted orgId from the browser on a couple of older endpoints.
-U: never trust orgId from the browser.
-U: membership can change mid-session; revocation has to bite immediately.
-
-In apps/api/src/middleware/tenant-context.ts I added TenantContextResolver.resolveFromSession(), changed services/auth/src/session.ts to sign active_membership_id instead of tenant_id, and removed the last direct req.body.orgId reads from apps/api/src/routes/projects.ts and apps/api/src/routes/billing.ts. Internal fan-out calls now forward x-ledgerleaf-tenant-id after middleware resolution rather than letting downstream services re-parse cookies. Commit a14c9e2.
-
-Closed it with integration coverage in apps/api/test/tenant-guard.revocation.test.ts: user loses membership, refreshes nothing, and the next request is denied because the middleware rehydrates tenant and role from membership state. Also named the new boundary pieces TenantGuard and TenantContextResolver so future auth work lands in one place.
-</p1>
-<p2>
-Moved LedgerLeaf auth to server-resolved tenant context in apps/api/src/middleware/tenant-context.ts and stopped trusting browser-provided orgId on the remaining old endpoints.
-U: never trust orgId from the browser.
-U: membership can change mid-session; revocation has to bite immediately.
-
-Sessions now carry active_membership_id, middleware rebuilds tenant and role per request, and downstream services consume x-ledgerleaf-tenant-id only after TenantGuard resolution. Added revocation coverage so stale tabs stop working immediately after membership removal.
-</p2>
-<p3>
-Tenant authorization now flows from membership state rather than browser-selected tenant IDs. The durable decision was to keep tenant and role out of client-controlled request surfaces and rebuild them server-side on each authenticated hop.
-</p3>
-<p4>active_membership_id; TenantGuard; TenantContextResolver; x-ledgerleaf-tenant-id</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* New authenticated handlers must derive tenant access from server-resolved membership state, never from request body, query, or cookie tenant IDs.
-* Any endpoint bypassing TenantGuard needs an explicit integration test covering membership revocation.
-</PROJECT_RULES>
-<ARCHITECTURE>
-* Session tokens carry user_id and active_membership_id; tenant and role are rehydrated server-side so revocation and membership changes apply without waiting for session expiry.
-* Billing, files, and audit services consume a middleware-built TenantContext instead of parsing auth material independently.
-</ARCHITECTURE>
-<CONSTRAINTS>
-* Browser-supplied orgId values are unsafe for tenant authorization because users can belong to multiple tenants and stale tabs can replay old selections.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* Internal tenant hop header: x-ledgerleaf-tenant-id.
-* Auth claim name: active_membership_id.
-</CONFIG_VALUES>
-<NAMING>
-* The auth boundary middleware is named TenantGuard and the resolver behind it is TenantContextResolver.
-</NAMING>
-</facts>
-<user_observations>
-* User frames security questions as trust-boundary rules and wants the unsafe source named explicitly.
-</user_observations>`
-  },
-  {
-    importance: 91,
-    block: `<compartment start="142" end="287" title="Leader election thrash from leases held across pod terminations" episode_type="investigation,bug,refactor" importance="91">
-<p1>
-Operator pods kept losing the leader lease every ~45s in the staging cluster and the reconciler queue would back up behind a thundering-herd resync. Traced through controller-runtime's leader election: the lease was being held by pods that had already been terminated by the rolling restart, and the lease duration (60s) plus retry period (15s) meant that during a routine deploy we'd routinely have 90+ seconds where no live pod could acquire.
-
-U: this has been happening since the v1.31 cluster upgrade right? feels related
-
-Pulled \`kubectl get lease -n loom-system loom-operator-leader -o yaml\` over a deploy and confirmed — holderIdentity stuck pointing at a pod whose Node was already gone. Root cause turned out to be that we'd written a custom \`ReleaseLease\` shim in \`internal/leaderelection/release.go\` that suppressed errors during shutdown so the SIGTERM handler wouldn't log noise. The suppression also swallowed the actual lease-release HTTP call when the kube-apiserver was momentarily slow.
-
-Fix landed in 4a9c1f2: removed the shim entirely, let controller-runtime's own release path run, and added a 5s \`PreStop\` hook so kube has time to ack the release before the container dies. Also dropped lease duration to 30s and retry period to 5s — the old values were copied from a 2021 blog post and never tuned for our pod count.
-
-U: ok but write down somewhere that we never touch the leader-election internals again, that's the second time this exact thing has bitten us
-
-Added a CODEOWNERS entry on \`internal/leaderelection/\` requiring two reviewers and a comment at the top of the package telling future devs to extend via controller-runtime config, not by wrapping.
-</p1>
-<p2>
-Operator leader-election thrash during rolling deploys. Our \`internal/leaderelection/release.go\` shim suppressed shutdown errors and ate the actual lease-release call, so terminated pods kept "holding" the lease for 60s+. Removed the shim (4a9c1f2), added a 5s PreStop hook, reduced lease duration 60→30s and retry 15→5s. U: "we never touch the leader-election internals again." CODEOWNERS lock + package-level warning comment added.
-</p2>
-<p3>
-Operator leader-election bug: custom shutdown-error suppression shim swallowed lease releases, leaving stale leaders for ~90s after rolling restarts. Removed the wrapper, retuned lease/retry timings, locked the package behind CODEOWNERS.
-</p3>
-<p4>
-internal/leaderelection/release.go shim removed; PreStop hook; lease 30s / retry 5s
-</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* Do not wrap or shim controller-runtime leader-election internals — extend via its config surface only. Package \`internal/leaderelection/\` is CODEOWNERS-locked for this reason.
-</PROJECT_RULES>
-<ARCHITECTURE>
-* Leader-election release path must run unobstructed during SIGTERM so the kube-apiserver can transfer the lease before the pod's Node disappears.
-</ARCHITECTURE>
-<CONSTRAINTS>
-* Suppressing errors during graceful shutdown can mask actual API calls in flight; the suppression boundary must be drawn around logging, not around the network call itself.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* Operator leader-election: lease duration 30s, retry period 5s, PreStop hook 5s.
-</CONFIG_VALUES>
-</facts>
-<events>
-<trajectory_correction at_compartment="1">
-  <summary>Stopped trying to "harden" shutdown by wrapping controller-runtime; reverted to library defaults and tuned only its config.</summary>
-  <before_strategy>Custom ReleaseLease wrapper that suppressed errors during SIGTERM to keep shutdown logs clean.</before_strategy>
-  <correction_source>user</correction_source>
-  <correction_signal>"write down somewhere that we never touch the leader-election internals again, that's the second time this exact thing has bitten us"</correction_signal>
-  <after_strategy>Delete the wrapper, use library's native release path, configure timings via standard options, lock the package under CODEOWNERS.</after_strategy>
-  <evidence>holderIdentity in \`kubectl get lease\` pointed at pods whose Nodes were already gone, for 90+ seconds during every rolling deploy.</evidence>
-</trajectory_correction>
-</events>`
-  },
-  {
-    importance: 91,
-    block: `<compartment start="472" end="509" title="Luminary: run_id idempotency model established for all pipeline runs" episode_type="design,feature" importance="91">
-<p1>
-Established the idempotency model for all Luminary ETL pipeline runs. Previously runs were not idempotent — retrying a failed run could double-count rows or leave partial loads in target tables. After two incidents in staging where retried runs corrupted the staging data warehouse, we committed to a run_id–based deduplication model across all 37 pipelines.
-
-U: "we had another corrupted staging run overnight, we need to fix retries properly not band-aid it again"
-
-Every pipeline run now generates a run_id before any writes begin: format {pipeline_name}_{YYYYMMDD}_{uuid4_prefix8} (e.g., orders_daily_20250523_a3f92c11). The run_id is written to the pipeline_run table at start. All target load steps carry the run_id as a deduplication key enforced by a unique constraint on (target_table, run_id) at the DB layer. If a run_id is retried, the write fails with IntegrityError and the caller detects and skips — the first attempt's data is already committed under that run_id.
-
-U: "so retrying the same run_id is always safe?"
-
-Yes: all data from the first attempt already committed under that run_id; the retry's writes fail harmlessly via IntegrityError. Retry logic in orchestrator/runner.py catches IntegrityError and treats it as already-complete. Full run replay is safe.
-
-Implemented across all 37 pipeline configs. Test coverage in tests/test_idempotency.py. Committed across b1d38e7 + c4a82f9.
-</p1>
-<p2>
-Luminary ETL runs are fully idempotent via run_id deduplication. run_id format: {pipeline_name}_{YYYYMMDD}_{uuid4_prefix8}. Unique constraint on (target_table, run_id) at DB; retry raises IntegrityError treated as already-complete by orchestrator/runner.py. U: "retrying the same run_id is always safe?" — confirmed by design. Applies to all 37 pipelines (b1d38e7 + c4a82f9).
-</p2>
-<p3>
-All Luminary ETL loads idempotent via run_id; DB-enforced deduplication; any run can be safely retried.
-</p3>
-<p4>
-run_id; pipeline_run; IntegrityError; idempotent retry; {pipeline_name}_{YYYYMMDD}_{uuid4_prefix8}; orchestrator/runner.py
-</p4>
-</compartment>
-<facts>
-<ARCHITECTURE>
-* All Luminary ETL pipeline loads are idempotent via run_id deduplication; any run can be safely retried without risk of double-counting or partial loads.
-</ARCHITECTURE>
-<PROJECT_RULES>
-* Every Luminary pipeline run must generate and log a run_id to the pipeline_run table before any target writes begin.
-</PROJECT_RULES>
-<CONSTRAINTS>
-* Luminary run_id uniqueness is enforced by a DB unique constraint on (target_table, run_id); a duplicate run_id raises IntegrityError, not a silent skip — retry logic must catch IntegrityError explicitly.
-</CONSTRAINTS>
-<NAMING>
-* Luminary idempotency primitives: run_id (string dedup key), pipeline_run (dedup table), orchestrator/runner.py (retry logic with IntegrityError handling).
-</NAMING>
-<CONFIG_VALUES>
-* Luminary run_id format: {pipeline_name}_{YYYYMMDD}_{uuid4_prefix8} (e.g., orders_daily_20250523_a3f92c11).
-</CONFIG_VALUES>
-</facts>`
-  },
-  {
-    importance: 91,
-    block: `<compartment start="37" end="52" title="Per-namespace QueueShard leases" episode_type="design,infra,feature" importance="91">
-<p1>
-U: "this operator is allowed to be boring, not clever"
-
-Started Harborlight operator sharding with a single global leader-election loop in controllers/queueshard_controller.go. That worked in envtest but made every namespace fail over together, which defeated the tenant isolation story. U: "don't make one leader own the world; namespace failover is the point"
-
-Reworked the design around one controller process with per-namespace Lease objects named harborlight-queueshard. Each QueueShard reconciler records status.observedLeaseUID, and spec stays pure user intent. We stopped comparing renewTime to local wall clock after tests showed skew between kind nodes; the reconciler now treats holderIdentity plus Lease UID transitions as authority. Generated CRDs, deepcopy, RBAC, and envtest fixtures. Commit e7c5a90.
-</p1>
-<p2>
-Harborlight QueueShard uses per-namespace Lease objects because, per U: "don't make one leader own the world; namespace failover is the point". status.observedLeaseUID records the active lease identity; spec remains user intent.
-</p2>
-<p3>
-Harborlight sharding is namespace-scoped: one operator binary can run cluster-wide, but failover is isolated by per-namespace QueueShard leases.
-</p3>
-<p4>QueueShard; observedLeaseUID; harborlight-queueshard Lease</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* Harborlight CRD changes must regenerate manifests, deepcopy code, RBAC, and envtest fixtures before merge.
-</PROJECT_RULES>
-<ARCHITECTURE>
-* Harborlight uses one controller process with per-namespace Lease objects so failover does not move unrelated tenants.
-* QueueShard.status.observedLeaseUID records reconciler-observed lease identity; QueueShard.spec remains user intent only.
-</ARCHITECTURE>
-<CONSTRAINTS>
-* Kubernetes Lease renewTime is unreliable for Harborlight ownership decisions under node clock skew.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* Harborlight QueueShard lease timing is duration 18s, renew deadline 12s, retry period 3s.
-</CONFIG_VALUES>
-<NAMING>
-* The Harborlight CRD kind is QueueShard; "WorkPartition" was rejected as too generic.
-</NAMING>
-</facts>
-<events>
-<trajectory_correction at_compartment="5">
-  <summary>Changed Harborlight from global leader ownership to per-namespace leases.</summary>
-  <before_strategy>Use one global leader-election loop for all QueueShard reconciliation.</before_strategy>
-  <correction_source>user</correction_source>
-  <correction_signal>U: "don't make one leader own the world; namespace failover is the point"</correction_signal>
-  <after_strategy>Use per-namespace Lease objects and record observed lease UID in QueueShard status.</after_strategy>
-  <evidence>The implementation now names one harborlight-queueshard Lease per namespace and avoids global failover.</evidence>
-</trajectory_correction>
-</events>
-<user_observations>
-* User is willing to reject working code when it changes operational blast radius.
-</user_observations>`
-  },
-  {
-    importance: 88,
-    block: `<compartment start="23" end="29" title="Moved CAN notify out of ISR" episode_type="bug,infra" importance="88">
-<p1>
-U: "no malloc in the ISR path, I mean none"
-
-Pawprint firmware was hard-resetting under CAN bus saturation on the nRF52840 board. The CAN RX interrupt called ble_notify_can_frame(), which built a heap-backed Vec before SoftDevice had released the radio lock. Replaced that path with a fixed can_rx_ring in firmware/src/can/isr.rs and deferred BLE notification to can_notify_work in firmware/src/ble/can_notify.rs. The ISR now drops with can_rx_ring_overrun when the ring is full instead of allocating. Commit 0fd92ab.
-</p1>
-<p2>
-Pawprint firmware now follows U: "no malloc in the ISR path, I mean none". CAN RX enqueues into can_rx_ring and BLE notification runs from can_notify_work outside interrupt context.
-</p2>
-<p3>
-CAN RX no longer allocates or sends BLE notifications inside the ISR; frames are buffered and flushed by deferred work.
-</p3>
-<p4>can_rx_ring; can_notify_work; nRF52840 SoftDevice</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* Pawprint firmware ISR paths must not allocate; enqueue to can_rx_ring and wake deferred work instead.
-</PROJECT_RULES>
-<CONSTRAINTS>
-* nRF52840 BLE notification from IRQ context can trigger supervisor reset when SoftDevice holds the radio lock.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* Pawprint can_rx_ring depth is 32 frames, with overflow counted by can_rx_ring_overrun.
-</CONFIG_VALUES>
-</facts>
-<events>
-<causal_incident at_compartment="3">
-  <summary>CAN saturation resets came from heap allocation inside the interrupt path.</summary>
-  <affected_surface>environment</affected_surface>
-  <symptom>Pawprint firmware hard-reset under CAN bus saturation.</symptom>
-  <cause_summary>The CAN RX ISR built a heap-backed Vec and attempted BLE notification while SoftDevice held the radio lock.</cause_summary>
-  <disposition>fixed</disposition>
-  <evidence>The failing path was ble_notify_can_frame() called from the CAN RX interrupt.</evidence>
-  <fix_summary>Moved frames into a fixed ring buffer and deferred BLE notification to can_notify_work.</fix_summary>
-</causal_incident>
-</events>`
-  },
-  {
-    importance: 87,
-    block: `<compartment start="301" end="402" title="NaN in mixed-precision training traced to clip_grad_norm_ before scaler.unscale_" episode_type="investigation,bug" importance="87">
-<p1>
-Distributed training run for the 1.3B retrieval model went to NaN at step 18,420 — second time this week. Replayed deterministically with seed=42 and reproduced at the same step. The loss spiked at 18,419 (a known noisy shard) then NaN'd on the next backward.
-
-Walked the training loop in \`trainer/loop.py\`. We were calling \`torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)\` BEFORE \`scaler.unscale_(optimizer)\`. With fp16 grads still scaled (~65536x), the clip norm computation overflows silently — grad norms above ~3e4 saturate to inf, the clip ratio becomes 0, and parameters get nuked on the optimizer step.
-
-Fix is one-line: swap the order so unscale happens first, then clip on the true grad magnitudes. Verified by reproducing the bad step with the new order — clip activates correctly at 1.0, no NaN.
-</p1>
-<p2>
-1.3B retrieval model NaN'd at step 18,420 across two runs. Cause: \`clip_grad_norm_\` was called before \`scaler.unscale_\`, so fp16-scaled grads overflowed during norm computation, clip ratio went to 0, params zeroed. Reordered in \`trainer/loop.py\`. Confirmed via deterministic replay.
-</p2>
-<p3>
-Mixed-precision NaN root cause: gradient clipping must run after the GradScaler unscale, never before.
-</p3>
-<p4>
-unscale_ → clip_grad_norm_ → step
-</p4>
-</compartment>
-<facts>
-<CONSTRAINTS>
-* \`torch.nn.utils.clip_grad_norm_\` called on still-scaled fp16 gradients overflows silently, returns inf, drives the clip ratio to 0, and zeros parameters on the next optimizer step.
-</CONSTRAINTS>
-<ARCHITECTURE>
-* In mixed-precision training, gradient clipping is computed against TRUE gradient magnitudes — \`scaler.unscale_(optimizer)\` must run before any norm-based clipping.
-</ARCHITECTURE>
-</facts>
-<events>
-<causal_incident at_compartment="2">
-  <summary>Repeated NaN divergence in the 1.3B retrieval training run.</summary>
-  <affected_surface>provider_sdk</affected_surface>
-  <symptom>Training loss became NaN at step 18,420 on two consecutive runs with the same seed.</symptom>
-  <cause_summary>Gradient clipping was applied before the GradScaler unscale; fp16-scaled norms overflowed and produced a zero clip ratio.</cause_summary>
-  <disposition>fixed</disposition>
-  <evidence>Deterministic replay with seed=42 reproduced NaN at the identical step; reordering unscale before clip eliminated the divergence.</evidence>
-  <fix_summary>Reorder operations in \`trainer/loop.py\` so unscale_ precedes clip_grad_norm_.</fix_summary>
-</causal_incident>
-</events>`
-  },
-  {
-    importance: 86,
-    block: `<compartment start="630" end="744" title="CRDT merge ordering: hybrid logical clocks over wall-clock LWW" episode_type="design,feature" importance="86">
-<p1>
-Designed the conflict-resolution layer for the collaborative document model. Two writers can edit the same text node concurrently across regions; the question is how we order their writes so all replicas converge.
-
-Pure wall-clock last-write-wins is unsafe — laptops can be 60+ seconds skewed, and we've seen clock drift on iPad clients that pause+resume. Pure Lamport clocks converge but produce visually wrong results (a stale-but-higher-Lamport write wins over a fresh edit).
-
-Settled on hybrid logical clocks (HLC): \`(physical_ms, logical_counter, node_id)\`. Physical component is wall-clock, but on receive we take \`max(local_physical, remote_physical)\` and bump the logical counter when ties happen. Bounded skew tolerance: we reject any incoming HLC whose physical component is more than 300s ahead of local — that's the "your clock is too broken to participate" line.
-
-Per-character ops use Yjs internally (we'd evaluated Automerge but its merge cost scales worse for our 50k-char doc size). Yjs's \`Y.Doc\` is wrapped by our \`LoomDoc\` so the HLC sits on top of Yjs's own ordering — Yjs handles concurrent insertion positioning, HLC handles cross-region conflict resolution at the structural level (block moves, deletions of whole nodes).
-</p1>
-<p2>
-CRDT layer: Yjs for per-character ops wrapped by \`LoomDoc\`, hybrid logical clocks \`(physical_ms, logical, node_id)\` for structural-op ordering. Reject any incoming HLC more than 300s ahead of local. Yjs chosen over Automerge for merge-cost scaling at 50k-char docs.
-</p2>
-<p3>
-Conflict resolution is HLC-based with a 300s skew cap; per-character editing uses Yjs.
-</p3>
-<p4>
-LoomDoc wraps Y.Doc; HLC (physical_ms, logical, node_id); skew cap 300s
-</p4>
-</compartment>
-<facts>
-<ARCHITECTURE>
-* Document conflict resolution uses a two-layer model: Yjs handles concurrent per-character positioning, while a hybrid logical clock on top orders structural operations across regions. The split exists because Yjs's intrinsic ordering doesn't carry cross-region semantics for whole-node operations.
-</ARCHITECTURE>
-<CONSTRAINTS>
-* Incoming HLC values whose physical component is more than 300 seconds ahead of local are rejected — clients with worse skew can't participate in collaboration until they correct.
-</CONSTRAINTS>
-<NAMING>
-* CRDT library: Yjs (rejected Automerge for merge-cost scaling on ~50k-char documents). Our wrapper type is \`LoomDoc\`.
-</NAMING>
-</facts>`
-  },
-  {
-    importance: 86,
-    block: `<compartment start="79" end="94" title="Auditable proration credit ledger" episode_type="design,feature,release" importance="86">
-<p1>
-U: "credits are money; don't hide them in metadata"
-
-Built Billetto's proration credit flow around real ledger entries instead of Stripe invoice metadata. The new billing/src/credits/proration.ts calculates unused-time and downgrade credits against subscription_version, then writes account_credit_entries tied to invoice_line_id. U: "we need ledger lines you can audit in six months"
-
-Retries reuse the same idempotency key and detect existing ledger entries instead of minting another credit. Added migration 202605101422_add_account_credit_entries.sql, rollback dry-run fixtures, and a release check that compares Stripe invoice totals against the local ledger. Commit 6c2d8ef.
-</p1>
-<p2>
-Billetto proration credits are ledger entries because U: "credits are money; don't hide them in metadata". account_credit_entries ties credits to invoice_line_id and subscription_version for auditable retries.
-</p2>
-<p3>
-Billetto made proration credits auditable by storing them in its own ledger table rather than Stripe metadata.
-</p3>
-<p4>account_credit_entries; subscription_version; proration idempotency key</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* Billetto billing migrations must include a rollback dry-run against test/fixtures/billing-ledger/.
-</PROJECT_RULES>
-<ARCHITECTURE>
-* Billetto represents credits as account_credit_entries tied to invoice_line_id, not as Stripe metadata.
-* Billetto proration calculation is idempotent around subscription_version and reuses existing ledger entries on retry.
-</ARCHITECTURE>
-<CONSTRAINTS>
-* Stripe invoice metadata is not a durable Billetto credit ledger because dashboard edits can mutate it outside the app.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* Billetto credit_kind enum values are unused_time, plan_downgrade, and manual_adjustment.
-* Billetto Stripe idempotency key format for proration is proration:{account_id}:{subscription_version}:{invoice_id}.
-</CONFIG_VALUES>
-<NAMING>
-* The Billetto credit ledger table is named account_credit_entries; "negative_invoice_lines" was rejected.
-</NAMING>
-</facts>`
-  },
-  {
-    importance: 82,
-    block: `<compartment start="15" end="22" title="Stopped contrastive loss cliff" episode_type="investigation,bug" importance="82">
-<p1>
-U: "can you chase the loss cliff, not tune around it"
-
-Investigated Nereid's contrastive trainer after loss jumped from 0.42 to 3.8 around step 17.8k on A100 runs. The tempting path was LR tuning, but crop-hash logging showed duplicated augmentations across dataloader workers after worker_init_fn was dropped in 6fb2d90. Restored per-worker seeding in training/data/seed.py, added epoch_seed to the run manifest, and reran runs/2026-05-08/a100-bf16-rerun through 52k steps without the cliff. Commit c8e4a11.
-</p1>
-<p2>
-Nereid's loss cliff was caused by shared augmentation seeds across dataloader workers, not optimizer settings. training/data/seed.py now derives worker seeds from base seed, worker id, and epoch.
-</p2>
-<p3>
-Nereid contrastive training stabilized after restoring per-worker augmentation seeds.
-</p3>
-<p4>worker_init_fn; augmentation_seed; runs/2026-05-08/a100-bf16-rerun</p4>
-</compartment>
-<facts>
-<CONSTRAINTS>
-* Nereid's contrastive trainer can diverge if augmentation_seed is shared across dataloader workers.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* Nereid worker augmentation seed formula is base_seed + worker_id + epoch * 1009.
-</CONFIG_VALUES>
-</facts>
-<events>
-<causal_incident at_compartment="2">
-  <summary>Training loss cliff traced to duplicated augmentation seeds.</summary>
-  <affected_surface>other</affected_surface>
-  <symptom>Contrastive loss jumped from 0.42 to 3.8 around step 17.8k on A100 runs.</symptom>
-  <cause_summary>worker_init_fn had been removed, causing dataloader workers to reuse augmentation seeds.</cause_summary>
-  <disposition>fixed</disposition>
-  <evidence>Crop-hash logging showed duplicated augmentations across dataloader workers.</evidence>
-  <fix_summary>Restored per-worker seed derivation in training/data/seed.py and recorded epoch_seed in run manifests.</fix_summary>
-</causal_incident>
-</events>`
-  },
-  {
-    importance: 79,
-    block: `<compartment start="1058" end="1187" title="Idempotency strategy for Stripe webhook handlers" episode_type="design,bug" importance="79">
-<p1>
-Duplicate charge events from Stripe were producing duplicate invoice rows in our system. Root issue: we'd been keying our internal idempotency on the request signature header, but Stripe's docs are clear that signature is per-DELIVERY, not per-EVENT — Stripe retries the same event with a fresh signature and timestamp.
-
-Redesigned. Idempotency now keys on the Stripe \`event.id\` itself (format: \`evt_*\`). New table \`stripe_event_idempotency(event_id text primary key, first_seen_at timestamptz, response_body bytea, response_status int)\`. Handler flow: open transaction → INSERT ... ON CONFLICT DO NOTHING → if no row inserted, return the stored response; else process and store the response inside the same transaction. TTL on rows is 90 days (Stripe's documented retry-then-give-up window is 3 days, so 90 is generous).
-
-U: don't be clever about the TTL, just set it long enough that we never see a Stripe replay miss
-
-The handler is wrapped in \`internal/billing/webhooks/idempotent.go\` and the table lives in the \`billing\` schema. Removed the old signature-based dedup entirely — keeping both would mask routing bugs.
-</p1>
-<p2>
-Stripe webhook idempotency rebuilt around \`event.id\` (not delivery signature). Table \`billing.stripe_event_idempotency\` stores event_id, first_seen, response body+status. Inside one transaction: INSERT ON CONFLICT DO NOTHING, replay stored response if not inserted, else process+store. 90-day TTL. U: "don't be clever about the TTL, just set it long enough that we never see a Stripe replay miss." Old signature-based dedup deleted.
-</p2>
-<p3>
-Stripe webhook idempotency keys on event.id with stored response replay; old signature-based dedup removed.
-</p3>
-<p4>
-billing.stripe_event_idempotency; key = event.id; TTL 90d
-</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* Idempotency for any external webhook source must key on the provider's event identifier (e.g. Stripe \`event.id\`), never on delivery-level signatures or timestamps. Stored response body+status is returned on duplicate.
-</PROJECT_RULES>
-<CONSTRAINTS>
-* Stripe webhook signatures and timestamps are regenerated per delivery attempt — they CANNOT be used as idempotency keys because retries of the same event produce different signatures.
-</CONSTRAINTS>
-<ARCHITECTURE>
-* Webhook idempotency uses a write-through pattern: the handler's full response is captured inside the same transaction that records the event_id, so replays return byte-identical responses without re-executing side effects.
-</ARCHITECTURE>
-<CONFIG_VALUES>
-* \`billing.stripe_event_idempotency\` table; primary key on \`event_id\`; row TTL 90 days; wrapper in \`internal/billing/webhooks/idempotent.go\`.
-</CONFIG_VALUES>
-<NAMING>
-* Webhook idempotency table is \`billing.stripe_event_idempotency\`. Future provider-specific tables follow the pattern \`<provider>_event_idempotency\`.
-</NAMING>
-</facts>
-<events>
-<causal_incident at_compartment="8">
-  <summary>Duplicate invoices were being created when Stripe retried webhook deliveries.</summary>
-  <affected_surface>provider_sdk</affected_surface>
-  <symptom>Customer support reported multiple customers seeing duplicate invoices for the same charge event.</symptom>
-  <cause_summary>Our dedup keyed on the webhook signature header, but Stripe regenerates that per delivery attempt — retries bypassed dedup.</cause_summary>
-  <disposition>fixed</disposition>
-  <evidence>Stripe dashboard event log showed multiple delivery attempts of the same \`evt_*\` ID, each producing a new invoice row in our DB.</evidence>
-  <fix_summary>Reimplemented idempotency on \`event.id\`; added write-through response storage; deleted signature-based dedup.</fix_summary>
-</causal_incident>
-</events>`
-  },
-  {
-    importance: 78,
-    block: `<compartment start="361" end="392" title="Tethys: JWT refresh not re-fetching tenant roles after role change" episode_type="investigation,bug,refactor" importance="78">
-<p1>
-Bug report: a user whose tenant admin role was revoked could still access admin-only endpoints for up to 15 minutes after revocation. Investigation showed JWT access tokens carry tenant_roles claim at issue time; revoking a role in the DB doesn't invalidate existing tokens, which remain valid until TTL expiry.
-
-U: "this is a security issue, not a UX issue — we need role changes to propagate faster than 15 minutes"
-
-The clean fix was the refresh path: on token refresh, re-query tenant membership and embed fresh claims. But the refresh endpoint (auth/token/refresh.go) was only re-issuing basic claims (sub, iat, exp) and copying TenantRoles verbatim from the incoming token. One-line omission: refreshedClaims.TenantRoles was never populated from a fresh DB lookup.
-
-Fixed by pulling tenant membership at refresh time and embedding in the new token. Added an integration test: revoke a role, trigger a refresh, assert the refreshed token does not carry the revoked role.
-
-U: "what's the max lag now"
-
-Max lag is bounded by access_token_ttl=900 s for clients that never call refresh. Any client that refreshes (which the SDK does automatically on 401) gets updated claims immediately. Acceptable under current threat model. Committed 9d7ca2c.
-</p1>
-<p2>
-Tethys JWT refresh was copying tenant_roles from old token instead of re-fetching; revoked roles persisted for up to access_token_ttl=900 s. Fixed in auth/token/refresh.go: fresh tenant membership fetched at refresh time (9d7ca2c). U: "this is a security issue" — treated as immediate priority. Max lag now bounded by TTL for clients that never refresh.
-</p2>
-<p3>
-Tethys token refresh now embeds freshly-fetched tenant_roles; revoked role lag bounded by access_token_ttl=900 s.
-</p3>
-<p4>
-JWT refresh; tenant_roles; access_token_ttl=900s; refresh_token_ttl=86400s; auth/token/refresh.go
-</p4>
-</compartment>
-<facts>
-<CONSTRAINTS>
-* Tethys JWT access tokens carry tenant_roles at issue time; role changes do not invalidate existing tokens — a revoked role remains usable until token expiry (up to access_token_ttl=900 s for clients that don't refresh).
-</CONSTRAINTS>
-<PROJECT_RULES>
-* Tethys token refresh must always re-fetch tenant_roles from the DB; never carry role claims forward from the incoming token.
-</PROJECT_RULES>
-<CONFIG_VALUES>
-* Tethys token TTLs: access_token_ttl=900 s, refresh_token_ttl=86400 s.
-</CONFIG_VALUES>
-</facts>
-<events>
-<causal_incident at_compartment="15">
-  <summary>Revoked tenant admin role remained usable via JWT for up to 15 minutes after DB revocation</summary>
-  <affected_surface>other</affected_surface>
-  <symptom>User with revoked admin role could access admin-only endpoints for up to access_token_ttl duration after revocation</symptom>
-  <cause_summary>Token refresh endpoint copied TenantRoles claim verbatim from incoming token instead of re-fetching from DB; refreshed tokens perpetuated stale role grants indefinitely</cause_summary>
-  <disposition>fixed</disposition>
-  <evidence>the refresh endpoint was only re-issuing basic claims (sub, iat, exp) and copying TenantRoles verbatim from the incoming token — one-line omission</evidence>
-  <fix_summary>Pull fresh tenant membership from DB at refresh time; embed updated TenantRoles in new token; integration test added</fix_summary>
-</causal_incident>
-</events>
-<user_observations>
-* User explicitly labels security issues ("this is a security issue, not a UX issue") and expects immediate escalated priority separate from normal bug triage.
-</user_observations>`
-  },
-  {
-    importance: 74,
-    block: '<compartment start="760" end="848" title="HLS segment numbering migration from 5-digit to 9-digit indices" episode_type="refactor,infra" importance="74">\n<p1>\nThe transcoder\'s HLS output was using `segment_%05d.ts` — five digits, max 99,999 segments. For a 24/7 live channel at 6s segments that\'s ~7 days before wraparound, and we just hit a wraparound on `channel-news-east` Friday night that broke the playlist sliding window for ~40 minutes before paging on-call noticed.\n\nMigrated to `segment_%09d.ts` everywhere. Touched `transcoder/hls/segmenter.go` for the writer, `transcoder/hls/playlist.go` for the manifest builder, and the CDN purge job\'s glob in `ops/purge-stale-segments.sh`. The CDN cache config didn\'t need changes — the glob was already `segment_*.ts`. Backfill is a no-op because old playlists naturally roll off the sliding window within an hour.\n\nCodified in the writer: any future segment-index format change must keep monotonic ordering AND must always be lexicographically sortable. The 5-digit choice was actually fine lexicographically until wraparound — the failure mode was running out of namespace, not ordering.\n</p1>\n<p2>\nHLS segment naming widened from `%05d` to `%09d` after a live-channel wraparound broke playlist sliding-window on `channel-news-east`. Changes in `transcoder/hls/segmenter.go` and `transcoder/hls/playlist.go`. Naming rule documented: segment indices must always be zero-padded to remain lexicographically sortable, with enough digits for a year of continuous segments at our minimum segment duration.\n</p2>\n<p3>\nHLS segment indices widened after a live-channel index wraparound.\n</p3>\n<p4>\nsegment_%09d.ts; transcoder/hls/\n</p4>\n</compartment>\n<facts>\n<CONFIG_VALUES>\n* HLS segment filename format: `segment_%09d.ts` (writer in `transcoder/hls/segmenter.go`, manifest builder in `transcoder/hls/playlist.go`).\n</CONFIG_VALUES>\n<PROJECT_RULES>\n* HLS segment indices must be zero-padded to a width sufficient for at least one year of continuous output at the minimum supported segment duration. Lexicographic sortability is required for CDN purge globbing.\n</PROJECT_RULES>\n</facts>\n<events>\n<causal_incident at_compartment="5">\n  <summary>Live channel playback window broke for ~40 minutes after HLS segment index wrapped from 99,999 back to 0.</summary>\n  <affected_surface>edit_pipeline</affected_surface>\n  <symptom>Playlist sliding window on `channel-news-east` stopped advancing; viewers saw frozen live feed for ~40 minutes.</symptom>\n  <cause_summary>5-digit segment index namespace exhausted on a continuously-running channel; new segments lexicographically sorted before old ones, breaking the manifest builder\'s ordering assumption.</cause_summary>\n  <disposition>fixed</disposition>\n  <evidence>On-call paged on viewer drop in channel-news-east; logs showed segment files alternating between `segment_99998.ts` and `segment_00000.ts` in the same directory.</evidence>\n  <fix_summary>Widened format to `segment_%09d.ts` across writer, manifest builder, and CDN purge glob.</fix_summary>\n</causal_incident>\n</events>'
-  },
-  {
-    importance: 74,
-    block: `<compartment start="115" end="126" title="Partition stats invalidation fence" episode_type="investigation,bug" importance="74">
-<p1>
-Went after the planner regression in BirchDB where a detach and reattach burst on a partitioned table could push the optimizer toward a seq scan even though the SQL and schema stayed the same. The hot path was src/planner/stats_cache.rs: NDV and selectivity estimates survived child-map churn because the cache key only looked at parent identity and predicate shape. Commit d91fe63.
-
-I added partition_epoch in src/catalog/partition_map.rs, bumped it on attach and detach commit, and keyed cached stats on that epoch so topology changes invalidate only the affected estimates. tests/sql/partition_pruning_regress.slt now exercises the exact detach, reattach, and replan sequence instead of just checking fresh planner state.
-</p1>
-<p2>
-BirchDB's planner cache was too coarse for partition topology changes. src/planner/stats_cache.rs now includes partition_epoch from src/catalog/partition_map.rs so attach and detach churn invalidates stale selectivity data without flushing everything.
-</p2>
-<p3>
-Partition membership changes now fence planner statistics through partition_epoch. The durable point is that topology changes can invalidate estimates even when table schema and query text are unchanged.
-</p3>
-<p4>Partition topology changes now fence planner stats through partition_epoch instead of relying on coarse cache clears.</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* Any catalog change affecting partition membership needs a planner regression under tests/sql/partition_pruning_regress.slt.
-</PROJECT_RULES>
-<ARCHITECTURE>
-* Planner stats cache keys include partition_epoch so partition topology changes invalidate selectivity estimates without clearing the whole cache.
-</ARCHITECTURE>
-<CONSTRAINTS>
-* Child partition attach and detach can make NDV and selectivity data unsafe even when the parent table schema is unchanged.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* New planner cache key field: partition_epoch.
-</CONFIG_VALUES>
-</facts>
-<events>
-<causal_incident at_compartment="13">
-  <summary>Partition churn led the planner toward seq scans because cached selectivity estimates outlived topology changes.</summary>
-  <affected_surface>other</affected_surface>
-  <symptom>After detach and reattach activity, identical queries could switch from expected partition-pruned plans to broader seq scans.</symptom>
-  <cause_summary>The stats cache keyed estimates too loosely and did not notice child partition membership changes.</cause_summary>
-  <disposition>fixed</disposition>
-  <evidence>Repro in tests/sql/partition_pruning_regress.slt showed stale NDV surviving detach and reattach until the new epoch field was added.</evidence>
-  <fix_summary>Added partition_epoch to the cache key and bumped it on partition topology commits.</fix_summary>
-</causal_incident>
-</events>`
-  },
-  {
-    importance: 72,
-    block: `<compartment start="95" end="110" title="CRDT ordering by Lamport site" episode_type="design,refactor,investigation" importance="72">
-<p1>
-Started CollabPad reconnect handling by sorting incoming ops with server receivedAt. U: "server time feels simpler; prove it doesn't lie"
-
-The offline-client replay test proved it did lie: a browser tab could reconnect over WebRTC with buffered edits older than a websocket ack, and the server would assign a later receivedAt that inverted causality. U: "ok, make the doc clock the story, not the transport"
-
-Refactored packages/collab/src/oplog.ts and packages/collab/src/sync/replay.ts to order by (lamport, site_id), with receivedAt kept only for telemetry. Renamed clientId to site_id in the wire schema because tabs, workers, and imported offline bundles are separate editing sites even when they share an account. Commit b44e0d9.
-</p1>
-<p2>
-CollabPad abandoned receivedAt ordering after the reconnect test showed it inverted offline edits. U: "make the doc clock the story, not the transport"; ops now order by (lamport, site_id).
-</p2>
-<p3>
-CollabPad CRDT ordering now follows document clocks rather than server receive time.
-</p3>
-<p4>lamport site_id; receivedAt telemetry only; reconnect replay</p4>
-</compartment>
-<facts>
-<ARCHITECTURE>
-* CollabPad orders CRDT operations by (lamport, site_id); server receivedAt is telemetry only.
-</ARCHITECTURE>
-<CONSTRAINTS>
-* WebRTC reconnect can deliver buffered CollabPad ops older than a websocket ack, so receivedAt cannot be used as causal order.
-</CONSTRAINTS>
-<NAMING>
-* CollabPad's editing-site field is named site_id rather than clientId because multiple browser contexts can share one account.
-</NAMING>
-</facts>
-<events>
-<trajectory_correction at_compartment="10">
-  <summary>Changed CollabPad op ordering from server time to document clocks.</summary>
-  <before_strategy>Sort reconnect replay operations by server receivedAt.</before_strategy>
-  <correction_source>test_result</correction_source>
-  <correction_signal>The offline-client replay test showed receivedAt inverted edits buffered over WebRTC.</correction_signal>
-  <after_strategy>Order operations by lamport and site_id, keeping receivedAt only for telemetry.</after_strategy>
-  <evidence>The final patch refactored oplog.ts and replay.ts around (lamport, site_id).</evidence>
-</trajectory_correction>
-</events>
-<user_observations>
-* User asks for simple designs but accepts added machinery when a test demonstrates the simpler model is false.
-</user_observations>`
-  },
-  {
-    importance: 71,
-    block: `<compartment start="861" end="943" title="BLE bonding records lost across firmware OTA — bond table erase fix" episode_type="bug,feature" importance="71">
-<p1>
-Customer reported that after every OTA update, paired phones had to re-bond with the wearable. Tracked to the OTA pre-image-swap routine in \`boot/dfu/swap.c\` doing a full sector erase of the flash region from 0x70000–0x7FFFF, which (per the partition map we'd "verified" in 2023) is supposed to be free space. Except the nRF SDK 2.6.0 bond manager parks the bond table at 0x7E000–0x7FFFF when \`NRF_FSTORAGE_API_FDS\` is enabled, and it doesn't honor the partition manifest.
-
-Fix: defined a dedicated \`bond_table\` partition at 0x7E000–0x7FFFF in \`pm_static.yml\`, narrowed the OTA pre-swap erase to 0x70000–0x7DFFF, and verified across an OTA cycle that bonds survive. Bond table capacity stays at 8 entries (SDK default) — we'll revisit if customers complain about that ceiling.
-</p1>
-<p2>
-OTA pre-swap erase was clobbering the nRF SDK bond table (parked at 0x7E000–0x7FFFF when FDS is enabled, despite our partition manifest claiming the region was free). Carved out a \`bond_table\` partition in \`pm_static.yml\` and narrowed the erase range. Bond capacity unchanged at 8 entries.
-</p2>
-<p3>
-OTA was erasing the SDK bond table; carved a dedicated partition to protect it.
-</p3>
-<p4>
-bond_table partition 0x7E000–0x7FFFF; pm_static.yml
-</p4>
-</compartment>
-<facts>
-<CONSTRAINTS>
-* nRF SDK 2.6.0 bond manager (with \`NRF_FSTORAGE_API_FDS\`) writes its bond table to the top 8KB of flash regardless of the partition manifest — the SDK does not consult \`pm_static.yml\`.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* \`bond_table\` partition reserved at 0x7E000–0x7FFFF in \`pm_static.yml\`. OTA pre-swap erase range narrowed to 0x70000–0x7DFFF.
-</CONFIG_VALUES>
-</facts>
-<events>
-<causal_incident at_compartment="6">
-  <summary>Paired phones lost their bond with the wearable after every OTA update.</summary>
-  <affected_surface>environment</affected_surface>
-  <symptom>Customers had to re-pair their phones after each firmware update.</symptom>
-  <cause_summary>OTA pre-image-swap erased flash 0x70000–0x7FFFF, which overlapped the nRF SDK's bond table at 0x7E000–0x7FFFF — the SDK ignores the partition manifest and writes there unconditionally.</cause_summary>
-  <disposition>fixed</disposition>
-  <evidence>Flash dump after OTA showed all bond records zeroed.</evidence>
-  <fix_summary>Reserved a \`bond_table\` partition and narrowed the OTA erase range to avoid it.</fix_summary>
-</causal_incident>
-</events>`
-  },
-  {
-    importance: 71,
-    block: `<compartment start="58" end="74" title="Vesper: controller leader election via Kubernetes Lease" episode_type="feature,infra" importance="71">
-<p1>
-Implemented controller leader election for Vesper using a Kubernetes Lease resource in the operator's own namespace. Only the replica holding the lease processes reconciliation events; others run health probes only and skip the reconcile loop entirely. Lease parameters exposed as env vars: VESPER_LEASE_DURATION_S (default 30), VESPER_RENEW_INTERVAL_S (default 10), VESPER_ACQUIRE_DEADLINE_S (default 8). Implementation in internal/controller/leader.go using controller-runtime's leaderelection package. Non-holders log at DEBUG when skipping reconcile, making it easy to confirm only one is active.
-
-U: "ship multi-replica support today if possible, we've had two operators conflict on the same resource this week"
-
-Tested with 3 replicas; leader loss triggers handoff within one renew interval. Committed b9e14c3.
-</p1>
-<p2>
-Vesper controller leader election via Kubernetes Lease: only the lease holder reconciles, others skip. VESPER_LEASE_DURATION_S=30, VESPER_RENEW_INTERVAL_S=10, VESPER_ACQUIRE_DEADLINE_S=8. internal/controller/leader.go (b9e14c3).
-</p2>
-<p3>
-Vesper uses Lease-based leader election; only one replica reconciles at a time; handoff within one renew interval on leader loss.
-</p3>
-<p4>
-leader election; Lease resource; VESPER_LEASE_DURATION_S; VESPER_RENEW_INTERVAL_S; VESPER_ACQUIRE_DEADLINE_S; internal/controller/leader.go
-</p4>
-</compartment>
-<facts>
-<ARCHITECTURE>
-* Vesper controller uses Kubernetes Lease-based leader election; non-holder replicas skip the reconcile loop entirely and only run health probes.
-</ARCHITECTURE>
-<CONFIG_VALUES>
-* Vesper leader election defaults: VESPER_LEASE_DURATION_S=30, VESPER_RENEW_INTERVAL_S=10, VESPER_ACQUIRE_DEADLINE_S=8 (all overridable via env).
-</CONFIG_VALUES>
-</facts>`
-  },
-  {
-    importance: 68,
-    block: `<compartment start="418" end="452" title="boltpkg: plugin lifecycle hook API design and documentation" episode_type="design,docs" importance="68">
-<p1>
-Designed and documented the plugin lifecycle hook API for boltpkg. Initially prototyped an EventEmitter model where plugins subscribe to named events (install:pre, install:post, remove). Load testing with 4 plugins all subscribing to install:pre showed non-deterministic execution order depending on which plugin was registered first — registration order is load-order-dependent and not something plugin authors can control reliably.
-
-U: "plugins need predictable ordering or we'll be chasing user-reported race conditions forever"
-
-Pivoted to explicit lifecycle hooks: plugins export a manifest with declared hook functions (onPreInstall, onPostInstall, onRemove). Hooks fire in dependency-declaration order — if plugin B declares a dependency on plugin A, A's hooks run first. This is deterministic and matches user intuition about dependency ordering.
-
-U: "what if a plugin doesn't implement a hook — do we error or skip"
-
-Skip silently; missing hooks are optional. Unknown hooks in the manifest are ignored (forward-compatible). Manifest must include schema_version; loader rejects manifests with unrecognized schema versions to prevent silently running incompatible plugins.
-
-Documented in docs/plugin-api.md. Interfaces in src/plugin/types.ts. Committed e9a3b81.
-</p1>
-<p2>
-boltpkg plugin API uses explicit lifecycle hooks (onPreInstall, onPostInstall, onRemove) firing in dependency-declaration order. EventEmitter model dropped due to non-deterministic registration-order dependency. U: "plugins need predictable ordering" drove the pivot. Manifest must declare schema_version; loader rejects unknown versions. docs/plugin-api.md; src/plugin/types.ts.
-</p2>
-<p3>
-boltpkg plugin lifecycle uses explicit ordered hooks in dependency-declaration order; schema_version in manifest required; EventEmitter rejected.
-</p3>
-<p4>
-onPreInstall; onPostInstall; onRemove; schema_version; dependency-declaration order; EventEmitter rejected
-</p4>
-</compartment>
-<facts>
-<ARCHITECTURE>
-* boltpkg plugin hooks execute in plugin dependency-declaration order, not registration order; deterministic and matches user expectations about dependency sequencing.
-</ARCHITECTURE>
-<NAMING>
-* boltpkg plugin lifecycle hooks: onPreInstall, onPostInstall, onRemove (src/plugin/types.ts).
-</NAMING>
-<PROJECT_RULES>
-* boltpkg plugin manifests must include schema_version; the loader rejects manifests with unrecognized schema versions to prevent silently running mismatched plugins.
-</PROJECT_RULES>
-</facts>
-<events>
-<trajectory_correction at_compartment="17">
-  <summary>EventEmitter plugin model dropped in favor of explicit lifecycle hooks after ordering non-determinism discovered</summary>
-  <before_strategy>EventEmitter model: plugins subscribe to named events (install:pre, install:post, remove); order determined by registration</before_strategy>
-  <correction_source>test_result</correction_source>
-  <correction_signal>Load test with 4 plugins all subscribing to install:pre showed non-deterministic execution order dependent on plugin registration sequence</correction_signal>
-  <after_strategy>Explicit lifecycle hook functions declared in plugin manifest; executed in dependency-declaration order (deterministic)</after_strategy>
-  <evidence>Load testing with 4 plugins all subscribing to install:pre showed non-deterministic execution order depending on which plugin was registered first.</evidence>
-</trajectory_correction>
-</events>`
-  },
-  {
-    importance: 68,
-    block: `<compartment start="30" end="36" title="Added subscription day fact table" episode_type="feature,infra" importance="68">
-<p1>
-U: "I want finance to answer 'what was MRR on Tuesday' without replaying the universe"
-
-Added warehouse/models/marts/fct_subscription_day.sql in Northstar DW as an incremental dbt model. It snapshots subscription state per account per day from stg_billing_events and dims it through dim_plan, so finance can query historical MRR without replaying all billing events. Added a backfill macro in warehouse/macros/backfill_subscription_day.sql and documented the windowed rerun in warehouse/README.md. Commit d4b13f0.
-</p1>
-<p2>
-Northstar DW now has fct_subscription_day as the daily subscription/MRR snapshot, with a dbt backfill macro for controlled date-window reruns.
-</p2>
-<p3>
-Subscription MRR history moved into a daily fact table instead of being reconstructed from raw billing events at query time.
-</p3>
-<p4>fct_subscription_day; dbt incremental; MRR daily snapshot</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* Northstar DW subscription backfills should use the backfill_subscription_day dbt macro instead of ad hoc DELETE and INSERT queries.
-</PROJECT_RULES>
-<ARCHITECTURE>
-* Northstar DW answers historical MRR from fct_subscription_day daily snapshots rather than replaying raw billing events at query time.
-</ARCHITECTURE>
-<CONFIG_VALUES>
-* fct_subscription_day is materialized incrementally with unique key account_id, subscription_id, and date_day.
-</CONFIG_VALUES>
-<NAMING>
-* The subscription daily snapshot model is named fct_subscription_day.
-</NAMING>
-</facts>`
-  },
-  {
-    importance: 67,
-    block: `<compartment start="958" end="1042" title="Matchmaking bucket calibration after season-3 player distribution shift" episode_type="feature" importance="67">
-<p1>
-Season 3 introduced ranked-restricted heroes which compressed the high-skill distribution — the top decile now sits in a much narrower MMR band. Old matchmaking buckets (width=100 MMR, K-factor=32) produced lopsided lobbies for top-500 players because the bucket frequently spanned the entire competitive range.
-
-Recalibrated. New bucket width 50, K-factor dropped to 24 across the board for stability. Bucket expansion is now asymmetric: a player waits up to 60s in their native bucket, then expands DOWN-only for the next 60s (top players never get matched UP into a bucket that doesn't exist), and only after 120s do we expand symmetrically.
-
-U: keep it asymmetric, the symmetric expansion was producing those "rank-1 vs gold" clips that made the front page of the subreddit
-
-Numbers came from sweeping a replay of the last 7 days of queue history; the new params land us at 89% balanced-lobby rate (was 71%).
-</p1>
-<p2>
-Matchmaking recalibrated for Season 3's compressed top-decile distribution: bucket width 100→50, K-factor 32→24, asymmetric bucket expansion (down-only for the first 60s after the initial wait). Validated via replay sweep on the last 7 days of queue history: 89% balanced-lobby rate, up from 71%.
-</p2>
-<p3>
-Matchmaking buckets narrowed and bucket expansion made asymmetric to stop top-skill players from getting matched into empty upper buckets.
-</p3>
-<p4>
-bucket width 50; K=24; asymmetric expansion down-only first 60s
-</p4>
-</compartment>
-<facts>
-<CONFIG_VALUES>
-* Matchmaking: bucket width 50 MMR, K-factor 24, native-bucket wait 60s, down-only expansion phase 60s, symmetric expansion after 120s.
-</CONFIG_VALUES>
-<ARCHITECTURE>
-* Matchmaking expands the candidate bucket asymmetrically (down-only first) for high-rank players because the skill distribution is right-truncated — there are no buckets above them to expand into, and expanding symmetrically produces visible mismatches.
-</ARCHITECTURE>
-</facts>
-<user_observations>
-* User cites public/community signal (subreddit, social) as concrete evidence when arguing for a design choice, treating it as a real constraint rather than noise.
-</user_observations>`
-  },
-  {
-    importance: 61,
-    block: `<compartment start="70" end="78" title="Preserved PDF rotation before OCR" episode_type="investigation,bug" importance="61">
-<p1>
-QuillOCR misread several rotated county tax forms after the Poppler path landed. The symptom was columns transposed only on pages using JBIG2 image masks. The raster path in workers/pdf/rasterize.ts trusted pdfimages output, but pdfimages dropped page rotation for those masks; Tesseract then deskewed from the wrong orientation. Fixed by reading rotation from pdfinfo before rasterization and applying it in normalizePageBitmap(). Added fixtures under test/fixtures/county-tax-rotated/. Commit f0a6d2b.
-</p1>
-<p2>
-QuillOCR now reads page rotation from pdfinfo before rasterizing Poppler image output, fixing rotated JBIG2-mask tax forms.
-</p2>
-<p3>
-PDF page rotation is captured before OCR rasterization so Tesseract sees the correct orientation.
-</p3>
-<p4>pdfinfo rotation; JBIG2 masks; normalizePageBitmap</p4>
-</compartment>
-<facts>
-<CONSTRAINTS>
-* QuillOCR cannot rely on pdfimages output for page rotation when Poppler emits JBIG2 masks; rotation must be read from pdfinfo before rasterization.
-</CONSTRAINTS>
-</facts>
-<events>
-<causal_incident at_compartment="8">
-  <summary>Rotated tax forms were misread because Poppler image extraction lost rotation.</summary>
-  <affected_surface>other</affected_surface>
-  <symptom>OCR transposed columns on rotated county tax-form pages using JBIG2 masks.</symptom>
-  <cause_summary>The pdfimages path dropped page rotation, so Tesseract deskewed from the wrong orientation.</cause_summary>
-  <disposition>fixed</disposition>
-  <evidence>The failure reproduced only on rotated JBIG2-mask fixtures.</evidence>
-  <fix_summary>Read rotation from pdfinfo before rasterization and applied it in normalizePageBitmap().</fix_summary>
-</causal_incident>
-</events>`
-  },
-  {
-    importance: 58,
-    block: `<compartment start="138" end="146" title="Moved synonym rollout to shadow index" episode_type="infra,refactor" importance="58">
-<p1>
-Reworked how the Atlas search stack ships synonym changes after the last in-place reload caused a lunchtime latency spike. search/indexer/src/synonyms/reload.ts no longer patches the hot index directly; instead it builds a shadow index, loads the synonym set there, warms the query cache, and then swaps aliases. terraform/opensearch/synonym_sets.tf and docs/search/release.md were updated to treat synonym changes the same way schema promotions already work. Commit 73ce4ad.
-</p1>
-<p2>
-Atlas search now rolls out synonym changes through a shadow-index promotion instead of mutating the live index in place. That keeps synonym updates on the same safer path as schema changes.
-</p2>
-<p3>
-Synonym edits are now shipped by building and promoting a shadow index, not by reloading the hot one.
-</p3>
-<p4>products_live; products_next; shadow-index synonym rollout</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* Search schema changes and synonym changes ship through the same shadow-index promotion workflow.
-</PROJECT_RULES>
-<ARCHITECTURE>
-* Synonym changes are applied by building a shadow index and swapping aliases, not by reloading the hot index in place.
-</ARCHITECTURE>
-<NAMING>
-* The paired search aliases are products_live and products_next.
-</NAMING>
-</facts>`
-  },
-  {
-    importance: 54,
-    block: `<compartment start="65" end="69" title="Kept ranked parties intact" episode_type="feature" importance="54">
-<p1>
-U: "keep duos together even if it adds 30s; don't split the party for math"
-
-Updated Arcade Relay matchmaking in services/matchmaker/src/ranked_duo.rs so party_id is a hard constraint. The ranked_duo queue now widens MMR windows over time before considering cross-region fallback, and the solver rejects any candidate lobby that splits a party. Added simulations in services/matchmaker/test/fixtures/duo_wait_curves.json. Commit 5b1e7aa.
-</p1>
-<p2>
-Arcade Relay ranked_duo matchmaking treats party_id as non-splittable and widens MMR windows before relaxing anything else.
-</p2>
-<p3>
-Ranked duo matchmaking now preserves parties even when it increases queue time.
-</p3>
-<p4>ranked_duo; party_id hard constraint; duo_wait_curves</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* Arcade Relay matchmaker must not split a party_id across ranked lobbies; widen match criteria before breaking party constraints.
-</PROJECT_RULES>
-<CONFIG_VALUES>
-* Arcade Relay ranked_duo MMR window widens by 75 every 15s up to 450.
-</CONFIG_VALUES>
-</facts>`
-  },
-  {
-    importance: 52,
-    block: '<compartment start="1201" end="1264" title="Slowly-changing-dim fix in dim_customer dbt model" episode_type="refactor,bug" importance="52">\n<p1>\n`dim_customer` was implementing a hand-rolled Type-2 SCD with `valid_from`/`valid_to` columns and a `is_current` flag, updated by a UDF that fired on row change. The UDF had a race window where two concurrent upstream loads could both stamp `is_current=true` on overlapping rows for the same customer_id.\n\nMigrated to dbt snapshots (`snapshots/dim_customer.sql`) with `strategy=\'timestamp\'` on `updated_at`. Snapshot runs single-threaded by design; no race window. Backfilled the snapshot from the existing dim — diffed against the old table, 14 customers had overlapping `is_current` windows, all resolved by taking the latest by `updated_at`. Old UDF and trigger removed.\n</p1>\n<p2>\n`dim_customer` SCD reimplemented as a dbt snapshot (timestamp strategy on `updated_at`) replacing a hand-rolled trigger+UDF that had a concurrent-update race. Backfill resolved 14 customers with overlapping is_current windows.\n</p2>\n<p3>\nCustomer SCD moved from custom triggers to dbt snapshots.\n</p3>\n<p4>\nsnapshots/dim_customer.sql; strategy=timestamp on updated_at\n</p4>\n</compartment>\n<facts>\n<PROJECT_RULES>\n* Type-2 SCD modeling uses dbt snapshots with the `timestamp` strategy. Hand-rolled SCD via triggers/UDFs is not permitted because it has no race-free coordination across concurrent upstream loads.\n</PROJECT_RULES>\n</facts>'
-  },
-  {
-    importance: 48,
-    block: `<compartment start="1402" end="1456" title="CSP nonce missing on injected MV3 content script" episode_type="bug" importance="48">
-<p1>
-Content script in the browser extension was silently no-op'd on Stripe checkout pages — the page's CSP includes \`script-src 'self' 'nonce-...'\` and Chrome MV3 doesn't propagate the page nonce to extension-injected scripts. Switched the injection path from \`chrome.scripting.executeScript({ files: [...] })\` to \`world: 'ISOLATED'\` (was 'MAIN'), since the script doesn't need to reach into the page's JS context — it only needs DOM read access, which works fine from the isolated world without needing the nonce.
-
-Verified across the three CSP-heavy sites we'd seen reports on. No behavior change on non-CSP pages.
-</p1>
-<p2>
-Extension content script switched from \`world: 'MAIN'\` to \`world: 'ISOLATED'\` to bypass page CSP nonce requirements. Isolated world has the DOM access we need.
-</p2>
-<p3>
-Content script moved to the isolated world to sidestep page CSP.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 46,
-    block: `<compartment start="1278" end="1389" title="Tesseract pinned to 5.3.3 after multi-column regression in 5.3.4" episode_type="bug,infra" importance="46">
-<p1>
-Document OCR accuracy dropped from ~96% to ~71% on bank-statement-shaped PDFs after the weekly base-image rebuild. Diff'd the rebuild — only relevant change was tesseract bumped from 5.3.3 to 5.3.4 by the apt source. Ran golden-set evaluation against both: 5.3.4 regresses badly on multi-column layouts (column-detection heuristic in LSTM postprocessing changed). Single-column docs unaffected.
-
-Pinned tesseract to 5.3.3 in \`docker/ocr/Dockerfile\` via explicit apt version and SHA pin, opened upstream issue #4117 with a minimal repro. Will revisit on next minor.
-</p1>
-<p2>
-Tesseract 5.3.4 introduced a regression in multi-column layout detection that dropped our OCR accuracy from 96% to 71% on bank statements. Pinned to 5.3.3 in \`docker/ocr/Dockerfile\`. Upstream issue #4117 filed.
-</p2>
-<p3>
-Tesseract pinned to 5.3.3 due to a multi-column regression in 5.3.4.
-</p3>
-<p4>
-tesseract=5.3.3; docker/ocr/Dockerfile; upstream #4117
-</p4>
-</compartment>
-<facts>
-<CONFIG_VALUES>
-* \`docker/ocr/Dockerfile\` pins \`tesseract-ocr=5.3.3\` with apt version + SHA pin. Unpin only after upstream #4117 resolves.
-</CONFIG_VALUES>
-<CONSTRAINTS>
-* Tesseract 5.3.4 regresses multi-column layout detection (column-detection heuristic in LSTM postprocessing changed). Single-column accuracy is unaffected.
-</CONSTRAINTS>
-</facts>
-<events>
-<causal_incident at_compartment="10">
-  <summary>OCR accuracy dropped sharply after weekly base-image rebuild.</summary>
-  <affected_surface>environment</affected_surface>
-  <symptom>OCR accuracy on multi-column bank statements dropped from 96% to 71%.</symptom>
-  <cause_summary>Weekly base-image rebuild pulled tesseract 5.3.4 from apt; the new version's column-detection heuristic regressed on multi-column inputs.</cause_summary>
-  <disposition>workaround</disposition>
-  <evidence>Golden-set evaluation reproduced the regression isolated to tesseract version with all other deps held constant.</evidence>
-  <fix_summary>Pin tesseract to 5.3.3 in \`docker/ocr/Dockerfile\` until upstream #4117 is resolved.</fix_summary>
-</causal_incident>
-</events>`
-  },
-  {
-    importance: 41,
-    block: `<compartment start="125" end="132" title="Added Snapbench record examples" episode_type="feature,docs" importance="41">
-<p1>
-U: "show me the command somebody would paste, not a paragraph"
-
-Added runnable examples for the Snapbench CLI in docs/recording.md and examples/basic/snapbench.toml. The new snapbench record flow writes snapshots into .snapbench/ by default, honors --config for alternate TOML files, and prints a copy-pasteable re-run command after capture. Commit e3b4c77.
-</p1>
-<p2>
-Snapbench docs now show pasteable snapbench record commands and the default snapshot/config locations.
-</p2>
-<p3>
-Snapbench recording examples became runnable instead of descriptive only.
-</p3>
-<p4>snapbench record; .snapbench/; snapbench.toml</p4>
-</compartment>
-<facts>
-<CONFIG_VALUES>
-* Snapbench's default snapshot directory is .snapbench/.
-</CONFIG_VALUES>
-<NAMING>
-* The Snapbench capture subcommand is named snapbench record.
-</NAMING>
-</facts>
-<user_observations>
-* User prefers runnable commands over prose-only explanations when validating developer tooling.
-</user_observations>`
-  },
-  {
-    importance: 38,
-    block: '<compartment start="1471" end="1518" title="Add --json output flag to status command" episode_type="feature" importance="38">\n<p1>\nAdded `--json` flag to `loomctl status` so downstream automation can parse the output cleanly. Shape mirrors the existing human output: `{"connected": bool, "tenant": "...", "endpoint": "...", "version": "...", "warnings": [...]}`. When `--json` is set, errors also serialize as JSON: `{"error": "..."}` to stderr. Tests in `cmd/loomctl/status_test.go` cover both human and JSON modes.\n</p1>\n<p2>\n`loomctl status --json` emits a structured status object; errors also JSON-shaped to stderr when the flag is set.\n</p2>\n<p3>\nStatus command gained a `--json` output mode.\n</p3>\n<p4/>\n</compartment>'
-  },
-  {
-    importance: 38,
-    block: `<compartment start="208" end="219" title="Meridian: fix HLS segment pts discontinuity causing playback stutters" episode_type="bug" importance="38">
-<p1>
-Meridian HLS segmenter was producing ~40 ms playback stutters at every segment join. Traced to presentation timestamp (pts) discontinuity: the first frame of each new segment had a pts slightly ahead of the previous segment's final pts + frame_duration, creating a gap the player absorbed via buffer stall.
-
-U: "we're getting stutters on every segment join in the player, this is a regression from last week's segmenter refactor"
-
-Root cause: segment timestamp wasn't anchored to the previous segment's final pts at the boundary. Each segment started a fresh pts sequence from 0 and relied on the muxer to reconcile — which it didn't under all codec configurations. Fixed by tracking last_pts per output stream in segmenter state and forcing continuity at segment start. Also added -copyts to ffmpeg mux flags to prevent pts rescaling during remux. Patch in services/segmenter/hls.go, commit 6a1bc3f.
-</p1>
-<p2>
-Fixed Meridian HLS segment pts discontinuity: ~40 ms gaps at segment joins caused by each segment restarting pts from 0. Fix: track last_pts per output stream; force continuity at segment start; add -copyts to mux flags. services/segmenter/hls.go (6a1bc3f).
-</p2>
-<p3>
-HLS segment boundary pts continuity enforced; -copyts required in Meridian mux args.
-</p3>
-<p4>
-HLS; pts discontinuity; last_pts; -copyts; hls.go
-</p4>
-</compartment>
-<facts>
-<CONSTRAINTS>
-* Meridian's ffmpeg HLS mux requires the -copyts flag when chaining segments; without it pts is rescaled per-segment and playback gaps appear at boundaries under some codec configurations.
-</CONSTRAINTS>
-</facts>
-<events>
-<causal_incident at_compartment="8">
-  <summary>HLS playback stutters at every segment join traced to pts discontinuity in segmenter</summary>
-  <affected_surface>other</affected_surface>
-  <symptom>~40 ms playback stutter at every HLS segment join; regression from segmenter refactor</symptom>
-  <cause_summary>Each segment reset pts to 0 with no anchoring to previous segment's final pts + frame_duration; muxer did not reconcile under all codec configurations</cause_summary>
-  <disposition>fixed</disposition>
-  <evidence>first frame of each new segment had a pts slightly ahead of the previous segment's final pts + frame_duration, creating a gap the player absorbed via buffer stall</evidence>
-  <fix_summary>Track last_pts per output stream; force segment-start pts continuity; add -copyts to mux flags in hls.go</fix_summary>
-</causal_incident>
-</events>`
-  },
-  {
-    importance: 36,
-    block: '<compartment start="1533" end="1617" title="Statistics-refresh hook on bulk-load completion in query planner integration" episode_type="feature,refactor" importance="36">\n<p1>\nThe embedded analytics DB\'s query planner uses table statistics that get stale after large bulk loads (>1M rows), causing the next query against the loaded table to pick a sequential scan even when a covering index would crush it. Added a `post_bulk_load` hook in `internal/storage/loader.go` that triggers an asynchronous `ANALYZE` against the affected tables. The hook is opt-in per loader because some flows already know they\'ll be followed by a manual ANALYZE; default is on.\n\nVerified the planner picks the index on the post-load query in the affected analytics benchmark — query went from 18s to 240ms.\n</p1>\n<p2>\nBulk loader (`internal/storage/loader.go`) now fires an async `ANALYZE` via a `post_bulk_load` hook after >1M-row loads to keep planner stats fresh. Affected benchmark: 18s → 240ms.\n</p2>\n<p3>\nBulk loader triggers asynchronous statistics refresh on large loads to keep the planner from picking sequential scans.\n</p3>\n<p4>\npost_bulk_load hook; internal/storage/loader.go\n</p4>\n</compartment>\n<facts>\n<ARCHITECTURE>\n* Bulk-load paths are responsible for refreshing planner statistics on the tables they touch — the planner does not auto-trigger ANALYZE on bulk-loaded tables, and stale stats cause it to choose sequential scans over covering indexes.\n</ARCHITECTURE>\n</facts>'
-  },
-  {
-    importance: 36,
-    block: `<compartment start="111" end="115" title="Removed Electron pane jitter" episode_type="bug" importance="36">
-<p1>
-Fixed a small but visible jitter in LumenClip's Electron helper pane. The right-pinned pane bounced by one pixel on fractional-scale monitors because app/shell/windowBounds.ts rounded width before x. Reordered the rounding so x derives from the final integer width and added a regression case for scaleFactor 1.25. Commit d20a7f4.
-</p1>
-<p2>
-LumenClip's pinned helper pane no longer jitters on fractional-scale monitors; bounds rounding now derives x from the final integer width.
-</p2>
-<p3>
-Electron pane positioning was made stable under fractional display scaling.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 33,
-    block: `<compartment start="399" end="411" title="Polaris: extract dataset preprocessing into offline cached stage" episode_type="refactor" importance="33">
-<p1>
-Extracted inline dataset preprocessing (normalization, tokenization, augmentation) from the training loop into a standalone preprocessing stage that writes cached outputs to data/preprocessed/. Training loop now reads from the cache on startup. Reduces training startup time from ~8 minutes (preprocessing on-the-fly) to ~20 seconds (cache hit). Cache keyed by dataset name + SHA256 of preprocessing config. Changed src/data/dataset.py; added src/data/preprocessor.py. Preprocessing stage triggered separately via python -m polaris.preprocess --config configs/preprocess.yaml. No logic changes — mechanical extraction only.
-</p1>
-<p2>
-Polaris dataset preprocessing moved offline; outputs cached at data/preprocessed/ keyed by dataset name + config hash. Training startup 8 min → 20 sec. src/data/preprocessor.py added; triggered via python -m polaris.preprocess.
-</p2>
-<p3>
-Polaris has a separate preprocessing stage; training loop reads from data/preprocessed/ cache.
-</p3>
-<p4>
-Polaris; data/preprocessed/; preprocessor.py; polaris.preprocess; preprocess.yaml
-</p4>
-</compartment>
-<facts>
-<CONFIG_VALUES>
-* Polaris preprocessed dataset cache dir: data/preprocessed/; triggered via python -m polaris.preprocess --config configs/preprocess.yaml; cache key: dataset name + SHA256 of preprocessing config.
-</CONFIG_VALUES>
-</facts>`
-  },
-  {
-    importance: 31,
-    block: `<compartment start="130" end="137" title="SKU import defaults to preview" episode_type="feature,docs" importance="31">
-<p1>
-Adjusted the warehouse SKU importer so the new ERP feed lands in a safer operational shape.
-U: no, make it dry-run first or I won't let ops touch it.
-
-The first pass of tools/sku-import/main.go had apply semantics too close to the happy path, which was fine for local testing and bad for a warehouse runbook. I flipped the command so preview is the default, added an explicit --apply gate for mutations, and rewrote docs/runbooks/sku-import.md to show the diff summary operators should review before committing changes. Commit a92d6f1.
-</p1>
-<p2>
-Changed tools/sku-import/main.go so preview is the default and destructive writes require --apply. docs/runbooks/sku-import.md now assumes operators review the diff summary before running a live import.
-</p2>
-<p3>
-The SKU importer now defaults to a safe preview workflow instead of assuming live writes. The durable memory is the operational default, not the specific feed.
-</p3>
-<p4>sku-import; preview default; --apply</p4>
-</compartment>
-<facts>
-<PROJECT_RULES>
-* New operational import commands should default to preview mode unless an explicit apply flag is present.
-</PROJECT_RULES>
-<CONFIG_VALUES>
-* Destructive execution flag: --apply; preview mode is the default when it is absent.
-</CONFIG_VALUES>
-</facts>
-<events>
-<trajectory_correction at_compartment="15">
-  <summary>Shifted the SKU importer from live-first behavior to preview-first operation.</summary>
-  <before_strategy>Expose the ERP feed through a command that effectively applies changes on the normal execution path.</before_strategy>
-  <correction_source>user</correction_source>
-  <correction_signal>U: no, make it dry-run first or I won't let ops touch it.</correction_signal>
-  <after_strategy>Require an explicit apply flag and treat preview output as the standard operator workflow.</after_strategy>
-  <evidence>The final command behavior in tools/sku-import/main.go makes preview the default and docs/runbooks/sku-import.md leads with the diff-review step.</evidence>
-</trajectory_correction>
-</events>
-<user_observations>
-* User prefers operational tooling to fail safe and make irreversible actions opt-in.
-</user_observations>`
-  },
-  {
-    importance: 29,
-    block: `<compartment start="138" end="143" title="Routed malformed telemetry to DLQ" episode_type="infra" importance="29">
-<p1>
-Updated BeaconMesh ingestion so malformed device payloads go to a dead-letter Kafka topic instead of being dropped after parse failure. The change touched ingest/src/parser.rs and deploy/helm/values-prod.yaml, added a sampled log line with device_id hash, and kept the hot path unchanged for valid payloads. Commit c1129af.
-</p1>
-<p2>
-BeaconMesh malformed telemetry now lands in telemetry.raw.dlq.v2 with sampled parse-failure logs.
-</p2>
-<p3>
-Invalid IoT telemetry is retained in a DLQ instead of silently disappearing.
-</p3>
-<p4>telemetry.raw.dlq.v2; parse_failure_sample_rate</p4>
-</compartment>
-<facts>
-<CONFIG_VALUES>
-* BeaconMesh malformed raw telemetry is routed to Kafka topic telemetry.raw.dlq.v2.
-</CONFIG_VALUES>
-</facts>`
-  },
-  {
-    importance: 27,
-    block: `<compartment start="158" end="163" title="Scoped mobile offline sync MVP" episode_type="feature,design" importance="27">
-<p1>
-U: "do the dumb version first; notes only, attachments can wait"
-
-Scoped Harbor Notes mobile offline sync to note title and body fields. mobile/src/sync/offlineScope.ts now rejects attachment blobs and comment threads during queue creation, and the settings screen labels them online-only instead of silently skipping them. Commit 7a2f0de.
-</p1>
-<p2>
-Harbor Notes offline sync MVP covers notes only; attachments and comment threads are explicitly online-only.
-</p2>
-<p3>
-Mobile offline sync shipped with a narrow notes-only scope.
-</p3>
-<p4>offlineScope.ts; notes only; attachments online-only</p4>
-</compartment>
-<facts>
-<CONFIG_VALUES>
-* Harbor Notes offline sync MVP includes note title and body only; attachments and comment threads remain online-only.
-</CONFIG_VALUES>
-</facts>`
-  },
-  {
-    importance: 27,
-    block: `<compartment start="160" end="168" title="Manual page rotation escape hatch" episode_type="feature,bug" importance="27">
-<p1>
-Started by trying to auto-rotate ugly multi-scan uploads in the docket OCR intake, then backed away from making low-confidence guesses.
-U: if confidence is fuzzy, give support a knob instead of guessing.
-
-ingest/api/src/routes/upload.ts now stores an optional per-page rotation override alongside the upload manifest, and web/src/components/PageRotationOverride.tsx gives support a manual control in triage. Automatic rotation only applies when the OCR angle model is confidently right; the rest stay untouched until a human steps in. docs/support/scan-triage.md covers when to use the override. Commit 7ab2c54.
-</p1>
-<p2>
-The rotation fix became a support-side escape hatch, not aggressive automation.
-U: if confidence is fuzzy, give support a knob instead of guessing.
-
-ingest/api/src/routes/upload.ts persists per-page overrides, web/src/components/PageRotationOverride.tsx exposes them in triage, and auto-rotation stays gated behind a high confidence threshold.
-</p2>
-<p3>
-Low-confidence scan rotation is now handled through a manual override path, with automation reserved for only the most certain OCR angle predictions.
-</p3>
-<p4>PageRotationOverride; upload manifest override; angle_confidence threshold</p4>
-</compartment>
-<facts>
-<CONSTRAINTS>
-* OCR angle predictions below a high confidence threshold are not reliable enough for unattended page rotation on messy multi-scan uploads.
-</CONSTRAINTS>
-<CONFIG_VALUES>
-* Automatic rotation threshold: angle_confidence 0.98 or higher.
-</CONFIG_VALUES>
-</facts>
-<events>
-<trajectory_correction at_compartment="19">
-  <summary>Changed scan rotation from auto-fix ambition to manual override with high-confidence automation only.</summary>
-  <before_strategy>Use OCR angle predictions to auto-rotate problematic scans broadly during ingest.</before_strategy>
-  <correction_source>user</correction_source>
-  <correction_signal>U: if confidence is fuzzy, give support a knob instead of guessing.</correction_signal>
-  <after_strategy>Persist per-page rotation overrides and reserve automatic rotation for only high-confidence predictions.</after_strategy>
-  <evidence>The final implementation added PageRotationOverride in triage UI and left ingest auto-rotation behind a strict confidence gate.</evidence>
-</trajectory_correction>
-</events>
-<user_observations>
-* User accepts deterministic manual escape hatches faster than vague low-confidence automation when support burden is obvious.
-</user_observations>`
-  },
-  {
-    importance: 24,
-    block: `<compartment start="1631" end="1672" title="Cut v2.4.1 patch release for the segment-wraparound fix" episode_type="release" importance="24">
-<p1>
-Cut v2.4.1 off main containing only the HLS segment-naming widening (commit 7a3e210). Tagged, pushed, release pipeline went green, artifacts uploaded to the artifact bucket. Release notes point at the existing incident postmortem for context.
-</p1>
-<p2>
-Cut v2.4.1 patch release with only the segment-naming widening (7a3e210).
-</p2>
-<p3>
-Patch release 2.4.1.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 24,
-    block: `<compartment start="295" end="318" title="Ferrite: write amplification spike investigation — inconclusive" episode_type="investigation" importance="24">
-<p1>
-Investigated a write amplification spike in Ferrite under sequential key write workloads. Metrics showed write amplification ratio jumping from ~4x to ~12x during certain write patterns on the benchmark cluster. Initial hypothesis: L0 compaction trigger threshold too low, causing premature level merges.
-
-U: "WA is spiking under sequential writes, worth looking into before we tune anything"
-
-Traced through the compaction scheduler in src/compaction/scheduler.rs. The spike correlates with L0→L1 level-merge events when L0 accumulates to max_l0_sst_count=8 SSTs. This is expected LSM-tree behavior: write amplification increases transiently during level merges by design and returns to baseline immediately after the merge completes. Existing defaults (l0_compaction_trigger=4, max_l0_sst_count=8) appear appropriate for the current workload; lowering them would increase compaction frequency without reducing peak WA.
-
-No action taken. If WA becomes a sustained concern under heavier write load, adjusting max_bytes_for_level_base is the next lever.
-</p1>
-<p2>
-Ferrite write amplification spike investigated: transient WA increase during L0→L1 level merge is expected LSM behavior, not a misconfiguration. Defaults (l0_compaction_trigger=4, max_l0_sst_count=8) are correct. No action taken.
-</p2>
-<p3>
-Ferrite WA spike is expected LSM behavior during level merges; no fix needed; defaults appropriate.
-</p3>
-<p4>
-Ferrite; write amplification; L0 compaction; LSM; inconclusive; max_l0_sst_count
-</p4>
-</compartment>`
-  },
-  {
-    importance: 22,
-    block: `<compartment start="39" end="45" title="Narrowed May orders replay" episode_type="infra,investigation" importance="22">
-<p1>
-Started from a revenue mismatch between Stripe exports and the warehouse and was about to re-run the whole 2025 orders model.
-U: don't touch closed months if the hole is just that May gap.
-
-After checking dags/reconcile_orders.py and the landed_at partitions feeding sql/marts/fct_orders.sql, it turned out the drift was isolated to four ingestion days after a connector retry loop. I changed the repair plan to replay only raw.orders_ingest for 2025-05-11 through 2025-05-14, documented the partition command in runbook/backfills.md, and left the rest of the year alone. Commit 2e7af53.
-</p1>
-<p2>
-The warehouse repair stopped being a full-year rebuild once the mismatch traced back to a four-day ingest gap. Replayed only the landed_at partitions for 2025-05-11 through 2025-05-14 and documented the repair command in runbook/backfills.md.
-</p2>
-<p3>
-This was a scoped replay, not a lasting data-model change: the useful outcome was knowing the repair should target landed_at partitions instead of rebuilding closed months.
-</p3>
-<p4>reconcile_orders.py; landed_at; 2025-05-11..2025-05-14</p4>
-</compartment>
-<facts>
-<CONFIG_VALUES>
-* The orders repair workflow is keyed off landed_at partitions rather than invoice_date.
-</CONFIG_VALUES>
-</facts>
-<events>
-<trajectory_correction at_compartment="5">
-  <summary>Shifted from a full-year warehouse rebuild to a four-day targeted replay.</summary>
-  <before_strategy>Re-run the full 2025 orders reconciliation to eliminate the revenue mismatch.</before_strategy>
-  <correction_source>user</correction_source>
-  <correction_signal>U: don't touch closed months if the hole is just that May gap.</correction_signal>
-  <after_strategy>Trace the mismatch to its ingestion window and replay only the affected landed_at partitions.</after_strategy>
-  <evidence>The investigation isolated the issue to raw.orders_ingest for 2025-05-11 through 2025-05-14, and the final repair command targeted only that range.</evidence>
-</trajectory_correction>
-</events>`
-  },
-  {
-    importance: 21,
-    block: `<compartment start="133" end="137" title="Collapsed package harness helpers" episode_type="refactor" importance="21">
-<p1>
-Cleaned FinchPkg's resolver test harness by merging three nearly identical temp-registry helpers into tests/support/registry.ts. No resolver behavior changed; the diff mostly removed duplicated fixture setup and updated imports in lockfile and peer-dependency tests. Commit aa19d02.
-</p1>
-<p2>
-FinchPkg resolver tests now share one temp-registry helper instead of three duplicated setup paths.
-</p2>
-<p3>
-Package resolver test setup was deduplicated without behavior changes.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 20,
-    block: `<compartment start="1686" end="1720" title="README install path correction for darwin-arm64" episode_type="docs" importance="20">
-<p1>
-README's quick-install snippet still pointed at \`/usr/local/bin\` for darwin-arm64; Homebrew on Apple Silicon installs to \`/opt/homebrew/bin\`. Updated the snippet and the troubleshooting "binary not found" entry to reflect both paths.
-</p1>
-<p2>
-README install path corrected for darwin-arm64 (Homebrew puts the binary in \`/opt/homebrew/bin\`, not \`/usr/local/bin\`).
-</p2>
-<p3>
-README install path fixed for Apple Silicon.
-</p3>
-<p4/>
-</compartment>
-<facts>
-<NAMING>
-* On darwin-arm64 (Apple Silicon), the installed binary path is \`/opt/homebrew/bin/loomctl\`. On darwin-x86_64 and Linux, it remains \`/usr/local/bin/loomctl\`.
-</NAMING>
-</facts>`
-  },
-  {
-    importance: 17,
-    block: '<compartment start="1734" end="1768" title="Rename internal `bilUtil` helper to `invoiceMath`" episode_type="refactor" importance="17">\n<p1>\nThe `bilUtil` package in the billing service was a holdover name from a partial rename — `bil` was the original short prefix before we standardized on `invoice`. Renamed to `invoiceMath` since that\'s what the package actually does (rounding, proration, tax-base math). No behavior change. Updated callers, ran tests, done.\n</p1>\n<p2>\nRenamed `bilUtil` package to `invoiceMath` to match its actual responsibility.\n</p2>\n<p3>\nNaming cleanup in the billing service.\n</p3>\n<p4/>\n</compartment>\n<facts>\n<NAMING>\n* Billing math helpers live in package `invoiceMath` (rounding, proration, tax-base computation). The prior name `bilUtil` is deprecated.\n</NAMING>\n</facts>'
-  },
-  {
-    importance: 14,
-    block: `<compartment start="1781" end="1854" title="Inconclusive investigation into nightly training throughput drift" episode_type="investigation" importance="14">
-<p1>
-Nightly training runs have been ~7% slower on Tue/Wed for the last three weeks but back to baseline Thu–Mon. No code changes correlate. Looked at GPU utilization (steady), dataloader throughput (steady), network egress (unremarkable), shared-filesystem latency (no signal in our metrics), and cluster autoscaler activity (no correlation).
-
-U: probably some other team's job is contending on the same nodes those days but I don't want to spend more time on it right now
-
-Parking. If it gets worse or starts hitting Thu, revisit.
-</p1>
-<p2>
-Investigated a recurring Tue/Wed ~7% training throughput drift; no signal in obvious metrics. Parked pending escalation.
-</p2>
-<p3>
-Inconclusive performance investigation, parked.
-</p3>
-<p4/>
-</compartment>
-<user_observations>
-* User comfortably parks inconclusive investigations rather than forcing closure, but tags conditions under which to revisit.
-</user_observations>`
-  },
-  {
-    importance: 14,
-    block: `<compartment start="459" end="466" title="Vesper: add kind cluster to CI integration test pipeline" episode_type="infra" importance="14">
-<p1>
-Set up a local kind cluster in the Vesper CI pipeline for integration tests. Tests previously ran against a mocked Kubernetes API (envtest), which missed controller-runtime edge cases around watch reconnection and leader election handoff. kind cluster config at ci/kind-config.yaml, node image kindest/node:v1.29.2. Integration test job added to .github/workflows/integration.yml. CI run time increased by ~3 minutes.
-</p1>
-<p2>
-kind cluster added to Vesper CI for integration tests; config ci/kind-config.yaml, node image kindest/node:v1.29.2. CI time +3 min. .github/workflows/integration.yml updated.
-</p2>
-<p3>
-Vesper CI now runs integration tests against a real kind cluster instead of envtest mock.
-</p3>
-<p4>
-kind; ci/kind-config.yaml; kindest/node:v1.29.2; integration.yml
-</p4>
-</compartment>
-<facts>
-<CONFIG_VALUES>
-* Vesper CI kind cluster: config ci/kind-config.yaml, node image kindest/node:v1.29.2.
-</CONFIG_VALUES>
-</facts>`
-  },
-  {
-    importance: 12,
-    block: `<compartment start="76" end="82" title="Dropped table-detector detour" episode_type="investigation,docs" importance="12">
-<p1>
-Spent a short pass checking whether the vendor table detector would rescue the weird invoice-header cases in the OCR pipeline.
-U: if it only helps 3 invoices, skip it.
-
-The sample in notebooks/vendorbbox-check.ipynb only improved 3 of 40 documents and made 5 worse because the detector over-merged header boxes. I left the current bbox heuristics alone and added the dead-end note to docs/ocr/field-mapping.md so we do not re-run the same experiment next week. Commit 1c9d5fe.
-</p1>
-<p2>
-Tested the vendor table detector against a small bad-invoice set and it was not worth adopting. The only lasting output was a docs note in docs/ocr/field-mapping.md that this path regressed more samples than it helped.
-</p2>
-<p3>
-This was a discarded OCR detour: table detection did not improve enough documents to justify replacing the current bbox heuristics.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 9,
-    block: `<compartment start="858" end="866" title="CLI nightly dry run" episode_type="release" importance="9">
-<p1>
-Ran the developer CLI nightly release dry run for \`0.14.0-next.20260523\` and confirmed it produced tarballs without publishing. The generated artifacts were deleted from \`dist/\`.
-</p1>
-<p2>
-CLI nightly release dry run succeeded without publishing; temporary artifacts were removed.
-</p2>
-<p3>
-A CLI nightly dry run passed and left no artifacts.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 8,
-    block: `<compartment start="1869" end="1928" title="Tried replacing controller-runtime cache with informer-direct; reverted" episode_type="refactor" importance="8">
-<p1>
-Speculated that bypassing controller-runtime's cache and going directly to informers would cut reconcile latency. Spent two hours wiring it up in a scratch branch — turned out the cache was already informer-backed and the "bypass" was just moving the same indirection around. Latency unchanged in the microbench.
-
-U: yeah let's not, this was a bad idea
-
-Branch deleted, no commit landed on main.
-</p1>
-<p2>
-Tried bypassing controller-runtime cache for direct informer access; learned the cache is already informer-backed. Branch deleted.
-</p2>
-<p3>
-False start: attempted-and-reverted controller-runtime cache bypass.
-</p3>
-<p4/>
-</compartment>
-<facts>
-<CONSTRAINTS>
-* controller-runtime's cache is itself informer-backed; "going direct to informers" doesn't remove any indirection and gives no latency benefit.
-</CONSTRAINTS>
-</facts>
-<events>
-<trajectory_correction at_compartment="18">
-  <summary>Abandoned a refactor after the underlying assumption (that the cache was a meaningful extra layer) was falsified.</summary>
-  <before_strategy>Rewrite the reconciler against raw informers to skip controller-runtime's cache layer.</before_strategy>
-  <correction_source>self_review</correction_source>
-  <correction_signal>Microbenchmark showed no latency change; realized controller-runtime cache is informer-backed.</correction_signal>
-  <after_strategy>Delete the scratch branch; keep the existing setup.</after_strategy>
-  <evidence>"yeah let's not, this was a bad idea"</evidence>
-</trajectory_correction>
-</events>`
-  },
-  {
-    importance: 7,
-    block: `<compartment start="224" end="231" title="Ledger: invoice_status column rename reversed after reporting breakage" episode_type="bug" importance="7">
-<p1>
-Renamed invoice_status column to status in the invoices table as cosmetic cleanup (migration 0047_rename_invoice_status.sql). Two hours later all scheduled overnight reports came back empty.
-
-U: "why are all the reports empty this morning"
-
-Traced to the reporting service using raw SQL with column name invoice_status — not through the ORM. Missed in review because the reporting service lives in a separate repo. Reverted via migration 0048_revert_rename.sql, commit 1f0e52a. Rename deferred until the reporting service can be updated in the same coordinated changeset.
-</p1>
-<p2>
-Attempted rename of Ledger invoice_status → status; reverted same day when reporting service (separate repo, raw SQL) silently broke overnight reports. Rename deferred pending cross-repo coordination.
-</p2>
-<p3>
-Column rename reverted; reporting service has raw SQL dependency on invoice_status that must be updated before rename can land.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 7,
-    block: `<compartment start="164" end="166" title="Discarded Percy baseline theory" episode_type="investigation" importance="7">
-<p1>
-Checked whether Quasar UI's Percy diffs came from the Playwright 1.45 bump, then abandoned the theory after the same baseline mismatch reproduced on main. No code was kept from the branch except the investigation note in the PR thread.
-</p1>
-<p2>
-Percy baseline mismatch was not caused by the Playwright bump; the test branch was discarded.
-</p2>
-<p3>
-A false Playwright/Percy lead was ruled out.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 7,
-    block: `<compartment start="562" end="564" title="Added --dry-run flag to transcode CLI" episode_type="feature" importance="7">
-<p1>
-Added --dry-run to transcode command. Validates preset and queue submission without calling ffmpeg.
-</p1>
-<p2>
---dry-run flag for transcode CLI; validates without executing.
-</p2>
-<p3>
-Added dry-run mode to video transcode CLI.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 7,
-    block: `<compartment start="874" end="881" title="Upload button spacing" episode_type="bug" importance="7">
-<p1>
-Adjusted the upload button margin in \`apps/web/src/routes/upload/UploadDropzone.tsx\` from \`mt-3\` to \`mt-4\` after the icon looked cramped on the empty state.
-</p1>
-<p2>
-Changed upload empty-state button spacing from \`mt-3\` to \`mt-4\`.
-</p2>
-<p3>
-Minor upload empty-state spacing tweak.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 5,
-    block: `<compartment start="1942" end="1968" title="Aborted feature flag tweak — wrong env" episode_type="feature" importance="5">
-<p1>
-Toggled the \`mm_async_lobby_v2\` flag in what I thought was staging; it was prod-shadow. No traffic impact (shadow is read-only) but reverted immediately. Note to self: read the flag-env banner in LaunchDarkly before clicking.
-</p1>
-<p2>
-Toggled a flag in the wrong env; no impact, reverted.
-</p2>
-<p3>
-Flag-toggle misfire, reverted.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 5,
-    block: `<compartment start="352" end="353" title="Canopy: popup container width CSS typo (300 px → 400 px)" episode_type="bug" importance="5">
-<p1>
-Fixed popup.css: .popup-container width was 300px (typo) instead of intended 400px. One-line change, commit f2a017e.
-</p1>
-<p2>
-Popup width corrected to 400 px in popup.css.
-</p2>
-<p3>
-CSS typo fixed.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 4,
-    block: `<compartment start="571" end="578" title="Noted CAN bus arbitration failure under high load" episode_type="infra" importance="4">
-<p1>
-Bus load test at 85% showed arbitration collapse on the MCU. U: bus load test showed arbitration collapse at 85%, driver needs fix
-Added note in driver README; no code change this session. Commit 8f3d1a9.
-</p1>
-<p2>
-Documented CAN arbitration collapse above 80% bus load.
-</p2>
-<p3>
-Captured high-load CAN bus limitation in firmware docs.
-</p3>
-<p4>can-driver; 80% bus load; arbitration collapse</p4>
-</compartment>
-<facts>
-<CONSTRAINTS>
-* CAN bus arbitration on the current MCU fails under >80% bus load; requires priority inversion mitigation in the driver.
-</CONSTRAINTS>
-</facts>`
-  },
-  {
-    importance: 3,
-    block: `<compartment start="1981" end="1994" title="Typo fix in CRDT conflict error message" episode_type="bug" importance="3">
-<p1>
-\`recieved\` → \`received\` in \`loomdoc/conflict.go\` error string. That's the whole change.
-</p1>
-<p2>
-Typo fix in a conflict error message.
-</p2>
-<p3>
-Typo fix.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 3,
-    block: `<compartment start="45" end="46" title="boltpkg: fix 'dependancy' typo in resolver error message" episode_type="bug" importance="3">
-<p1>
-Fixed spelling error in src/resolver/errors.go:114: "could not resolve dependancy" → "dependency". One-line patch, commit 3c02a1d.
-</p1>
-<p2>
-Typo fix in resolver error message (src/resolver/errors.go:114).
-</p2>
-<p3>
-Typo fixed.
-</p3>
-<p4/>
-</compartment>`
-  },
-  {
-    importance: 3,
-    block: `<compartment start="167" end="168" title="Renamed docs Recipes to Cookbook" episode_type="docs" importance="3">
-<p1>
-Changed the AstraKit docs sidebar label from "Recipes" to "Cookbook" in docs/sidebar.ts. Commit 1db0ac3.
-</p1>
-<p2>
-AstraKit docs now label examples as Cookbook.
-</p2>
-<p3>
-Docs examples section was renamed.
-</p3>
-<p4/>
-</compartment>
-<facts>
-<NAMING>
-* AstraKit's docs navigation label for examples is "Cookbook", not "Recipes".
-</NAMING>
-</facts>`
-  }
-];
-
-// ../plugin/src/hooks/magic-context/reference-retrieval.ts
-var SEED_FLOOR = 3;
-var SESSION_REF_WINDOW = 4;
-var SESSION_REF_DIVERSE = 3;
-var SESSION_REF_LIMIT = SESSION_REF_WINDOW + SESSION_REF_DIVERSE;
-var SEED_BANDS = [
-  [85, 100],
-  [60, 84],
-  [30, 59],
-  [10, 29],
-  [1, 9]
-];
-function seedBandIndex(importance) {
-  for (let i = 0;i < SEED_BANDS.length; i++) {
-    const [lo, hi] = SEED_BANDS[i];
-    if (importance >= lo && importance <= hi)
-      return i;
-  }
-  return importance > 100 ? 0 : SEED_BANDS.length - 1;
-}
-function seedsByBand() {
-  const bands = SEED_BANDS.map(() => []);
-  for (const seed of REFERENCE_SEEDS) {
-    bands[seedBandIndex(seed.importance)].push(seed);
-  }
-  return bands;
-}
-function fnv1a(input) {
-  let h = 2166136261;
-  for (let i = 0;i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24)) >>> 0;
-  }
-  return h >>> 0;
-}
-function selectSeeds(sessionId, chunkStart, count = SEED_FLOOR) {
-  const bands = seedsByBand();
-  const seed = fnv1a(`${sessionId}:${chunkStart}`);
-  const picks = [];
-  const bandOrder = [];
-  for (let i = 0;i < SEED_BANDS.length; i++) {
-    bandOrder.push((i + seed % SEED_BANDS.length) % SEED_BANDS.length);
-  }
-  let bi = 0;
-  let guard = 0;
-  while (picks.length < count && guard < SEED_BANDS.length * 4) {
-    const band = bands[bandOrder[bi % bandOrder.length]];
-    bi++;
-    guard++;
-    if (band.length === 0)
-      continue;
-    const idx = (seed + picks.length) % band.length;
-    const candidate = band[idx];
-    if (!picks.includes(candidate))
-      picks.push(candidate);
-  }
-  for (let i = 0;picks.length < count && i < REFERENCE_SEEDS.length; i++) {
-    const candidate = REFERENCE_SEEDS[(seed + i) % REFERENCE_SEEDS.length];
-    if (!picks.includes(candidate))
-      picks.push(candidate);
-  }
-  return picks;
-}
-function renderSeedExamplesBlock(seeds) {
-  if (seeds.length === 0)
-    return "";
-  const body = seeds.map((s) => s.block).join(`
-
-`);
-  return `<compartment_examples_from_other_projects>
-${body}
-</compartment_examples_from_other_projects>`;
-}
-function renderSessionRefCompartment(c, showImportance) {
-  const importance = c.importance ?? 50;
-  const attrs = `start="${c.startMessage}" end="${c.endMessage}" title="${escapeXmlAttr(c.title)}"` + (c.episodeType ? ` episode_type="${escapeXmlAttr(c.episodeType)}"` : "") + (showImportance ? ` importance="${importance}"` : "");
-  if (typeof c.p1 === "string" && c.p1.length > 0) {
-    const p4 = c.p4 && c.p4.length > 0 ? `<p4>
-${escapeXmlContent(c.p4)}
-</p4>` : "<p4/>";
-    return [
-      `<compartment ${attrs}>`,
-      `<p1>
-${escapeXmlContent(c.p1)}
-</p1>`,
-      `<p2>
-${escapeXmlContent(c.p2 ?? "")}
-</p2>`,
-      `<p3>
-${escapeXmlContent(c.p3 ?? "")}
-</p3>`,
-      p4,
-      `</compartment>`
-    ].join(`
-`);
-  }
-  return `<compartment ${attrs}>
-${escapeXmlContent(c.content)}
-</compartment>`;
-}
-function selectSessionReferences(allCompartments, seeds, sessionId, chunkStart) {
-  const eligible = allCompartments.filter((c) => !isNoContentCompartment(c));
-  const olderCount = Math.max(0, eligible.length - SESSION_REF_WINDOW);
-  const recent = eligible.slice(olderCount);
-  const bands = SEED_BANDS.map(() => []);
-  const counts = SEED_BANDS.map(() => 0);
-  for (const c of seeds)
-    counts[seedBandIndex(c.importance)]++;
-  for (let i = 0;i < olderCount; i++) {
-    bands[seedBandIndex(eligible[i].importance ?? 50)].push(i);
-  }
-  const hash = fnv1a(`${sessionId}:${chunkStart}`);
-  const bandOrder = SEED_BANDS.map((_, i) => (i + hash % SEED_BANDS.length) % SEED_BANDS.length);
-  const picks = [];
-  while (picks.length < SESSION_REF_DIVERSE) {
-    let best = -1;
-    for (const bi of bandOrder) {
-      if (bands[bi].length > 0 && (best < 0 || counts[bi] < counts[best]))
-        best = bi;
-    }
-    if (best < 0)
-      break;
-    const band = bands[best];
-    const [pick] = band.splice((hash + picks.length) % band.length, 1);
-    picks.push(pick);
-    counts[best]++;
-  }
-  picks.sort((a, b) => a - b);
-  return [...picks.map((i) => eligible[i]), ...recent];
-}
-function renderSessionReferencesBlock(selected, window = SESSION_REF_LIMIT) {
-  selected = selected.filter((c) => !isNoContentCompartment(c));
-  const count = Math.max(0, Math.min(SESSION_REF_LIMIT, Math.floor(window)));
-  if (selected.length === 0 || count === 0)
-    return "";
-  const recentStart = Math.max(0, selected.length - SESSION_REF_WINDOW);
-  const trimStart = Math.max(0, selected.length - count);
-  const body = selected.slice(trimStart).map((c, i) => renderSessionRefCompartment(c, i + trimStart < recentStart)).join(`
-
-`);
-  return `<session_references>
-${body}
-</session_references>`;
-}
-
-// ../plugin/src/hooks/magic-context/historian-prompt-fit.ts
-var HISTORIAN_MIN_FIT_CHUNK_TOKENS = 1000;
-var FIT_SLACK_TOKENS = 64;
-var PRODUCER_PROMPT_FIT_FAILURE_PATTERN = /producer_prompt_(?:exceeds_window|fit_unavailable|unfit)/;
-function resolveHistorianProducerWindow(modelKey, configuredMaxOutputTokens, fallbackContextLimit) {
-  const limits = resolveHistorianProducerLimits(modelKey);
-  const context = limits.context ?? (limits.input === undefined ? fallbackContextLimit : undefined);
-  const slash = modelKey?.indexOf("/") ?? -1;
-  const catalogOutput = modelKey && slash > 0 ? getSdkOutputLimit(modelKey.slice(0, slash), modelKey.slice(slash + 1)) : undefined;
-  return {
-    modelKey,
-    contextLimitTokens: context,
-    inputLimitTokens: limits.input,
-    maxOutputTokens: historianProducerReserve(context, configuredMaxOutputTokens, catalogOutput)
-  };
-}
-function fitRecompHistorianPrompt(args) {
-  const modelKey = toModelEntry(args.model)?.model ?? args.fallbackModelId;
-  return fitHistorianPrompt({
-    window: resolveHistorianProducerWindow(modelKey, undefined),
-    systemPrompt: withContentLanguageDirective(COMPARTMENT_AGENT_SYSTEM_PROMPT, args.language),
-    requestedChunkTokens: args.requestedChunkTokens,
-    sessionId: args.sessionId,
-    chunkStart: Math.max(1, args.chunkStart),
-    lastOrdinal: args.lastOrdinal,
-    sessionCompartments: args.sessionCompartments,
-    memories: [],
-    memoryEnabled: false,
-    extractionFree: true
-  });
-}
-function describeHistorianPromptTrim(fit) {
-  const { kept } = fit;
-  return `chunkTokens=${fit.chunkTokens} sessionReferences=${kept.sessionReferences} memories=${kept.memories}/${kept.memoriesTotal} seeds=${kept.seeds}/${kept.seedsTotal}`;
-}
-function fitHistorianPrompt(args) {
-  const requested = Math.max(0, Math.floor(args.requestedChunkTokens));
-  const seeds = selectSeeds(args.sessionId, args.chunkStart);
-  const references = selectSessionReferences(args.sessionCompartments, seeds, args.sessionId, args.chunkStart);
-  const memories = orderHistorianMemories(args.memories);
-  const render = (refs, memoryCount, seedCount) => ({
-    seedExamples: renderSeedExamplesBlock(seeds.slice(0, seedCount)),
-    sessionReferences: renderSessionReferencesBlock(references, refs),
-    projectMemory: renderHistorianMemoryBlock(memories.slice(0, memoryCount)) ?? ""
-  });
-  const kept = (refs, memoryCount, seedCount) => ({
-    sessionReferences: refs,
-    memories: memoryCount,
-    memoriesTotal: memories.length,
-    seeds: seedCount,
-    seedsTotal: seeds.length
-  });
-  const limit = producerInputTokenLimit(args.window.contextLimitTokens, args.window.maxOutputTokens, args.window.inputLimitTokens);
-  if (limit === undefined) {
-    return {
-      ok: true,
-      guarded: false,
-      chunkTokens: requested,
-      ...render(references.length, memories.length, seeds.length),
-      trimmed: false,
-      kept: kept(references.length, memories.length, seeds.length)
-    };
-  }
-  const calibration = calibrationForModelKey(args.window.modelKey);
-  const systemLocal = estimateFixedPromptTokens(args.systemPrompt);
-  const mass = (proseLocal) => providerMass({ prose: proseLocal, system: systemLocal }, calibration, true);
-  if (!Number.isFinite(mass(0)) || mass(0) <= 0) {
-    return {
-      ok: false,
-      reason: `producer_prompt_fit_unavailable model=${args.window.modelKey ?? "unknown"}`
-    };
-  }
-  const chunkHeader = `Messages ${args.chunkStart}-${args.lastOrdinal}:
-
-`;
-  const counted = new Map;
-  const fixedLocal = (blocks, header = chunkHeader) => {
-    const text = buildCompartmentAgentPrompt({
-      ...blocks,
-      inputSource: header,
-      memoryEnabled: args.memoryEnabled,
-      extractionFree: args.extractionFree
-    });
-    let tokens = counted.get(text);
-    if (tokens === undefined) {
-      tokens = estimateFixedPromptTokens(text);
-      counted.set(text, tokens);
-    }
-    return tokens;
-  };
-  const roomFor = (blocks) => {
-    const fixed = fixedLocal(blocks);
-    if (mass(fixed) > limit)
-      return -1;
-    let lo = 0;
-    let hi = 1;
-    while (mass(fixed + hi) <= limit) {
-      lo = hi;
-      hi *= 2;
-    }
-    while (hi - lo > 1) {
-      const mid = Math.floor((lo + hi) / 2);
-      if (mass(fixed + mid) <= limit)
-        lo = mid;
-      else
-        hi = mid;
-    }
-    return Math.max(0, lo - FIT_SLACK_TOKENS);
-  };
-  const accept = (refs, memoryCount, seedCount, chunkTokens) => ({
-    ok: true,
-    guarded: true,
-    chunkTokens,
-    roomTokens: Math.max(chunkTokens, roomFor(render(refs, memoryCount, seedCount))),
-    ...render(refs, memoryCount, seedCount),
-    trimmed: refs < references.length || memoryCount < memories.length || seedCount < seeds.length,
-    kept: kept(refs, memoryCount, seedCount)
-  });
-  for (let refs = references.length;refs >= 0; refs -= 1) {
-    if (roomFor(render(refs, memories.length, seeds.length)) >= requested) {
-      return accept(refs, memories.length, seeds.length, requested);
-    }
-  }
-  if (memories.length > 0 && roomFor(render(0, 0, seeds.length)) >= requested) {
-    let lo = 0;
-    let hi = memories.length;
-    while (hi - lo > 1) {
-      const mid = Math.floor((lo + hi) / 2);
-      if (roomFor(render(0, mid, seeds.length)) >= requested)
-        lo = mid;
-      else
-        hi = mid;
-    }
-    return accept(0, lo, seeds.length, requested);
-  }
-  for (let seedCount = seeds.length;seedCount >= 0; seedCount -= 1) {
-    if (roomFor(render(0, 0, seedCount)) >= requested) {
-      return accept(0, 0, seedCount, requested);
-    }
-  }
-  const floor = Math.min(requested, HISTORIAN_MIN_FIT_CHUNK_TOKENS);
-  const room = roomFor(render(0, 0, 0));
-  if (room >= floor && room > 0)
-    return accept(0, 0, 0, Math.min(requested, room));
-  const fixedTokens = mass(fixedLocal(render(0, 0, 0), `Messages 1-1:
-
-`));
-  return {
-    ok: false,
-    reason: `producer_prompt_unfit model=${args.window.modelKey ?? "unknown"} limit=${limit} fixed_tokens=${fixedTokens} min_chunk_tokens=${floor}`
-  };
-}
-
 // ../plugin/src/hooks/magic-context/persist-filtered-noise.ts
 function persistFilteredNoise(db, sessionId, chunk, eligibleEnd) {
   const rows = chunk.filteredNoiseLines ?? [];
@@ -27212,6 +27087,37 @@ function persistFilteredNoise(db, sessionId, chunk, eligibleEnd) {
   if (saved)
     sessionLog2(sessionId, `historian skipped ordinals ${start}-${eligibleEnd - 1}: all ${rows.length} raw rows excluded by chunk filters (no-content boundary marker)`);
   return saved;
+}
+
+// src/pi-history-retirement.ts
+var KEY = "piHistorianRetirement";
+function readState(db, sessionId) {
+  const row = db.prepare("SELECT deferred_execute_state AS state FROM session_meta WHERE session_id = ?").get(sessionId);
+  const state = row?.state ? JSON.parse(row.state) : {};
+  if (!state || typeof state !== "object" || Array.isArray(state))
+    throw new Error("Invalid session metadata JSON");
+  return state;
+}
+function readPiHistoryRetirement(db, sessionId) {
+  const target = readState(db, sessionId)[KEY];
+  return typeof target === "string" && target.length > 0 ? target : null;
+}
+function queuePiHistoryRetirement(db, sessionId, throughMessageId) {
+  ensureSessionMetaRow(db, sessionId);
+  const state = readState(db, sessionId);
+  state[KEY] = throughMessageId;
+  db.prepare("UPDATE session_meta SET deferred_execute_state = ? WHERE session_id = ?").run(JSON.stringify(state), sessionId);
+}
+function acknowledgePiHistoryRetirement(db, sessionId, publishedEnd, ordinalOf) {
+  const state = readState(db, sessionId);
+  const target = state[KEY];
+  if (typeof target !== "string")
+    return;
+  const ordinal = ordinalOf(target);
+  if (ordinal === undefined || ordinal > publishedEnd)
+    return;
+  delete state[KEY];
+  db.prepare("UPDATE session_meta SET deferred_execute_state = ? WHERE session_id = ?").run(JSON.stringify(state), sessionId);
 }
 
 // src/system-entry-pi.ts
@@ -27451,7 +27357,7 @@ async function runHistorianSubagentWithTransientRetriesGuarded(args) {
       result = {
         ok: false,
         reason: "model_failed",
-        error: desc.brief,
+        error: PRODUCER_PROMPT_FIT_FAILURE_PATTERN.test(desc.message) ? desc.message : desc.brief,
         durationMs: Date.now() - attemptStart
       };
     }
@@ -27626,6 +27532,7 @@ async function runPiHistorian(deps) {
       const priorCompartments = getCompartments(db, sessionId);
       const existingValidationError = validateStoredCompartments(priorCompartments);
       if (existingValidationError) {
+        telemetry.failureReason = existingValidationError;
         sessionLog2(sessionId, `historian failure: source=existing-validation reason="${existingValidationError}"`);
         {
           const failCount = incrementHistorianFailure(db, sessionId, existingValidationError);
@@ -27636,6 +27543,8 @@ async function runPiHistorian(deps) {
       const offset = priorCompartments.length > 0 ? priorCompartments[priorCompartments.length - 1].endMessage + 1 : 1;
       let boundarySnapshot = providedBoundarySnapshot ?? null;
       if (!boundarySnapshot) {
+        telemetry.status = "noop";
+        telemetry.failureReason = "missing protected-tail boundary snapshot";
         sessionLog2(sessionId, "historian no-op: missing protected-tail boundary snapshot from Pi trigger decision");
         return;
       }
@@ -27658,12 +27567,16 @@ async function runPiHistorian(deps) {
         }
       }
       if (!validation.ok) {
+        telemetry.status = "noop";
+        telemetry.failureReason = "stale protected-tail boundary snapshot";
         sessionLog2(sessionId, `historian no-op: stale protected-tail snapshot (${validation.detail ?? validation.reason ?? "unknown"})`);
         return;
       }
       const protectedTailStart = boundarySnapshot.protectedTailStart;
       const eligibleEndOrdinal = Math.min(boundarySnapshot.eligibleEndOrdinal, protectedTailStart);
       if (protectedTailStart <= offset || eligibleEndOrdinal <= offset) {
+        telemetry.status = "noop";
+        telemetry.failureReason = "nothing to compact before protected tail";
         sessionLog2(sessionId, `historian no-op: protectedTailStart=${protectedTailStart} eligibleEnd=${eligibleEndOrdinal} <= offset=${offset} — nothing to compact; ${describeBoundaryDiagnostics(boundarySnapshot)}`);
         if (boundarySnapshot.usagePercentage < 80) {
           if (!isWrapupInProgress(db, sessionId))
@@ -27755,6 +27668,7 @@ async function runPiHistorian(deps) {
       }
       const chunkCoverageError = validateChunkCoverage(chunk);
       if (chunkCoverageError) {
+        telemetry.failureReason = chunkCoverageError;
         sessionLog2(sessionId, `historian failure: source=chunk-coverage reason="${chunkCoverageError}" chunkRange=${chunk.startIndex}-${chunk.endIndex}`);
         {
           const failCount = incrementHistorianFailure(db, sessionId, chunkCoverageError);
@@ -27764,6 +27678,8 @@ async function runPiHistorian(deps) {
         return;
       }
       if (!projectPath) {
+        telemetry.status = "noop";
+        telemetry.failureReason = "project path unavailable";
         rollbackDrainReservation();
         return;
       }
@@ -27938,6 +27854,7 @@ ${chunkText}`,
       }
       if (validatedPass.kind !== "ok") {
         const errorMsg = validatedPass.kind === "validation-failed" ? validatedPass.error : validatedPass.kind === "spawn-failed" ? `subagent run failed (${validatedPass.reason}): ${validatedPass.error}` : "historian returned no usable text";
+        telemetry.failureReason = validatedPass.kind === "validation-failed" ? validatedPass.error : validatedPass.kind === "no-output" ? "empty_output" : piSubagentFailureReason(validatedPass);
         if (!producerDispatched && !PRODUCER_PROMPT_FIT_FAILURE_PATTERN.test(errorMsg))
           retainDrainReservationForRetryThrottle = false;
         sessionLog2(sessionId, `historian failure: ${errorMsg}`);
@@ -27995,6 +27912,7 @@ ${chunkText}`,
       const lastNewEnd = newCompartments[newCompartments.length - 1]?.endMessage ?? 0;
       if (lastNewEnd + 1 <= offset) {
         const errorMsg = `historian returned compartments that did not advance past raw message ${offset - 1}`;
+        telemetry.failureReason = errorMsg;
         sessionLog2(sessionId, `historian failure: source=no-progress newCompartmentCount=${newCompartments.length} lastNewEnd=${lastNewEnd} priorEnd=${offset - 1}`);
         {
           const failCount = incrementHistorianFailure(db, sessionId, errorMsg);
@@ -28040,6 +27958,8 @@ ${chunkText}`,
       let publishedEventCount = 0;
       let persistedIds = [];
       if (!compartmentLeaseHolderId) {
+        telemetry.status = "noop";
+        telemetry.failureReason = "missing compartment lease holder";
         sessionLog2(sessionId, "historian publish skipped: missing compartment lease holder");
         rollbackDrainReservation();
         return;
@@ -28052,6 +27972,8 @@ ${chunkText}`,
       try {
         if (!isCompartmentLeaseHeld(db, sessionId, compartmentLeaseHolderId)) {
           db.exec("ROLLBACK");
+          telemetry.status = "noop";
+          telemetry.failureReason = "compartment lease no longer held";
           sessionLog2(sessionId, "historian publish skipped: compartment lease no longer held");
           rollbackDrainReservation();
           return;
@@ -28076,6 +27998,7 @@ ${chunkText}`,
         clearHistorianFailureState(db, sessionId);
         clearHistorianDrainFailure(db, sessionId);
         recordProtectedTailPublicationFloor(db, sessionId, lastNewEnd + 1);
+        acknowledgePiHistoryRetirement(db, sessionId, lastNewEnd, (id) => provider.readMessages().find((message) => message.id === id)?.ordinal);
         if (!isWrapupInProgress(db, sessionId))
           clearEmergencyRecovery(db, sessionId);
         if (lastNewEndMessageId) {
@@ -28204,7 +28127,7 @@ ${chunkText}`,
     });
   } catch (error) {
     const desc = describeError(error);
-    telemetry.failureReason = `exception: ${desc.brief}`;
+    telemetry.failureReason = PRODUCER_PROMPT_FIT_FAILURE_PATTERN.test(desc.message) ? desc.message : externalHistorianFailureReason(error, "exception");
     sessionLog2(sessionId, `historian failure: source=exception ${desc.brief}${desc.stackHead ? ` stackHead="${desc.stackHead}"` : ""}`);
     if (!issueNotified) {
       const failCount = incrementHistorianFailure(db, sessionId, desc.brief);
@@ -28228,7 +28151,7 @@ ${chunkText}`,
         subagentInvocationId: invocationId,
         runKind: telemetry.runKind ?? "incremental",
         status: telemetry.status ?? "failed",
-        failureReason: telemetry.failureReason ?? null,
+        failureReason: telemetry.failureReason ?? ((telemetry.status ?? "failed") === "failed" ? "provider_error" : null),
         chunkStartOrdinal: telemetry.chunkStartOrdinal ?? null,
         chunkEndOrdinal: telemetry.chunkEndOrdinal ?? null,
         unprocessedFrom: telemetry.unprocessedFrom ?? null,
@@ -28248,12 +28171,36 @@ ${chunkText}`,
     } catch {}
   }
 }
+function piSubagentFailureReason(failure) {
+  if (PRODUCER_PROMPT_FIT_FAILURE_PATTERN.test(failure.error))
+    return failure.error;
+  if (["step_limit", "token_budget", "invalid_prompt"].includes(failure.reason)) {
+    return failure.error;
+  }
+  if (failure.reason === "abort")
+    return "aborted";
+  if (failure.reason === "timeout") {
+    return externalHistorianFailureReason(failure.error, "timeout");
+  }
+  if (failure.reason === "parse_failed")
+    return "parse_failed";
+  if (failure.reason === "non_zero_exit") {
+    const exitCode = failure.meta?.exitCode ?? /\bcode\s*=\s*(-?\d+|null)\b/i.exec(failure.error)?.[1];
+    return subprocessExitHistorianFailureReason(exitCode, failure.meta?.stderr);
+  }
+  if (failure.reason === "no_assistant") {
+    const providerReason = externalHistorianFailureReason(failure.error);
+    return providerReason === "provider_error" ? "empty_output" : providerReason;
+  }
+  return externalHistorianFailureReason(failure.error, failure.reason === "spawn_failed" ? "exception" : "provider_error");
+}
 async function validateHistorianResult(result, sessionId, chunk, priorCompartments, sequenceOffset) {
   if (!result.ok) {
     return {
       kind: "spawn-failed",
       reason: result.reason,
-      error: result.error
+      error: result.error,
+      ...result.meta ? { meta: result.meta } : {}
     };
   }
   if (result.assistantText.trim().length === 0) {
@@ -28308,19 +28255,77 @@ function findFirstKeptEntryId(entries, lastCompactedOrdinal, ordinalOffset = 0) 
 }
 
 // src/compaction-marker-manager-pi.ts
+var loggedMarkerDrainGates = new BoundedSessionMap(1000);
+function logPiCompactionMarkerDrainGateOnce(sessionId, pending, gate, fields = {}) {
+  const markerIdentity = `${pending.endMessageId}\x00${pending.ordinal}\x00${pending.publishedAt}`;
+  let state = loggedMarkerDrainGates.get(sessionId);
+  if (!state || state.markerIdentity !== markerIdentity) {
+    state = { markerIdentity, gates: new Set };
+  }
+  if (state.gates.has(gate))
+    return;
+  state.gates.add(gate);
+  loggedMarkerDrainGates.set(sessionId, state);
+  const firstKeptEntryId = Object.hasOwn(fields, "firstKeptEntryId") ? fields.firstKeptEntryId : pending.firstKeptEntryId;
+  const parts = [
+    `gate=${gate}`,
+    `endMessageId=${pending.endMessageId}`,
+    `ordinal=${pending.ordinal}`,
+    `firstKeptEntryId=${firstKeptEntryId ?? "<none>"}`,
+    `renderedCoverageOrdinal=${fields.renderedCoverageOrdinal ?? "<none>"}`
+  ];
+  if (fields.renderedCoverageEndMessageId !== undefined)
+    parts.push(`renderedCoverageEndMessageId=${fields.renderedCoverageEndMessageId ?? "<none>"}`);
+  if (fields.m1CoverageOrdinal !== undefined)
+    parts.push(`m1CoverageOrdinal=${fields.m1CoverageOrdinal ?? "<none>"}`);
+  if (fields.m1CoverageEndMessageId !== undefined)
+    parts.push(`m1CoverageEndMessageId=${fields.m1CoverageEndMessageId ?? "<none>"}`);
+  if (fields.matchCount !== undefined)
+    parts.push(`matchCount=${fields.matchCount}`);
+  if (fields.alignment !== undefined)
+    parts.push(`alignment=${fields.alignment}`);
+  if (fields.foldingOnlyTools !== undefined)
+    parts.push(`foldingOnlyTools=${JSON.stringify(fields.foldingOnlyTools)}`);
+  if (fields.persistedOnlyTools !== undefined)
+    parts.push(`persistedOnlyTools=${JSON.stringify(fields.persistedOnlyTools)}`);
+  if (fields.changedTools !== undefined)
+    parts.push(`changedTools=${JSON.stringify(fields.changedTools)}`);
+  if (fields.promptLengthDelta !== undefined)
+    parts.push(`promptLengthDelta=${fields.promptLengthDelta}`);
+  if (fields.foldingPromptLength !== undefined)
+    parts.push(`foldingPromptLength=${fields.foldingPromptLength}`);
+  if (fields.persistedPromptLength !== undefined)
+    parts.push(`persistedPromptLength=${fields.persistedPromptLength}`);
+  if (fields.errorName !== undefined)
+    parts.push(`errorName=${JSON.stringify(fields.errorName)}`);
+  if (fields.errorCode !== undefined)
+    parts.push(`errorCode=${JSON.stringify(fields.errorCode)}`);
+  sessionLog2(sessionId, `Pi compaction-marker drain ${parts.join(" ")}`);
+}
+function clearPiCompactionMarkerDrainLogState(sessionId) {
+  loggedMarkerDrainGates.delete(sessionId);
+}
+function getPiCompactionMarkerDrainErrorFields(error) {
+  const candidate = error !== null && typeof error === "object" ? error : undefined;
+  const errorName = typeof candidate?.name === "string" ? candidate.name : error instanceof Error ? error.name : "Error";
+  return {
+    errorName,
+    ...typeof candidate?.code === "string" ? { errorCode: candidate.code } : {}
+  };
+}
 function applyDeferredPiCompactionMarker(deps, sessionId, pending) {
   try {
     const matches = getCompartmentsByEndMessageId(deps.db, sessionId, pending.endMessageId);
     if (matches.length === 0 || matches.length > 1) {
-      if (matches.length > 1) {
-        sessionLog2(sessionId, `Pi compaction-marker drain: ${matches.length} compartments share endMessageId=${pending.endMessageId}; treating as stale`);
-      }
+      logPiCompactionMarkerDrainGateOnce(sessionId, pending, matches.length === 0 ? "compartment-not-found" : "duplicate-compartment-end", { matchCount: matches.length });
       return { kind: "stale-skip", reason: "compartment-removed" };
     }
     if (matches[0]?.endMessage !== pending.ordinal) {
+      logPiCompactionMarkerDrainGateOnce(sessionId, pending, "target-superseded");
       return { kind: "stale-skip", reason: "target-superseded" };
     }
     if (getUncoveredCompartmentEndThrough(deps.db, sessionId, pending.ordinal)) {
+      logPiCompactionMarkerDrainGateOnce(sessionId, pending, "partial-message-boundary");
       return { kind: "stale-skip", reason: "partial-message-boundary" };
     }
     const branchEntries = deps.readBranchEntries();
@@ -28328,16 +28333,18 @@ function applyDeferredPiCompactionMarker(deps, sessionId, pending) {
     if (!firstKeptEntryId) {
       const alignment = resolvePiOrdinalAlignment(deps.db, sessionId, branchEntries);
       if (isPiOrdinalAlignmentUnanchored(alignment)) {
+        logPiCompactionMarkerDrainGateOnce(sessionId, pending, "ordinal-alignment-unavailable", { alignment: alignment.kind });
         return { kind: "waiting-for-entry" };
       }
       firstKeptEntryId = findFirstKeptEntryId(branchEntries, pending.ordinal, alignment.offset);
     }
     if (!firstKeptEntryId) {
-      sessionLog2(sessionId, `Pi compaction-marker drain: still waiting for a resolvable kept entry at or after ordinal ${pending.ordinal + 1}`);
+      logPiCompactionMarkerDrainGateOnce(sessionId, pending, "no-replay-safe-kept-entry", { firstKeptEntryId: null });
       return { kind: "waiting-for-entry" };
     }
     const pendingFirstKeptIndex = findEntryIndex(branchEntries, firstKeptEntryId);
     if (pendingFirstKeptIndex < 0) {
+      logPiCompactionMarkerDrainGateOnce(sessionId, pending, "kept-entry-not-on-branch", { firstKeptEntryId });
       return { kind: "stale-skip", reason: "entry-removed" };
     }
     const latestCompaction = findLatestCompaction(branchEntries);
@@ -28345,9 +28352,14 @@ function applyDeferredPiCompactionMarker(deps, sessionId, pending) {
       const latestFirstKeptIndex = findEntryIndex(branchEntries, latestCompaction.firstKeptEntryId);
       if (latestFirstKeptIndex >= pendingFirstKeptIndex) {
         if (latestCompaction.id === null) {
+          const error = new Error("Pi compaction entry has no id");
+          logPiCompactionMarkerDrainGateOnce(sessionId, pending, "current-compaction-id-unavailable", {
+            firstKeptEntryId: latestCompaction.firstKeptEntryId,
+            errorName: error.name
+          });
           return {
             kind: "retryable-failure",
-            error: new Error("Pi compaction entry has no id")
+            error
           };
         }
         return {
@@ -28362,16 +28374,20 @@ function applyDeferredPiCompactionMarker(deps, sessionId, pending) {
       lastCompactedOrdinal: pending.ordinal
     }, true);
     if (typeof compactionId !== "string" || compactionId.length === 0) {
+      const error = new Error("Pi appendCompaction returned no compaction id");
+      logPiCompactionMarkerDrainGateOnce(sessionId, pending, "append-compaction-returned-no-id", { errorName: error.name });
       return {
         kind: "retryable-failure",
-        error: new Error("Pi appendCompaction returned no compaction id")
+        error
       };
     }
     sessionLog2(sessionId, `Pi compaction-marker drain: persisted compactionId=${compactionId} firstKept=${firstKeptEntryId} endMessageId=${pending.endMessageId} ordinal=${pending.ordinal} tokensBefore=${pending.tokensBefore}`);
     return { kind: "applied", firstKeptEntryId, compactionId };
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
-    sessionLog2(sessionId, `Pi compaction-marker drain: retryable failure for ordinal ${pending.ordinal}:`, error);
+    logPiCompactionMarkerDrainGateOnce(sessionId, pending, "manager-threw", {
+      ...getPiCompactionMarkerDrainErrorFields(err)
+    });
     return { kind: "retryable-failure", error };
   }
 }
@@ -29976,6 +29992,1100 @@ function readPiHistorianTail(db, sessionId, provider) {
   return { messages, absoluteMessageCount: messages.length };
 }
 
+// ../plugin/src/features/magic-context/store-generation-rebase.ts
+var rebasesInFlight = new WeakMap;
+var repairCheckedSessions = new WeakMap;
+
+// ../plugin/src/hooks/magic-context/send-session-notification.ts
+var queuedIgnoredNotifications = new Map;
+var flushingIgnoredNotifications = new Set;
+var idleSessions = new Set;
+var lastDeliveredText = new Map;
+var activityEpoch = new Map;
+function notifyDelivered(sessionId, params) {
+  try {
+    params.onDelivered?.();
+  } catch (error) {
+    sessionLog2(sessionId, "notification delivery callback failed:", getErrorMessage(error));
+  }
+}
+function inferToastVariant(text) {
+  const lower = text.toLowerCase();
+  if (lower.includes("error") || lower.includes("failed") || lower.includes("alert"))
+    return "error";
+  if (lower.includes("warning") || lower.includes("⚠"))
+    return "warning";
+  if (lower.includes("complete") || lower.includes("success") || lower.includes("✓") || lower.includes("finished"))
+    return "success";
+  return "info";
+}
+function extractToastTitle(text) {
+  const headingMatch = text.match(/^#+\s+(.+)/m);
+  if (headingMatch)
+    return headingMatch[1].trim();
+  const firstLine = text.split(`
+`)[0].trim();
+  if (firstLine.length <= 80)
+    return firstLine;
+  return "Magic Context";
+}
+async function sendStatusNotification(_client, sessionId, text, params) {
+  try {
+    const { pushNotification } = await importPluginModule(() => import("./rpc-notifications-gm1mdpwh.js"));
+    pushNotification("toast", {
+      title: extractToastTitle(text),
+      message: text,
+      variant: inferToastVariant(text),
+      duration: params.toastDurationMs ?? 5000
+    }, sessionId);
+    notifyDelivered(sessionId, params);
+    return "sent";
+  } catch (error) {
+    sessionLog2(sessionId, "status RPC enqueue failed:", getErrorMessage(error));
+    return "failed";
+  }
+}
+
+// ../plugin/src/hooks/magic-context/compartment-runner-incremental.ts
+var inconsistentProducerWindows = new Set;
+var HISTORIAN_ALERT_COOLDOWN_MS2 = 60 * 1000;
+var lastHistorianAlertBySession2 = new Map;
+var STORED_COMPARTMENT_FAILURE_BACKOFF_MS = 30 * 60 * 1000;
+
+// ../plugin/src/hooks/magic-context/compartment-runner-recomp.ts
+function insertRecompCompartmentRows(db, sessionId, compartments, now) {
+  const stmt = db.prepare("INSERT INTO compartments (session_id, sequence, start_message, end_message, start_message_id, end_message_id, title, content, p1, p2, p3, p4, importance, episode_type, legacy, created_at, harness, start_block_index, end_block_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  for (const c of compartments) {
+    const hasTiers = typeof c.p1 === "string" && c.p1.length > 0;
+    stmt.run(sessionId, c.sequence, c.startMessage, c.endMessage, c.startMessageId, c.endMessageId, c.title, c.content, c.p1 ?? null, c.p2 ?? null, c.p3 ?? null, c.p4 ?? null, typeof c.importance === "number" ? c.importance : 50, c.episodeType ?? null, hasTiers ? 0 : 1, now, getHarness2(), c.startBlockIndex ?? null, c.endBlockIndex ?? null);
+  }
+}
+function promoteRecompStagingWithM0Mutation(db, sessionId, holderId) {
+  const now = Date.now();
+  db.exec("BEGIN IMMEDIATE");
+  const transactionStartedAt = performance.now();
+  let finished = false;
+  try {
+    if (!isCompartmentLeaseHeld(db, sessionId, holderId)) {
+      db.exec("ROLLBACK");
+      finished = true;
+      return null;
+    }
+    const staging = getRecompStaging(db, sessionId);
+    if (!staging || staging.compartments.length === 0) {
+      db.exec("ROLLBACK");
+      finished = true;
+      return null;
+    }
+    deleteChunkEmbedBackoffForSession(db, sessionId);
+    db.prepare("DELETE FROM compartments WHERE session_id = ?").run(sessionId);
+    db.prepare("DELETE FROM session_facts WHERE session_id = ?").run(sessionId);
+    insertRecompCompartmentRows(db, sessionId, staging.compartments, now);
+    queueM0Mutation(db, {
+      sessionId,
+      mutationType: "recomp_boundary_change",
+      targetId: null,
+      queuedAt: now
+    });
+    db.prepare("DELETE FROM recomp_compartments WHERE session_id = ?").run(sessionId);
+    db.prepare("DELETE FROM recomp_facts WHERE session_id = ?").run(sessionId);
+    clearCachedM0M1(db, sessionId);
+    db.exec("COMMIT");
+    finished = true;
+    invalidateAutoEmbedSession(sessionId);
+    logSlowWriteTransaction("historian-publish:recomp", transactionStartedAt);
+    return { compartments: staging.compartments, facts: staging.facts };
+  } finally {
+    if (!finished) {
+      try {
+        db.exec("ROLLBACK");
+      } catch {}
+    }
+  }
+}
+async function executeContextRecompInternal(deps) {
+  const {
+    client,
+    db,
+    sessionId,
+    historianChunkTokens,
+    directory,
+    historianTimeoutMs,
+    getNotificationParams
+  } = deps;
+  const notifParams = () => getNotificationParams?.() ?? {};
+  const holderId = deps.compartmentLeaseHolderId;
+  if (!holderId) {
+    return `## Magic Recomp — Skipped
+
+Could not acquire the compartment-state lease for this session.`;
+  }
+  const leaseHolderId = holderId;
+  if (!await prepareRawSessionOrdinals2(sessionId))
+    return `## Magic Recomp — Deferred
+
+Session ordinals are warming in the background. Retry shortly; no history was rebuilt.`;
+  const logPostPublishFailure = (step, error) => {
+    sessionLog2(sessionId, `recomp post-publish step=${step} failed; publication stands: ${getErrorMessage(error)}`);
+  };
+  const afterPublish = (step, run) => {
+    try {
+      run();
+    } catch (error) {
+      logPostPublishFailure(step, error);
+    }
+  };
+  const afterPublishAsync = async (step, run) => {
+    try {
+      await run();
+    } catch (error) {
+      logPostPublishFailure(step, error);
+    }
+  };
+  updateSessionMeta(db, sessionId, { compartmentInProgress: true });
+  try {
+    const rawMessageCount = getRawSessionMessageCount2(sessionId);
+    const boundarySnapshot = resolveOpenCodeProtectedTailBoundary({
+      db,
+      sessionId,
+      mode: "manual-full-recomp",
+      contextLimit: 128000,
+      executeThresholdPercentage: 65,
+      usage: null,
+      usageSource: "provisional-zero"
+    });
+    const protectedTailStart = Math.min(boundarySnapshot.protectedTailStart, rawMessageCount + 1);
+    if (rawMessageCount <= 0) {
+      return `## Magic Recomp
+
+No raw history exists, so nothing was rebuilt.`;
+    }
+    const parentSessionResponse = await client?.session.get({ path: { id: sessionId } }).catch(() => null);
+    const parentSession = normalizeSDKResponse(parentSessionResponse, null, { preferResponseOnMissingData: true });
+    const sessionDirectory = parentSession?.directory ?? directory;
+    const existingStaging = getRecompStaging(db, sessionId);
+    let candidateCompartments = existingStaging?.compartments ?? [];
+    let candidateFacts = existingStaging?.facts ?? [];
+    let offset = existingStaging ? existingStaging.lastEndMessage + 1 : 1;
+    let passCount = existingStaging?.passCount ?? 0;
+    let currentTokenBudget = historianChunkTokens;
+    let passAttempt = 1;
+    const resumed = existingStaging !== null;
+    if (resumed) {
+      await sendStatusNotification(client, sessionId, `## Magic Recomp — Resumed
+
+Found ${existingStaging.compartments.length} staged compartment(s) from ${existingStaging.passCount} previous pass(es), covering messages 1-${existingStaging.lastEndMessage}. Resuming from message ${offset}.`, notifParams());
+    }
+    const totalMessages = Math.max(0, protectedTailStart - 1);
+    const progressStartedAt = Date.now();
+    const emitProgress = (note) => {
+      try {
+        deps.onRecompProgress?.({
+          sessionId,
+          phase: "recomp",
+          processedMessages: Math.min(offset, totalMessages),
+          totalMessages,
+          passCount,
+          compartmentsCreated: candidateCompartments.length,
+          startedAt: progressStartedAt,
+          updatedAt: Date.now(),
+          note
+        });
+      } catch {}
+    };
+    emitProgress("Preparing…");
+    async function promoteAndFinalize(reason) {
+      if (passCount === 0 || candidateCompartments.length === 0)
+        return null;
+      const mergedError = validateStoredCompartments(candidateCompartments);
+      if (mergedError)
+        return null;
+      saveRecompStagingPass(db, sessionId, passCount, candidateCompartments, candidateFacts);
+      const lastCompartmentEnd = candidateCompartments[candidateCompartments.length - 1]?.endMessage ?? 0;
+      const compartmentTagKeys = lastCompartmentEnd > 0 ? await getRawSessionTagKeysThrough2(sessionId, lastCompartmentEnd, { db }) : null;
+      const promoted = promoteRecompStagingWithM0Mutation(db, sessionId, leaseHolderId);
+      if (!promoted)
+        return null;
+      afterPublish("compression-depth", () => clearCompressionDepth(db, sessionId));
+      if (deps.preserveInjectionCacheUntilConsumed !== true) {
+        clearInjectionCache(sessionId);
+      }
+      promoted.facts;
+      await afterPublishAsync("embedding", async () => {
+        const projectIdentity = resolveProjectIdentity(sessionDirectory);
+        await deps.ensureProjectRegistered?.(sessionDirectory, db);
+        const liveCompartments = getCompartments(db, sessionId);
+        const chunksToEmbed = liveCompartments.map((c) => ({
+          id: c.id,
+          startMessage: c.startMessage,
+          endMessage: c.endMessage
+        }));
+        embedAndStoreCompartmentChunks(db, sessionId, projectIdentity, chunksToEmbed);
+      });
+      if (lastCompartmentEnd > 0 && compartmentTagKeys) {
+        afterPublish("drop-queue", () => queueDropsForCompartmentalizedMessages(db, sessionId, lastCompartmentEnd, compartmentTagKeys));
+      }
+      afterPublish("publication-signal", () => deps.onCompartmentStatePublished?.(sessionId));
+      if (lastCompartmentEnd > 0) {
+        afterPublish("compaction-marker", () => {
+          const markerUpdated = (deps.compactionMarkerStrategy?.publish ?? updateCompactionMarkerAfterPublication)(db, sessionId, lastCompartmentEnd, deps.directory);
+          if (markerUpdated) {
+            const stalePending = getPendingCompactionMarkerState(db, sessionId);
+            if (stalePending) {
+              clearPendingCompactionMarkerStateIf(db, sessionId, stalePending);
+            }
+          }
+        });
+      }
+      sessionLog2(sessionId, `recomp partial code=${userFacingFailureCode("recomp_unavailable")} reason="${reason}"`);
+      return [
+        `Rebuilt ${promoted.compartments.length} history block${promoted.compartments.length === 1 ? "" : "s"} across ${passCount} successful pass${passCount === 1 ? "" : "es"}.`,
+        renderUserFacingFailure("recomp_unavailable")
+      ].join(`
+`);
+    }
+    while (offset < protectedTailStart) {
+      const promptFit = fitRecompHistorianPrompt({
+        model: deps.model,
+        fallbackModelId: deps.fallbackModelId,
+        language: deps.language,
+        requestedChunkTokens: currentTokenBudget,
+        sessionId,
+        chunkStart: offset,
+        lastOrdinal: protectedTailStart - 1,
+        sessionCompartments: candidateCompartments
+      });
+      if (!promptFit.ok) {
+        recordHistorianRun(db, {
+          sessionId,
+          harness: getHarness2(),
+          subagentInvocationId: null,
+          runKind: "recomp",
+          status: "failed",
+          failureReason: promptFit.reason,
+          chunkStartOrdinal: offset,
+          chunkEndOrdinal: null,
+          compartmentsProduced: 0
+        });
+        sessionLog2(sessionId, `recomp failed code=${userFacingFailureCode("historian_window_too_small")} reason="${promptFit.reason}"`);
+        const partial = await promoteAndFinalize(`the history model's window cannot hold a historian prompt: ${promptFit.reason}`);
+        if (partial) {
+          return `## Magic Recomp — Partial
+
+${partial}`;
+        }
+        return `## Magic Recomp — Failed
+
+${renderUserFacingFailure("historian_window_too_small")}`;
+      }
+      if (promptFit.trimmed || promptFit.chunkTokens < currentTokenBudget) {
+        sessionLog2(sessionId, `recomp prompt fit: ${describeHistorianPromptTrim(promptFit)} requestedChunkTokens=${currentTokenBudget}`);
+      }
+      const chunk = readSessionChunk2(sessionId, promptFit.chunkTokens, offset, protectedTailStart, { expandTools: deps.historianExpandTools });
+      if (!chunk.text || chunk.messageCount === 0 || chunk.endIndex < offset) {
+        const promoted = await promoteAndFinalize(`remaining messages ${offset}-${protectedTailStart - 1} were too few or all noise to form a historian chunk`);
+        if (promoted) {
+          return `## Magic Recomp — Complete
+
+${promoted}`;
+        }
+        return `## Magic Recomp — Failed
+
+Recomp stopped because raw history ${offset}-${protectedTailStart - 1} could not be turned into a valid historian chunk. Nothing was written.`;
+      }
+      const chunkCoverageError = validateChunkCoverage(chunk);
+      if (chunkCoverageError) {
+        const partial = await promoteAndFinalize(`chunk could not be represented safely: ${chunkCoverageError}`);
+        if (partial) {
+          return `## Magic Recomp — Partial
+
+${partial}`;
+        }
+        sessionLog2(sessionId, `recomp failed code=${userFacingFailureCode("recomp_unavailable")} reason="${chunkCoverageError}"`);
+        return `## Magic Recomp — Failed
+
+${renderUserFacingFailure("recomp_unavailable")}`;
+      }
+      const prompt = buildCompartmentAgentPrompt({
+        seedExamples: promptFit.seedExamples,
+        sessionReferences: promptFit.sessionReferences,
+        projectMemory: "",
+        inputSource: `Messages ${chunk.startIndex}-${chunk.endIndex}:
+
+${chunk.text}`,
+        memoryEnabled: false,
+        extractionFree: true
+      });
+      await sendStatusNotification(client, sessionId, `## Magic Recomp
+
+Historian pass ${passCount + 1}, attempt ${passAttempt} started for messages ${chunk.startIndex}-${chunk.endIndex}.`, notifParams());
+      emitProgress(`Running historian (pass ${passCount + 1})…`);
+      const validatedPass = await runValidatedHistorianPass({
+        client,
+        hiddenCompletionExecutor: deps.hiddenCompletionExecutor,
+        db,
+        parentSessionId: sessionId,
+        sessionDirectory,
+        prompt,
+        chunk,
+        priorCompartments: candidateCompartments,
+        sequenceOffset: candidateCompartments.length,
+        dumpLabelBase: `recomp-${sessionId}-${chunk.startIndex}-${chunk.endIndex}-pass-${passCount + 1}`,
+        timeoutMs: historianTimeoutMs,
+        model: deps.model,
+        fallbackModelId: deps.fallbackModelId,
+        fallbackModels: deps.fallbackModels,
+        twoPass: deps.historianTwoPass,
+        subagentKind: "recomp",
+        agentId: HISTORIAN_RECOMP_AGENT,
+        language: deps.language,
+        callbacks: {
+          onRepairRetry: async (error) => {
+            emitProgress(`Repair retry (pass ${passCount + 1})…`);
+            sessionLog2(sessionId, `recomp retry code=${userFacingFailureCode("recomp_unavailable")} reason="${error}"`);
+            await sendStatusNotification(client, sessionId, `## Magic Recomp
+
+History compression is retrying this pass. ${renderUserFacingFailure("recomp_unavailable")}`, notifParams());
+          },
+          onModelFallback: (modelId, index, total) => {
+            const short = modelId.includes("/") ? modelId.split("/").pop() : modelId;
+            emitProgress(`Trying fallback ${short} (${index}/${total})…`);
+          }
+        }
+      });
+      if (!validatedPass.ok) {
+        const reducedBudget = getReducedRecompTokenBudget(promptFit.chunkTokens);
+        if (reducedBudget !== null) {
+          const smallerChunk = readSessionChunk2(sessionId, reducedBudget, offset, protectedTailStart, { expandTools: deps.historianExpandTools });
+          if (smallerChunk.messageCount > 0 && smallerChunk.endIndex < chunk.endIndex) {
+            await sendStatusNotification(client, sessionId, `## Magic Recomp
+
+History compression is retrying with a smaller set of messages. ${renderUserFacingFailure("recomp_unavailable")}`, notifParams());
+            currentTokenBudget = reducedBudget;
+            passAttempt += 1;
+            continue;
+          }
+        }
+        recordHistorianRun(db, {
+          sessionId,
+          harness: getHarness2(),
+          subagentInvocationId: validatedPass.invocationId ?? null,
+          runKind: "recomp",
+          status: "failed",
+          failureReason: validatedPass.failureReason ?? validatedPass.error,
+          chunkStartOrdinal: chunk.startIndex,
+          chunkEndOrdinal: chunk.endIndex,
+          compartmentsProduced: 0
+        });
+        sessionLog2(sessionId, `recomp failed code=${userFacingFailureCode("recomp_unavailable")} reason="${validatedPass.error}" messageRange=${chunk.startIndex}-${chunk.endIndex}`);
+        const partial = await promoteAndFinalize(`history model response did not validate for messages ${chunk.startIndex}-${chunk.endIndex}`);
+        if (partial) {
+          return `## Magic Recomp — Partial
+
+${partial}`;
+        }
+        return `## Magic Recomp — Failed
+
+${renderUserFacingFailure("recomp_unavailable")}`;
+      }
+      {
+        const passComps = validatedPass.compartments ?? [];
+        const passFacts = validatedPass.facts ?? [];
+        const imp = summarizeImportance(passComps.map((c) => c.importance ?? 50));
+        recordHistorianRun(db, {
+          sessionId,
+          harness: getHarness2(),
+          subagentInvocationId: validatedPass.invocationId ?? null,
+          runKind: "recomp",
+          status: "success",
+          chunkStartOrdinal: chunk.startIndex,
+          chunkEndOrdinal: chunk.endIndex,
+          unprocessedFrom: passComps[passComps.length - 1]?.endMessage ?? null,
+          compartmentsProduced: passComps.length,
+          factsEmitted: passFacts.length,
+          factsByCategory: passFacts.length > 0 ? tallyFactsByCategory(passFacts) : null,
+          eventsEmitted: (validatedPass.events ?? []).length,
+          importanceMin: imp.min,
+          importanceMax: imp.max,
+          importanceAvg: imp.avg
+        });
+      }
+      candidateCompartments = [
+        ...candidateCompartments,
+        ...validatedPass.compartments ?? []
+      ];
+      candidateFacts = validatedPass.facts ?? [];
+      passCount += 1;
+      currentTokenBudget = historianChunkTokens;
+      passAttempt = 1;
+      saveRecompStagingPass(db, sessionId, passCount, candidateCompartments, candidateFacts);
+      const nextOffset = (validatedPass.compartments?.[validatedPass.compartments.length - 1]?.endMessage ?? chunk.endIndex) + 1;
+      if (nextOffset <= offset) {
+        const partial = await promoteAndFinalize(`historian made no forward progress after messages ${chunk.startIndex}-${chunk.endIndex}`);
+        if (partial) {
+          return `## Magic Recomp — Partial
+
+${partial}`;
+        }
+        return `## Magic Recomp — Failed
+
+Recomp made no forward progress after messages ${chunk.startIndex}-${chunk.endIndex}. Nothing was written.`;
+      }
+      offset = nextOffset;
+      emitProgress();
+    }
+    const mergedValidationError = validateStoredCompartments(candidateCompartments);
+    if (mergedValidationError) {
+      clearRecompStaging(db, sessionId);
+      sessionLog2(sessionId, `recomp failed code=${userFacingFailureCode("recomp_unavailable")} reason="${mergedValidationError}"`);
+      return `## Magic Recomp — Failed
+
+${renderUserFacingFailure("recomp_unavailable")}`;
+    }
+    saveRecompStagingPass(db, sessionId, passCount, candidateCompartments, candidateFacts);
+    const lastCompartmentEnd = candidateCompartments[candidateCompartments.length - 1]?.endMessage ?? 0;
+    const compartmentTagKeys = lastCompartmentEnd > 0 ? await getRawSessionTagKeysThrough2(sessionId, lastCompartmentEnd, { db }) : null;
+    const promoted = promoteRecompStagingWithM0Mutation(db, sessionId, leaseHolderId);
+    if (!promoted) {
+      sessionLog2(sessionId, "recomp publish skipped: compartment lease no longer held");
+      return `## Magic Recomp — Skipped
+
+Another process acquired the compartment-state lease before recomp could publish. No state was written.`;
+    }
+    afterPublish("compression-depth", () => clearCompressionDepth(db, sessionId));
+    if (deps.preserveInjectionCacheUntilConsumed !== true) {
+      clearInjectionCache(sessionId);
+    }
+    const finalCompartments = promoted?.compartments ?? candidateCompartments;
+    const finalFacts = promoted?.facts ?? candidateFacts;
+    if (lastCompartmentEnd > 0 && compartmentTagKeys) {
+      afterPublish("drop-queue", () => queueDropsForCompartmentalizedMessages(db, sessionId, lastCompartmentEnd, compartmentTagKeys));
+    }
+    afterPublish("publication-signal", () => deps.onCompartmentStatePublished?.(sessionId));
+    await afterPublishAsync("embedding", async () => {
+      const projectIdentity = resolveProjectIdentity(sessionDirectory);
+      await deps.ensureProjectRegistered?.(sessionDirectory, db);
+      const liveCompartments = getCompartments(db, sessionId);
+      const chunksToEmbed = liveCompartments.map((c) => ({
+        id: c.id,
+        startMessage: c.startMessage,
+        endMessage: c.endMessage
+      }));
+      embedAndStoreCompartmentChunks(db, sessionId, projectIdentity, chunksToEmbed);
+    });
+    if (lastCompartmentEnd > 0) {
+      afterPublish("compaction-marker", () => {
+        const markerUpdated = (deps.compactionMarkerStrategy?.publish ?? updateCompactionMarkerAfterPublication)(db, sessionId, lastCompartmentEnd, deps.directory);
+        if (markerUpdated) {
+          const stalePending = getPendingCompactionMarkerState(db, sessionId);
+          if (stalePending) {
+            clearPendingCompactionMarkerStateIf(db, sessionId, stalePending);
+          }
+        }
+      });
+    }
+    return [
+      "## Magic Recomp — Complete",
+      "",
+      ...resumed ? ["Resumed from previous interrupted run."] : [],
+      `Rebuilt ${finalCompartments.length} compartment${finalCompartments.length === 1 ? "" : "s"} across ${passCount} historian pass${passCount === 1 ? "" : "es"}.`,
+      `Covered raw history 1-${lastCompartmentEnd} out of ${rawMessageCount} total messages, stopping before protected tail at ${protectedTailStart}.`
+    ].join(`
+`);
+  } catch (error) {
+    const message = getErrorMessage(error);
+    sessionLog2(sessionId, `recomp failed code=${userFacingFailureCode("recomp_unavailable")} reason="${message}"`);
+    return `## Magic Recomp — Failed
+
+${renderUserFacingFailure("recomp_unavailable")}`;
+  } finally {
+    updateSessionMeta(db, sessionId, { compartmentInProgress: false });
+  }
+}
+
+// ../plugin/src/hooks/magic-context/compartment-runner-partial-recomp.ts
+function snapRangeToCompartments(compartments, range) {
+  if (compartments.length === 0) {
+    return {
+      error: "No compartments exist yet for this session. Run `/ctx-recomp` (full) first, then use partial recomp to refine specific ranges."
+    };
+  }
+  const sorted = compartments.slice().sort((a, b) => a.sequence - b.sequence);
+  const { start, end } = range;
+  if (start < 1)
+    return { error: `Start must be >= 1 (got ${start}).` };
+  if (end < start)
+    return { error: `End must be >= start (got ${start}-${end}).` };
+  const firstEnclosingIdx = sorted.findIndex((c) => c.endMessage >= start);
+  if (firstEnclosingIdx === -1) {
+    const last = sorted[sorted.length - 1];
+    return {
+      error: `Range ${start}-${end} starts after the last compartment (which ends at message ${last.endMessage}). Nothing to rebuild.`
+    };
+  }
+  let lastEnclosingIdx = -1;
+  for (let i = sorted.length - 1;i >= 0; i--) {
+    if (sorted[i].startMessage <= end) {
+      lastEnclosingIdx = i;
+      break;
+    }
+  }
+  if (lastEnclosingIdx === -1 || lastEnclosingIdx < firstEnclosingIdx) {
+    return {
+      error: `Range ${start}-${end} does not overlap any compartment.`
+    };
+  }
+  return {
+    snapStart: sorted[firstEnclosingIdx].startMessage,
+    snapEnd: sorted[lastEnclosingIdx].endMessage,
+    priorCompartments: sorted.slice(0, firstEnclosingIdx),
+    rangeCompartments: sorted.slice(firstEnclosingIdx, lastEnclosingIdx + 1),
+    tailCompartments: sorted.slice(lastEnclosingIdx + 1)
+  };
+}
+function compartmentToInput(c, newSequence) {
+  return {
+    sequence: newSequence,
+    startMessage: c.startMessage,
+    endMessage: c.endMessage,
+    startMessageId: c.startMessageId,
+    endMessageId: c.endMessageId,
+    startBlockIndex: c.startBlockIndex,
+    endBlockIndex: c.endBlockIndex,
+    title: c.title,
+    content: c.content,
+    p1: c.p1,
+    p2: c.p2,
+    p3: c.p3,
+    p4: c.p4,
+    importance: c.importance,
+    episodeType: c.episodeType
+  };
+}
+async function executePartialRecompInternal(deps, range) {
+  const {
+    client,
+    db,
+    sessionId,
+    historianChunkTokens,
+    directory,
+    historianTimeoutMs,
+    getNotificationParams
+  } = deps;
+  const notifParams = () => getNotificationParams?.() ?? {};
+  const holderId = deps.compartmentLeaseHolderId;
+  if (!holderId) {
+    return `## Magic Recomp — Failed
+
+Could not acquire the compartment-state lease for this session.`;
+  }
+  const leaseHolderId = holderId;
+  updateSessionMeta(db, sessionId, { compartmentInProgress: true });
+  try {
+    let promoteFinal = function() {
+      const newBuilt = candidateCompartments.slice(priorCompartments.length);
+      if (newBuilt.length === 0)
+        return null;
+      const newBuiltError = (() => {
+        let expected = snapStart;
+        for (const c of newBuilt) {
+          if (c.startMessage !== expected) {
+            return c.startMessage < expected ? `overlap in rebuilt range near ${expected}` : `gap in rebuilt range before ${c.startMessage} (expected ${expected})`;
+          }
+          if (c.endMessage < c.startMessage) {
+            return `invalid range ${c.startMessage}-${c.endMessage}`;
+          }
+          expected = c.endMessage + 1;
+        }
+        if (expected - 1 !== snapEnd) {
+          return `rebuilt range ends at ${expected - 1} but snapped end is ${snapEnd}`;
+        }
+        return null;
+      })();
+      if (newBuiltError) {
+        log2(`[magic-context] partial recomp validation failed: ${newBuiltError}`);
+        return null;
+      }
+      const merged = [
+        ...candidateCompartments,
+        ...tailCompartments.map((c, idx) => compartmentToInput(c, candidateCompartments.length + idx))
+      ];
+      const mergedError = validateStoredCompartments(merged);
+      if (mergedError) {
+        log2(`[magic-context] partial recomp merged validation failed: ${mergedError}`);
+        return null;
+      }
+      saveRecompStagingPass(db, sessionId, passCount + 1, merged, stagedFacts);
+      const promoted = promoteRecompStagingWithM0Mutation(db, sessionId, leaseHolderId);
+      if (!promoted) {
+        log2("[magic-context] partial recomp promote returned null");
+        return null;
+      }
+      setRecompPartialRange(db, sessionId, null);
+      clearCompressionDepthRange(db, sessionId, snapStart, snapEnd);
+      if (deps.preserveInjectionCacheUntilConsumed !== true) {
+        clearInjectionCache(sessionId);
+      }
+      deps.onCompartmentStatePublished?.(sessionId);
+      {
+        const projectIdentity = resolveProjectIdentity(sessionDirectory);
+        const liveCompartments = getCompartments(db, sessionId);
+        const chunksToEmbed = liveCompartments.map((c) => ({
+          id: c.id,
+          startMessage: c.startMessage,
+          endMessage: c.endMessage
+        }));
+        Promise.resolve(deps.ensureProjectRegistered?.(sessionDirectory, db)).then(() => embedAndStoreCompartmentChunks(db, sessionId, projectIdentity, chunksToEmbed));
+      }
+      const lastEnd = merged[merged.length - 1]?.endMessage ?? snapEnd;
+      if (lastEnd > 0) {
+        const markerUpdated = (deps.compactionMarkerStrategy?.publish ?? updateCompactionMarkerAfterPublication)(db, sessionId, lastEnd, deps.directory);
+        if (markerUpdated) {
+          const stalePending = getPendingCompactionMarkerState(db, sessionId);
+          if (stalePending) {
+            clearPendingCompactionMarkerStateIf(db, sessionId, stalePending);
+          }
+        }
+      }
+      return { compartmentCount: merged.length, lastEndMessage: lastEnd };
+    };
+    const existingCompartments = getCompartments(db, sessionId);
+    const snapResult = snapRangeToCompartments(existingCompartments, range);
+    if ("error" in snapResult) {
+      return `## Magic Recomp — Failed
+
+${snapResult.error}`;
+    }
+    const { snapStart, snapEnd, priorCompartments, tailCompartments } = snapResult;
+    const storedRange = getRecompPartialRange(db, sessionId);
+    const existingStaging = getRecompStaging(db, sessionId);
+    if (existingStaging && storedRange && (storedRange.start !== snapStart || storedRange.end !== snapEnd)) {
+      return [
+        "## Magic Recomp — Failed",
+        "",
+        `An unfinished partial recomp is already staged for range ${storedRange.start}-${storedRange.end}, which does not match the requested range ${snapStart}-${snapEnd}.`,
+        "",
+        "Resume that range by running `/ctx-recomp` with the same original arguments,",
+        "or cancel it by running `/ctx-flush` before starting a new partial recomp."
+      ].join(`
+`);
+    }
+    if (existingStaging && !storedRange) {
+      return [
+        "## Magic Recomp — Failed",
+        "",
+        "An unfinished full recomp is already staged for this session.",
+        "Resume it by running `/ctx-recomp` without arguments,",
+        "or cancel it before starting a partial recomp."
+      ].join(`
+`);
+    }
+    const stagedFacts = [];
+    const parentSessionResponse = await client?.session.get({ path: { id: sessionId } }).catch(() => null);
+    const parentSession = normalizeSDKResponse(parentSessionResponse, null, { preferResponseOnMissingData: true });
+    const sessionDirectory = parentSession?.directory ?? directory;
+    let candidateCompartments;
+    let passCount;
+    let offset;
+    const resumed = existingStaging !== null && storedRange !== null;
+    if (resumed && existingStaging) {
+      candidateCompartments = existingStaging.compartments;
+      passCount = existingStaging.passCount;
+      const lastInStaging = existingStaging.lastEndMessage;
+      offset = lastInStaging >= snapStart ? lastInStaging + 1 : snapStart;
+    } else {
+      candidateCompartments = priorCompartments.map((c, idx) => compartmentToInput(c, idx));
+      passCount = 0;
+      offset = snapStart;
+      saveRecompStagingPass(db, sessionId, 0, candidateCompartments, stagedFacts);
+      setRecompPartialRange(db, sessionId, { start: snapStart, end: snapEnd });
+    }
+    let currentTokenBudget = historianChunkTokens;
+    let passAttempt = 1;
+    await sendStatusNotification(client, sessionId, resumed ? `## Magic Recomp — Resumed (Partial)
+
+Found ${candidateCompartments.length - priorCompartments.length} newly built compartment(s) from ${passCount} previous pass(es), covering messages ${snapStart}-${offset - 1}. Resuming from message ${offset} toward ${snapEnd}.` : `## Magic Recomp — Partial
+
+Snapped to compartment boundaries: rebuilding messages ${snapStart}-${snapEnd} (${tailCompartments.length} tail compartment(s) preserved).`, notifParams());
+    while (offset <= snapEnd) {
+      const promptFit = fitRecompHistorianPrompt({
+        model: deps.model,
+        fallbackModelId: deps.fallbackModelId,
+        language: deps.language,
+        requestedChunkTokens: currentTokenBudget,
+        sessionId,
+        chunkStart: offset,
+        lastOrdinal: snapEnd,
+        sessionCompartments: candidateCompartments
+      });
+      if (!promptFit.ok) {
+        log2(`[magic-context] partial recomp failed session=${sessionId} code=${userFacingFailureCode("historian_window_too_small")} reason="${promptFit.reason}"`);
+        return `## Magic Recomp — Failed
+
+${renderUserFacingFailure("historian_window_too_small")}`;
+      }
+      if (promptFit.trimmed || promptFit.chunkTokens < currentTokenBudget) {
+        log2(`[magic-context] partial recomp prompt fit session=${sessionId}: ${describeHistorianPromptTrim(promptFit)} requestedChunkTokens=${currentTokenBudget}`);
+      }
+      const chunk = readSessionChunk2(sessionId, promptFit.chunkTokens, offset, snapEnd + 1, { expandTools: deps.historianExpandTools });
+      if (!chunk.text || chunk.messageCount === 0 || chunk.endIndex < offset) {
+        return `## Magic Recomp — Failed
+
+Recomp stopped because raw history ${offset}-${snapEnd} could not be turned into a valid historian chunk. Partial recomp preserved original state (staging kept for retry).`;
+      }
+      const chunkCoverageError = validateChunkCoverage(chunk);
+      if (chunkCoverageError) {
+        log2(`[magic-context] partial recomp failed session=${sessionId} code=${userFacingFailureCode("recomp_unavailable")} reason="${chunkCoverageError}"`);
+        return `## Magic Recomp — Failed
+
+${renderUserFacingFailure("recomp_unavailable")}`;
+      }
+      const prompt = buildCompartmentAgentPrompt({
+        seedExamples: promptFit.seedExamples,
+        sessionReferences: promptFit.sessionReferences,
+        projectMemory: "",
+        inputSource: `Messages ${chunk.startIndex}-${chunk.endIndex}:
+
+${chunk.text}`,
+        memoryEnabled: false,
+        extractionFree: true
+      });
+      await sendStatusNotification(client, sessionId, `## Magic Recomp — Partial
+
+Historian pass ${passCount + 1}, attempt ${passAttempt} started for messages ${chunk.startIndex}-${chunk.endIndex}.`, notifParams());
+      const validatedPass = await runValidatedHistorianPass({
+        client,
+        hiddenCompletionExecutor: deps.hiddenCompletionExecutor,
+        db,
+        parentSessionId: sessionId,
+        sessionDirectory,
+        prompt,
+        chunk,
+        priorCompartments: candidateCompartments,
+        sequenceOffset: candidateCompartments.length,
+        dumpLabelBase: `partial-recomp-${sessionId}-${chunk.startIndex}-${chunk.endIndex}-pass-${passCount + 1}`,
+        timeoutMs: historianTimeoutMs,
+        model: deps.model,
+        fallbackModelId: deps.fallbackModelId,
+        fallbackModels: deps.fallbackModels,
+        twoPass: deps.historianTwoPass,
+        subagentKind: "recomp",
+        agentId: HISTORIAN_RECOMP_AGENT,
+        language: deps.language,
+        callbacks: {
+          onRepairRetry: async (error) => {
+            log2(`[magic-context] partial recomp retry session=${sessionId} code=${userFacingFailureCode("recomp_unavailable")} reason="${error}"`);
+            await sendStatusNotification(client, sessionId, `## Magic Recomp — Partial
+
+History compression is retrying this pass. ${renderUserFacingFailure("recomp_unavailable")}`, notifParams());
+          }
+        }
+      });
+      if (!validatedPass.ok) {
+        const reducedBudget = getReducedRecompTokenBudget(promptFit.chunkTokens);
+        if (reducedBudget !== null) {
+          const smallerChunk = readSessionChunk2(sessionId, reducedBudget, offset, snapEnd + 1, { expandTools: deps.historianExpandTools });
+          if (smallerChunk.messageCount > 0 && smallerChunk.endIndex < chunk.endIndex) {
+            await sendStatusNotification(client, sessionId, `## Magic Recomp — Partial
+
+History compression is retrying with a smaller set of messages. ${renderUserFacingFailure("recomp_unavailable")}`, notifParams());
+            currentTokenBudget = reducedBudget;
+            passAttempt += 1;
+            continue;
+          }
+        }
+        log2(`[magic-context] partial recomp failed session=${sessionId} code=${userFacingFailureCode("recomp_unavailable")} reason="${validatedPass.error}" messageRange=${chunk.startIndex}-${chunk.endIndex}`);
+        return `## Magic Recomp — Failed
+
+${renderUserFacingFailure("recomp_unavailable")}`;
+      }
+      candidateCompartments = [
+        ...candidateCompartments,
+        ...validatedPass.compartments ?? []
+      ];
+      passCount += 1;
+      currentTokenBudget = historianChunkTokens;
+      passAttempt = 1;
+      saveRecompStagingPass(db, sessionId, passCount, candidateCompartments, stagedFacts);
+      const nextOffset = (validatedPass.compartments?.[validatedPass.compartments.length - 1]?.endMessage ?? chunk.endIndex) + 1;
+      if (nextOffset <= offset) {
+        return `## Magic Recomp — Failed
+
+Partial recomp made no forward progress after messages ${chunk.startIndex}-${chunk.endIndex}. Staging kept for retry.`;
+      }
+      offset = nextOffset;
+    }
+    const finalResult = promoteFinal();
+    if (!finalResult) {
+      return `## Magic Recomp — Failed
+
+Partial recomp completed historian passes but the final compartment set failed validation. Original state preserved (staging kept for inspection).`;
+    }
+    return [
+      "## Magic Recomp — Partial Complete",
+      "",
+      ...resumed ? ["Resumed from previous interrupted partial run."] : [],
+      `Rebuilt compartments covering messages ${snapStart}-${snapEnd} using ${passCount} historian pass${passCount === 1 ? "" : "es"}.`,
+      `Preserved ${priorCompartments.length} prior compartment(s) and ${tailCompartments.length} tail compartment(s) unchanged.`,
+      `Total compartments: ${finalResult.compartmentCount}.`
+    ].join(`
+`);
+  } catch (error) {
+    const message = getErrorMessage(error);
+    log2(`[magic-context] partial recomp failed session=${sessionId} code=${userFacingFailureCode("recomp_unavailable")} reason="${message}"`);
+    return `## Magic Recomp — Failed
+
+${renderUserFacingFailure("recomp_unavailable")}`;
+  } finally {
+    updateSessionMeta(db, sessionId, { compartmentInProgress: false });
+    const leftoverStaging = getRecompStaging(db, sessionId);
+    const leftoverRange = getRecompPartialRange(db, sessionId);
+    if (leftoverStaging && leftoverRange) {} else if (leftoverStaging && !leftoverRange) {
+      log2(`[magic-context] partial recomp cleanup: clearing orphaned staging without range marker for session ${sessionId}`);
+      clearRecompStaging(db, sessionId);
+    }
+  }
+}
+
+// ../plugin/src/hooks/magic-context/compartment-runner.ts
+var activeRuns = new Map;
+function getActiveCompartmentRun(sessionId) {
+  return activeRuns.get(sessionId);
+}
+function markActiveCompartmentRunPublished(sessionId) {
+  const activeRun = activeRuns.get(sessionId);
+  if (activeRun)
+    activeRun.published = true;
+}
+function withPublishedCallback(deps) {
+  return {
+    ...deps,
+    onCompartmentStatePublished: (sid) => {
+      markActiveCompartmentRunPublished(sid);
+      deps.onCompartmentStatePublished?.(sid);
+    }
+  };
+}
+function startLeaseRenewal(deps, holderId) {
+  return setInterval(() => {
+    try {
+      if (!renewCompartmentLease(deps.db, deps.sessionId, holderId)) {
+        sessionLog2(deps.sessionId, "compartment lease renewal failed; publish will be skipped if holder is stale");
+      }
+    } catch (err) {
+      sessionLog2(deps.sessionId, `compartment lease renewal threw; publish will be skipped if holder is stale (${err instanceof Error ? err.message : String(err)})`);
+    }
+  }, COMPARTMENT_LEASE_RENEWAL_MS);
+}
+async function executeContextRecompWithResult(deps, options = {}) {
+  const { sessionId } = deps;
+  if (isWrapupInProgress(deps.db, sessionId)) {
+    return {
+      message: "## Magic Recomp — Skipped\n\n/ctx-wrapup is already compacting this session. Wait for it to finish, then try `/ctx-recomp` again.",
+      published: false
+    };
+  }
+  if (activeRuns.has(sessionId)) {
+    return {
+      message: "## Magic Recomp — Skipped\n\nHistorian is already running for this session. Wait for it to finish, then try `/ctx-recomp` again.",
+      published: false
+    };
+  }
+  const holderId = crypto.randomUUID();
+  const lease = acquireCompartmentLease(deps.db, sessionId, holderId);
+  if (!lease) {
+    sessionLog2(sessionId, "recomp skipped: compartment lease held by another process");
+    return {
+      message: "## Magic Recomp — Skipped\n\nAnother process is already mutating compartment state for this session. Wait for it to finish, then try `/ctx-recomp` again.",
+      published: false
+    };
+  }
+  options.onLeaseAcquired?.();
+  if (isWrapupInProgress(deps.db, sessionId)) {
+    sessionLog2(sessionId, "recomp skipped: /ctx-wrapup became active");
+    releaseCompartmentLease(deps.db, sessionId, holderId);
+    return {
+      message: "## Magic Recomp — Skipped\n\n/ctx-wrapup is already compacting this session. Wait for it to finish, then try `/ctx-recomp` again.",
+      published: false
+    };
+  }
+  const renewal = startLeaseRenewal(deps, holderId);
+  const runnerDeps = withPublishedCallback({ ...deps, compartmentLeaseHolderId: holderId });
+  const promise = options.range ? executePartialRecompInternal(runnerDeps, options.range) : executeContextRecompInternal(runnerDeps);
+  const wrappedPromise = promise.then(() => {
+    return;
+  }).catch((err) => {
+    sessionLog2(sessionId, "compartment agent: recomp unhandled rejection:", err);
+  });
+  activeRuns.set(sessionId, { promise: wrappedPromise, published: false, kind: "recomp" });
+  try {
+    const message = await promise;
+    const published = activeRuns.get(sessionId)?.published === true;
+    const outcomeSummary = message.replace(/\s+/g, " ").trim().slice(0, 240);
+    sessionLog2(sessionId, `recomp finished (published=${published}): ${outcomeSummary}`);
+    return {
+      message,
+      published
+    };
+  } finally {
+    clearInterval(renewal);
+    releaseCompartmentLease(deps.db, sessionId, holderId);
+    if (activeRuns.get(sessionId)?.promise === wrappedPromise) {
+      activeRuns.delete(sessionId);
+    }
+  }
+}
+
+// ../plugin/src/hooks/magic-context/history-boundary-repair.ts
+function readBaseline(db, sessionId) {
+  const row = db.prepare("SELECT cached_m0_bytes IS NOT NULL AS hasM0, cached_m0_last_baseline_end_message_id AS boundary FROM session_meta WHERE session_id = ?").get(sessionId);
+  return {
+    hasCachedM0: row?.hasM0 === 1,
+    boundary: row?.boundary && row.boundary.length > 0 ? row.boundary : null
+  };
+}
+function findAnchor(compartments, latestIndex, isInHostStore) {
+  for (let index = latestIndex - 1;index >= 0; index -= 1) {
+    const candidate = compartments[index];
+    const endId = candidate?.endMessageId;
+    if (!candidate || typeof endId !== "string" || endId.length === 0)
+      continue;
+    const present = isInHostStore(endId);
+    if (present === null)
+      return "unknown";
+    if (present)
+      return candidate;
+  }
+  return null;
+}
+function forgetCachedPrefix(sessionId) {
+  clearInjectionCache(sessionId);
+  resetPrefixTrimFallbackState(sessionId);
+}
+function dropCompartmentsAfter(db, sessionId, anchor, holderId, activeBranch = false, onRetire) {
+  db.exec("BEGIN IMMEDIATE");
+  let finished = false;
+  try {
+    if (!isCompartmentLeaseHeld(db, sessionId, holderId)) {
+      db.exec("ROLLBACK");
+      finished = true;
+      return null;
+    }
+    const dropped = db.prepare("SELECT id, sequence FROM compartments WHERE session_id = ? AND sequence > ? ORDER BY sequence").all(sessionId, anchor?.sequence ?? -1);
+    onRetire?.();
+    const deleteEmbeddings = db.prepare("DELETE FROM compartment_chunk_embeddings WHERE compartment_id = ?");
+    for (const row of dropped)
+      deleteEmbeddings.run(row.id);
+    db.prepare("DELETE FROM compartments WHERE session_id = ? AND sequence > ?").run(sessionId, anchor?.sequence ?? -1);
+    db.prepare("DELETE FROM compression_depth WHERE session_id = ? AND message_ordinal > ?").run(sessionId, anchor?.endMessage ?? 0);
+    if (activeBranch) {
+      db.prepare("UPDATE session_meta SET prior_boundary_ordinal = ? WHERE session_id = ?").run((anchor?.endMessage ?? 0) + 1, sessionId);
+      const marker = getPendingPiCompactionMarkerState(db, sessionId);
+      if (marker)
+        clearPendingPiCompactionMarkerStateIf(db, sessionId, marker);
+    }
+    deleteChunkEmbedBackoffForSession(db, sessionId);
+    queueM0Mutation(db, { sessionId, mutationType: "recomp_boundary_change" });
+    clearCachedM0M1(db, sessionId);
+    db.exec("COMMIT");
+    finished = true;
+    return dropped.map((row) => row.sequence);
+  } finally {
+    if (!finished) {
+      try {
+        db.exec("ROLLBACK");
+      } catch {}
+    }
+  }
+}
+function repairMissingHistoryBoundary(args) {
+  const { db, sessionId, isInHostStore, scope = "store" } = args;
+  const compartments = scope === "active-branch" ? db.prepare("SELECT sequence, COALESCE(end_message_id, '') AS endMessageId FROM compartments WHERE session_id = ? ORDER BY sequence").all(sessionId) : getCompartments(db, sessionId);
+  let latestIndex = compartments.length - 1;
+  while (latestIndex >= 0 && !compartments[latestIndex]?.endMessageId)
+    latestIndex -= 1;
+  if (latestIndex < 0)
+    return { kind: "intact" };
+  if (scope === "active-branch") {
+    for (let index = 0;index <= latestIndex; index += 1) {
+      const endId = compartments[index]?.endMessageId;
+      if (!endId)
+        continue;
+      const present = isInHostStore(endId);
+      if (present === null)
+        return { kind: "unknown" };
+      if (!present) {
+        latestIndex = index;
+        break;
+      }
+    }
+  }
+  const latestEnd = compartments[latestIndex].endMessageId;
+  const latestPresent = isInHostStore(latestEnd);
+  if (latestPresent === null)
+    return { kind: "unknown" };
+  if (!latestPresent) {
+    const missing = latestEnd;
+    const problem = `compartment end ${latestEnd} is not in ${scope === "active-branch" ? "the active host branch" : "the host store"}`;
+    const anchor = findAnchor(compartments, latestIndex, isInHostStore);
+    if (anchor === "unknown")
+      return { kind: "unknown" };
+    if (anchor === null && scope === "store") {
+      sessionLog2(sessionId, `history boundary unresolved: ${problem} and no older compartment end is in the host store; nothing to re-anchor on`);
+      return { kind: "unresolved", reason: "no-anchor", missingEndMessageId: missing };
+    }
+    if (getActiveCompartmentRun(sessionId) !== undefined) {
+      return { kind: "unresolved", reason: "busy", missingEndMessageId: missing };
+    }
+    const holderId = crypto.randomUUID();
+    if (!acquireCompartmentLease(db, sessionId, holderId)) {
+      return { kind: "unresolved", reason: "busy", missingEndMessageId: missing };
+    }
+    let dropped;
+    let anchorForDrop = anchor;
+    try {
+      if (scope === "active-branch" && anchor) {
+        const row = db.prepare("SELECT end_message AS endMessage FROM compartments WHERE session_id = ? AND sequence = ?").get(sessionId, anchor.sequence);
+        if (!row)
+          return { kind: "unresolved", reason: "busy", missingEndMessageId: missing };
+        anchorForDrop = { ...anchor, endMessage: row.endMessage };
+      }
+      dropped = dropCompartmentsAfter(db, sessionId, anchorForDrop, holderId, scope === "active-branch", () => args.onRetire?.(compartments.slice(latestIndex), anchor));
+    } finally {
+      releaseCompartmentLeaseBestEffort(db, sessionId, holderId);
+    }
+    if (dropped === null) {
+      return { kind: "unresolved", reason: "busy", missingEndMessageId: missing };
+    }
+    invalidateAutoEmbedSession(sessionId);
+    forgetCachedPrefix(sessionId);
+    const range = dropped.length === 0 ? "none" : `${dropped[0]}-${dropped[dropped.length - 1]} (${dropped.length})`;
+    sessionLog2(sessionId, `history boundary repair: ${problem}; re-anchored on ${anchorForDrop ? `compartment ${anchorForDrop.sequence} ending at ${anchorForDrop.endMessageId} (ordinal ${anchorForDrop.endMessage})` : "the start of history"}; removed compartments ${range} for the historian to rebuild; the cached prefix is rebuilt on this pass`);
+    return {
+      kind: "repaired",
+      missingEndMessageId: missing,
+      anchorEndMessageId: anchor?.endMessageId ?? "",
+      droppedSequences: dropped
+    };
+  }
+  if (scope === "active-branch")
+    return { kind: "intact" };
+  const baseline = readBaseline(db, sessionId);
+  if (!baseline.hasCachedM0 || baseline.boundary === null || baseline.boundary === latestEnd) {
+    return { kind: "intact" };
+  }
+  if (isInHostStore(baseline.boundary) !== false)
+    return { kind: "intact" };
+  clearCachedM0M1(db, sessionId);
+  forgetCachedPrefix(sessionId);
+  sessionLog2(sessionId, `history boundary repair: the cached prefix boundary ${baseline.boundary} is not in the host store; rebuilding it on this pass against compartment end ${latestEnd}`);
+  return {
+    kind: "baseline-reset",
+    anchorEndMessageId: latestEnd,
+    staleBaselineId: baseline.boundary
+  };
+}
+
 // src/inject-compartments-pi.ts
 function resolveStableId(msg, index, entryIds) {
   return resolvePiStableId(msg, index, entryIds) ?? "";
@@ -31304,6 +32414,123 @@ function clearM0M1PiCache(db, sessionId, reason) {
   sessionLog2(sessionId, `cleared cached m[0] (${reason})`);
 }
 
+// src/history-boundary-repair-pi.ts
+var lastCleanBySession = new Map;
+function clearPiHistoryBoundaryRepairSession(sessionId) {
+  lastCleanBySession.delete(sessionId);
+}
+function compartmentRevision(db, sessionId) {
+  try {
+    const row = db.prepare("SELECT generation, version FROM compartment_history_versions WHERE session_id = ?").get(sessionId);
+    if (!row)
+      return "empty";
+    return typeof row.generation === "string" && row.generation.length > 0 && Number.isSafeInteger(row.version) && row.version >= 0 ? `${row.generation}:${row.version}` : null;
+  } catch {
+    return null;
+  }
+}
+function realId(id) {
+  return id.startsWith(SYNTH_USER_ID_PREFIX) ? id.slice(SYNTH_USER_ID_PREFIX.length) : id;
+}
+function repairPiHistoryBoundary(db, sessionId, ctx, branchEntries) {
+  const sm = ctx?.sessionManager;
+  if (typeof sm?.getBranch !== "function" || typeof sm.getLeafId !== "function")
+    return;
+  let entries;
+  let leaf;
+  try {
+    entries = branchEntries ?? sm.getBranch();
+    leaf = sm.getLeafId();
+  } catch {
+    return;
+  }
+  if (!Array.isArray(entries))
+    return;
+  if (leaf !== null && typeof leaf !== "string")
+    return;
+  if (entries.at(-1)?.id !== (leaf ?? undefined))
+    return;
+  const revision = compartmentRevision(db, sessionId);
+  const previous = lastCleanBySession.get(sessionId);
+  if (revision !== null && previous?.db === db && previous.revision === revision && entries.length >= previous.entryCount && (previous.entryCount === 0 || entries[previous.entryCount - 1]?.id === previous.leafId)) {
+    lastCleanBySession.set(sessionId, {
+      db,
+      leafId: leaf,
+      entryCount: entries.length,
+      revision
+    });
+    return;
+  }
+  lastCleanBySession.delete(sessionId);
+  const ids = new Set;
+  let parent = null;
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object")
+      return;
+    const row = entry;
+    if (typeof row.id !== "string" || !row.id || row.parentId !== parent || ids.has(row.id))
+      return;
+    ids.add(row.id);
+    parent = row.id;
+  }
+  if (leaf !== parent)
+    return;
+  const targetOnBranch = (endIds) => {
+    const raw = convertEntriesToRawMessages(entries);
+    const ordinalByEntry = new Map(raw.map((message, index) => [realId(message.id), index]));
+    let targetIndex = -1;
+    for (let id of endIds) {
+      const seen = new Set;
+      id = realId(id);
+      while (id && !seen.has(id)) {
+        seen.add(id);
+        const index = ordinalByEntry.get(id);
+        if (index !== undefined) {
+          targetIndex = Math.max(targetIndex, index);
+          break;
+        }
+        const entry = sm.getEntry?.(id);
+        if (!entry || typeof entry.parentId !== "string")
+          break;
+        id = entry.parentId;
+      }
+    }
+    return raw[targetIndex]?.id ?? null;
+  };
+  const pending = readPiHistoryRetirement(db, sessionId);
+  if (pending && !ids.has(realId(pending))) {
+    const target = targetOnBranch([pending]);
+    if (target)
+      db.transaction(() => queuePiHistoryRetirement(db, sessionId, target)).immediate();
+  }
+  const result = repairMissingHistoryBoundary({
+    db,
+    sessionId,
+    scope: "active-branch",
+    isInHostStore: (id) => ids.has(realId(id)),
+    onRetire: (retired, anchor) => {
+      const target = targetOnBranch([
+        ...retired.map((compartment) => compartment.endMessageId),
+        ...pending ? [pending] : []
+      ]);
+      if (target && (!anchor || realId(target) !== realId(anchor.endMessageId)))
+        queuePiHistoryRetirement(db, sessionId, target);
+    }
+  });
+  if (result.kind === "repaired" || result.kind === "baseline-reset")
+    clearPiMuralProcessCache(sessionId);
+  if (result.kind === "intact" || result.kind === "repaired") {
+    const checkedRevision = result.kind === "repaired" ? compartmentRevision(db, sessionId) : revision;
+    if (checkedRevision !== null)
+      lastCleanBySession.set(sessionId, {
+        db,
+        leafId: leaf,
+        entryCount: entries.length,
+        revision: checkedRevision
+      });
+  }
+}
+
 // src/native-replay-pi.ts
 function getNativeEnvelope(message) {
   if (!isRecord(message) || isPiSystemEntry(message))
@@ -31670,6 +32897,17 @@ class PiContextBudget {
   abandoned = false;
   completed = false;
   failureReason;
+  signal;
+  cancelled = false;
+  isCancelled(error) {
+    return this.cancelled || this.signal?.aborted === true || !this.signal && typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
+  }
+  cancel() {
+    this.cancelled = true;
+    this.abandoned = true;
+    this.completed = false;
+    this.failureReason = undefined;
+  }
   assertOwner = () => {};
   constructor(startedAt = performance.now(), now = () => performance.now()) {
     this.startedAt = startedAt;
@@ -31687,6 +32925,7 @@ class PiContextBudget {
   }
   assertOutcome = () => {
     this.assertOwner();
+    this.signal?.throwIfAborted();
     if (this.abandoned || this.elapsed() >= PI_CONTEXT_BUDGET.outcomeMs)
       throw new PiContextDeadlineError(this.diagnostic());
   };
@@ -31696,6 +32935,7 @@ class PiContextBudget {
       throw new PiContextDeadlineError(this.diagnostic());
   };
   assertDecisionPublication = () => {
+    this.signal?.throwIfAborted();
     if (!this.completed)
       this.assertOwner();
     if (this.abandoned || !this.completed && this.elapsed() >= PI_CONTEXT_BUDGET.outcomeMs)
@@ -31705,17 +32945,33 @@ class PiContextBudget {
     return `stage=${this.stage} elapsed=${Math.round(this.elapsed())}ms recovery=${this.recovery}`;
   }
   waitUntil = async (pending, assert, remaining) => {
-    assert();
+    try {
+      assert();
+    } catch (error) {
+      pending.catch(() => {});
+      throw error;
+    }
     let timer;
+    let onAbort;
     try {
       return await Promise.race([
         pending,
+        ...this.signal ? [
+          new Promise((_, reject) => {
+            onAbort = () => reject(this.signal?.reason);
+            this.signal?.addEventListener("abort", onAbort, {
+              once: true
+            });
+          })
+        ] : [],
         new Promise((_, reject) => {
           timer = setTimeout(() => reject(new PiContextDeadlineError(this.diagnostic())), remaining());
         })
       ]);
     } finally {
       clearTimeout(timer);
+      if (onAbort)
+        this.signal?.removeEventListener("abort", onAbort);
       assert();
     }
   };
@@ -31744,7 +33000,6 @@ function resolvePiWindowGeometry(args) {
     output: args.model?.maxTokens
   }, {
     providerLimit: observedWindow === undefined ? undefined : { context: observedWindow },
-    overlay: resolveWindowOverlayFacts(providerID, modelID, getWindowOverlay()),
     contextCap: isSaneLimit2(args.detectedContextLimit) ? args.detectedContextLimit : undefined,
     outputReserveOverride,
     harness: "pi"
@@ -31837,26 +33092,66 @@ function firstText(value, type) {
   const part = record3(value[0]);
   return part?.type === type && typeof part.text === "string" ? part.text : undefined;
 }
+function leadingInstructions(messages, roles, inputBlocks = false) {
+  const system = [];
+  let index = 0;
+  while (index < messages.length) {
+    const message = record3(messages[index]);
+    if (typeof message?.role !== "string" || !roles.includes(message.role))
+      break;
+    const content = message.content;
+    if (typeof content === "string")
+      system.push(content);
+    else if (inputBlocks && message.type === "message" && Array.isArray(content) && content.length > 0 && content.every((part) => record3(part)?.type === "input_text" && typeof record3(part)?.text === "string")) {
+      system.push(content.map((part) => record3(part)?.text).join(`
+`));
+    } else
+      return;
+    index++;
+  }
+  return { system, messages: messages.slice(index) };
+}
 function providerRequest(payload) {
   const body = record3(payload);
   if (!body || !Array.isArray(body.tools))
     return;
-  if (Array.isArray(body.input) && typeof body.instructions === "string") {
-    if ("messages" in body || "system" in body || !body.tools.every((tool) => record3(tool)?.type === "function"))
+  if (Array.isArray(body.input)) {
+    if ("messages" in body || "system" in body || body.instructions !== undefined && typeof body.instructions !== "string")
+      return;
+    const leading = leadingInstructions(body.input, typeof body.instructions === "string" ? ["developer"] : ["system", "developer"], typeof body.instructions === "string");
+    if (!leading)
       return;
     return {
-      messages: body.input,
-      system: [body.instructions],
-      tools: body.tools.map((tool) => record3(tool)?.name),
+      messages: leading.messages,
+      system: typeof body.instructions === "string" ? [body.instructions] : leading.system.slice(0, 1),
+      tools: body.tools.map((tool) => {
+        const entry = record3(tool);
+        return entry?.type === "function" && !("function" in entry) ? entry.name : undefined;
+      }),
       textType: "input_text"
     };
   }
   if (!Array.isArray(body.messages) || "input" in body || "instructions" in body)
     return;
+  if (!("system" in body)) {
+    const leading = leadingInstructions(body.messages, ["system", "developer"]);
+    if (!leading?.system.length)
+      return;
+    return {
+      ...leading,
+      system: leading.system.slice(0, 1),
+      tools: body.tools.map((tool) => {
+        const entry = record3(tool);
+        return entry?.type === "function" && !("name" in entry) ? record3(entry.function)?.name : undefined;
+      }),
+      textType: "text"
+    };
+  }
   const system = typeof body.system === "string" ? [body.system] : Array.isArray(body.system) ? body.system.map(firstTextBlock) : [];
   const tools = body.tools.map((tool) => {
-    const name = record3(tool)?.name;
-    return typeof name === "string" && name.startsWith("_") ? name.slice(1) : undefined;
+    const entry = record3(tool);
+    const name = entry && !("function" in entry) && entry.type !== "function" ? entry.name : undefined;
+    return typeof name === "string" ? name.startsWith("_") ? name.slice(1) : name : undefined;
   });
   return { messages: body.messages, system, tools, textType: "text" };
 }
@@ -31888,6 +33183,1103 @@ function isOmpUnmanagedCaptureRequest(payload) {
   return last?.role === "user" && firstText(last.content, request.textType)?.startsWith(CAPTURE_PREFIX) === true;
 }
 
+// src/pi-dispatch-google.ts
+function piGoogleConversation(payload) {
+  if (!payload || typeof payload !== "object")
+    return;
+  const body = payload;
+  if (body.messages !== undefined || body.input !== undefined)
+    return;
+  if (Array.isArray(body.contents))
+    return body;
+  const request = body.request;
+  if (!request || typeof request !== "object")
+    return;
+  const conversation = request;
+  return Array.isArray(conversation.contents) ? conversation : undefined;
+}
+
+// src/pi-dispatch-identity.ts
+var MAX_NODES = 1e5;
+var MAX_STRING_UNITS = 32 * 1024 * 1024;
+var MAX_DEPTH = 128;
+function piConversationFields(payload) {
+  try {
+    if (!payload || typeof payload !== "object")
+      return;
+    const body = payload;
+    let conversation;
+    let anthropic = false;
+    if (Array.isArray(body.messages) && body.input === undefined) {
+      conversation = { messages: body.messages, system: body.system };
+      anthropic = typeof body.system === "string" || Array.isArray(body.system);
+    } else if ((Array.isArray(body.input) || typeof body.input === "string") && body.messages === undefined) {
+      conversation = {
+        input: body.input,
+        instructions: body.instructions,
+        previous_response_id: body.previous_response_id,
+        conversation: body.conversation,
+        prompt: body.prompt
+      };
+    } else {
+      const google = piGoogleConversation(payload);
+      if (!google)
+        return;
+      conversation = {
+        contents: google.contents,
+        systemInstruction: google.systemInstruction,
+        configSystemInstruction: google.config?.systemInstruction
+      };
+    }
+    const fields = [];
+    const seen = new WeakSet;
+    let nodes = 0;
+    let strings = 0;
+    const visit = (value, position, depth) => {
+      if (++nodes > MAX_NODES || depth > MAX_DEPTH)
+        throw new Error("conversation structure limit");
+      if (typeof value === "string") {
+        strings += value.length;
+        if (strings > MAX_STRING_UNITS)
+          throw new Error("conversation string limit");
+        fields.push(LKG_SNAPSHOT_STRING, value);
+      } else if (value === null)
+        fields.push(LKG_SNAPSHOT_NULL);
+      else if (typeof value === "number")
+        fields.push(LKG_SNAPSHOT_NUMBER, value);
+      else if (typeof value === "boolean")
+        fields.push(LKG_SNAPSHOT_BOOLEAN, value);
+      else if (!value || typeof value !== "object")
+        fields.push(LKG_SNAPSHOT_UNDEFINED);
+      else {
+        if (seen.has(value))
+          throw new Error("cyclic conversation");
+        seen.add(value);
+        if (Array.isArray(value)) {
+          if (anthropic && (position === "content" || position === "system") && value.length === 1) {
+            const block = value[0];
+            if (block && typeof block === "object" && block.type === "text" && typeof block.text === "string" && Object.keys(block).every((key) => key === "type" || key === "text" || key === "cache_control")) {
+              visit(block.text, "other", depth + 1);
+              seen.delete(value);
+              return;
+            }
+          }
+          fields.push(LKG_SNAPSHOT_ARRAY, value.length);
+          for (const item of value)
+            visit(item, position === "messages" ? "message" : anthropic && (position === "content" || position === "system") ? "block" : "other", depth + 1);
+        } else {
+          const entries = Object.entries(value).filter(([key, child]) => child !== undefined && typeof child !== "function" && typeof child !== "symbol" && !(anthropic && position === "block" && key === "cache_control"));
+          for (const [key] of entries)
+            strings += key.length;
+          if (strings > MAX_STRING_UNITS)
+            throw new Error("conversation key limit");
+          entries.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+          fields.push(LKG_SNAPSHOT_OBJECT, entries.length);
+          for (const [key, child] of entries) {
+            fields.push(LKG_SNAPSHOT_KEY, key);
+            visit(child, position === "root" && key === "messages" ? "messages" : position === "root" && key === "system" ? "system" : position === "message" && key === "content" ? "content" : "other", depth + 1);
+          }
+        }
+        seen.delete(value);
+      }
+    };
+    visit(conversation, "root", 0);
+    return fields;
+  } catch {
+    return;
+  }
+}
+function piManagedSignature(messages) {
+  for (const message of messages.slice(0, 8)) {
+    if (!message || typeof message !== "object")
+      continue;
+    const content = message.content;
+    const text = typeof content === "string" ? content : Array.isArray(content) ? content.find((part) => part?.type === "text" && typeof part.text === "string")?.text : undefined;
+    if (!text)
+      continue;
+    const marker = /^(<project-docs>|<user-profile>|<covered-system-messages>|<session-history>|<project-memory>|<memory-mural>|<session-history-since>|<knowledge-updates>|<memory>|§\d+§)/.exec(text)?.[0];
+    return marker ?? text.slice(0, 128);
+  }
+  return;
+}
+function piHasManagedSignature(payload, signature) {
+  if (!signature || !payload || typeof payload !== "object")
+    return false;
+  const body = payload;
+  const google = piGoogleConversation(payload);
+  const nativeText = !!google || body.inferenceConfig !== undefined;
+  if (typeof body.input === "string" && body.messages === undefined)
+    return body.input.slice(0, 4096).includes(signature);
+  const messages = Array.isArray(body.messages) ? body.messages : Array.isArray(body.input) ? body.input : google?.contents;
+  if (!messages)
+    return false;
+  for (const message of messages.slice(0, 8)) {
+    if (!message || typeof message !== "object")
+      continue;
+    const content = google ? message.parts : message.content;
+    if (typeof content === "string" && content.slice(0, 4096).includes(signature))
+      return true;
+    if (!Array.isArray(content))
+      continue;
+    for (const block of content.slice(0, 32)) {
+      if (block && (["text", "input_text", "output_text"].includes(block.type) || nativeText && block.type === undefined) && typeof block.text === "string" && block.text.slice(0, 4096).includes(signature))
+        return true;
+    }
+  }
+  return false;
+}
+
+// src/pi-dispatch-agent-history.ts
+function object(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function piAgentHistory(messages, api) {
+  return messages.flatMap((value) => {
+    const message = object(value);
+    if (!message)
+      return [value];
+    if (message.role === "compactionSummary") {
+      return [
+        {
+          ...message,
+          role: "user",
+          content: message.blocks !== undefined ? [
+            { type: "text", text: message.summary },
+            ...Array.isArray(message.blocks) ? message.blocks : []
+          ] : [
+            { type: "text", text: "Compaction context envelope" },
+            ...Array.isArray(message.images) ? message.images : []
+          ]
+        }
+      ];
+    }
+    if (message.role !== "custom" && message.role !== "hookMessage")
+      return [value];
+    if (typeof message.content !== "string" && !Array.isArray(message.content))
+      return [];
+    const content = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content;
+    const userInvoked = message.role === "custom" && message.attribution === "user";
+    if (userInvoked && message.customType === "collab-prompt") {
+      const text = content.filter((part) => object(part)?.type === "text").map((part) => object(part)?.text).join(`
+`);
+      return [
+        {
+          ...message,
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: text.length ? "User interjection envelope" : ""
+            },
+            ...content.filter((part) => object(part)?.type === "image")
+          ]
+        }
+      ];
+    }
+    if (userInvoked && message.customType === "skill-prompt")
+      return [{ ...message, role: "user", content }];
+    const images = content.filter((part) => object(part)?.type === "image");
+    const developerRole = api === "ollama-chat" && message.attribution !== "user" ? "developer" : "user";
+    if (!images.length)
+      return [{ ...message, role: developerRole, content }];
+    const texts = content.filter((part) => object(part)?.type === "text");
+    return [
+      ...texts.length ? [{ ...message, role: developerRole, content: texts }] : [],
+      {
+        ...message,
+        role: "user",
+        content: [
+          { type: "text", text: `Images attached to ${message.customType}.` },
+          ...images
+        ]
+      }
+    ];
+  });
+}
+
+// src/pi-dispatch-chat-history.ts
+var MAX_EXACT_UNITS = 32 * 1024 * 1024;
+var IMAGE_CAPTION = "Attached image(s) from tool result:";
+function object2(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function omitsAssistant(message, model, compat) {
+  if (!Array.isArray(message.content))
+    return false;
+  let thinking = false;
+  let hasTextBlock = false;
+  for (const value of message.content) {
+    const block = object2(value);
+    if (!block)
+      return false;
+    if (block.type === "text") {
+      hasTextBlock = true;
+      if (typeof block.text !== "string" || block.text.trim())
+        return false;
+    } else if (block.type === "thinking") {
+      if (typeof block.thinking !== "string")
+        return false;
+      thinking ||= block.thinking.trim().length > 0;
+    } else
+      return false;
+  }
+  if (!hasTextBlock && ["length", "error", "aborted"].includes(String(message.stopReason)))
+    return true;
+  if (compat.requiresReasoningContentForAllAssistantTurns === true)
+    return false;
+  if (!thinking)
+    return true;
+  return message.api === model.api && message.provider === model.provider && message.model === model.id && compat.requiresThinkingAsText !== true && compat.requiresReasoningContentForToolCalls !== true && compat.replayReasoningContent !== true && compat.mistralReasoningContentParts !== true && compat.thinkingFormat !== "zai";
+}
+function piChatHistoryPlan(messages, model) {
+  if (model?.api !== "openai-completions")
+    return;
+  const compat = object2(model.compat) ?? {};
+  const calls = new Set;
+  for (const value of messages) {
+    const message = object2(value);
+    if (message?.role !== "assistant" || !Array.isArray(message.content))
+      continue;
+    for (const value of message.content) {
+      const block = object2(value);
+      if (block?.type === "toolCall" && typeof block.id === "string")
+        calls.add(block.id);
+    }
+  }
+  const transformed = [];
+  let pending = new Set;
+  let exactUnits = 0;
+  for (let index = 0;index < messages.length; index++) {
+    const message = object2(messages[index]);
+    if (!message)
+      return;
+    if ((message.role === "bashExecution" || message.role === "pythonExecution") && message.excludeFromContext === true)
+      continue;
+    if (message.role === "assistant" || message.role === "user" || message.role === "developer")
+      pending = new Set;
+    if (message.role === "assistant") {
+      if (omitsAssistant(message, model, compat))
+        continue;
+      if (Array.isArray(message.content))
+        for (const value of message.content) {
+          const block = object2(value);
+          if (block?.type === "toolCall" && typeof block.id === "string")
+            pending.add(block.id);
+        }
+    }
+    if (message.role === "toolResult" && typeof message.toolCallId === "string") {
+      pending.delete(message.toolCallId);
+      if (!calls.has(message.toolCallId)) {
+        if (pending.size || typeof message.toolName !== "string" || !Array.isArray(message.content))
+          return;
+        const parts = [];
+        for (const value of message.content) {
+          const part = object2(value);
+          if (part?.type === "text" && typeof part.text === "string" && part.text.trim())
+            parts.push(part.text);
+        }
+        if (!parts.length)
+          return;
+        const error = message.isError ? ' is-error="true"' : "";
+        const template = `<stale-tool-result tool="${message.toolName}" id="${message.toolCallId}"${error}>
+${parts.join(`
+`)}
+</stale-tool-result>`;
+        if (exactUnits + template.length > MAX_EXACT_UNITS)
+          return;
+        const text = new TextDecoder().decode(new TextEncoder().encode(template));
+        exactUnits += text.length;
+        if (exactUnits > MAX_EXACT_UNITS)
+          return;
+        transformed.push({ kind: "note", text });
+        continue;
+      }
+    }
+    transformed.push({ kind: "source", index });
+  }
+  const steps = [];
+  let images = [];
+  const flushImages = () => {
+    if (images.length) {
+      steps.push({ kind: "images", urls: images });
+      images = [];
+    }
+  };
+  const vision = model.input?.includes("image") === true && compat.stripImageInput !== true;
+  for (const step of transformed) {
+    const message = step.kind === "source" ? object2(messages[step.index]) : undefined;
+    if (message?.role !== "toolResult")
+      flushImages();
+    steps.push(step);
+    if (message?.role !== "toolResult" || !vision || !Array.isArray(message.content))
+      continue;
+    for (const value of message.content) {
+      const block = object2(value);
+      if (block?.type !== "image")
+        continue;
+      if (compat.requiresAssistantAfterToolResult === true)
+        return;
+      let url;
+      if (typeof block.url === "string")
+        url = block.url;
+      else if (typeof block.data === "string" && typeof block.mimeType === "string")
+        url = `data:${block.mimeType};base64,${block.data}`;
+      else
+        return;
+      exactUnits += url.length;
+      if (exactUnits > MAX_EXACT_UNITS)
+        return;
+      images.push(url);
+    }
+  }
+  flushImages();
+  return steps;
+}
+function piMatchesChatImages(content, urls) {
+  if (!Array.isArray(content) || content.length !== urls.length + 1)
+    return false;
+  const caption = object2(content[0]);
+  if (caption?.type !== "text" || caption.text !== IMAGE_CAPTION || Object.keys(caption).length !== 2)
+    return false;
+  for (let i = 0;i < urls.length; i++) {
+    const block = object2(content[i + 1]);
+    const image = object2(block?.image_url);
+    if (block?.type !== "image_url" || Object.keys(block).length !== 2 || !image || Object.keys(image).length !== 1 || image.url !== urls[i])
+      return false;
+  }
+  return true;
+}
+
+// src/pi-dispatch-responses-history.ts
+var MAX_TEXT_UNITS = 32 * 1024 * 1024;
+function object3(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function wellFormed(text) {
+  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�");
+}
+function textIdentity(text, phase) {
+  return JSON.stringify([
+    text,
+    phase === "commentary" || phase === "final_answer" ? phase : null
+  ]);
+}
+function signaturePhase(block) {
+  try {
+    if (typeof block.textSignature === "string") {
+      const signature = object3(JSON.parse(block.textSignature));
+      if (signature?.v === 1 && typeof signature.id === "string")
+        return signature.phase;
+    }
+  } catch {}
+  return;
+}
+function demotedThinking(text, model) {
+  const id = model.id?.toLowerCase() ?? "";
+  if (/^(?:[^/]+\/)?muse-spark-1\.3(?:-|$)/u.test(id))
+    return `<thinking>
+${wellFormed(text)}
+</thinking>`;
+  if (/^(?:[^/]+\/)?(?:gpt-|o[134](?:-|$)|chatgpt-|codex-)/u.test(id))
+    return `<think>
+${wellFormed(text)}
+</think>`;
+  return;
+}
+function piResponsesAssistantTexts(value, model) {
+  const message = object3(value);
+  if (!message || !Array.isArray(message.content))
+    return;
+  if (["length", "error", "aborted"].includes(String(message.stopReason)) && !message.content.some((value) => ["text", "toolCall"].includes(String(object3(value)?.type))))
+    return [];
+  const texts = [];
+  const blocks = [];
+  const sameModel = model !== undefined && typeof model.api === "string" && typeof model.id === "string" && typeof model.provider === "string" && message.api === model.api && message.model === model.id && message.provider === model.provider;
+  let units = 0;
+  for (const value of message.content) {
+    const block = object3(value);
+    if (block?.type === "toolCall")
+      continue;
+    if (block?.type === "thinking") {
+      if (sameModel)
+        continue;
+      if (typeof block.thinking !== "string" || !model)
+        return;
+      if (!block.thinking.trim())
+        continue;
+      const compat = object3(model.compat);
+      if (block.summary === false && (compat?.requiresReasoningContentForToolCalls === true || compat?.requiresReasoningContentForAllAssistantTurns === true))
+        return;
+      const text = demotedThinking(block.thinking, model);
+      if (text === undefined)
+        return;
+      units += text.length;
+      if (units > MAX_TEXT_UNITS)
+        return;
+      texts.push(textIdentity(text, undefined));
+      continue;
+    }
+    if (block?.type !== "text" || typeof block.text !== "string")
+      return;
+    units += block.text.length;
+    if (units > MAX_TEXT_UNITS)
+      return;
+    texts.push(textIdentity(wellFormed(block.text), sameModel ? signaturePhase(block) : undefined));
+    blocks.push(block);
+  }
+  const payload = object3(message.providerPayload);
+  if (message.api !== model?.api || typeof model?.id !== "string" || typeof model?.provider !== "string" || message.model !== model?.id || (payload?.provider ?? message.provider) !== model?.provider || payload?.type !== "openaiResponsesHistory" || payload.dt !== true || !Array.isArray(payload.items) || message.content.length !== blocks.length)
+    return texts;
+  const replay = [];
+  for (const value of payload.items) {
+    const item = object3(value);
+    if (item?.type !== "message" || item.role !== "assistant" || !Array.isArray(item.content))
+      return texts;
+    for (const value of item.content) {
+      const part = object3(value);
+      const block = blocks[replay.length];
+      if (!block || part?.type !== "output_text" || typeof part.text !== "string")
+        return texts;
+      let signature;
+      try {
+        if (typeof block.textSignature === "string")
+          signature = object3(JSON.parse(block.textSignature));
+      } catch {
+        return texts;
+      }
+      if (signature?.v !== 1 || typeof signature.id !== "string" || item.id !== signature.id || item.phase !== signature.phase || part.text !== block.text.replace(/^§\d+§ /u, ""))
+        return texts;
+      replay.push(textIdentity(wellFormed(part.text), item.phase));
+    }
+  }
+  return replay.length === texts.length ? replay : texts;
+}
+function piResponsesWireTexts(value, phase) {
+  if (phase !== undefined && phase !== null && phase !== "commentary" && phase !== "final_answer")
+    return;
+  if (typeof value === "string")
+    return [textIdentity(value, phase)];
+  if (!Array.isArray(value))
+    return;
+  const texts = [];
+  let units = 0;
+  for (const partValue of value) {
+    const part = object3(partValue);
+    if (part?.type !== "output_text" || typeof part.text !== "string")
+      return;
+    units += part.text.length;
+    if (units > MAX_TEXT_UNITS)
+      return;
+    texts.push(textIdentity(part.text, phase));
+  }
+  return texts;
+}
+
+// src/pi-dispatch-tool-ids.ts
+function record4(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+var sanitize = (id) => id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+function hash2(id) {
+  return typeof Bun === "undefined" ? undefined : Bun.hash(id).toString(36);
+}
+function responsesComponent(id) {
+  const sep = id.search(/[\n|]/);
+  return sep > 0 ? id.slice(0, sep) : id;
+}
+function codexCallId(id) {
+  if (!id) {
+    const suffix = hash2("empty");
+    return suffix === undefined ? undefined : `call_${suffix}`;
+  }
+  const sep = id.search(/[\n|]/);
+  const base = sep > 0 ? id.slice(0, sep) : sep === 0 ? id.slice(1) : id;
+  const normalized = base.replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_+$/, "");
+  if (normalized && normalized.length <= 64 && normalized === base)
+    return normalized;
+  const suffix = hash2(base || id);
+  if (suffix === undefined)
+    return;
+  return `${(normalized || "call").slice(0, Math.max(0, 63 - suffix.length))}_${suffix}`.slice(0, 64);
+}
+function piToolCallWireId(id, model, source) {
+  const origin = record4(source);
+  const same = origin !== undefined && origin.provider === model.provider && origin.api === model.api && origin.model === model.id;
+  const compat = record4(model.compat);
+  switch (model.api) {
+    case "openai-completions": {
+      if (compat?.requiresMistralToolIds === true) {
+        const normalized = id.replace(/[^a-zA-Z0-9]/g, "");
+        return (normalized + "ABCDEFGHI".slice(0, Math.max(0, 9 - normalized.length))).slice(0, 9);
+      }
+      if (!same && id.includes("|"))
+        return id.split("|", 1)[0].replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+      return compat?.usesOpenAIToolCallIdLimit === true ? id.slice(0, 40) : id;
+    }
+    case "anthropic-messages": {
+      if (same && compat?.officialEndpoint !== true)
+        return id;
+      const normalized = sanitize(id);
+      if (normalized)
+        return normalized;
+      const suffix = hash2(id);
+      return suffix === undefined ? undefined : `toolu_${suffix}`;
+    }
+    case "bedrock-converse-stream":
+      return sanitize(id);
+    case "google-generative-ai":
+    case "google-gemini-cli":
+    case "google-vertex":
+      return same ? id : sanitize(id);
+    case "openai-responses":
+    case "azure-openai-responses": {
+      const sep = id.search(/[\n|]/);
+      const simple = sep < 0 && id.length <= 64 && /^[a-zA-Z0-9_-]+$/.test(id);
+      const foreign = origin && (origin.provider !== model.provider || origin.api !== model.api);
+      return !same && !simple && (foreign || sep >= 0 || id.length > 64) ? codexCallId(responsesComponent(id)) : responsesComponent(id);
+    }
+    case "openai-codex-responses":
+      return codexCallId(responsesComponent(id));
+    default:
+      return id;
+  }
+}
+
+// src/pi-dispatch-structure.ts
+var MAX_MESSAGES = 1e5;
+function object4(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function messageStructure(value) {
+  const message = object4(value);
+  if (!message)
+    return;
+  const role = [
+    "custom",
+    "hookMessage",
+    "developer",
+    "branchSummary",
+    "compactionSummary",
+    "bashExecution",
+    "pythonExecution"
+  ].includes(String(message.role)) ? "user" : message.role;
+  if (role !== "user" && role !== "assistant" && role !== "toolResult")
+    return;
+  const row = { role, calls: [], results: [] };
+  if (typeof message.timestamp === "number")
+    row.timestamp = message.timestamp;
+  if (role === "toolResult") {
+    if (typeof message.toolCallId !== "string")
+      return;
+    row.results.push(message.toolCallId);
+  }
+  if (role === "assistant" && Array.isArray(message.content)) {
+    for (const value of message.content) {
+      const block = object4(value);
+      if (block?.type !== "toolCall" && block?.type !== "tool_use")
+        continue;
+      if (typeof block.id !== "string")
+        return;
+      row.calls.push(block.id);
+      row.callNames ??= [];
+      row.callNames.push(typeof block.name === "string" ? block.name : "");
+    }
+  }
+  return row;
+}
+function projectMissingToolResults(messages) {
+  const responsesComponents = new Set;
+  const opaqueIds = new Set;
+  const component = (id) => {
+    const pipe = id.indexOf("|");
+    return pipe > 0 ? id.slice(0, pipe) : id;
+  };
+  for (const value of messages) {
+    const message = object4(value);
+    if (message?.role !== "assistant" || !Array.isArray(message.content))
+      continue;
+    for (const value of message.content) {
+      const block = object4(value);
+      if (block?.type !== "toolCall" || typeof block.id !== "string")
+        continue;
+      if ([
+        "openai-responses",
+        "azure-openai-responses",
+        "openai-codex-responses"
+      ].includes(String(message.api)))
+        responsesComponents.add(component(block.id));
+      else if (block.id.includes("|"))
+        opaqueIds.add(block.id);
+    }
+  }
+  const pairingId = (id) => !opaqueIds.has(id) && responsesComponents.has(component(id)) ? component(id) : id;
+  const lastResult = new Map;
+  messages.forEach((value, index) => {
+    const message = object4(value);
+    if (message?.role === "toolResult" && typeof message.toolCallId === "string")
+      lastResult.set(pairingId(message.toolCallId), index);
+  });
+  const projected = [];
+  const resolved = new Set;
+  let pending = [];
+  let start = -1;
+  let aborted = false;
+  let timestamp;
+  const flush = (boundaryTimestamp) => {
+    for (const call of pending) {
+      const key = pairingId(call.id);
+      if (resolved.has(key) || (lastResult.get(key) ?? -1) > start)
+        continue;
+      projected.push({
+        role: "toolResult",
+        toolCallId: call.id,
+        toolName: call.name,
+        content: [
+          { type: "text", text: aborted ? "aborted" : "No result provided" }
+        ],
+        isError: true,
+        timestamp: aborted ? timestamp : boundaryTimestamp
+      });
+      resolved.add(key);
+    }
+    pending = [];
+  };
+  for (let index = 0;index < messages.length; index++) {
+    const value = messages[index];
+    const message = object4(value);
+    if ((message?.role === "bashExecution" || message?.role === "pythonExecution") && message.excludeFromContext === true)
+      continue;
+    if (message?.role !== "toolResult")
+      flush(message?.timestamp);
+    else if (typeof message.toolCallId === "string" && pending.some((call) => pairingId(call.id) === pairingId(String(message.toolCallId))))
+      resolved.add(pairingId(message.toolCallId));
+    projected.push(value);
+    if (message?.role !== "assistant" || !Array.isArray(message.content))
+      continue;
+    start = index;
+    aborted = message.stopReason === "aborted" || message.stopReason === "error";
+    timestamp = message.timestamp;
+    if (aborted && typeof timestamp !== "number")
+      continue;
+    for (const value of message.content) {
+      const block = object4(value);
+      if (block?.type === "toolCall" && typeof block.id === "string")
+        pending.push({
+          id: block.id,
+          name: typeof block.name === "string" ? block.name : ""
+        });
+    }
+  }
+  flush();
+  return projected;
+}
+function preparePiDispatch(messages, model, omp) {
+  let output = messages;
+  const structure = buildPiPreparedStructure(messages, model, omp ? (index, source) => {
+    if (object4(source.providerPayload)?.type !== "openaiResponsesHistory")
+      return;
+    if (output === messages)
+      output = messages.slice();
+    const { providerPayload: _payload, ...copy } = source;
+    output[index] = copy;
+  } : undefined);
+  return { messages: output, structure };
+}
+function buildPiPreparedStructure(messages, model, prepareUser) {
+  if (!messages.length || messages.length > MAX_MESSAGES)
+    return;
+  for (let index = 0;index < messages.length; index++) {
+    const source = object4(messages[index]);
+    if (source?.role === "user" || source?.role === "compactionSummary")
+      prepareUser?.(index, source);
+  }
+  const projectedMessages = projectMissingToolResults(model?.api ? piAgentHistory(messages, model.api) : messages);
+  if (projectedMessages.length > MAX_MESSAGES)
+    return;
+  const rows = [];
+  const toolNames = new Map;
+  const toolIds = new Map;
+  const responsesToolIds = new Map;
+  const byIndex = new Map;
+  let valid = true;
+  for (let index = 0;index < projectedMessages.length; index++) {
+    const message = projectedMessages[index];
+    const source = object4(message);
+    if (rows.length === 0 && (source?.role === "system" || source?.role === "developer"))
+      continue;
+    if ((source?.role === "bashExecution" || source?.role === "pythonExecution") && source.excludeFromContext === true)
+      continue;
+    const row = messageStructure(message);
+    if (!row) {
+      if (!prepareUser)
+        return;
+      valid = false;
+      continue;
+    }
+    if ([
+      "openai-completions",
+      "openrouter",
+      "anthropic-messages",
+      "bedrock-converse-stream",
+      "google-generative-ai",
+      "google-gemini-cli",
+      "google-vertex",
+      "openai-responses",
+      "azure-openai-responses",
+      "openai-codex-responses"
+    ].includes(model?.api ?? "") && (source?.role === "user" || source?.role === "developer") && (typeof source.content === "string" ? !source.content.trim() : Array.isArray(source.content) && !source.content.some((value) => {
+      const block = object4(value);
+      return block?.type === "image" || block?.type === "text" && typeof block.text === "string" && block.text.trim();
+    })))
+      continue;
+    row.calls.forEach((id, index) => {
+      toolNames.set(id, row.callNames?.[index] ?? "");
+      if (model?.api) {
+        const normalized = piToolCallWireId(id, model, source);
+        row.wireCalls ??= [];
+        row.wireCalls.push(normalized);
+        toolIds.set(id, normalized);
+        if ([
+          "openai-responses",
+          "azure-openai-responses",
+          "openai-codex-responses"
+        ].includes(String(source?.api)))
+          responsesToolIds.set(id.split("|", 1)[0], normalized);
+      }
+    });
+    if (row.results.length) {
+      row.resultNames = row.results.map((id) => toolNames.get(id) ?? "");
+      if (model?.api)
+        row.wireResults = row.results.map((id) => toolIds.has(id) ? toolIds.get(id) : responsesToolIds.get(id.split("|", 1)[0]));
+    }
+    rows.push(row);
+    byIndex.set(index, row);
+  }
+  if (!valid)
+    return;
+  const responsesApi = responsesLane(model?.api);
+  let responsesMessages = responsesApi ? [] : undefined;
+  if (responsesMessages) {
+    for (const [index, row] of byIndex) {
+      if (row.role !== "assistant") {
+        responsesMessages.push(row);
+        continue;
+      }
+      const texts = piResponsesAssistantTexts(projectedMessages[index], model);
+      if (!texts) {
+        responsesMessages = undefined;
+        break;
+      }
+      if (!texts.length && !row.calls.length)
+        continue;
+      const previous = responsesMessages.at(-1);
+      if (previous?.role === "assistant") {
+        previous.calls.push(...row.calls);
+        previous.wireCalls?.push(...row.wireCalls ?? []);
+        previous.responseTexts?.push(...texts);
+      } else
+        responsesMessages.push({
+          ...row,
+          calls: [...row.calls],
+          ...row.wireCalls ? { wireCalls: [...row.wireCalls] } : {},
+          responseTexts: [...texts]
+        });
+    }
+  }
+  const plan = piChatHistoryPlan(projectedMessages, model);
+  const chatMessages = plan?.flatMap((step) => {
+    if (step.kind === "source") {
+      const row = byIndex.get(step.index);
+      return row ? [row] : [];
+    }
+    return [
+      {
+        role: "user",
+        calls: [],
+        results: [],
+        ...step.kind === "note" ? { exactText: step.text } : { exactImages: step.urls }
+      }
+    ];
+  });
+  return {
+    messages: rows,
+    ...responsesApi && !responsesMessages ? { structuralSkipReason: "Responses history transform is not modeled" } : model?.api === "openai-completions" && !chatMessages ? { structuralSkipReason: "Chat history transform is not modeled" } : {},
+    ...chatMessages ? { chatMessages } : {},
+    ...responsesMessages ? { responsesMessages } : {},
+    ...model?.api ? { api: model.api } : {},
+    ...model?.api?.startsWith("google-") ? {
+      googleFunctionIds: object4(model.compat)?.supportsFunctionPartId === true
+    } : {}
+  };
+}
+function responsesLane(api) {
+  return [
+    "openai-responses",
+    "azure-openai-responses",
+    "openai-codex-responses"
+  ].includes(api ?? "");
+}
+function payloadStructure(payload, ollama = false, responsesItems = false) {
+  const body = object4(payload);
+  if (!body)
+    return;
+  const google = piGoogleConversation(payload);
+  if (google)
+    return googleStructure(google.contents);
+  const bedrock = body.inferenceConfig !== undefined;
+  if (body.messages === undefined && typeof body.input === "string")
+    return [{ role: "user", calls: [], results: [] }];
+  const responses = body.messages === undefined && Array.isArray(body.input);
+  const messages = responses ? body.input : body.messages;
+  if (!Array.isArray(messages) || messages.length > MAX_MESSAGES)
+    return;
+  const rows = [];
+  for (const value of messages) {
+    const message = object4(value);
+    if (!message)
+      return;
+    if (rows.length === 0 && (message.role === "system" || message.role === "developer"))
+      continue;
+    if (responses && message.type === "reasoning")
+      continue;
+    if (responses && ["function_call", "custom_tool_call", "computer_call"].includes(String(message.type))) {
+      if (typeof message.call_id !== "string")
+        return;
+      let assistant = rows.at(-1);
+      if (assistant?.role !== "assistant") {
+        assistant = {
+          role: "assistant",
+          calls: [],
+          results: [],
+          ...responsesItems ? { responseTexts: [] } : {}
+        };
+        rows.push(assistant);
+      }
+      assistant.calls.push(message.call_id);
+      continue;
+    }
+    if (responses && [
+      "function_call_output",
+      "custom_tool_call_output",
+      "computer_call_output"
+    ].includes(String(message.type))) {
+      if (typeof message.call_id !== "string")
+        return;
+      rows.push({ role: "toolResult", calls: [], results: [message.call_id] });
+      continue;
+    }
+    if (message.role === "tool") {
+      if (message.tool_call_id === undefined && ollama && typeof message.tool_name === "string") {
+        rows.push({
+          role: "toolResult",
+          calls: [],
+          results: [""],
+          resultNames: [message.tool_name],
+          idlessResults: [true]
+        });
+        continue;
+      }
+      if (typeof message.tool_call_id !== "string")
+        return;
+      rows.push({
+        role: "toolResult",
+        calls: [],
+        results: [message.tool_call_id]
+      });
+      continue;
+    }
+    if (message.role === "user" && Array.isArray(message.content)) {
+      const results = message.content.filter((block) => object4(block)?.type === "tool_result" || bedrock && object4(block)?.toolResult);
+      if (results.length) {
+        for (const block of results) {
+          const id = bedrock ? block.toolResult?.toolUseId : block.tool_use_id;
+          if (typeof id !== "string")
+            return;
+          rows.push({
+            role: "toolResult",
+            calls: [],
+            results: [id]
+          });
+        }
+        continue;
+      }
+    }
+    const row = messageStructure(ollama && message.role === "system" ? { ...message, role: "user" } : message);
+    if (!row)
+      return;
+    row.wireContent = message.content;
+    if (responses && responsesItems && row.role === "assistant") {
+      const texts = piResponsesWireTexts(message.content, message.phase);
+      if (!texts)
+        return;
+      row.responseTexts = [...texts];
+    }
+    row.wireRole = message.role;
+    if (bedrock && row.role === "assistant" && Array.isArray(message.content)) {
+      for (const block of message.content) {
+        if (!block?.toolUse)
+          continue;
+        if (typeof block.toolUse.toolUseId !== "string")
+          return;
+        row.calls.push(block.toolUse.toolUseId);
+      }
+    }
+    if (Array.isArray(message.tool_calls)) {
+      for (const call of message.tool_calls) {
+        const source = object4(call);
+        if (!source)
+          return;
+        if (source.id === undefined && ollama) {
+          const fn = object4(source.function);
+          if (typeof fn?.name !== "string")
+            return;
+          row.calls.push("");
+          row.callNames ??= [];
+          row.callNames.push(fn.name);
+          row.idlessCalls ??= [];
+          row.idlessCalls.push(true);
+        } else {
+          if (typeof source.id !== "string")
+            return;
+          row.calls.push(source.id);
+          if (ollama) {
+            row.callNames ??= [];
+            row.callNames.push("");
+            row.idlessCalls ??= [];
+            row.idlessCalls.push(false);
+          }
+        }
+      }
+    }
+    if (responses && row.role === "assistant" && rows.at(-1)?.role === "assistant") {
+      const previous = rows[rows.length - 1];
+      previous.calls.push(...row.calls);
+      if (responsesItems)
+        previous.responseTexts?.push(...row.responseTexts ?? []);
+    } else
+      rows.push(row);
+  }
+  return rows;
+}
+function googleStructure(contents) {
+  if (contents.length > MAX_MESSAGES)
+    return;
+  const rows = [];
+  for (const value of contents) {
+    const message = object4(value);
+    if (!message || !Array.isArray(message.parts))
+      return;
+    if (message.role !== "user" && message.role !== "model")
+      return;
+    const row = {
+      role: message.role === "model" ? "assistant" : "user",
+      calls: [],
+      results: []
+    };
+    const results = [];
+    for (const value of message.parts) {
+      const part = object4(value);
+      if (!part)
+        return;
+      if (part.functionCall) {
+        const call = object4(part.functionCall);
+        if (row.role !== "assistant" || typeof call?.name !== "string" || call.id !== undefined && typeof call.id !== "string")
+          return;
+        row.calls.push(call.id ?? "");
+        row.callNames ??= [];
+        row.callNames.push(call.name);
+      }
+      if (part.functionResponse) {
+        const result = object4(part.functionResponse);
+        if (row.role !== "user" || typeof result?.name !== "string" || result.id !== undefined && typeof result.id !== "string")
+          return;
+        results.push({
+          role: "toolResult",
+          calls: [],
+          results: [result.id ?? ""],
+          resultNames: [result.name]
+        });
+      }
+    }
+    if (results.length)
+      rows.push(...results);
+    else
+      rows.push(row);
+  }
+  return rows;
+}
+function wireId(id, anthropic, responses) {
+  if (anthropic)
+    return id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+  if (responses) {
+    const callId = id.split(/[\n|]/, 1)[0];
+    return /^[a-zA-Z0-9_-]{1,64}$/.test(callId) ? callId : undefined;
+  }
+  return id;
+}
+function safeRole(row, readable) {
+  if (!readable)
+    return "unreadable";
+  if (!row)
+    return "missing";
+  return ["user", "assistant", "toolResult"].includes(row.role) ? row.role : "unknown";
+}
+function safeCount(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : "unreadable";
+}
+function structureDetail(index, expected, actual, comparison) {
+  const expectedRow = expected?.[index];
+  const actualRow = actual?.[index];
+  return `row=${index} expectedRows=${safeCount(expected?.length)} actualRows=${safeCount(actual?.length)} expectedRole=${safeRole(expectedRow, !!expected)} actualRole=${safeRole(actualRow, !!actual)} expectedCalls=${safeCount(expected ? expectedRow?.calls.length ?? 0 : undefined)} actualCalls=${safeCount(actual ? actualRow?.calls.length ?? 0 : undefined)} expectedResults=${safeCount(expected ? expectedRow?.results.length ?? 0 : undefined)} actualResults=${safeCount(actual ? actualRow?.results.length ?? 0 : undefined)} comparison=${comparison}`;
+}
+function piPreparedStructureMismatch(payload, prepared) {
+  try {
+    if (prepared?.structuralSkipReason)
+      return;
+    const body = object4(payload);
+    const ollama = prepared?.api === "ollama-chat" && !!body && Array.isArray(body.messages) && body.input === undefined && body.system === undefined && body.inferenceConfig === undefined;
+    const responses = body?.messages === undefined && Array.isArray(body?.input);
+    const rows = payloadStructure(payload, ollama, responses && !!prepared?.responsesMessages);
+    const chat = !!body && Array.isArray(body.messages) && (prepared?.api === "openai-completions" || body.system === undefined) && body.input === undefined && body.inferenceConfig === undefined;
+    const expectedRows = responses && prepared?.responsesMessages ? prepared.responsesMessages : chat && prepared?.chatMessages ? prepared.chatMessages : prepared?.messages;
+    if (!rows || !expectedRows)
+      return structureDetail(0, expectedRows, rows, "count");
+    if (!body)
+      return structureDetail(0, expectedRows, rows, "count");
+    const google = !!piGoogleConversation(payload);
+    const anthropic = google || body.inferenceConfig !== undefined || prepared?.api === "anthropic-messages" || !prepared?.api && body.max_tokens !== undefined && Array.isArray(body.system);
+    for (let i = 0;i < Math.min(rows.length, expectedRows.length); i++) {
+      const expected = expectedRows[i];
+      const actual = rows[i];
+      if (actual.role !== expected.role)
+        return structureDetail(i, expectedRows, rows, "role");
+      if (expected.responseTexts !== undefined && (expected.responseTexts.length !== actual.responseTexts?.length || expected.responseTexts.some((text, index) => text !== actual.responseTexts?.[index])))
+        return structureDetail(i, expectedRows, rows, "content");
+      if (expected.exactText !== undefined || expected.exactImages !== undefined) {
+        if (actual.wireRole !== "user")
+          return structureDetail(i, expectedRows, rows, "role");
+        if (expected.exactText !== undefined && actual.wireContent !== expected.exactText || expected.exactImages !== undefined && !piMatchesChatImages(actual.wireContent, expected.exactImages))
+          return structureDetail(i, expectedRows, rows, "content");
+      }
+      if (actual.calls.length !== expected.calls.length || actual.results.length !== expected.results.length)
+        return structureDetail(i, expectedRows, rows, "count");
+      if (actual.timestamp !== undefined && actual.timestamp !== expected.timestamp)
+        return structureDetail(i, expectedRows, rows, "timestamp");
+      for (let j = 0;j < actual.calls.length; j++)
+        if (google && actual.calls[j] === "" && prepared?.googleFunctionIds !== true || ollama && actual.idlessCalls?.[j] === true ? !expected.callNames?.[j] || actual.callNames?.[j] !== expected.callNames[j] : google && prepared?.googleFunctionIds === false || actual.calls[j] !== (expected.wireCalls ? expected.wireCalls[j] : wireId(expected.calls[j], anthropic, responses)))
+          return structureDetail(i, expectedRows, rows, google && actual.calls[j] === "" || ollama && actual.idlessCalls?.[j] === true ? "name" : "call id");
+      for (let j = 0;j < actual.results.length; j++)
+        if (google && actual.results[j] === "" && prepared?.googleFunctionIds !== true || ollama && actual.idlessResults?.[j] === true ? !expected.resultNames?.[j] || actual.resultNames?.[j] !== expected.resultNames[j] : google && prepared?.googleFunctionIds === false || actual.results[j] !== (expected.wireResults ? expected.wireResults[j] : wireId(expected.results[j], anthropic, responses)))
+          return structureDetail(i, expectedRows, rows, google && actual.results[j] === "" || ollama && actual.idlessResults?.[j] === true ? "name" : "result id");
+    }
+    if (rows.length !== expectedRows.length)
+      return structureDetail(Math.min(rows.length, expectedRows.length), expectedRows, rows, "count");
+    return;
+  } catch {
+    return structureDetail(0, undefined, undefined, "count");
+  }
+}
+
 // src/pi-context-refusal.ts
 var ENTRY_TYPE = "magic-context-turn-refused";
 var RETRY_MESSAGE = "Magic Context could not safely prepare this turn; send your message again.";
@@ -31904,6 +34296,26 @@ var receiptMaps = new Set;
 function clearPiContextReceipt(sessionId) {
   for (const receipts of receiptMaps)
     receipts.delete(sessionId);
+}
+function createPiContextOwnershipGuards(operations, key, active, budget, owner) {
+  const sideTurn = budget.sideTurn;
+  const signal = budget.signal;
+  const isOwned = () => sideTurn ? operations.get(key) === owner : operations.get(key) === active && active.pass === budget;
+  const isCurrent = () => isOwned() && (sideTurn || !active.ended);
+  const assertOwner = () => {
+    if (!isCurrent())
+      throw new PiContextSupersededError("Pi context pass superseded: no longer valid for this operation", active.ended ? "agent_end" : operations.get(key) !== (sideTurn ? owner : active) ? "operation replacement or cache eviction" : "newer context pass");
+    signal?.throwIfAborted();
+  };
+  return { isOwned, isCurrent, assertOwner };
+}
+function releasePiOperationPayloads(operation) {
+  operation.inputKeys = undefined;
+  operation.inputMessages = undefined;
+  operation.inputBranch = undefined;
+  operation.dispatchFields = undefined;
+  operation.managedSignature = undefined;
+  operation.preparedStructure = undefined;
 }
 function operationKey(ctx) {
   return ctx.sessionManager?.getSessionId?.() ?? ctx.sessionManager ?? "no-session";
@@ -31932,6 +34344,69 @@ function endBelongsToEarlierRun(operation, event) {
     return false;
   return operation.inputKeys.some((key) => !ended.has(key));
 }
+function messageSnapshots(messages) {
+  const snapshots = [];
+  for (const message of messages) {
+    const id = messageKey(message);
+    const fields = lkgContentFields(message);
+    if (!id || !fields)
+      return;
+    snapshots.push({ id, fields });
+  }
+  return snapshots.length ? snapshots : undefined;
+}
+function inputBranch(ctx, inputs) {
+  try {
+    const branch = ctx.sessionManager.getBranch();
+    const entries = branch.filter((entry) => entry.type === "message" || entry.type === "custom_message");
+    const anchorId = entries.at(-1)?.id;
+    const native = messageSnapshots(entries.map((entry) => {
+      if (entry.type === "message")
+        return entry.message;
+      const attribution = entry.attribution;
+      const timestamp = new Date(entry.timestamp).getTime();
+      if (!Number.isFinite(timestamp) || !entry.customType || typeof entry.content !== "string" && !Array.isArray(entry.content) || attribution !== undefined && attribution !== "agent" && attribution !== "user")
+        return;
+      return {
+        role: "custom",
+        customType: entry.customType,
+        content: entry.content,
+        display: entry.display,
+        details: entry.details,
+        attribution,
+        timestamp
+      };
+    }));
+    inputs ??= native;
+    if (!anchorId || !native || !inputs || native.length > inputs.length || exactReusablePrefix(native, inputs) !== native.length)
+      return;
+    return {
+      anchorId,
+      anchorIndex: native.length - 1,
+      entryIds: entries.map((entry) => entry.id),
+      messages: inputs
+    };
+  } catch {
+    return;
+  }
+}
+function dispatchedEndBelongsToEarlierRun(operation, event, ctx) {
+  if (!operation.dispatched || !operation.started || !operation.ready || !operation.pass?.completed || operation.refused || operation.pass.abandoned || !operation.inputBranch)
+    return false;
+  try {
+    if (ctx.isIdle() !== false)
+      return false;
+    const current = inputBranch(ctx);
+    const prepared = operation.inputBranch;
+    if (!current || current.entryIds[prepared.anchorIndex] !== prepared.anchorId || current.messages.length !== prepared.messages.length || exactReusablePrefix(current.messages, prepared.messages) !== prepared.messages.length)
+      return false;
+    const messages = event?.messages;
+    const ended = Array.isArray(messages) ? messageSnapshots(messages) : undefined;
+    return !!(ended && ended.length <= prepared.anchorIndex && ended.length < prepared.messages.length && exactReusablePrefix(prepared.messages, ended) === ended.length);
+  } catch {
+    return false;
+  }
+}
 function inputMessageKeys(event) {
   try {
     const messages = event.messages;
@@ -31953,6 +34428,7 @@ function registerPiGuardedContext(pi, handler, options = {}) {
   const sideSessions = new Map;
   receiptMaps.add(operations);
   const newOperation = () => ({
+    retainedAfterEnd: false,
     dispatched: false,
     started: false,
     ready: false,
@@ -31972,6 +34448,8 @@ function registerPiGuardedContext(pi, handler, options = {}) {
   const fenceEnabled = resolvePiHarnessKind() === "omp";
   const unsendableNonces = new Map;
   receiptMaps.add(unsendableNonces);
+  const structureWarnings = new Map;
+  receiptMaps.add(structureWarnings);
   const refuse = (ctx, budget, reason, isCurrent) => {
     if (!isCurrent()) {
       log2(`[magic-context][pi] DISCARDED CONTEXT RESULT ${budget.diagnostic()}`, reason);
@@ -31981,6 +34459,7 @@ function registerPiGuardedContext(pi, handler, options = {}) {
     budget.recovery = budget.recovery === "not attempted" ? "no managed result; refused" : budget.recovery;
     const identityConflict = findPiTagIdentityConflict2(reason);
     const message = identityConflict ? `${identityConflict.message}. ${budget.diagnostic()}` : `${RETRY_MESSAGE} ${budget.diagnostic()} (${reason instanceof Error ? reason.message : String(reason)})`;
+    log2("[magic-context][pi] CONTEXT REFUSED", message);
     try {
       ctx.ui?.notify(message, "error");
     } catch (error) {
@@ -32018,7 +34497,9 @@ function registerPiGuardedContext(pi, handler, options = {}) {
         log2(`[magic-context][pi] OMP context counts session=${String(key)} side_contexts=${counts.sides} context_passes=${counts.contexts} dispatch_fence=${counts.sides ? "latched off" : "on"}`);
       const operation = operations.get(key);
       if (operation) {
-        if (endBelongsToEarlierRun(operation, event)) {
+        if (endBelongsToEarlierRun(operation, event) || lifecycleSeen.starts > lifecycleSeen.ends && dispatchedEndBelongsToEarlierRun(operation, event, ctx)) {
+          if (operation.dispatched)
+            operation.retainedAfterEnd = true;
           if (lifecycleSeen.starts <= lifecycleSeen.ends)
             operation.started = false;
           log2(`[magic-context][pi] agent_end attributed to an earlier run; keeping the latest context pass session=${String(key)} ${operation.pass?.diagnostic() ?? ""}`);
@@ -32026,9 +34507,18 @@ function registerPiGuardedContext(pi, handler, options = {}) {
         }
         operation.ended = true;
         operation.ready = false;
+        releasePiOperationPayloads(operation);
       }
     });
     pi.on("before_provider_request", (event, ctx) => {
+      const cancelledOperation = operations.get(operationKey(ctx));
+      const signal = ctx.signal;
+      if (signal ? signal.aborted : cancelledOperation?.pass?.isCancelled()) {
+        cancelledOperation?.pass?.cancel();
+        if (cancelledOperation)
+          cancelledOperation.ready = false;
+        return;
+      }
       if (options.compactionOff?.(ctx))
         return;
       const payload = event.payload;
@@ -32056,6 +34546,10 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       const isCurrent = () => operations.get(key) === active;
       const capture = isOmpUnmanagedCaptureRequest(payload);
       const budget = (capture ? undefined : active.pass) ?? new PiContextBudget;
+      if (active.refused && active.pass === budget) {
+        ctx.abort();
+        return;
+      }
       let refusalOrigin;
       try {
         if (capture)
@@ -32070,8 +34564,39 @@ function registerPiGuardedContext(pi, handler, options = {}) {
         }
         if (!budget.completed || !active.ready || active.refused || budget.abandoned)
           throw new Error("context pass ran without a managed context receipt");
+        if (!piHasManagedSignature(payload, active.managedSignature))
+          throw new Error("provider request does not match this pass's managed dispatch (missing current receipt signature)");
+        const fields = piConversationFields(payload);
+        if (!fields)
+          throw new Error("provider conversation identity could not be established");
+        const body = payload;
+        const skipReason = active.preparedStructure ? active.preparedStructure.structuralSkipReason ?? (active.preparedStructure.api && body?.messages === undefined && Array.isArray(body?.input) && !active.preparedStructure.responsesMessages ? "provider selected Responses items without a matching history plan" : undefined) : "prepared history representation is not modeled";
+        if (skipReason && !structureWarnings.has(key)) {
+          structureWarnings.set(key, true);
+          log2(`[magic-context][pi] OMP structural comparison skipped: ${skipReason}; stale prepared requests are not detected on this pass; session=${String(key)}`);
+        }
+        const structureMismatch = skipReason ? undefined : piPreparedStructureMismatch(payload, active.preparedStructure);
+        if (structureMismatch)
+          throw new Error(`provider request does not match this pass's managed dispatch (prepared turn structure); ${structureMismatch}`);
+        if (active.dispatched) {
+          if (!active.dispatchFields || exactReusablePrefix([{ id: "conversation", fields }], [{ id: "conversation", fields: active.dispatchFields }]) !== 1)
+            throw new Error("provider request does not match this pass's managed dispatch");
+        }
+        if (!active.dispatched && active.inputMessages && (!active.inputBranch || active.inputBranch.anchorIndex < active.inputMessages.length - 1)) {
+          const previous = active.inputBranch;
+          const persisted = inputBranch(ctx, active.inputMessages);
+          if (!previous || persisted && persisted.anchorIndex > previous.anchorIndex && persisted.entryIds[previous.anchorIndex] === previous.anchorId)
+            active.inputBranch = persisted;
+        }
+        if (!active.dispatched)
+          active.dispatchFields = fields;
         active.dispatched = true;
       } catch (error) {
+        if (signal ? signal.aborted : budget.isCancelled(error)) {
+          budget.cancel();
+          active.ready = false;
+          return;
+        }
         active.refused = true;
         budget.stage = refusalOrigin ? `provider dispatch (origin=${refusalOrigin}; context stage=${budget.stage})` : "provider dispatch";
         refuse(ctx, budget, error, isCurrent);
@@ -32083,6 +34608,7 @@ function registerPiGuardedContext(pi, handler, options = {}) {
     if (fenceEnabled && isOmpDumpContext())
       return { messages: event.messages };
     const budget = new PiContextBudget;
+    budget.signal = event.signal ?? ctx.signal;
     budget.sideTurn = fenceEnabled && isOmpSideContext(event);
     const key = operationKey(ctx);
     if (fenceEnabled) {
@@ -32095,7 +34621,7 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       if (budget.sideTurn && ++counts.sides === 1)
         log2(`[magic-context][pi] OMP dispatch fence disabled for session ${String(key)}: verified ephemeral context; session-wide abort cannot distinguish provider operations (side_contexts=${counts.sides} context_passes=${counts.contexts})`);
     }
-    const owner = operations.get(key);
+    const owner = budget.sideTurn ? operations.get(key) : undefined;
     let operation = operations.get(key);
     if (budget.sideTurn || !operation || operation.ended || !fenceEnabled) {
       operation = newOperation();
@@ -32104,26 +34630,41 @@ function registerPiGuardedContext(pi, handler, options = {}) {
     }
     const active = operation;
     active.pass = budget;
-    active.inputKeys = undefined;
+    releasePiOperationPayloads(active);
+    active.retainedAfterEnd = false;
     active.dispatched = false;
     active.ready = false;
     active.refused = false;
-    const isOwned = () => budget.sideTurn ? operations.get(key) === owner : operations.get(key) === active && active.pass === budget;
-    const isCurrent = () => isOwned() && (budget.sideTurn || !active.ended);
-    budget.assertOwner = () => {
-      if (!isCurrent())
-        throw new PiContextSupersededError("Pi context pass superseded: no longer valid for this operation", active.ended ? "agent_end" : operations.get(key) !== (budget.sideTurn ? owner : active) ? "operation replacement or cache eviction" : "newer context pass");
-    };
+    const { isOwned, isCurrent, assertOwner } = createPiContextOwnershipGuards(operations, key, active, budget, owner);
+    budget.assertOwner = assertOwner;
     try {
-      if (fenceEnabled && !budget.sideTurn)
+      budget.assertOutcome();
+      let inputs;
+      if (fenceEnabled && !budget.sideTurn) {
         active.inputKeys = inputMessageKeys(event);
+        inputs = messageSnapshots(event.messages);
+        active.inputMessages = inputs;
+      }
       const result = await budget.waitMandatory(Promise.resolve(withSqliteTransformPass2(() => handler(event, ctx, budget))));
       if (result?.messages) {
+        const prepared = preparePiDispatch(result.messages, fenceEnabled ? ctx.model : undefined, fenceEnabled);
+        if (prepared.messages !== result.messages)
+          result.messages = prepared.messages;
+        active.managedSignature = piManagedSignature(result.messages);
+        active.preparedStructure = prepared.structure;
         budget.completed = true;
         active.ready = true;
+        if (inputs)
+          active.inputBranch = inputBranch(ctx, inputs);
       }
       return result;
     } catch (error) {
+      if (budget.isCancelled(error)) {
+        budget.cancel();
+        if (isOwned())
+          active.ready = false;
+        return;
+      }
       if (error instanceof PiContextSupersededError || !isCurrent()) {
         if (fenceEnabled && !budget.sideTurn && !sideSessions.get(key)?.sides && !options.compactionOff?.(ctx)) {
           const nonce = crypto.randomUUID();
@@ -32161,6 +34702,9 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       active.refused = true;
       refuse(ctx, budget, error, isOwned);
       return { messages: event.messages };
+    } finally {
+      if (!fenceEnabled || budget.sideTurn)
+        releasePiOperationPayloads(active);
     }
   });
 }
@@ -32279,340 +34823,378 @@ function createPiFallbackIndex() {
   };
 }
 
-// ../plugin/src/hooks/magic-context/openai-compat-adjacency.ts
-function assertOpenAiCompatAdjacency(messages) {
-  const violations = [];
-  for (let i = 0;i < messages.length; i++) {
-    const msg = messages[i];
-    if (msg.role !== "assistant" || !msg.tool_calls || msg.tool_calls.length === 0) {
-      continue;
-    }
-    const expectedIds = msg.tool_calls.map((tc) => tc.id);
-    const expectedSet = new Set(expectedIds);
-    const collected = new Map;
-    let j = i + 1;
-    while (j < messages.length && messages[j].role === "tool") {
-      const toolMsg = messages[j];
-      const id = toolMsg.tool_call_id;
-      if (!id) {
-        violations.push({
-          index: i,
-          kind: "unmatched_tool_call_id",
-          detail: `tool message at index ${j} missing tool_call_id`
-        });
-      } else if (!expectedSet.has(id)) {
-        violations.push({
-          index: i,
-          kind: "unmatched_tool_call_id",
-          toolCallId: id,
-          assistantToolCallIds: expectedIds,
-          detail: `tool message at index ${j} references unexpected id ${id}`
-        });
-      } else {
-        collected.set(id, j);
-      }
-      j++;
-    }
-    const followingRoles = messages.slice(i + 1, Math.min(messages.length, i + 4)).map((m) => m.role);
-    const missing = expectedIds.filter((id) => !collected.has(id));
-    if (missing.length > 0) {
-      violations.push({
-        index: i,
-        kind: "missing_tool_messages",
-        assistantToolCallIds: expectedIds,
-        followingRoles,
-        detail: missing.length === expectedIds.length ? `assistant at index ${i} has tool_calls but next messages are not contiguous tool role (following: ${followingRoles.join(", ") || "none"})` : `assistant at index ${i} missing tool results for: ${missing.join(", ")}`
-      });
-      if (j < messages.length && messages[j].role !== "tool") {
-        const last = violations[violations.length - 1];
-        last.detail += `; blocked by ${messages.slice(i + 1, j + 1).map((m, off) => `${m.role}[${i + 1 + off}]`).join(", ")}`;
-      }
-    }
-  }
-  for (let i = 0;i < messages.length; i++) {
-    if (messages[i].role !== "tool")
-      continue;
-    const id = messages[i].tool_call_id ?? "";
-    if (!id)
-      continue;
-    let found = false;
-    for (let k = i - 1;k >= 0; k--) {
-      const prev = messages[k];
-      if (prev.role === "assistant" && prev.tool_calls?.some((tc) => tc.id === id)) {
-        const between = messages.slice(k + 1, i);
-        if (between.every((m) => m.role === "tool")) {
-          found = true;
-        }
-        break;
-      }
-      if (prev.role === "assistant" || prev.role === "user")
-        break;
-    }
-    if (!found) {
-      violations.push({
-        index: i,
-        kind: "orphan_tool_message",
-        toolCallId: id,
-        detail: `tool message at index ${i} is not immediately after its assistant tool_calls`
-      });
-    }
-  }
-  return { ok: violations.length === 0, violations };
-}
+// src/pi-fit-reclaim.ts
+import { createHash as createHash12, randomUUID as randomUUID4 } from "node:crypto";
 
-// ../plugin/src/hooks/magic-context/lkg-replay.ts
-function canonicalLkgModelKeys(modelKey, providerKey) {
-  const canonicalModelKey = modelKey ? piModelRefToCanonical(modelKey) : null;
-  const slash = canonicalModelKey?.indexOf("/") ?? -1;
-  return {
-    modelKey: canonicalModelKey,
-    providerKey: slash > 0 && canonicalModelKey ? canonicalModelKey.slice(0, slash) : providerKey
-  };
-}
-function recordValue(info, key) {
-  return info && typeof info === "object" ? info[key] : undefined;
-}
-function messageInfo(message) {
-  if (message.info && typeof message.info === "object")
-    return message.info;
-  return message;
-}
-function messageParts(message) {
-  return Array.isArray(message.parts) ? message.parts : [];
-}
-function messageRole(message) {
-  const infoRole = recordValue(messageInfo(message), "role");
-  if (typeof infoRole === "string")
-    return infoRole;
-  const role = recordValue(message, "role");
-  return typeof role === "string" ? role : undefined;
-}
-function messageId2(message) {
-  const id = recordValue(messageInfo(message), "id") ?? recordValue(message, "id");
-  return typeof id === "string" && id.length > 0 ? id : null;
-}
-function entryIdsAreValid(slot, entryIds) {
-  if (slot.inputIdSeq.length === 0 || entryIds.length < slot.inputIdSeq.length)
-    return false;
-  if (slot.inputIdSeq[slot.inputIdSeq.length - 1] !== slot.lastInputMessageId)
-    return false;
-  const seen = new Set;
-  for (const id of entryIds) {
-    if (!id || seen.has(id))
-      return false;
-    seen.add(id);
-  }
-  if (entryIds.indexOf(slot.lastInputMessageId) !== slot.inputIdSeq.length - 1)
-    return false;
-  for (let index = 0;index < slot.inputIdSeq.length; index += 1) {
-    if (entryIds[index] !== slot.inputIdSeq[index])
-      return false;
-  }
-  return true;
-}
-function entryContentIsValid(slot, entry) {
-  return entry.entryContentDigests.length >= slot.inputContentDigests.length && slot.inputContentDigests.every((digest, index) => isLegacyLkgDigest(digest) ? entry.entryLegacyContentDigests?.[index] === digest : entry.entryContentDigests[index] === digest);
-}
-function partCallIds(message) {
-  const ids = [];
-  for (const rawPart of messageParts(message)) {
-    if (!rawPart || typeof rawPart !== "object")
+// src/tokenize-pi-messages.ts
+function tokenizePiMessages(messages, options) {
+  let conversation = 0;
+  let toolCall = 0;
+  let cacheValidationMs = 0;
+  let bpeMs = 0;
+  const liveIds = options ? new Set : undefined;
+  for (const raw of messages) {
+    if (!raw || typeof raw !== "object")
       continue;
-    const part = rawPart;
-    if (part.type !== "tool" && part.type !== "tool_use")
-      continue;
-    const callId = part.callID ?? part.callId ?? part.id;
-    if (typeof callId === "string" && callId.length > 0)
-      ids.push(callId);
-  }
-  return ids;
-}
-function partResultIds(message) {
-  const ids = [];
-  for (const rawPart of messageParts(message)) {
-    if (!rawPart || typeof rawPart !== "object")
-      continue;
-    const part = rawPart;
-    if (part.type !== "tool_result" && part.type !== "tool-result")
-      continue;
-    const callId = part.tool_call_id ?? part.tool_use_id ?? part.callID ?? part.callId;
-    if (typeof callId === "string" && callId.length > 0)
-      ids.push(callId);
-  }
-  return ids;
-}
-function partIsReasoning(part) {
-  return Boolean(part && typeof part === "object" && part.type === "reasoning");
-}
-function partIsAnthropicThinking(part) {
-  if (!part || typeof part !== "object")
-    return false;
-  const type = part.type;
-  return type === "thinking" || type === "reasoning" || type === "redacted_thinking";
-}
-function partEndsAnthropicAssistantRun(part) {
-  if (!part || typeof part !== "object")
-    return false;
-  const value = part;
-  if (value.type !== "tool" || value.providerExecuted === true || !value.state || typeof value.state !== "object") {
-    return false;
-  }
-  const status = value.state.status;
-  return status === "completed" || status === "error";
-}
-function partIsOpenCodeStepMetadata(part) {
-  if (!part || typeof part !== "object")
-    return false;
-  const type = part.type;
-  return type === "step-start" || type === "step-finish";
-}
-function validateAnthropicReasoningRuns(messages) {
-  let index = 0;
-  while (index < messages.length) {
-    if (messageRole(messages[index]) !== "assistant") {
-      index += 1;
-      continue;
+    const cacheValidationStart = options?.onTiming ? performance.now() : 0;
+    const resolvedStableId = options?.stableId(raw);
+    const stableId = resolvedStableId !== undefined && isTokenCacheSafeMessage(raw) ? resolvedStableId : undefined;
+    const fingerprint = stableId === undefined ? null : buildTokenCacheFingerprint(raw);
+    if (stableId !== undefined && fingerprint !== null) {
+      liveIds?.add(stableId);
+      const cached = options?.cache.get(stableId);
+      if (cached && tokenCacheFingerprintsEqual(cached.fingerprint, fingerprint)) {
+        conversation += cached.counts.conversation;
+        toolCall += cached.counts.toolCall;
+        cacheValidationMs += performance.now() - cacheValidationStart;
+        continue;
+      }
     }
-    let firstMessageInRun = null;
-    let sawOtherContent = false;
-    while (index < messages.length && messageRole(messages[index]) === "assistant") {
-      for (const part of messageParts(messages[index])) {
-        if (partEndsAnthropicAssistantRun(part)) {
-          firstMessageInRun = null;
-          sawOtherContent = false;
-        } else if (!partIsOpenCodeStepMetadata(part)) {
-          if (firstMessageInRun === null)
-            firstMessageInRun = index;
-          if (partIsAnthropicThinking(part)) {
-            if (sawOtherContent || index !== firstMessageInRun)
-              return false;
-          } else {
-            sawOtherContent = true;
+    cacheValidationMs += performance.now() - cacheValidationStart;
+    const bpeStart = options?.onTiming ? performance.now() : 0;
+    const beforeConversation = conversation;
+    const beforeToolCall = toolCall;
+    try {
+      const msg = raw;
+      const content = msg.content;
+      if (msg.role === "user" || msg.role === "assistant" || msg.role === "custom") {
+        if (typeof content === "string") {
+          conversation += estimateTokens(content);
+          continue;
+        }
+        if (!Array.isArray(content))
+          continue;
+        let opaqueCounted = false;
+        for (const part of content) {
+          if (!part || typeof part !== "object")
+            continue;
+          const p = part;
+          switch (p.type) {
+            case "text":
+              if (typeof p.text === "string")
+                conversation += estimateTokens(p.text);
+              break;
+            case "thinking":
+            case "redacted_thinking":
+              if (!p.redacted && typeof p.thinking === "string")
+                conversation += estimateTokens(p.thinking);
+              if (!opaqueCounted && (p.redacted || p.type === "redacted_thinking" || !p.thinking && p.thinkingSignature)) {
+                opaqueCounted = true;
+                conversation += opaqueThinkingCost(msg.usage?.reasoning, msg.usage?.output).tokens;
+              }
+              break;
+            case "image":
+              conversation += 1200;
+              break;
+            case "toolCall":
+              if (typeof p.name === "string")
+                toolCall += estimateTokens(p.name);
+              if (p.arguments !== undefined) {
+                const s = typeof p.arguments === "string" ? p.arguments : safeJsonStringify2(p.arguments);
+                if (s)
+                  toolCall += estimateTokens(s);
+              }
+              break;
+          }
+        }
+        continue;
+      }
+      if (msg.role === "toolResult") {
+        if (typeof content === "string") {
+          toolCall += estimateTokens(content);
+          continue;
+        }
+        if (!Array.isArray(content))
+          continue;
+        for (const part of content) {
+          if (!part || typeof part !== "object")
+            continue;
+          const p = part;
+          if (p.type === "text" && typeof p.text === "string") {
+            toolCall += estimateTokens(p.text);
+          } else if (p.type === "image") {
+            toolCall += 1200;
           }
         }
       }
-      index += 1;
-    }
-  }
-  return true;
-}
-function validateLkgSeamBoundary(prefix, tail) {
-  const last = prefix[prefix.length - 1];
-  const first = tail[0];
-  if (!last || !first)
-    return true;
-  const lastCalls = partCallIds(last);
-  if (lastCalls.length === 0)
-    return true;
-  const firstCalls = new Set([...partCallIds(first), ...partResultIds(first)]);
-  if (messageRole(first) === "tool" || lastCalls.some((callId) => firstCalls.has(callId)))
-    return false;
-  return !messageParts(last).some((part) => {
-    if (!part || typeof part !== "object")
-      return false;
-    const value = part;
-    if (value.type !== "tool")
-      return false;
-    const state = value.state;
-    return !state || typeof state !== "object" || state.status !== "completed";
-  });
-}
-function validateLkgSeam(prefix, tail, providerKey) {
-  const all = [...prefix, ...tail];
-  const ids = new Set;
-  const calls = new Set;
-  const results = new Set;
-  for (const message of all) {
-    const id = messageId2(message);
-    if (id !== null) {
-      if (ids.has(id))
-        return false;
-      ids.add(id);
-    }
-    for (const callId of partCallIds(message)) {
-      if (calls.has(callId))
-        return false;
-      calls.add(callId);
-    }
-    for (const callId of partResultIds(message)) {
-      if (results.has(callId))
-        return false;
-      results.add(callId);
-    }
-    if (messageRole(message) !== "assistant" && messageParts(message).some(partIsReasoning))
-      return false;
-    if (providerKey !== "anthropic" && messageParts(message).some((part) => {
-      if (!part || typeof part !== "object")
-        return false;
-      const value = part;
-      return (value.type === "text" || value.type === "reasoning") && value.text === "";
-    }))
-      return false;
-  }
-  if (!validateLkgSeamBoundary(prefix, tail))
-    return false;
-  const wireCandidates = all.map((message) => message);
-  if (wireCandidates.every((message) => typeof message.role === "string")) {
-    const adjacency = assertOpenAiCompatAdjacency(wireCandidates);
-    if (!adjacency.ok)
-      return false;
-    const wireCallIds = new Set;
-    for (const wireMessage of wireCandidates) {
-      for (const call of wireMessage.tool_calls ?? []) {
-        if (wireCallIds.has(call.id))
-          return false;
-        wireCallIds.add(call.id);
+    } finally {
+      bpeMs += performance.now() - bpeStart;
+      if (stableId !== undefined && fingerprint !== null) {
+        options?.cache.set(stableId, {
+          fingerprint,
+          counts: {
+            conversation: conversation - beforeConversation,
+            toolCall: toolCall - beforeToolCall
+          }
+        });
       }
     }
   }
+  if (options && liveIds) {
+    const cachePruneStart = options.onTiming ? performance.now() : 0;
+    for (const id of options.cache.keys()) {
+      if (!liveIds.has(id))
+        options.cache.delete(id);
+    }
+    options.onTiming?.("cachePrune", performance.now() - cachePruneStart);
+  }
+  options?.onTiming?.("cacheValidation", cacheValidationMs);
+  options?.onTiming?.("bpe", bpeMs);
+  return { conversation, toolCall };
+}
+function buildTokenCacheFingerprint(value) {
+  const message = value;
+  const role = typeof message.role === "string" ? message.role : null;
+  const fingerprint = [
+    role,
+    String(message.usage?.reasoning ?? ""),
+    String(message.usage?.output ?? "")
+  ];
+  if (role !== "user" && role !== "assistant" && role !== "toolResult" && role !== "custom") {
+    return fingerprint;
+  }
+  if (typeof message.content === "string") {
+    fingerprint.push("string", message.content);
+    return fingerprint;
+  }
+  if (!Array.isArray(message.content)) {
+    fingerprint.push("non-array");
+    return fingerprint;
+  }
+  fingerprint.push("parts");
+  for (const rawPart of message.content) {
+    if (!rawPart || typeof rawPart !== "object")
+      continue;
+    const part = rawPart;
+    if (role === "toolResult") {
+      if (part.type === "text" && typeof part.text === "string") {
+        fingerprint.push("text", part.text);
+      } else if (part.type === "image") {
+        fingerprint.push("image");
+      }
+      continue;
+    }
+    switch (part.type) {
+      case "text":
+        fingerprint.push("text", typeof part.text === "string" ? part.text : null, typeof part.textSignature === "string" ? part.textSignature : null);
+        break;
+      case "thinking":
+      case "redacted_thinking":
+        fingerprint.push(part.type, String(part.redacted ?? false), typeof part.thinking === "string" ? part.thinking : null, typeof part.thinkingSignature === "string" ? part.thinkingSignature : null);
+        break;
+      case "image":
+        fingerprint.push("image");
+        break;
+      case "toolCall": {
+        const argumentsJson = part.arguments === undefined ? null : typeof part.arguments === "string" ? part.arguments : safeJsonStringify2(part.arguments);
+        fingerprint.push("toolCall", typeof part.name === "string" ? part.name : null, argumentsJson);
+        break;
+      }
+    }
+  }
+  return fingerprint;
+}
+function piOpaqueThinkingFallbackSteps(messages) {
+  return messages.filter((raw) => {
+    if (!raw || typeof raw !== "object")
+      return false;
+    const message = raw;
+    return opaqueThinkingCost(message.usage?.reasoning, message.usage?.output).fallback && Array.isArray(message.content) && message.content.some((p) => p && (p.type === "redacted_thinking" || p.type === "thinking" && (p.redacted || !p.thinking && p.thinkingSignature)));
+  }).length;
+}
+function piFitMessageBytes(raw) {
+  const message = raw;
+  const opaque = Array.isArray(message.content) && message.content.some((p) => p && (p.type === "redacted_thinking" || p.type === "thinking" && (p.redacted || !p.thinking && p.thinkingSignature)));
+  if (!opaque && (!Array.isArray(message.content) || !message.content.some((part) => part && (part.type === "thinking" && part.thinkingSignature !== undefined || part.type === "text" && part.textSignature !== undefined))))
+    return Buffer.byteLength(JSON.stringify(raw));
+  const content = Array.isArray(message.content) ? message.content.map((part) => {
+    if (!part || typeof part !== "object")
+      return part;
+    if (part.type === "redacted_thinking" || part.type === "thinking" && part.redacted)
+      return { type: part.type, redacted: true };
+    if (part.type === "thinking") {
+      const plain = { ...part };
+      delete plain.thinkingSignature;
+      return plain;
+    }
+    if (part.type === "text") {
+      const plain = { ...part };
+      delete plain.textSignature;
+      return plain;
+    }
+    return part;
+  }) : undefined;
+  const bytes = Buffer.byteLength(JSON.stringify(content ? { ...message, content } : raw));
+  return bytes + (opaque ? 4 * opaqueThinkingCost(message.usage?.reasoning, message.usage?.output).tokens : 0);
+}
+function tokenCacheFingerprintsEqual(left, right) {
+  if (left.length !== right.length)
+    return false;
+  for (let index = 0;index < left.length; index += 1) {
+    if (left[index] !== right[index])
+      return false;
+  }
   return true;
 }
-function replayLkg(args) {
-  const slot = getSlot(args.sessionId);
-  if (!slot)
-    return { ok: false, reason: "lkg_invalidated_reshape" };
-  const requestedModelKeys = canonicalLkgModelKeys(args.modelKey, args.providerKey);
-  const capturedModelKeys = canonicalLkgModelKeys(slot.modelKey, slot.providerKey);
-  if (capturedModelKeys.modelKey !== requestedModelKeys.modelKey || capturedModelKeys.providerKey !== requestedModelKeys.providerKey) {
-    dropSlot(args.sessionId, "lkg_model_mismatch");
-    return { ok: false, reason: "lkg_model_mismatch" };
+function isTokenCacheSafeMessage(value) {
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null)
+    return false;
+  if ("toJSON" in value)
+    return false;
+  if (!isJsonVisibleDataProperty(value, "role") || !isJsonVisibleDataProperty(value, "content")) {
+    return false;
   }
-  const entry = args.entry ?? noteEntry(args.sessionId, args.messages);
-  if (!entry || entry.anchorIndex !== slot.inputIdSeq.length - 1 || !entryIdsAreValid(slot, entry.entryInputIds)) {
-    dropSlot(args.sessionId, "lkg_invalidated_reshape");
-    return { ok: false, reason: "lkg_invalidated_reshape" };
+  return isPlainJsonData(value.content, new Set);
+}
+function isJsonVisibleDataProperty(value, key) {
+  if (!(key in value))
+    return true;
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor !== undefined && descriptor.enumerable === true && "value" in descriptor;
+}
+function isPlainJsonData(value, seen) {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean" || typeof value === "undefined") {
+    return true;
   }
-  if (!entryContentIsValid(slot, entry)) {
-    dropSlot(args.sessionId, "lkg_content_mismatch");
-    return { ok: false, reason: "lkg_content_mismatch" };
+  if (typeof value !== "object" || seen.has(value))
+    return false;
+  const prototype = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+    return false;
   }
-  let prefix;
+  if ("toJSON" in value)
+    return false;
+  seen.add(value);
   try {
-    const parsed = JSON.parse(slot.jsonPrefix);
-    if (!Array.isArray(parsed))
-      throw new Error("prefix is not an array");
-    prefix = parsed;
+    for (const key of Reflect.ownKeys(value)) {
+      if (Array.isArray(value) && key === "length")
+        continue;
+      if (typeof key !== "string")
+        return false;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor?.enumerable || !("value" in descriptor)) {
+        return false;
+      }
+      if (!isPlainJsonData(descriptor.value, seen))
+        return false;
+    }
+    return true;
+  } finally {
+    seen.delete(value);
+  }
+}
+function safeJsonStringify2(value) {
+  try {
+    return JSON.stringify(value);
   } catch {
-    dropSlot(args.sessionId, "lkg_seam_invalid");
-    return { ok: false, reason: "lkg_seam_invalid" };
+    return "";
   }
-  const replayed = [...prefix, ...entry.pristineTail];
-  args.prepareReplay?.(replayed);
-  if (!args.skipSeamValidation) {
-    if (!validateLkgSeamBoundary(prefix, entry.pristineTail)) {
-      dropSlot(args.sessionId, "lkg_unsafe_seam");
-      return { ok: false, reason: "lkg_unsafe_seam" };
+}
+
+// src/pi-fit-reclaim.ts
+var pendingInput = new Set;
+var KEY2 = "piUpperEstimateReclaim";
+function piFitOverflowPossible(args) {
+  if (!args.hasUI && args.inputTokens <= 0 || args.recoveryArmed || args.forceMaterialization || args.imported || args.coldInjection || args.cacheBusting || pendingInput.has(args.sessionId))
+    return true;
+  if (!args.contextLimit || !Number.isFinite(args.contextLimit))
+    return false;
+  const headroom = args.contextLimit * ((args.forcePercentage ?? 85) / 100) - args.inputTokens;
+  let appendedBytes = 0;
+  try {
+    for (const message of args.appendedMessages ?? []) {
+      appendedBytes += piFitMessageBytes(message);
+      if (2 * appendedBytes >= headroom)
+        return true;
     }
-    if (!validateLkgSeam(prefix, entry.pristineTail, requestedModelKeys.providerKey)) {
-      dropSlot(args.sessionId, "lkg_seam_invalid");
-      return { ok: false, reason: "lkg_seam_invalid" };
-    }
+  } catch {
+    return true;
   }
-  if (requestedModelKeys.providerKey === "anthropic" && !validateAnthropicReasoningRuns(replayed)) {
-    dropSlot(args.sessionId, "lkg_anthropic_reasoning_run_invalid");
-    return { ok: false, reason: "lkg_anthropic_reasoning_run_invalid" };
-  }
-  return { ok: true, messages: replayed };
+  return false;
+}
+function clearPiUpperReclaimSession(sessionId) {
+  pendingInput.delete(sessionId);
+}
+function requestPiFitReclaimInput(sessionId) {
+  pendingInput.add(sessionId);
+}
+function clearPiFitReclaimInput(sessionId) {
+  pendingInput.delete(sessionId);
+}
+function piUpperReclaimCursor(args) {
+  const head = args.head;
+  return {
+    sessionId: args.sessionId,
+    modelKey: args.modelKey,
+    contextWindow: args.contextWindow ?? null,
+    head: head ? createHash12("sha256").update(JSON.stringify([
+      Buffer.from(head.cachedM0Bytes ?? []).toString("base64"),
+      Buffer.from(head.cachedM1Bytes ?? []).toString("base64"),
+      head.cachedM0MuralDataUrl ?? null
+    ])).digest("hex") : null,
+    recoveryArmedAt: getEmergencyRecoveryArmedAt(args.sessionId)
+  };
+}
+function claimFrom(value, sessionId) {
+  const claim = value;
+  return claim?.sessionId === sessionId && (typeof claim.modelKey === "string" || claim.modelKey === null) ? claim : null;
+}
+function canReclaim(previous, cursor) {
+  return !previous || previous.modelKey !== cursor.modelKey || (previous.contextWindow ?? null) !== cursor.contextWindow || (previous.head ?? null) !== cursor.head || cursor.recoveryArmedAt !== null && cursor.recoveryArmedAt !== previous.recoveryArmedAt;
+}
+function shouldReclaimPiUpperEstimate(db, cursor) {
+  if (!cursor)
+    return false;
+  return canReclaim(claimFrom(readReplayEnvelope(db, cursor.sessionId)[KEY2], cursor.sessionId), cursor);
+}
+function reservePiUpperEstimateReclaim(db, cursor) {
+  const reservation = randomUUID4();
+  return db.transaction(() => {
+    let claimed = false;
+    if (!updateReplayDocument(db, cursor.sessionId, (doc) => {
+      claimed = canReclaim(claimFrom(doc[KEY2], cursor.sessionId), cursor);
+      if (!claimed)
+        return false;
+      doc.version = 2;
+      doc[KEY2] = { ...cursor, reservation };
+      return true;
+    }))
+      throw new Error("Could not reserve upper-estimate reclaim");
+    return claimed ? reservation : undefined;
+  }).immediate();
+}
+function recordPiUpperEstimateReclaim(db, cursor, reservation) {
+  const owner = reservation ?? reservePiUpperEstimateReclaim(db, cursor);
+  if (!owner)
+    return;
+  if (!updateReplayDocument(db, cursor.sessionId, (doc) => {
+    if (claimFrom(doc[KEY2], cursor.sessionId)?.reservation !== owner)
+      return false;
+    doc.version = 2;
+    doc[KEY2] = cursor;
+    return true;
+  }))
+    throw new Error("Could not persist upper-estimate reclaim cursor");
+  pendingInput.delete(cursor.sessionId);
+}
+function releasePiUpperEstimateReclaim(db, cursor, reservation) {
+  if (!updateReplayDocument(db, cursor.sessionId, (doc) => {
+    if (claimFrom(doc[KEY2], cursor.sessionId)?.reservation !== reservation)
+      return false;
+    delete doc[KEY2];
+    return true;
+  }))
+    throw new Error("Could not release upper-estimate reclaim");
+}
+function resetPiUpperEstimateReclaim(db, sessionId) {
+  if (!claimFrom(readReplayEnvelope(db, sessionId)[KEY2], sessionId))
+    return;
+  if (!updateReplayDocument(db, sessionId, (doc) => {
+    delete doc[KEY2];
+    return true;
+  }))
+    throw new Error("Could not clear upper-estimate reclaim cursor");
 }
 
 // src/pi-lkg.ts
@@ -32671,6 +35253,7 @@ function clearPiLkgSessionState(sessionId) {
   if (state)
     state.captureSequence += 1;
   piLkgSessionStates.delete(sessionId);
+  clearLkgFenceProcessState(sessionId);
 }
 
 class PiLkgUncapturable extends Error {
@@ -32872,6 +35455,36 @@ function piProviderInput(message) {
   delete descriptors.contextSnapshot;
   return Object.create(Object.getPrototypeOf(message), descriptors);
 }
+function restorePiLkgInputForFit(snapshot, branchEntries) {
+  if (!snapshot || snapshot.preparationFailure || !branchEntries || !snapshot.inputs.length)
+    return;
+  const byId = new Map;
+  for (const value of branchEntries) {
+    const entry = value;
+    if (entry?.type !== "message" || typeof entry.id !== "string")
+      continue;
+    if (byId.has(entry.id))
+      return;
+    byId.set(entry.id, entry.message);
+  }
+  const input = [];
+  for (const saved of snapshot.inputs) {
+    if (!byId.has(saved.id))
+      return;
+    const message = byId.get(saved.id);
+    if (!message || typeof message !== "object" || Array.isArray(message) || Object.hasOwn(message, "parts"))
+      return;
+    const fields = plainJsonFields(snapshot.omitsBookkeeping ? piProviderInput(message) : message);
+    if (!fields || fields.length !== saved.fields.length || fields.some((field, i) => field !== saved.fields[i]))
+      return;
+    input.push(message);
+  }
+  try {
+    return structuredClone(input);
+  } catch {
+    return;
+  }
+}
 function extendsMeasuredRequest(measuredJson, nextJson) {
   return measuredJson === nextJson || measuredJson.length > 2 && nextJson.startsWith(`${measuredJson.slice(0, -1)},`);
 }
@@ -32891,11 +35504,57 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
     }
     return state;
   };
+  const recoveryFor = (snapshot) => {
+    const state = stateFor(snapshot.sessionId);
+    const prefix = state.recoveryPrefix;
+    if (!prefix) {
+      const slot = getSlot(snapshot.sessionId);
+      return lkgRecoveryFenceUnclean(snapshot.sessionId) || slot && lkgFenceRequiresRebuild(snapshot.sessionId, state.acceptedInputs ? slot : loadPersistedLkgSlot(db, snapshot.sessionId) ?? slot, !!state.acceptedInputs) ? { rebuildReason: "lkg_restart_rebuild" } : {};
+    }
+    const durableSlot = loadPersistedLkgSlot(db, snapshot.sessionId) ?? getSlot(snapshot.sessionId);
+    if (snapshot.preparationFailure || !durableSlot || !ownsLkgDirtyFence(snapshot.sessionId, prefix.fenceRevision) || prefix.modelKey !== snapshot.modelKey || prefix.providerKey !== snapshot.providerKey || JSON.stringify(prefix.systemEntries) !== JSON.stringify(snapshot.systemEntries) || exactReusablePrefix(snapshot.inputs, prefix.inputs) !== prefix.inputs.length)
+      return { rebuildReason: "lkg_recovery_input_rebuild" };
+    return { prefix };
+  };
+  const noteRecovery = (snapshot, messages) => {
+    const state = stateFor(snapshot.sessionId);
+    const anchor = snapshot.replayAnchorInputIndex;
+    const slot = getSlot(snapshot.sessionId);
+    if (snapshot.preparationFailure || anchor === null || !slot?.piOutputEntryIds)
+      throw new PiLkgUncapturable("lkg_output_mapping_unavailable", "Cannot retain recovered output ownership");
+    const surviving = new Set(snapshot.inputs.map((input) => input.id));
+    const outputEntryIds = [
+      ...slot.piOutputEntryIds.filter((id) => id === null || surviving.has(id)),
+      ...snapshot.inputs.slice(anchor + 1).map((input) => input.id)
+    ];
+    if (outputEntryIds.length !== messages.length)
+      throw new PiLkgUncapturable("lkg_output_mapping_unavailable", "Recovered output ownership does not match the served array");
+    state.recoveryPrefix = {
+      fenceRevision: markLkgRecoveryDirty({
+        sessionId: snapshot.sessionId,
+        slot,
+        processLocalProof: !!state.acceptedInputs,
+        ownDirtyRevision: state.recoveryPrefix?.fenceRevision
+      }),
+      modelKey: snapshot.modelKey,
+      providerKey: snapshot.providerKey,
+      systemEntries: snapshot.systemEntries,
+      inputs: snapshot.inputs,
+      json: JSON.stringify(messages),
+      outputEntryIds,
+      untaggedInputIds: new Set([
+        ...state.recoveryPrefix?.untaggedInputIds ?? [],
+        ...snapshot.inputs.slice(anchor + 1).map((input) => input.id)
+      ])
+    };
+  };
   const beginPass = (args) => {
-    const snapped = snapshotInputs(args.messages, args.entryIds, omitsRootBookkeeping(args));
+    const omitsBookkeeping = omitsRootBookkeeping(args);
+    const snapped = snapshotInputs(args.messages, args.entryIds, omitsBookkeeping);
     const slot = getSlot(args.sessionId);
     if (snapped.failure || !slot) {
       return {
+        omitsBookkeeping,
         sessionId: args.sessionId,
         inputs: snapped.inputs,
         preparationFailure: snapped.failure,
@@ -32909,6 +35568,7 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
     const stableAnchorIndex = snapped.inputs.findIndex((input) => input.id === slot.lastInputMessageId);
     if (stableAnchorIndex < 0) {
       return {
+        omitsBookkeeping,
         sessionId: args.sessionId,
         inputs: snapped.inputs,
         preparationFailure: null,
@@ -32922,6 +35582,7 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
     const messageAnchorIndex = snapped.inputs[stableAnchorIndex]?.messageIndex;
     if (messageAnchorIndex === undefined) {
       return {
+        omitsBookkeeping,
         sessionId: args.sessionId,
         inputs: snapped.inputs,
         preparationFailure: null,
@@ -32934,6 +35595,7 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
     }
     try {
       return {
+        omitsBookkeeping,
         sessionId: args.sessionId,
         inputs: snapped.inputs,
         preparationFailure: null,
@@ -32945,6 +35607,7 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
       };
     } catch {
       return {
+        omitsBookkeeping,
         sessionId: args.sessionId,
         inputs: snapped.inputs,
         preparationFailure: null,
@@ -32987,7 +35650,8 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
       modelKey: piModelRefToCanonical(request.modelKey).toLowerCase(),
       inputTokens: request.usage.inputTokens,
       envelopeSignature: request.envelopeSignature,
-      appendedMessages
+      appendedMessages,
+      previousMessages: JSON.parse(request.jsonPrefix)
     };
   };
   const replay = (snapshot, parentOf) => {
@@ -33207,7 +35871,10 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
         if (args.publishServedNumbers) {
           if (lkgSlotRejection(plan.sessionId, slot))
             throw new PiLkgUncapturable("lkg_slot_rejected", "LKG slot rejected the Pi snapshot");
-          if (!saveLkgSlotToDb(db, plan.sessionId, slot, args.publishServedNumbers)) {
+          if (!saveLkgSlotToDb(db, plan.sessionId, slot, args.publishServedNumbers, {
+            rebuild: args.releaseRecovery,
+            retainDirtyRevision: !args.releaseRecovery ? state.recoveryPrefix?.fenceRevision : undefined
+          })) {
             throw new Error("Pi LKG/served publication failed");
           }
           args.assertCurrentPass?.();
@@ -33217,7 +35884,18 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
         }
         state.acceptedInputs = plan.inputs;
         state.acceptedSlot = slot;
-        const persisted = args.publishServedNumbers ? true : saveLkgSlotToDb(db, plan.sessionId, slot);
+        if (state.recoveryPrefix) {
+          state.recoveryPrefix = args.releaseRecovery ? undefined : {
+            ...state.recoveryPrefix,
+            inputs: plan.inputs,
+            json: plan.jsonPrefix,
+            outputEntryIds: ownership ?? state.recoveryPrefix.outputEntryIds
+          };
+        }
+        const persisted = args.publishServedNumbers ? true : saveLkgSlotToDb(db, plan.sessionId, slot, undefined, {
+          rebuild: args.releaseRecovery,
+          retainDirtyRevision: state.recoveryPrefix?.fenceRevision
+        });
         state.syncCaptureRequired = !persisted;
         if (args.publishServedNumbers)
           noteCapturedRequest();
@@ -33264,6 +35942,8 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
     return state.outputSnapshot ?? undefined;
   };
   return {
+    noteRecovery,
+    recoveryFor,
     beginPass(args) {
       return {
         ...beginPass(args),
@@ -33682,20 +36362,21 @@ function capturePiServedArray(sessionId, messages, options = {}) {
     const digest = sha256(serializedArray);
     const storageDir = options.storageDir ?? getMagicContextStorageDir();
     identityPersistenceFailed = true;
-    const previousNumbers = getPiServedTagNumbers(sessionId, storageDir);
+    const previousNumbers = options.recoveryWithoutTagState ? new Set : getPiServedTagNumbers(sessionId, storageDir);
+    const managedNumbers = options.recoveryWithoutTagState ? [] : options.servedTagNumbers ?? [];
     identityPersistenceFailed = false;
     const served = new Set(previousNumbers);
-    if (options.db) {
+    if (options.db && !options.recoveryWithoutTagState) {
       identityPersistenceFailed = true;
       for (const number of readPiCommittedServedNumbers(options.db, sessionId))
         served.add(number);
-      for (const number of options.servedTagNumbers ?? []) {
+      for (const number of managedNumbers) {
         if (!served.has(number))
           throw new PiServedIdentityError(new Error("Pi identities have no committed LKG"));
       }
       identityPersistenceFailed = false;
     }
-    for (const number of options.servedTagNumbers ?? []) {
+    for (const number of managedNumbers) {
       if (Number.isSafeInteger(number) && number > 0)
         served.add(number);
     }
@@ -33759,17 +36440,17 @@ function capturePiServedArray(sessionId, messages, options = {}) {
 process.once("beforeExit", flushPiServedArrayLedger);
 
 // src/pi-tool-identity.ts
-function record4(value) {
+function record5(value) {
   return value !== null && typeof value === "object" ? value : undefined;
 }
 function contentParts(message) {
   return Array.isArray(message.content) ? message.content.flatMap((part) => {
-    const p = record4(part);
+    const p = record5(part);
     return p ? [p] : [];
   }) : [];
 }
 function piAssistantToolIdentity(message) {
-  const m = record4(message);
+  const m = record5(message);
   if (m?.role !== "assistant" || typeof m.timestamp !== "number" || !Number.isFinite(m.timestamp))
     return;
   const ids = contentParts(m).filter((p) => p.type === "toolCall").map((p) => p.id);
@@ -33798,7 +36479,7 @@ function piRenderedTagNumbers(messages) {
       if (part.type === "text")
         readText(part.text);
       else if (part.type === "toolCall") {
-        const args = record4(part.arguments);
+        const args = record5(part.arguments);
         const keys = args ? Object.keys(args) : [];
         const value = keys.length === 1 ? args?.dropped : undefined;
         const match = typeof value === "string" ? DROPPED_INPUT_VALUE.exec(value) : null;
@@ -33846,7 +36527,7 @@ function readPiServedCachedArray(sessionId) {
   if (!Array.isArray(parsed))
     return;
   const messages = parsed.flatMap((m) => {
-    const r = record4(m);
+    const r = record5(m);
     return r ? [r] : [];
   });
   return { jsonPrefix, messages };
@@ -34226,232 +36907,6 @@ function resolvePiProvenInputFloor(args) {
   return observed;
 }
 
-// src/tokenize-pi-messages.ts
-function tokenizePiMessages(messages, options) {
-  let conversation = 0;
-  let toolCall = 0;
-  let cacheValidationMs = 0;
-  let bpeMs = 0;
-  const liveIds = options ? new Set : undefined;
-  for (const raw of messages) {
-    if (!raw || typeof raw !== "object")
-      continue;
-    const cacheValidationStart = options?.onTiming ? performance.now() : 0;
-    const resolvedStableId = options?.stableId(raw);
-    const stableId = resolvedStableId !== undefined && isTokenCacheSafeMessage(raw) ? resolvedStableId : undefined;
-    const fingerprint = stableId === undefined ? null : buildTokenCacheFingerprint(raw);
-    if (stableId !== undefined && fingerprint !== null) {
-      liveIds?.add(stableId);
-      const cached = options?.cache.get(stableId);
-      if (cached && tokenCacheFingerprintsEqual(cached.fingerprint, fingerprint)) {
-        conversation += cached.counts.conversation;
-        toolCall += cached.counts.toolCall;
-        cacheValidationMs += performance.now() - cacheValidationStart;
-        continue;
-      }
-    }
-    cacheValidationMs += performance.now() - cacheValidationStart;
-    const bpeStart = options?.onTiming ? performance.now() : 0;
-    const beforeConversation = conversation;
-    const beforeToolCall = toolCall;
-    try {
-      const msg = raw;
-      const content = msg.content;
-      if (msg.role === "user" || msg.role === "assistant") {
-        if (typeof content === "string") {
-          conversation += estimateTokens(content);
-          continue;
-        }
-        if (!Array.isArray(content))
-          continue;
-        for (const part of content) {
-          if (!part || typeof part !== "object")
-            continue;
-          const p = part;
-          switch (p.type) {
-            case "text":
-              if (typeof p.text === "string")
-                conversation += estimateTokens(p.text);
-              if (typeof p.textSignature === "string")
-                conversation += estimateTokens(p.textSignature);
-              break;
-            case "thinking":
-              if (typeof p.thinking === "string")
-                conversation += estimateTokens(p.thinking);
-              if (typeof p.thinkingSignature === "string")
-                conversation += estimateTokens(p.thinkingSignature);
-              break;
-            case "image":
-              conversation += 1200;
-              break;
-            case "toolCall":
-              if (typeof p.name === "string")
-                toolCall += estimateTokens(p.name);
-              if (p.arguments !== undefined) {
-                const s = typeof p.arguments === "string" ? p.arguments : safeJsonStringify2(p.arguments);
-                if (s)
-                  toolCall += estimateTokens(s);
-              }
-              break;
-          }
-        }
-        continue;
-      }
-      if (msg.role === "toolResult") {
-        if (typeof content === "string") {
-          toolCall += estimateTokens(content);
-          continue;
-        }
-        if (!Array.isArray(content))
-          continue;
-        for (const part of content) {
-          if (!part || typeof part !== "object")
-            continue;
-          const p = part;
-          if (p.type === "text" && typeof p.text === "string") {
-            toolCall += estimateTokens(p.text);
-          } else if (p.type === "image") {
-            toolCall += 1200;
-          }
-        }
-      }
-    } finally {
-      bpeMs += performance.now() - bpeStart;
-      if (stableId !== undefined && fingerprint !== null) {
-        options?.cache.set(stableId, {
-          fingerprint,
-          counts: {
-            conversation: conversation - beforeConversation,
-            toolCall: toolCall - beforeToolCall
-          }
-        });
-      }
-    }
-  }
-  if (options && liveIds) {
-    const cachePruneStart = options.onTiming ? performance.now() : 0;
-    for (const id of options.cache.keys()) {
-      if (!liveIds.has(id))
-        options.cache.delete(id);
-    }
-    options.onTiming?.("cachePrune", performance.now() - cachePruneStart);
-  }
-  options?.onTiming?.("cacheValidation", cacheValidationMs);
-  options?.onTiming?.("bpe", bpeMs);
-  return { conversation, toolCall };
-}
-function buildTokenCacheFingerprint(value) {
-  const message = value;
-  const role = typeof message.role === "string" ? message.role : null;
-  const fingerprint = [role];
-  if (role !== "user" && role !== "assistant" && role !== "toolResult") {
-    return fingerprint;
-  }
-  if (typeof message.content === "string") {
-    fingerprint.push("string", message.content);
-    return fingerprint;
-  }
-  if (!Array.isArray(message.content)) {
-    fingerprint.push("non-array");
-    return fingerprint;
-  }
-  fingerprint.push("parts");
-  for (const rawPart of message.content) {
-    if (!rawPart || typeof rawPart !== "object")
-      continue;
-    const part = rawPart;
-    if (role === "toolResult") {
-      if (part.type === "text" && typeof part.text === "string") {
-        fingerprint.push("text", part.text);
-      } else if (part.type === "image") {
-        fingerprint.push("image");
-      }
-      continue;
-    }
-    switch (part.type) {
-      case "text":
-        fingerprint.push("text", typeof part.text === "string" ? part.text : null, typeof part.textSignature === "string" ? part.textSignature : null);
-        break;
-      case "thinking":
-        fingerprint.push("thinking", typeof part.thinking === "string" ? part.thinking : null, typeof part.thinkingSignature === "string" ? part.thinkingSignature : null);
-        break;
-      case "image":
-        fingerprint.push("image");
-        break;
-      case "toolCall": {
-        const argumentsJson = part.arguments === undefined ? null : typeof part.arguments === "string" ? part.arguments : safeJsonStringify2(part.arguments);
-        fingerprint.push("toolCall", typeof part.name === "string" ? part.name : null, argumentsJson);
-        break;
-      }
-    }
-  }
-  return fingerprint;
-}
-function tokenCacheFingerprintsEqual(left, right) {
-  if (left.length !== right.length)
-    return false;
-  for (let index = 0;index < left.length; index += 1) {
-    if (left[index] !== right[index])
-      return false;
-  }
-  return true;
-}
-function isTokenCacheSafeMessage(value) {
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null)
-    return false;
-  if ("toJSON" in value)
-    return false;
-  if (!isJsonVisibleDataProperty(value, "role") || !isJsonVisibleDataProperty(value, "content")) {
-    return false;
-  }
-  return isPlainJsonData(value.content, new Set);
-}
-function isJsonVisibleDataProperty(value, key) {
-  if (!(key in value))
-    return true;
-  const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  return descriptor !== undefined && descriptor.enumerable === true && "value" in descriptor;
-}
-function isPlainJsonData(value, seen) {
-  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean" || typeof value === "undefined") {
-    return true;
-  }
-  if (typeof value !== "object" || seen.has(value))
-    return false;
-  const prototype = Object.getPrototypeOf(value);
-  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
-    return false;
-  }
-  if ("toJSON" in value)
-    return false;
-  seen.add(value);
-  try {
-    for (const key of Reflect.ownKeys(value)) {
-      if (Array.isArray(value) && key === "length")
-        continue;
-      if (typeof key !== "string")
-        return false;
-      const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (!descriptor?.enumerable || !("value" in descriptor)) {
-        return false;
-      }
-      if (!isPlainJsonData(descriptor.value, seen))
-        return false;
-    }
-    return true;
-  } finally {
-    seen.delete(value);
-  }
-}
-function safeJsonStringify2(value) {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return "";
-  }
-}
-
 // src/pi-raw-fallback.ts
 class PiStorageBusyError extends Error {
   code = "PI_STORAGE_BUSY";
@@ -34475,35 +36930,39 @@ class PiDegradedPassError extends Error {
 function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, contextLimit) {
   if (!observed || !Number.isFinite(observed.systemTokens) || observed.systemTokens <= 0 || !Number.isFinite(observed.toolDefinitionTokens) || observed.toolDefinitionTokens < 0 || !hasTokenizerForFit())
     return { tokens: 0, trusted: false };
-  const complete = messages.every((message) => {
+  const knownRole = (message) => {
     if (!message || typeof message !== "object")
       return false;
+    return ["user", "assistant", "toolResult", "custom"].includes(message.role ?? "");
+  };
+  const countable = (message) => {
+    if (!knownRole(message))
+      return false;
     const m = message;
-    return ["user", "assistant", "toolResult"].includes(m.role ?? "") && (typeof m.content === "string" || Array.isArray(m.content) && m.content.every((p) => p && typeof p === "object" && ["text", "thinking", "toolCall"].includes(String(p.type))));
-  });
-  if (!complete)
-    return { tokens: 0, trusted: false };
+    return typeof m.content === "string" || Array.isArray(m.content) && m.content.every((p) => p && typeof p === "object" && ["text", "thinking", "redacted_thinking", "toolCall"].includes(String(p.type)));
+  };
+  const complete = messages.every(countable);
   const measuredForBounds = measuredPrefix && measuredPrefix.modelKey === observed.modelKey && observed.envelopeSignature && measuredPrefix.envelopeSignature === observed.envelopeSignature && Number.isSafeInteger(measuredPrefix.inputTokens) && measuredPrefix.inputTokens > 0 ? measuredPrefix : undefined;
   if (contextLimit && Number.isFinite(contextLimit) && contextLimit > 0) {
     const priced = measuredForBounds?.appendedMessages ?? messages;
     const baseline = measuredForBounds?.inputTokens ?? 0;
     let contentBytes = 0;
-    for (const rawMessage of priced) {
+    for (const rawMessage of priced.filter(knownRole)) {
       const message = rawMessage;
       if (typeof message.content === "string")
         contentBytes += Buffer.byteLength(message.content);
-      else
+      else if (Array.isArray(message.content))
         for (const part of message.content) {
+          if (!part || typeof part !== "object")
+            continue;
           for (const value of [
-            part.text,
-            part.thinking,
-            part.thinkingSignature,
-            part.textSignature,
-            part.name
+            part.type === "text" ? part.text : undefined,
+            part.type === "thinking" && !part.redacted ? part.thinking : undefined,
+            part.type === "toolCall" ? part.name : undefined
           ])
             if (typeof value === "string")
               contentBytes += Buffer.byteLength(value);
-          if (part.arguments !== undefined)
+          if (part.type === "toolCall" && part.arguments !== undefined)
             contentBytes += Buffer.byteLength(JSON.stringify(part.arguments));
         }
       if (baseline + Math.ceil(contentBytes / 4) > contextLimit)
@@ -34523,7 +36982,7 @@ function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, conte
       tools: observed.toolDefinitionTokens
     }, observed.calibration ?? calibrationForModelKey(observed.modelKey), true);
     const fit = observed.calibration ?? calibrationForModelKey(observed.modelKey);
-    const upper = envelope + Math.max(UNKNOWN_FIT_RATIO, fit.toolsRatio, fit.proseRatio) * Buffer.byteLength(JSON.stringify(priced));
+    const upper = envelope + Math.max(UNKNOWN_FIT_RATIO, fit.toolsRatio, fit.proseRatio) * priced.reduce((sum, message) => sum + piFitMessageBytes(message), 0);
     if (upper <= contextLimit)
       return {
         tokens: upper,
@@ -34532,15 +36991,23 @@ function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, conte
         refusalBasis: "byte-bound"
       };
   }
+  if (!complete) {
+    return {
+      tokens: providerMass({
+        system: observed.systemTokens,
+        tools: observed.toolDefinitionTokens + messages.reduce((sum, message) => sum + piFitMessageBytes(message), 0)
+      }, observed.calibration ?? calibrationForModelKey(observed.modelKey), true),
+      trusted: true,
+      refusalGrade: false
+    };
+  }
   const bounded = messages.some((rawMessage) => {
     const content = rawMessage.content;
     if (typeof content === "string")
       return tokenCountUsesByteBound(content);
     return content.some((part) => [
       part.text,
-      part.thinking,
-      part.thinkingSignature,
-      part.textSignature,
+      part.redacted ? undefined : part.thinking,
       part.name,
       part.arguments === undefined ? undefined : JSON.stringify(part.arguments)
     ].some((value) => typeof value === "string" && tokenCountUsesByteBound(value)));
@@ -34549,7 +37016,7 @@ function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, conte
     return {
       tokens: providerMass({
         system: observed.systemTokens,
-        tools: observed.toolDefinitionTokens + Buffer.byteLength(JSON.stringify(messages))
+        tools: observed.toolDefinitionTokens + messages.reduce((sum, message) => sum + piFitMessageBytes(message), 0)
       }, observed.calibration ?? calibrationForModelKey(observed.modelKey), true),
       trusted: true,
       refusalGrade: false,
@@ -34569,9 +37036,7 @@ function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, conte
       return !tokenCountUsesByteBound(content);
     return content.every((part) => [
       part.text,
-      part.thinking,
-      part.thinkingSignature,
-      part.textSignature,
+      part.redacted ? undefined : part.thinking,
       part.name,
       part.arguments === undefined ? undefined : JSON.stringify(part.arguments)
     ].every((value) => typeof value !== "string" || !tokenCountUsesByteBound(value)));
@@ -34604,12 +37069,7 @@ function assertPiRawFallbackFits(messages, contextLimit, log, cause, observed, m
   let serializationFailed = false;
   try {
     for (const message of pricedMessages) {
-      const serialized = JSON.stringify(message);
-      if (typeof serialized !== "string") {
-        serializationFailed = true;
-        break;
-      }
-      bytes += Buffer.byteLength(serialized) + 1;
+      bytes += piFitMessageBytes(message) + 1;
       if (baseInputTokens + Math.ceil(bytes / 4) > contextLimit)
         break;
     }
@@ -34625,7 +37085,7 @@ function assertPiRawFallbackFits(messages, contextLimit, log, cause, observed, m
     if (!message || typeof message !== "object")
       return false;
     const m = message;
-    return ["user", "assistant", "toolResult"].includes(m.role ?? "") && (typeof m.content === "string" || Array.isArray(m.content) && m.content.every((p) => p !== null && typeof p === "object" && ["text", "thinking", "toolCall"].includes(String(p.type))));
+    return ["user", "assistant", "toolResult", "custom"].includes(m.role ?? "") && (typeof m.content === "string" || Array.isArray(m.content) && m.content.every((p) => p !== null && typeof p === "object" && ["text", "thinking", "redacted_thinking", "toolCall"].includes(String(p.type))));
   });
   const raw = tokenizePiMessages([...pricedMessages]);
   if (!hasTokenizerForFit()) {
@@ -34641,6 +37101,13 @@ function assertPiRawFallbackFits(messages, contextLimit, log, cause, observed, m
     log(`raw_fallback_over_context_limit proxy_bytes=${bytes} proxy_tokens=${proxyTokens} limit=${contextLimit} early_abort=true serialization_failed=${serializationFailed}`);
     throw new PiStorageBusyError({ cause });
   }
+}
+function classifyPiOutgoingFit(estimate, limit) {
+  if (!limit || !Number.isFinite(limit) || limit <= 0)
+    return "fits-or-unknown";
+  if (estimate.refusalGrade && typeof estimate.refusalTokens === "number" && Number.isFinite(estimate.refusalTokens) && estimate.refusalTokens > limit)
+    return "over-window-proof";
+  return estimate.trusted && Number.isFinite(estimate.tokens) && estimate.tokens > limit ? "upper-estimate-pressure" : "fits-or-unknown";
 }
 
 // src/pi-child-mode.ts
@@ -35225,6 +37692,13 @@ function handlePiProviderFailure(args) {
     return { kind: "none" };
   const modelKey = provider && model ? `${provider}/${model}` : undefined;
   recordOverflowDetected(args.db, args.sessionId, overflow.reportedLimit, modelKey, "provider_overflow", overflow.reportedLimitProvenance, overflow.reportedInputTokens);
+  if (getHarness2() === "pi") {
+    try {
+      resetPiUpperEstimateReclaim(args.db, args.sessionId);
+    } catch (error) {
+      args.report?.(`upper-estimate reclaim reset deferred: ${String(error)}`);
+    }
+  }
   return {
     kind: "overflow",
     ...overflow.reportedLimit !== undefined ? { reportedLimit: overflow.reportedLimit } : {},
@@ -35313,8 +37787,13 @@ function applyPiProactiveThinkingStrip(args) {
     if (protectedMessages.has(args.messages[index]))
       continue;
     const entryId = args.entryIds[index];
-    if (!entryId || !hasThinkingPart(args.messages[index]))
+    if (!hasThinkingPart(args.messages[index]))
       continue;
+    if (!entryId) {
+      if (args.requirePersistence)
+        throw new Error("Cannot persist thinking omission without a stable entry id");
+      continue;
+    }
     entryIds.push(entryId);
     indices.push(index);
   }
@@ -35330,6 +37809,8 @@ function applyPiProactiveThinkingStrip(args) {
     persisted = false;
   }
   if (!persisted) {
+    if (args.requirePersistence)
+      throw new Error("Cannot persist thinking omissions before recovery prefix rebuild");
     reportBindingRecovery(args.sessionId, args.report, "proactive thinking strip: persistence failed; serving the thinking unchanged");
     return null;
   }
@@ -35908,10 +38389,61 @@ function ownsToolCall(message) {
   const content = message?.content;
   return Array.isArray(content) && content.some((part) => part?.type === "toolCall");
 }
+function toolCallIds(messages) {
+  const ids = new Set;
+  for (const message of messages) {
+    const msg = message;
+    if (msg?.role !== "assistant" || !Array.isArray(msg.content))
+      continue;
+    for (const part of msg.content) {
+      if (part?.type === "toolCall" && typeof part.id === "string") {
+        ids.add(part.id);
+        ids.add(part.id.split("|")[0]);
+      }
+    }
+  }
+  return ids;
+}
+function isPairedResult(message, calls) {
+  const msg = message;
+  return msg?.role === "toolResult" && typeof msg.toolCallId === "string" && (calls.has(msg.toolCallId) || calls.has(msg.toolCallId.split("|")[0]));
+}
+function isDroppedResult(message) {
+  const msg = message;
+  if (msg?.role !== "toolResult" || typeof msg.toolCallId !== "string" || !Array.isArray(msg.content) || msg.content.length !== 1)
+    return false;
+  const part = msg.content[0];
+  return part?.type === "text" && typeof part.text === "string" && /^(?:§\d+§ )?\[dropped §\d+§\]$/.test(part.text);
+}
+function readPiOrphanToolDropFacts(db, sessionId, callId) {
+  const row = db.prepare(`SELECT MAX(status = 'active') AS active,
+			        MAX(CASE WHEN status = 'dropped' AND drop_mode = 'truncated'
+			                 THEN tag_number END) AS legacyTag
+			 FROM tags INDEXED BY idx_tags_session_message_id
+			 WHERE session_id = ? AND message_id = ? AND type = 'tool'`).get(sessionId, callId);
+  return {
+    active: row?.active === 1,
+    legacyDroppedTag: row?.legacyTag ?? undefined
+  };
+}
 function stripPiDroppedPlaceholderMessages(args) {
   const { db, sessionId, messages, isCacheBusting, stableIdByRef } = args;
   const persistedIds = getStrippedPlaceholderIds(db, sessionId);
   const idsToStrip = new Set(persistedIds);
+  const calls = toolCallIds(messages);
+  let toolFacts;
+  const factsFor = (message) => {
+    const msg = message;
+    if (msg?.role !== "toolResult" || typeof msg.toolCallId !== "string" || isPairedResult(msg, calls))
+      return;
+    toolFacts ??= new Map;
+    let facts = toolFacts.get(msg.toolCallId);
+    if (!facts) {
+      facts = args.getToolDropFacts ? args.getToolDropFacts(msg.toolCallId) : readPiOrphanToolDropFacts(db, sessionId, msg.toolCallId);
+      toolFacts.set(msg.toolCallId, facts);
+    }
+    return facts;
+  };
   const idOf = (msg, index) => {
     const m = msg && typeof msg === "object" ? msg : undefined;
     const carried = m ? stableIdByRef?.get(m) : undefined;
@@ -35924,13 +38456,38 @@ function stripPiDroppedPlaceholderMessages(args) {
   const canPrune = (isCacheBusting || args.forceDiscovery === true) && !!stableIdByRef;
   const presentIds = canPrune ? new Set : null;
   const discoveredIds = [];
-  if (isCacheBusting || args.forceDiscovery) {
+  const isActiveRealResult = (message) => {
+    const msg = message;
+    return msg?.role === "toolResult" && typeof msg.toolCallId === "string" && !isDroppedResult(message) && factsFor(message)?.active === true;
+  };
+  const isRetiredResult = (message) => {
+    const msg = message;
+    return msg?.role === "toolResult" && typeof msg.toolCallId === "string" && !isActiveRealResult(message) && (isDroppedResult(message) || factsFor(message)?.legacyDroppedTag !== undefined);
+  };
+  const discoverOrphans = args.canFirstApply === true || isCacheBusting || args.retireOrphansBeforeRefusal === true;
+  if (!discoverOrphans) {
+    for (let i = 0;i < messages.length; i++) {
+      const msg = messages[i];
+      if (msg?.role !== "toolResult" || typeof msg.toolCallId !== "string" || !Array.isArray(msg.content) || isPairedResult(msg, calls) || isActiveRealResult(msg) || idsToStrip.has(idOf(msg, i) ?? ""))
+        continue;
+      const tag = factsFor(msg)?.legacyDroppedTag;
+      if (tag === undefined)
+        continue;
+      const text = `[dropped §${tag}§]`;
+      messages[i] = {
+        ...msg,
+        content: msg.content.map((part) => part?.type === "text" ? { ...part, text } : { type: "text", text })
+      };
+      args.onLegacyReplay?.(msg, messages[i]);
+    }
+  }
+  if (isCacheBusting || args.forceDiscovery || discoverOrphans) {
     for (let i = 0;i < messages.length; i++) {
       const id = idOf(messages[i], i);
       if (!id)
         continue;
       presentIds?.add(id);
-      if (messageIsPlaceholderOnly(messages[i]) && !persistedIds.has(id)) {
+      if (!persistedIds.has(id) && ((isCacheBusting || args.forceDiscovery) && messageIsPlaceholderOnly(messages[i]) || discoverOrphans && !isPairedResult(messages[i], calls) && isRetiredResult(messages[i]))) {
         discoveredIds.push(id);
       }
     }
@@ -35942,15 +38499,15 @@ function stripPiDroppedPlaceholderMessages(args) {
         removedIds.push(id);
     }
   }
-  const toolOwnerIds = new Set;
+  const protectedIds = new Set;
   for (let i = 0;i < messages.length; i++) {
     const id = idOf(messages[i], i);
-    if (id && persistedIds.has(id) && ownsToolCall(messages[i]))
-      toolOwnerIds.add(id);
+    if (id && persistedIds.has(id) && (ownsToolCall(messages[i]) || isPairedResult(messages[i], calls) || isActiveRealResult(messages[i])))
+      protectedIds.add(id);
   }
   const mayForgetOwners = isCacheBusting || args.forceDiscovery === true || args.canFirstApply === true;
   if (mayForgetOwners) {
-    for (const id of toolOwnerIds)
+    for (const id of protectedIds)
       if (!removedIds.includes(id))
         removedIds.push(id);
   }
@@ -35977,7 +38534,7 @@ function stripPiDroppedPlaceholderMessages(args) {
     const id = idOf(messages[i], i);
     if (!id || !idsToStrip.has(id))
       continue;
-    if (toolOwnerIds.has(id))
+    if (protectedIds.has(id))
       continue;
     if (discovered > 0 && discoveredIds.includes(id))
       args.onFirstApplication?.(messages[i], i);
@@ -35985,7 +38542,7 @@ function stripPiDroppedPlaceholderMessages(args) {
     removed++;
   }
   if (removed > 0 || discovered > 0 || pruned > 0) {
-    sessionLog2(sessionId, `placeholder strip: removed=${removed} discovered=${discovered} pruned=${pruned} keptToolOwners=${toolOwnerIds.size}`);
+    sessionLog2(sessionId, `placeholder strip: removed=${removed} discovered=${discovered} pruned=${pruned} keptToolOwners=${protectedIds.size}`);
   }
   return { removed, discovered };
 }
@@ -36061,6 +38618,96 @@ function stripPiProcessedImages(args) {
 
 // src/system-prompt.ts
 import { createHash as createHash17 } from "node:crypto";
+
+// ../plugin/src/hooks/magic-context/system-prompt-dates.ts
+function replaceHostDates(prompt, replace) {
+  const fields = /<(plugin-env|environment|env)>[\s\S]*?<\/\1>|Today's date: [^\r\n<]+/g;
+  return prompt.replace(fields, (block) => block.replace(/(^[\t ]*(?:Date|Today's date):[\t ]*)([^\r\n<]+)/gm, (_line, label, date) => `${label}${replace(date)}`));
+}
+function systemPromptDates(prompt, sticky) {
+  const values = [];
+  replaceHostDates(prompt, (date) => {
+    values.push(date);
+    return date;
+  });
+  const prior = sticky ? JSON.parse(sticky) : [];
+  let index = 0;
+  const stable = replaceHostDates(prompt, (date) => prior[index++] ?? date);
+  return { live: values.length ? JSON.stringify(values) : undefined, stable };
+}
+
+// src/system-prompt-delivery-pi.ts
+var requests = new BoundedSessionMap(1000);
+function beginPiSystemPromptRequest(db, sessionId, modelKey, branch) {
+  acknowledgePiPendingSystemPromptResponses(sessionId);
+  const request = {
+    kind: "v2",
+    startedAt: Date.now(),
+    previousResponseId: undefined,
+    modelKey: piModelRefToCanonical(modelKey)
+  };
+  requests.set(sessionId, { request, branch, replies: [] });
+  recordSystemPromptForRequest(sessionId, request, getOrCreateSessionMeta(db, sessionId).systemPromptHash, db);
+}
+function recordPiHeldSystemHead(sessionId, deferRefresh) {
+  recordHeldHeadForRequest(sessionId, requests.get(sessionId)?.request, deferRefresh);
+}
+function acknowledgePiSystemPromptResponse(sessionId, message) {
+  const saved = requests.get(sessionId);
+  if (!saved?.branch || !message || typeof message !== "object" || message.role !== "assistant")
+    return;
+  if (!saved.replies.includes(message)) {
+    if (saved.replies.length === 32)
+      saved.replies.shift();
+    saved.replies.push(message);
+  }
+  acknowledgePiPendingSystemPromptResponses(sessionId);
+}
+function acknowledgePiPendingSystemPromptResponses(sessionId) {
+  const saved = requests.get(sessionId);
+  if (!saved?.branch)
+    return;
+  let entries;
+  try {
+    entries = saved.branch.readBranch();
+  } catch {
+    return;
+  }
+  if (!entries)
+    return;
+  for (const value of entries) {
+    if (!value || typeof value !== "object")
+      continue;
+    const entry = value;
+    if (entry.type !== "message" || !entry.id || entry.parentId !== saved.branch.parentId || !entry.message || !saved.replies.includes(entry.message))
+      continue;
+    const reply = entry.message;
+    if (!reply.provider || !reply.model || typeof reply.timestamp !== "number")
+      continue;
+    const completion = { finish: reply.stopReason, error: reply.errorMessage };
+    if (!isSuccessfulProviderCompletion(completion) && !providerResponseFailed(completion))
+      continue;
+    const response = {
+      sessionId,
+      request: saved.request,
+      responseId: entry.id,
+      createdAt: reply.timestamp,
+      modelKey: piModelRefToCanonical(`${reply.provider}/${reply.model}`),
+      ...completion,
+      v2: true
+    };
+    bindSystemPromptResponse(sessionId, saved.request, response);
+    acknowledgeSystemPromptDelivery(response);
+    requests.delete(sessionId);
+    return;
+  }
+}
+function clearPiSystemPromptDelivery(sessionId) {
+  requests.delete(sessionId);
+  clearSystemPromptDelivery(sessionId);
+}
+
+// src/system-prompt.ts
 var MAGIC_CONTEXT_MARKER = "## Magic Context";
 var stickyDateBySession = new Map;
 function buildMagicContextBlock(opts) {
@@ -36075,7 +38722,6 @@ function composeMagicContextSystemPrompt(basePrompt, block) {
 
 ${block}` : basePrompt;
 }
-var DATE_PATTERN = /Today's date: .+/;
 function processSystemPromptForCache(args) {
   const { db, sessionId, systemPrompt, isCacheBusting } = args;
   let sessionMeta;
@@ -36087,10 +38733,12 @@ function processSystemPromptForCache(args) {
   const previousHash = sessionMeta?.systemPromptHash ?? "";
   const isFirstHash = previousHash === "" || previousHash === "0";
   let frozenPrompt = systemPrompt;
-  const dateMatch = systemPrompt.match(DATE_PATTERN);
-  const liveDate = dateMatch ? dateMatch[0] : null;
+  if (isFirstHash)
+    stickyDateBySession.delete(sessionId);
   const stickyDate = stickyDateBySession.get(sessionId);
-  const stableCandidate = liveDate && stickyDate && liveDate !== stickyDate ? systemPrompt.replace(DATE_PATTERN, stickyDate) : systemPrompt;
+  const dates = systemPromptDates(systemPrompt, stickyDate);
+  const liveDate = dates.live;
+  const stableCandidate = dates.stable;
   const stableCandidateHash = createHash17("md5").update(promptSurfaceHashMaterial(stableCandidate, args.promptSurfacePreset)).digest("hex");
   const contentOrPresetChanged = !isFirstHash && stableCandidateHash !== previousHash;
   const idleCacheExpired = sessionMeta !== undefined && computeHardCacheExpired(sessionMeta.cacheTtl, sessionMeta.lastResponseTime, Date.now());
@@ -36102,7 +38750,7 @@ function processSystemPromptForCache(args) {
       stickyDateBySession.set(sessionId, liveDate);
       sessionLog2(sessionId, `system prompt date updated: ${stickyDate} → ${liveDate} (cache-busting pass)`);
     } else {
-      frozenPrompt = systemPrompt.replace(DATE_PATTERN, stickyDate);
+      frozenPrompt = stableCandidate;
       sessionLog2(sessionId, `system prompt date frozen: real=${liveDate}, using=${stickyDate} (cache-stable pass)`);
     }
   }
@@ -36131,6 +38779,7 @@ function processSystemPromptForCache(args) {
   };
 }
 function clearPiSystemPromptSession(sessionId) {
+  clearPiSystemPromptDelivery(sessionId);
   stickyDateBySession.delete(sessionId);
 }
 
@@ -36731,6 +39380,7 @@ function isPiHardCacheExpired(lastResponseTime, ttlMs, now) {
   return lastResponseTime > 0 && now - lastResponseTime > ttlMs;
 }
 var injectM0M1PiForRun = injectM0M1Pi;
+var resolvePiEffectiveSystemStateForRun = resolvePiEffectiveSystemState;
 var persistReasoningWatermarkForRun = updateSessionMeta;
 var persistStableIdSchemeForRun = updateSessionMeta;
 var afterFallbackAdoptionForTests;
@@ -36752,6 +39402,21 @@ var systemPromptRefreshSessions = new Set;
 var pendingMaterializationSessions = new Set;
 var deferredHistoryRefreshSessions = new Set;
 var deferredMaterializationSessions = new Set;
+function signalPiSystemHashChange(sessionId, hash) {
+  recordSystemRefreshOwnership(sessionId, hash, !historyRefreshSessions.has(sessionId), historyRefreshSessions, pendingMaterializationSessions);
+  signalPiHistoryRefresh(sessionId);
+  signalPiSystemPromptRefresh(sessionId);
+  if (!pendingMaterializationSessions.has(sessionId))
+    signalPiPendingMaterialization(sessionId, "system_hash");
+}
+function deferPiDeliveredSystemRefresh(sessionId, ownsHistory) {
+  deferDeliveredSystemRefresh({
+    historyRefreshSessions,
+    pendingMaterializationSessions,
+    deferredHistoryRefreshSessions,
+    deferredMaterializationSessions
+  }, sessionId, ownsHistory);
+}
 var sessionsByProject = new Map;
 var lastSeenProjectIdentityBySession = new Map;
 var persistedProjectIdentityBySession = new Map;
@@ -36763,14 +39428,24 @@ var lastHeuristicsTurnIdBySession = new Map;
 var routinePressureAppliedBySession = new Map;
 var firstContextPassSeenBySession = new Set;
 var contextPassGeneration = new Map;
+function createPiContextGenerationGuard(assertOperation, passSessionId, generation, sideTurn, signal) {
+  return () => {
+    assertOperation();
+    if (!sideTurn && passSessionId && contextPassGeneration.get(passSessionId) !== generation)
+      throw new PiContextSupersededError("Pi context pass superseded by a newer context generation", "context generation");
+    signal?.throwIfAborted();
+  };
+}
 
 class PiLkgAdmissionReplay extends Error {
   messages;
   recovery;
-  constructor(messages, recovery = "fitting LKG before writer retries") {
+  trigger;
+  constructor(messages, recovery = "fitting LKG before writer retries", trigger = "writer_busy") {
     super("Saved request served before writer wait");
     this.messages = messages;
     this.recovery = recovery;
+    this.trigger = trigger;
   }
 }
 var liveModelBySession = new Map;
@@ -36945,8 +39620,8 @@ function signalPiHistoryRefresh(sessionId) {
 function signalPiSystemPromptRefresh(sessionId) {
   systemPromptRefreshSessions.add(sessionId);
 }
-function signalPiPendingMaterialization(sessionId) {
-  pendingMaterializationSessions.add(sessionId);
+function signalPiPendingMaterialization(sessionId, origin = "user_flush") {
+  requestPendingMaterialization(pendingMaterializationSessions, sessionId, origin);
 }
 function clearPiM0Cache(db, sessionId, reason) {
   clearM0M1PiCache(db, sessionId, reason);
@@ -37073,7 +39748,7 @@ function hasPendingMaterialization(sessionId) {
 }
 function consumePendingMaterialization(sessionId) {
   const wasSet = pendingMaterializationSessions.has(sessionId);
-  pendingMaterializationSessions.delete(sessionId);
+  clearPendingMaterialization(pendingMaterializationSessions, sessionId);
   return wasSet;
 }
 function resolveSessionId2(ctx) {
@@ -37688,8 +40363,9 @@ function piMessageEntryFingerprintHeader(message) {
   ]);
 }
 function readPiFallbackFingerprintHeaders(db, sessionId) {
-  const rows = db.prepare(`SELECT DISTINCT entry_fingerprint FROM tags WHERE session_id = ? AND type = 'message'
-			 AND entry_fingerprint IS NOT NULL AND message_id LIKE 'pi-msg-%'`).all(sessionId);
+  const rows = db.prepare(`SELECT DISTINCT entry_fingerprint FROM json_each(?) prefix CROSS JOIN tags INDEXED BY idx_tags_session_message_id WHERE session_id = ? AND tags.type = 'message'
+             AND message_id >= prefix.value AND message_id < substr(prefix.value, 1, 6) || '.'
+             AND entry_fingerprint IS NOT NULL AND message_id LIKE 'pi-msg-%'`).all(PI_FALLBACK_PREFIXES_JSON, sessionId);
   const headers = new Set;
   for (const row of rows) {
     let parsed;
@@ -38346,7 +41022,7 @@ function registerPiContextHandler(pi, baseOptions) {
       sessionLog2(sessionId, `variant changed (${event.previousLevel} -> ${event.level}), triggering flush`);
       historyRefreshSessions.add(sessionId);
       systemPromptRefreshSessions.add(sessionId);
-      pendingMaterializationSessions.add(sessionId);
+      requestPendingMaterialization(pendingMaterializationSessions, sessionId, "variant_change");
       lastHeuristicsTurnIdBySession.delete(sessionId);
       return;
     }
@@ -38360,14 +41036,8 @@ function registerPiContextHandler(pi, baseOptions) {
     const generation = Symbol();
     if (passSessionId && !budget.sideTurn)
       contextPassGeneration.set(passSessionId, generation);
-    const signal = event.signal ?? ctx.signal;
-    const assertOperation = budget.assertOwner;
-    budget.assertOwner = () => {
-      assertOperation();
-      if (!budget.sideTurn && passSessionId && contextPassGeneration.get(passSessionId) !== generation)
-        throw new PiContextSupersededError("Pi context pass superseded by a newer context generation", "context generation");
-      signal?.throwIfAborted();
-    };
+    const signal = budget.signal;
+    budget.assertOwner = createPiContextGenerationGuard(budget.assertOwner, passSessionId, generation, budget.sideTurn, signal);
     let assertCurrentPass = budget.assert;
     const guardAwait = budget.wait;
     const passGuard = { assert: assertCurrentPass, wait: guardAwait };
@@ -38413,6 +41083,11 @@ function registerPiContextHandler(pi, baseOptions) {
       rawMessageCount = event.messages.length;
       const fullWireMessageCount = rawMessageCount;
       const options = baseOptions.resolveForProject?.(projectDirectory) ?? baseOptions;
+      const deliveryModelKey = resolvePiContextModelKey(ctx);
+      if (!budget.sideTurn && deliveryModelKey) {
+        const parentId = ctx.sessionManager.getLeafId?.();
+        beginPiSystemPromptRequest(options.db, sessionId, deliveryModelKey, parentId === null || typeof parentId === "string" ? { parentId, readBranch: () => ctx.sessionManager.getBranch() } : undefined);
+      }
       const schedulerConfig = options.scheduler ?? DEFAULT_SCHEDULER_CONFIG;
       const scheduler = schedulerFor(options);
       lkgCompactionOff = options.compactionOff === true;
@@ -38422,6 +41097,8 @@ function registerPiContextHandler(pi, baseOptions) {
       const tEntryBranch = performance.now();
       const branchEntries = readPiBranchEntriesForContext(ctx, sessionId);
       assertCurrentPass();
+      if (!budget.sideTurn)
+        repairPiHistoryBoundary(options.db, sessionId, ctx, branchEntries);
       const piLiveUsageIsRawBranchEstimate = isPiLiveUsageRawBranchEstimate(branchEntries);
       recordPiLiveUsageClassification(sessionId, piLiveUsageIsRawBranchEstimate);
       assertCurrentPass();
@@ -38466,6 +41143,7 @@ function registerPiContextHandler(pi, baseOptions) {
         transport: ctx.model?.transport
       });
       lkgPassSnapshot = snapshot;
+      const recovery = budget.sideTurn || lkgCompactionOff ? {} : lkgCoordinator.recoveryFor(snapshot);
       const lkgInputFields = new WeakMap(snapshot.inputs.flatMap((input) => {
         const message = event.messages[input.messageIndex];
         return message && typeof message === "object" ? [[message, input.fields]] : [];
@@ -38494,7 +41172,7 @@ function registerPiContextHandler(pi, baseOptions) {
               rawContextWindow: piUsage?.contextWindow,
               detectedContextLimit: state.detectedContextLimit
             })?.usableHard;
-          if (lkgCompactionOff || lkgEmergencyRecoveryArmed || isProviderOverflowFailClosedProven(sessionId))
+          if (lkgCompactionOff || recovery.rebuildReason || lkgEmergencyRecoveryArmed || isProviderOverflowFailClosedProven(sessionId))
             return;
           const replay = lkgCoordinator.replay(snapshot, (id) => ctx.sessionManager.getEntry?.(id)?.parentId);
           if (!replay.ok)
@@ -38690,7 +41368,7 @@ function registerPiContextHandler(pi, baseOptions) {
         }
         emergencyRecoveryArmed = overflowState.needsEmergencyRecovery;
         lkgEmergencyRecoveryArmed = emergencyRecoveryArmed;
-        needsEmergencyBump = overflowState.needsEmergencyRecovery && usagePercentage < 95;
+        needsEmergencyBump = overflowState.needsEmergencyRecovery;
       } catch (err) {
         sessionLog2(sessionId, `transform: overflow state read failed: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -38789,7 +41467,7 @@ function registerPiContextHandler(pi, baseOptions) {
       }
       if (stableIdSchemeCutover && !options.compactionOff) {
         schedulerDecision = "execute";
-        signalPiPendingMaterialization(sessionId);
+        signalPiPendingMaterialization(sessionId, "tag_identity_repair");
         sessionLog2(sessionId, `stable-id scheme cutover: stored=${storedStableIdScheme} < current=${PI_STABLE_ID_SCHEME} — forcing execute+materialize this pass`);
       }
       const tBoundaryChecks = performance.now();
@@ -38857,8 +41535,32 @@ function registerPiContextHandler(pi, baseOptions) {
       if (beforePipelineForTests)
         await budget.waitMandatory(beforePipelineForTests());
       assertCurrentPass();
-      const inputForThinkingFit = isPrefixBoundThinkingModel(ctx.model?.provider, ctx.model?.id) ? structuredClone(event.messages) : null;
+      const fitInputStart = hasPiTransformTimingObserver() ? performance.now() : undefined;
+      const nativeFitPossible = getHarness2() === "pi" && !options.compactionOff && piFitOverflowPossible({
+        hasUI: ctx.hasUI,
+        inputTokens: usageInputTokens,
+        recoveryArmed: emergencyRecoveryArmed || !!recovery.rebuildReason,
+        forceMaterialization,
+        imported: looksLikeImportedSession || usageInputTokens <= 0 && (isFirstContextPassForSession || lkgPassSnapshot?.replayFailure !== null),
+        coldInjection: !!options.injection && !sessionMeta.cachedM0Bytes,
+        cacheBusting: isCacheBusting,
+        sessionId,
+        appendedMessages: lkgPassSnapshot?.pristineTail ?? event.messages.slice(-1),
+        contextLimit: rawFallbackLimit,
+        forcePercentage: forceMaterializationPercentage
+      });
+      let inputForThinkingFit = (getHarness2() !== "pi" || nativeFitPossible) && isPrefixBoundThinkingModel(ctx.model?.provider, ctx.model?.id) ? structuredClone(event.messages) : null;
+      let inputForFitReclaim = nativeFitPossible ? inputForThinkingFit ?? structuredClone(event.messages) : undefined;
+      if (fitInputStart !== undefined)
+        recordPiTransformTiming({
+          sessionId,
+          stage: "fitInputPreparation",
+          elapsedMs: performance.now() - fitInputStart,
+          extra: inputForFitReclaim ? "snapshot" : "no-snapshot"
+        });
       const pipelineArgs = {
+        recoveryPrefix: recovery.prefix,
+        recoveryRebuildReason: recovery.rebuildReason,
         assertCurrentPass,
         db: options.db,
         tagger,
@@ -38912,6 +41614,7 @@ function registerPiContextHandler(pi, baseOptions) {
         },
         resolvedProviderID: ctx.model?.provider,
         resolvedModelID: ctx.model?.id,
+        providerApi: ctx.model?.api,
         canUseEmptySentinels,
         temporalAwareness: options.injection?.temporalAwareness === true,
         appendCompaction: guardedPiAppendCompaction(ctx, assertCurrentPass),
@@ -38940,12 +41643,12 @@ function registerPiContextHandler(pi, baseOptions) {
             return;
           }
           logPiLkgRecovery(sessionId, "Pi held identity rebuild: replaying the served prefix and retaining the pending repair");
-          throw new PiLkgAdmissionReplay(replay.messages, "held tag-identity rebuild: replaying the served prefix");
+          throw new PiLkgAdmissionReplay(replay.messages, "held tag-identity rebuild: replaying the served prefix", "held_identity_repair");
         }
       };
       let result = await budget.waitMandatory(runPipeline(pipelineArgs));
       logTransformTiming(sessionId, "runPipeline", tRunPipeline);
-      if (result.identityRebuilt)
+      if (result.identityRebuilt || result.lkgFrozenReleaseReason)
         schedulerDecision = "execute";
       const postPipelineStart = performance.now();
       const tTransformDecision = performance.now();
@@ -38968,7 +41671,8 @@ function registerPiContextHandler(pi, baseOptions) {
           droppedTokens: result.droppedTokens,
           droppedCount: result.droppedCount,
           inputTokens: usageInputTokens,
-          bustedThisPass: true
+          bustedThisPass: true,
+          lkgFrozenReleaseReason: result.lkgFrozenReleaseReason
         }, piDecisionSnapshotNewestAssistant, budget.assertDecisionPublication);
       } : undefined;
       logTransformTiming(sessionId, "transformDecisionAndReuseState", tTransformDecision);
@@ -39092,22 +41796,25 @@ function registerPiContextHandler(pi, baseOptions) {
       }
       logTransformTiming(sessionId, "autoSearch", tAutoSearch);
       const tTodoCapture = performance.now();
-      try {
-        const sessionMetaForTodo = sessionMeta;
-        if (options.todowriteEnabled === true && !options.compactionOff && !sessionMetaForTodo.isSubagent && sessionMetaForTodo.lastTodoState !== "") {
-          const isCacheBustingForTodo = result.prefixBustPermitted && !result.strictThinkingKept;
-          outputMessages = injectSyntheticTodowriteForPi({
-            db: options.db,
-            sessionId,
-            isSubagent: sessionMetaForTodo.isSubagent,
-            isCacheBusting: isCacheBustingForTodo,
-            lastTodoState: sessionMetaForTodo.lastTodoState,
-            messages: outputMessages
-          });
+      const injectTodo = () => {
+        try {
+          const sessionMetaForTodo = sessionMeta;
+          if (options.todowriteEnabled === true && !options.compactionOff && !sessionMetaForTodo.isSubagent && sessionMetaForTodo.lastTodoState !== "") {
+            const isCacheBustingForTodo = result.prefixBustPermitted && !result.strictThinkingKept;
+            outputMessages = injectSyntheticTodowriteForPi({
+              db: options.db,
+              sessionId,
+              isSubagent: sessionMetaForTodo.isSubagent,
+              isCacheBusting: isCacheBustingForTodo,
+              lastTodoState: sessionMetaForTodo.lastTodoState,
+              messages: outputMessages
+            });
+          }
+        } catch (err) {
+          sessionLog2(sessionId, `synthetic todowrite injection failed: ${err instanceof Error ? err.message : String(err)}`);
         }
-      } catch (err) {
-        sessionLog2(sessionId, `synthetic todowrite injection failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
+      };
+      injectTodo();
       logTransformTiming(sessionId, "todoCapture", tTodoCapture);
       const tThinkingBinding = performance.now();
       let hostEditBeforeNewestThinking = true;
@@ -39138,15 +41845,38 @@ function registerPiContextHandler(pi, baseOptions) {
             entryIds: outputEntryIds,
             provider: lkgProviderKey ?? undefined,
             model: ctx.model?.id,
-            cacheBustingPass: result.signedPrefixRewritten || result.prefixBustPermitted && !result.strictThinkingKept && (isCacheBusting || result.prefixRebuildAlreadyPriced || result.executedWorkThisPass && (result.prefixEditBesidesReasoningTrim || hostEditBeforeNewestThinking)),
+            cacheBustingPass: !!recovery.rebuildReason || result.signedPrefixRewritten || result.prefixBustPermitted && !result.strictThinkingKept && (isCacheBusting || result.prefixRebuildAlreadyPriced || result.executedWorkThisPass && (result.prefixEditBesidesReasoningTrim || hostEditBeforeNewestThinking)),
             stripActiveTurn: result.signedPrefixRewritten,
+            requirePersistence: !!recovery.rebuildReason,
             report: (line) => sessionLog2(sessionId, line)
           });
         } catch (err) {
+          if (recovery.rebuildReason)
+            throw err;
           sessionLog2(sessionId, `proactive thinking strip failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
       logTransformTiming(sessionId, "thinkingBinding", tThinkingBinding);
+      if (recovery.prefix && !result.recoveryNormalized) {
+        const priorIds = new Set(recovery.prefix.inputs.map((input) => input.id));
+        const newIds = new Set(snapshot.inputs.filter((input) => !priorIds.has(input.id)).map((input) => input.id));
+        const suffix = outputMessages.filter((message) => {
+          const id = result.postCommitEntryIdByRef.get(message) ?? result.lkgEntryIdByRef.get(message);
+          return id !== undefined && newIds.has(id);
+        });
+        const prefix = JSON.parse(recovery.prefix.json);
+        const recoveredEntryIds = new Map(result.postCommitEntryIdByRef);
+        prefix.forEach((message, index) => {
+          const id = recovery.prefix?.outputEntryIds[index];
+          if (id)
+            recoveredEntryIds.set(message, id);
+        });
+        result.postCommitEntryIdByRef = recoveredEntryIds;
+        outputMessages = [...prefix, ...suffix];
+        result.syntheticLeadingCount = recovery.prefix.outputEntryIds.findIndex((id) => id !== null);
+        if (result.syntheticLeadingCount < 0)
+          result.syntheticLeadingCount = prefix.length;
+      }
       const tChannelAccounting = performance.now();
       try {
         const sessionMetaForCh1 = sessionMeta;
@@ -39266,9 +41996,26 @@ function registerPiContextHandler(pi, baseOptions) {
       });
       sessionLog2(sessionId, `transform completed in ${transformElapsedMs.toFixed(1)}ms (${outputMessages.length} messages, ${result.targetCount} targets, watermark: ${result.reasoningWatermark})`);
       runPiDebugAssertion(assertTailHygieneLastWriter);
-      if (!options.compactionOff && (result.executedWorkThisPass || isCacheBusting || schedulerDecision === "execute")) {
+      const fitSelectionStart = hasPiTransformTimingObserver() ? performance.now() : undefined;
+      const checkOutgoingFit = !options.compactionOff && (getHarness2() === "pi" ? nativeFitPossible || result.bustedThisPass || result.materialized || isCacheBusting || schedulerDecision === "execute" : result.executedWorkThisPass || isCacheBusting || schedulerDecision === "execute");
+      if (fitSelectionStart !== undefined)
+        recordPiTransformTiming({
+          sessionId,
+          stage: "fitAdmissionSelection",
+          elapsedMs: performance.now() - fitSelectionStart,
+          extra: checkOutgoingFit ? "estimate" : "skip"
+        });
+      if (checkOutgoingFit) {
         const envelope = readPiLkgFitEnvelope(ctx, pi, resolvePiContextModelKey(ctx), sessionDecisionCalibration(options.db, sessionId), toolWireSchema);
-        let estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, lkgPassSnapshot ? lkgCoordinator.measureOutgoingPrefix(lkgPassSnapshot, outputMessages, (id) => ctx.sessionManager.getEntry?.(id)?.parentId) : undefined, rawFallbackLimit);
+        const measuredPrefix = lkgPassSnapshot ? lkgCoordinator.measureOutgoingPrefix(lkgPassSnapshot, outputMessages, (id) => ctx.sessionManager.getEntry?.(id)?.parentId) : undefined;
+        const outgoingFitLimit = getHarness2() === "pi" && baseWindowGeometry ? baseWindowGeometry.derivation.absoluteWall : rawFallbackLimit;
+        let estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, measuredPrefix, outgoingFitLimit);
+        let fitReclaimedThisPass = false;
+        if (!inputForThinkingFit && result.strictThinkingKept && rawFallbackLimit && estimate.refusalGrade && (estimate.refusalTokens ?? estimate.tokens) > rawFallbackLimit) {
+          const restored = restorePiLkgInputForFit(lkgPassSnapshot, branchEntries);
+          if (restored)
+            inputForThinkingFit = restored;
+        }
         if (inputForThinkingFit && result.strictThinkingKept && rawFallbackLimit && estimate.refusalGrade && (estimate.refusalTokens ?? estimate.tokens) > rawFallbackLimit) {
           result = await budget.waitMandatory(runPipeline({
             ...pipelineArgs,
@@ -39280,6 +42027,8 @@ function registerPiContextHandler(pi, baseOptions) {
               percentage: Math.max(95, pipelineArgs.contextUsage.percentage)
             }
           }));
+          fitReclaimedThisPass = true;
+          inputForFitReclaim = undefined;
           outputMessages = result.messages;
           const retryIds = resolvePiLkgOutputEntryIds(outputMessages, result.syntheticLeadingCount, (message) => result.lkgEntryIdByRef.get(message) ?? result.postCommitEntryIdByRef.get(message));
           applyPiProactiveThinkingStrip({
@@ -39294,11 +42043,129 @@ function registerPiContextHandler(pi, baseOptions) {
           });
           estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, undefined, rawFallbackLimit);
         }
+        const opaqueFallbackSteps = piOpaqueThinkingFallbackSteps(outputMessages);
+        if (opaqueFallbackSteps > 0)
+          sessionLog2(sessionId, `opaque thinking fallback: steps=${opaqueFallbackSteps} tokensPerStep=1000 (native usage unavailable; telemetry only)`);
+        if (measuredPrefix?.previousMessages?.some((raw) => {
+          const message = raw;
+          return Array.isArray(message.content) && message.content.some((part) => part.thinkingSignature);
+        })) {
+          const previous = estimatePiOutgoingInputTokens(measuredPrefix.previousMessages, envelope);
+          sessionLog2(sessionId, `thinking estimate drift: estimate=${previous.tokens} provider=${measuredPrefix.inputTokens} ratio=${(previous.tokens / measuredPrefix.inputTokens).toFixed(4)} (previous served request; telemetry only)`);
+        }
         if (result.signedPrefixRewritten && rawFallbackLimit && estimate.refusalGrade && (estimate.refusalTokens ?? estimate.tokens) > rawFallbackLimit)
           throw contextRefusalError("The request remains over the model window after stripping signed thinking and reclaiming context");
+        if (getHarness2() === "pi") {
+          const fitCase = classifyPiOutgoingFit(estimate, outgoingFitLimit);
+          const currentUpperCursor = () => piUpperReclaimCursor({
+            sessionId,
+            modelKey: resolvePiContextModelKey(ctx) ?? null,
+            contextWindow: outgoingFitLimit,
+            head: getOrCreateSessionMeta(options.db, sessionId),
+            messageCount: fullWireMessageCount,
+            snapshot: lkgPassSnapshot,
+            input: inputForFitReclaim ?? event.messages
+          });
+          const upperCursor = fitCase === "upper-estimate-pressure" ? currentUpperCursor() : undefined;
+          if (fitCase === "over-window-proof") {
+            requestPiFitReclaimInput(sessionId);
+          }
+          if (fitCase === "fits-or-unknown")
+            clearPiFitReclaimInput(sessionId);
+          const upperPassEligible = schedulerDecision === "execute" || result.bustedThisPass || result.prefixRebuildAlreadyPriced || isCacheBusting || forceMaterialization || isEmergency;
+          const reclaimHeld = fitCase === "upper-estimate-pressure" && (result.strictThinkingKept || !upperPassEligible || !shouldReclaimPiUpperEstimate(options.db, upperCursor));
+          if (reclaimHeld)
+            sessionLog2(sessionId, "outgoing fit: upper-estimate-pressure; reclaim held by signed prefix, deferred pass or used session latch");
+          if (fitCase === "upper-estimate-pressure" && !reclaimHeld && !inputForFitReclaim)
+            requestPiFitReclaimInput(sessionId);
+          if (fitCase !== "fits-or-unknown" && !reclaimHeld && !fitReclaimedThisPass && !inputForFitReclaim)
+            inputForFitReclaim = restorePiLkgInputForFit(lkgPassSnapshot, branchEntries);
+          if (fitCase !== "fits-or-unknown" && !reclaimHeld && !fitReclaimedThisPass && inputForFitReclaim) {
+            const reservation = upperCursor ? reservePiUpperEstimateReclaim(options.db, upperCursor) : undefined;
+            if (!upperCursor || reservation) {
+              let reclaimCompleted = false;
+              try {
+                sessionLog2(sessionId, `outgoing fit: ${fitCase}; attempting emergency reclaim`);
+                if (fitCase === "over-window-proof" && !ctx.hasUI && historian) {
+                  maybeFireHistorian({
+                    pi,
+                    ctx,
+                    sessionId,
+                    db: options.db,
+                    historian,
+                    startGuard: budget.assert,
+                    isFirstContextPassForSession: false,
+                    activeTags: result.activeTags,
+                    rawMessageProvider,
+                    ordinalAlignment: ordinalAlignment(),
+                    taggerFloor,
+                    sessionMeta: getOrCreateSessionMeta(options.db, sessionId),
+                    piUsage,
+                    pressureSnapshot: {
+                      percentage: Math.max(95, usagePercentage),
+                      inputTokens: usageInputTokens
+                    },
+                    minimumPercentage: 95,
+                    publishedHistoryRide: false,
+                    historianStateSnapshot: loadPiHistorianStateSnapshot(options.db, sessionId)
+                  });
+                  const pending = inFlightHistorian.get(sessionId);
+                  if (pending) {
+                    budget.stage = "headless fit historian";
+                    await budget.wait(pending);
+                  }
+                }
+                budget.stage = "outgoing fit reclaim";
+                const freshMeta = getOrCreateSessionMeta(options.db, sessionId);
+                result = await budget.waitMandatory(runPipeline({
+                  ...pipelineArgs,
+                  messages: inputForFitReclaim,
+                  sessionMeta: freshMeta,
+                  schedulerDecision: "execute",
+                  schedulerDeferReason: null,
+                  forceMaterialization: true,
+                  upperEstimateOnly: fitCase === "upper-estimate-pressure",
+                  forceSignedRebuildForFit: fitCase === "over-window-proof",
+                  isCacheBusting: historyRefreshSessions.has(sessionId) || deferredHistoryRefreshSessions.has(sessionId),
+                  injectionPassSnapshot: options.injection ? createPiM0M1PassSnapshot({
+                    db: options.db,
+                    sessionId,
+                    compactionOff: false,
+                    sessionMeta: freshMeta
+                  }) : undefined,
+                  contextUsage: {
+                    percentage: fitCase === "over-window-proof" ? Math.max(95, usagePercentage) : usagePercentage,
+                    inputTokens: usageInputTokens
+                  }
+                }));
+                outputMessages = result.messages;
+                injectTodo();
+                if (upperCursor)
+                  recordPiUpperEstimateReclaim(options.db, currentUpperCursor() ?? upperCursor, reservation);
+                reclaimCompleted = true;
+                applyPiProactiveThinkingStrip({
+                  db: options.db,
+                  sessionId,
+                  messages: outputMessages,
+                  entryIds: resolvePiLkgOutputEntryIds(outputMessages, result.syntheticLeadingCount, (message) => result.lkgEntryIdByRef.get(message) ?? result.postCommitEntryIdByRef.get(message)).map((id) => id ?? undefined),
+                  provider: ctx.model?.provider,
+                  model: ctx.model?.id,
+                  cacheBustingPass: result.bustedThisPass,
+                  stripActiveTurn: result.signedPrefixRewritten
+                });
+                estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, undefined, outgoingFitLimit);
+              } finally {
+                if (!reclaimCompleted && upperCursor && reservation)
+                  withoutSqliteTransformPass2(() => releasePiUpperEstimateReclaim(options.db, upperCursor, reservation));
+              }
+            }
+          }
+        }
         const refusal = outgoingContextRefusal(estimate, rawFallbackLimit, protectedToolTokenCount(getActiveTagsBySession2(options.db, sessionId), options.protectedTools, envelope ? calibrationForModelKey(envelope.modelKey) : undefined));
         if (refusal)
           throw contextRefusalError(refusal);
+        if (getHarness2() === "pi" && classifyPiOutgoingFit(estimate, outgoingFitLimit) === "over-window-proof")
+          throw new PiDegradedPassError("outgoing-over-window");
       }
       let serializedOutput;
       let numbersCommitted = false;
@@ -39326,10 +42193,18 @@ function registerPiContextHandler(pi, baseOptions) {
             snapshot: lkgPassSnapshot,
             outputMessages,
             outputEntryIds: resolvePiLkgOutputEntryIds(outputMessages, result.syntheticLeadingCount, (message) => result.postCommitEntryIdByRef.get(message) ?? result.lkgEntryIdByRef.get(message)),
-            cacheBusting: result.bustedThisPass
+            cacheBusting: result.bustedThisPass,
+            releaseRecovery: result.recoveryNormalized || !!recovery.rebuildReason
           });
           numbersCommitted = true;
         } catch (error) {
+          if (error instanceof LkgRecoveryFenceError)
+            throw new PiServedIdentityError(error);
+          try {
+            invalidateCleanLkgRecoveryFence(sessionId, () => loadPersistedLkgSlot(options.db, sessionId));
+          } catch (fenceError) {
+            throw new PiServedIdentityError(fenceError);
+          }
           budget.assertOutcome();
           clearPiLkgSessionState(sessionId);
           if (error instanceof PiLkgUncapturable) {
@@ -39376,8 +42251,12 @@ function registerPiContextHandler(pi, baseOptions) {
       }
       budget.assertOutcome();
       publishTransformDecision?.();
+      if (!budget.sideTurn && result.strictThinkingKept && !result.signedPrefixRewritten && !result.materialized)
+        recordPiHeldSystemHead(sessionId, (ownsHistory) => deferPiDeliveredSystemRefresh(sessionId, ownsHistory));
       return { messages: outputMessages };
     } catch (err) {
+      if (budget.isCancelled(err))
+        throw err;
       budget.assertOutcome();
       budget.stage = "recovery";
       if (err instanceof PiServedIdentityError) {
@@ -39387,9 +42266,11 @@ function registerPiContextHandler(pi, baseOptions) {
       }
       if (err instanceof PiLkgAdmissionReplay && sessionIdForError) {
         budget.assertOutcome();
+        if (lkgPassSnapshot && err.trigger === "writer_busy")
+          lkgCoordinator.noteRecovery(lkgPassSnapshot, err.messages);
         if (!budget.sideTurn)
           captureServedEvidence(sessionIdForError, err.messages, {
-            db: baseOptions.db,
+            recoveryWithoutTagState: true,
             assertCurrentPass: budget.assertOutcome
           });
         budget.assertOutcome();
@@ -39416,7 +42297,10 @@ function registerPiContextHandler(pi, baseOptions) {
       const failureLabel = transientStorageFailure ? "TRANSIENT STORAGE FAILURE" : "DEGRADED PASS";
       if (replayOrRefuse && sessionIdForError && lkgPassSnapshot && !lkgCompactionOff && !lkgEmergencyRecoveryArmed) {
         try {
-          const replay = lkgCoordinator.replay(lkgPassSnapshot, (id) => ctx.sessionManager.getEntry?.(id)?.parentId);
+          const replay = lkgCoordinator.recoveryFor(lkgPassSnapshot).rebuildReason ? {
+            ok: false,
+            reason: lkgPassSnapshot.replayFailure ?? "lkg_recovery_unproven"
+          } : lkgCoordinator.replay(lkgPassSnapshot, (id) => ctx.sessionManager.getEntry?.(id)?.parentId);
           if (replay.ok) {
             assertPiRawFallbackFits(replay.messages, rawFallbackLimit, (line) => {
               if (sessionIdForError)
@@ -39425,9 +42309,10 @@ function registerPiContextHandler(pi, baseOptions) {
             const reason = piStorageErrorReason(err);
             logPiLkgRecovery(sessionIdForError, `${failureLabel} ${reason}: LKG replay served ${replay.messages.length} messages instead of raw ${rawMessageCount}`);
             budget.assertOutcome();
+            lkgCoordinator.noteRecovery(lkgPassSnapshot, replay.messages);
             if (!budget.sideTurn)
               captureServedEvidence(sessionIdForError, replay.messages, {
-                db: baseOptions.db,
+                recoveryWithoutTagState: true,
                 assertCurrentPass: budget.assertOutcome
               });
             budget.assertOutcome();
@@ -39447,6 +42332,8 @@ function registerPiContextHandler(pi, baseOptions) {
       }
       if (transientStorageFailure)
         throw new PiStorageBusyError({ cause: err });
+      if (err instanceof PiDegradedPassError && err.site === "outgoing-over-window")
+        throw contextRefusalError("The request exceeds the model's context window after reclaim, and no fitting saved request is available; this turn was not sent.");
       if (!lkgCompactionOff && sessionIdForError) {
         throw new PiStorageBusyError({
           cause: err instanceof PiDegradedPassError ? err : new PiDegradedPassError("context-handler-failed", {
@@ -39885,12 +42772,37 @@ function maybeFireHistorian(args) {
   let boundarySnapshot;
   let triggered = false;
   try {
+    if (isFirstContextPassForSession && sessionMeta.compartmentInProgress && !inFlightHistorian.has(sessionId)) {
+      updateSessionMeta(db, sessionId, { compartmentInProgress: false });
+      sessionMeta.compartmentInProgress = false;
+      sessionLog2(sessionId, "historian: cleared stale compartmentInProgress flag on first context pass after restart");
+    }
+    if (readPiHistoryRetirement(db, sessionId)) {
+      const failedAt = getHistorianFailureState(db, sessionId).lastFailureAt ?? 0;
+      const now = Date.now();
+      if (sessionMeta.compartmentInProgress || failedAt > 0 && failedAt <= now && now - failedAt < EMERGENCY_DRAIN_FAILURE_BACKOFF_MS)
+        return;
+      const snapshot = resolveRunnablePiBoundarySnapshot();
+      if (!hasEligiblePiCompartmentHistory(db, sessionId, snapshot))
+        return;
+      triggered = true;
+      spawnPiHistorianRun({
+        startGuard: args.startGuard,
+        pi: args.pi,
+        ctx,
+        sessionId,
+        db,
+        historian,
+        provider,
+        unregister,
+        boundarySnapshot: snapshot,
+        refreshBoundarySnapshot: resolveRunnablePiBoundarySnapshot,
+        currentContextLimit: boundaryContextLimit,
+        fallbackModelId: modelKey
+      });
+      return;
+    }
     if (isFirstContextPassForSession) {
-      if (sessionMeta.compartmentInProgress && !inFlightHistorian.has(sessionId)) {
-        updateSessionMeta(db, sessionId, { compartmentInProgress: false });
-        sessionMeta.compartmentInProgress = false;
-        sessionLog2(sessionId, "historian: cleared stale compartmentInProgress flag on first context pass after restart");
-      }
       const failureCount = historianStateSnapshot.historianFailureCount;
       if (failureCount > 0) {
         triggered = true;
@@ -39943,8 +42855,6 @@ Historian previously failed ${failureCount} time(s), so Magic Context is retryin
       }
       return;
     }
-    if (!ctx.hasUI)
-      return;
     triggered = true;
     sessionLog2(sessionId, `historian trigger fired (reason=${trigger.reason ?? "unknown"}) usage=${usage.percentage.toFixed(1)}% — spawning subagent`);
     spawnPiHistorianRun({
@@ -40087,7 +42997,7 @@ async function runPipeline(args) {
     parts: (message) => Array.isArray(message?.content) ? message.content : []
   });
   if (thinkingRecovery.ended)
-    signalPiPendingMaterialization(args.sessionId);
+    signalPiPendingMaterialization(args.sessionId, "thinking_hold");
   let restoreOriginals;
   let activeThinkingTurn = hasActiveAnthropicThinkingTurn(args.messages, args.resolvedProviderID, args.resolvedModelID);
   let protectedSignedPrefix = activeThinkingTurn && args.reasoningClearing?.prefixBound === true;
@@ -40104,7 +43014,8 @@ async function runPipeline(args) {
       model: args.resolvedModelID,
       cacheBustingPass: true,
       stripActiveTurn: true,
-      persistOnly: true
+      persistOnly: true,
+      requirePersistence: !!args.recoveryRebuildReason
     });
     if (activeThinkingTurn && !result)
       throw new Error("Cannot persist signed thinking omission before prefix rewrite");
@@ -40112,17 +43023,15 @@ async function runPipeline(args) {
     activeThinkingTurn = false;
     protectedSignedPrefix = false;
   };
-  if (args.forceSignedRebuildForFit && protectedSignedPrefix)
+  if (args.recoveryRebuildReason || args.forceSignedRebuildForFit && protectedSignedPrefix)
     stripForPrefixRewrite();
   const realStableId = (msg, index) => resolvePiRealStableId(msg, index, args.entryIds, args.entryIdByRef ?? undefined);
   const passFallbackIds = settlePiFallbackOccurrences(args.db, args.sessionId, piContentFallbackIds(args.messages, realStableId));
   const stableIdResolver = (msg, index) => realStableId(msg, index) ?? passFallbackIds[index] ?? resolvePiStableId(msg, index);
   let foldingSystemState = null;
   try {
-    foldingSystemState = resolvePiEffectiveSystemState(args.messages);
-  } catch (error) {
-    sessionLog2(args.sessionId, `Pi folding-input system state could not be resolved; native marker drain will remain pending: ${error instanceof Error ? error.message : String(error)}`);
-  }
+    foldingSystemState = resolvePiEffectiveSystemStateForRun(args.messages);
+  } catch {}
   const forceMaterializationPercentage = args.forceMaterializationPercentage ?? escalationBands(65).forceMaterializationPercentage;
   let executedWorkThisPass = false;
   let historyWasConsumedThisPass = false;
@@ -40470,6 +43379,8 @@ async function runPipeline(args) {
     ...message,
     parts: message.parts
   }));
+  const recoveryNormalized = !!args.recoveryPrefix && (foldBustsServedPrefixThisPass || firstRenderBust || identityRebuild);
+  const taggingView = args.recoveryPrefix && !recoveryNormalized ? mutationView.filter((message) => !args.recoveryPrefix?.untaggedInputIds.has(message.info.id ?? "")) : mutationView;
   let tagTextTokenCache = piTagTextTokenCacheBySession.get(args.sessionId);
   if (!tagTextTokenCache) {
     tagTextTokenCache = new Map;
@@ -40482,7 +43393,7 @@ async function runPipeline(args) {
   }
   const { targets } = runPersistedReplayStage("tagging-persistence-failure", () => args.tagger.cleanup(args.sessionId), () => {
     args.assertCurrentPass?.();
-    return tagTranscript(args.sessionId, { ...transcript, messages: mutationView }, args.tagger, args.db, {
+    return tagTranscript(args.sessionId, { ...transcript, messages: taggingView }, args.tagger, args.db, {
       skipPrefixInjection: !ctxReduceCallable,
       entryFingerprintByMessageId,
       reuseMessageIds: textIdentityPlan.reusableMessageIds,
@@ -40528,7 +43439,7 @@ async function runPipeline(args) {
     info: message.info,
     parts: message.parts
   })), targets, protectedThinkingProxies, args.reasoningClearing?.prefixBound === true));
-  if (protectedSignedPrefix && args.contextUsage.percentage >= 95) {
+  if (protectedSignedPrefix && args.contextUsage.percentage >= 95 && !args.upperEstimateOnly) {
     const candidates = getActiveTagsBySession2(args.db, args.sessionId).filter((tag) => tag.type === "tool" && targets.get(tag.tagNumber)?.canDrop?.());
     if (candidates.length > 0 && candidates.every((tag) => newTargets.get(tag.tagNumber)?.thinkingRewriteProtected === true)) {
       stripForPrefixRewrite();
@@ -40616,7 +43527,7 @@ async function runPipeline(args) {
     shouldRunReasoningCleanup: args.reasoningClearing !== undefined && shouldRunHeuristics
   });
   if (shouldApplyPendingOps) {
-    const applyReason = hasPendingMaterializeSignal ? "explicit_flush" : deferredMaterialize ? "deferred_publication" : args.forceMaterialization ? "force_materialization" : foldBustsServedPrefixThisPass && args.schedulerDecision !== "execute" ? `m0_hard_fold (drain folded into executed m[0] bust, scheduler=${args.schedulerDecision})` : `${reclaimRideLabel(rideSignals)} (scheduler=${args.schedulerDecision})`;
+    const applyReason = hasPendingMaterializeSignal ? `pending_materialization origin=${pendingMaterializationOrigin(pendingMaterializationSessions, args.sessionId)}` : deferredMaterialize ? "deferred_publication" : args.forceMaterialization ? "force_materialization" : foldBustsServedPrefixThisPass && args.schedulerDecision !== "execute" ? `m0_hard_fold (drain folded into executed m[0] bust, scheduler=${args.schedulerDecision})` : `${reclaimRideLabel(rideSignals)} (scheduler=${args.schedulerDecision})`;
     const pendingOpsDepth = getPendingOpsCount(args.db, args.sessionId);
     const pendingDecisionLog = `pending ops WILL APPLY — reason=${applyReason}, pendingOps=${pendingOpsDepth === null ? "not loaded (deferred pass)" : pendingOpsDepth} context=${args.contextUsage.percentage.toFixed(1)}%`;
     sessionLog2(args.sessionId, pendingDecisionLog);
@@ -40961,7 +43872,7 @@ async function runPipeline(args) {
     db: args.db,
     sessionId: args.sessionId,
     activeTags,
-    targets: newTargets,
+    targets,
     legacyReminderTagNumbers: textIdentityPlan.legacyReminderTagNumbers,
     cacheBusting: isCacheBustingPass
   });
@@ -41078,15 +43989,28 @@ async function runPipeline(args) {
     stableIdByRef: postCommitStableIdByRef,
     forceDiscovery: args.stableIdSchemeCutover === true && prefixMutationAllowed,
     canFirstApply: isCacheBustingPass,
+    onLegacyReplay: (previous, next) => {
+      const id = postCommitStableIdByRef.get(previous);
+      if (id)
+        postCommitStableIdByRef.set(next, id);
+    },
+    retireOrphansBeforeRefusal: [
+      "openai-responses",
+      "openai-codex-responses",
+      "azure-openai-responses",
+      "anthropic-messages"
+    ].includes(args.providerApi ?? ""),
     onFirstApplication: (message, index) => recordFirstApplicationAt(message, index, 0, (item) => item && typeof item === "object" ? postCommitStableIdByRef.get(item) : undefined)
   });
   logTransformTiming(args.sessionId, "stripDroppedPlaceholders", tDroppedPlaceholders);
   const deferredHistoryDrainEligible = historyWasConsumedThisPass && materializationSatisfiedThisPass && (deferredHistoryWasPendingAtPassStart || hasPendingMaterializeSignal) && !suppressDeferredHistoryDrain && !casLost;
   let preserveDeferredMaterializationForMarkerDrain = false;
+  let pendingForDrain = null;
   if (deferredHistoryDrainEligible) {
     try {
       args.assertCurrentPass?.();
       const pending = getPendingPiCompactionMarkerState(args.db, args.sessionId);
+      pendingForDrain = pending;
       if (!pending) {
         if (injectionResult?.contentionExhausted === true) {
           suppressDeferredHistoryDrain = true;
@@ -41100,11 +44024,21 @@ async function runPipeline(args) {
         preserveDeferredMaterializationForMarkerDrain = true;
         const boundary = injectionResult?.renderedBoundary;
         const m1Coverage = injectionResult?.m1RenderedCoverage;
-        sessionLog2(args.sessionId, `Pi compaction-marker drain skipped: pending ordinal ${pending.ordinal} is newer than rendered boundary ${boundary?.ordinal ?? "<none>"} endMessageId=${boundary?.endMessageId ?? "<none>"} (m[1] coverage ${m1Coverage?.ordinal ?? "<none>"} endMessageId=${m1Coverage?.endMessageId ?? "<none>"}); preserving deferred signals`);
+        logPiCompactionMarkerDrainGateOnce(args.sessionId, pending, "rendered-history-not-covering-marker", {
+          renderedCoverageOrdinal: boundary?.ordinal,
+          renderedCoverageEndMessageId: boundary?.endMessageId,
+          m1CoverageOrdinal: m1Coverage?.ordinal,
+          m1CoverageEndMessageId: m1Coverage?.endMessageId
+        });
       } else if (!args.appendCompaction || !args.readBranchEntries || !foldingSystemState) {
         suppressDeferredHistoryDrain = true;
         preserveDeferredMaterializationForMarkerDrain = true;
-        sessionLog2(args.sessionId, "Pi compaction-marker drain skipped: sessionManager appendCompaction/getBranch or folding system state unavailable; preserving deferred signals");
+        if (!args.appendCompaction)
+          logPiCompactionMarkerDrainGateOnce(args.sessionId, pending, "append-compaction-unavailable");
+        if (!args.readBranchEntries)
+          logPiCompactionMarkerDrainGateOnce(args.sessionId, pending, "get-branch-unavailable");
+        if (!foldingSystemState)
+          logPiCompactionMarkerDrainGateOnce(args.sessionId, pending, "folding-system-state-unavailable");
       } else {
         args.assertCurrentPass?.();
         const outcome = applyDeferredPiCompactionMarker({
@@ -41129,28 +44063,34 @@ async function runPipeline(args) {
             suppressDeferredHistoryDrain = true;
             preserveDeferredMaterializationForMarkerDrain = true;
             if (adoption.kind === "divergent") {
-              const promptLengthDelta = adoption.persistedPromptLength - adoption.foldingPromptLength;
-              sessionLog2(args.sessionId, `Pi compaction-marker equivalence refused compactionId=${outcome.compactionId}: foldingOnlyTools=${JSON.stringify(adoption.foldingOnlyTools)} persistedOnlyTools=${JSON.stringify(adoption.persistedOnlyTools)} changedTools=${JSON.stringify(adoption.changedTools)} promptLengthDelta=${promptLengthDelta} (folding=${adoption.foldingPromptLength}, persisted=${adoption.persistedPromptLength}); persisted entry cannot be retracted, pending marker retained for next-pass journal recheck`);
+              logPiCompactionMarkerDrainGateOnce(args.sessionId, pending, "equivalence-refused", {
+                firstKeptEntryId: outcome.firstKeptEntryId,
+                foldingOnlyTools: adoption.foldingOnlyTools,
+                persistedOnlyTools: adoption.persistedOnlyTools,
+                changedTools: adoption.changedTools,
+                promptLengthDelta: adoption.persistedPromptLength - adoption.foldingPromptLength,
+                foldingPromptLength: adoption.foldingPromptLength,
+                persistedPromptLength: adoption.persistedPromptLength
+              });
             } else {
-              sessionLog2(args.sessionId, `Pi compaction-marker equivalence unavailable for compactionId=${outcome.compactionId}: ${adoption.reason}; preserving deferred signals`);
+              logPiCompactionMarkerDrainGateOnce(args.sessionId, pending, "equivalence-unavailable", { firstKeptEntryId: outcome.firstKeptEntryId });
             }
           }
         }
         if (outcome.kind === "waiting-for-entry") {
           suppressDeferredHistoryDrain = true;
           preserveDeferredMaterializationForMarkerDrain = true;
-        } else if (outcome.kind === "retryable-failure") {
-          sessionLog2(args.sessionId, `Pi compaction-marker drain retryable failure: ${outcome.error.message}`);
-        } else if (markerEquivalent && clearPendingPiCompactionMarkerStateIf(args.db, args.sessionId, pending)) {
+        } else if (outcome.kind === "retryable-failure") {} else if (markerEquivalent && clearPendingPiCompactionMarkerStateIf(args.db, args.sessionId, pending)) {
           consumeDeferredHistoryRefresh(args.sessionId);
         } else if (markerEquivalent) {
           casLost = true;
-          sessionLog2(args.sessionId, "CAS-clear failed (newer blob written or another actor cleared); preserving deferred-history signal");
+          logPiCompactionMarkerDrainGateOnce(args.sessionId, pending, "cas-clear-lost");
         }
       }
     } catch (err) {
       args.assertCurrentPass?.();
-      sessionLog2(args.sessionId, `Pi compaction-marker drain failed (continuing): ${err instanceof Error ? err.message : String(err)}`);
+      if (pendingForDrain)
+        logPiCompactionMarkerDrainGateOnce(args.sessionId, pendingForDrain, "drain-threw", getPiCompactionMarkerDrainErrorFields(err));
     }
   }
   if (preserveDeferredMaterializationForMarkerDrain && deferredMaterializationConsumedThisPass) {
@@ -41218,7 +44158,7 @@ async function runPipeline(args) {
     }
   }
   const materializeReason = identityRebuild ? PI_TAG_IDENTITY_REPAIR_REASON : injectionResult?.m0Reason ?? null;
-  const bustedThisPass = identityRebuild || firstRenderBust || pendingOpsDidMutate || heuristicOrReasoningDidMutate || autoReclaimDidMutateThisPass || materialized || historyWasConsumedThisPass;
+  const bustedThisPass = !!args.recoveryRebuildReason || recoveryNormalized || identityRebuild || firstRenderBust || pendingOpsDidMutate || heuristicOrReasoningDidMutate || autoReclaimDidMutateThisPass || materialized || historyWasConsumedThisPass;
   const calibrationBustReason = identityRebuild ? PI_TAG_IDENTITY_REPAIR_REASON : materialized || firstRenderBust ? "fold" : args.forceMaterialization ? "force" : pendingOpsDidMutate ? "flush" : historyWasConsumedThisPass ? "refresh" : args.schedulerDecision === "execute" ? "execute" : "unknown";
   const activeCalibration = sessionDecisionCalibration(args.db, args.sessionId, {
     bustPermitted: bustedThisPass,
@@ -41258,6 +44198,8 @@ async function runPipeline(args) {
   }
   return {
     messages: outputMessages,
+    recoveryNormalized,
+    lkgFrozenReleaseReason: args.recoveryRebuildReason ?? (recoveryNormalized ? "recovery_tail_normalized" : undefined),
     prefixBustPermitted: isCacheBustingPass,
     prefixMutationAllowed,
     strictThinkingKept: protectedSignedPrefix,
@@ -41278,7 +44220,7 @@ async function runPipeline(args) {
     emergency,
     bustedThisPass,
     agentDropsAppliedThisPass: pendingOpsDidMutate,
-    prefixEditBesidesReasoningTrim: prefixEditBesidesReasoningTrim || firstRenderBust || args.isCacheBusting || hasPendingMaterializeSignal || deferredMaterializationConsumedThisPass || foldBustsServedPrefixThisPass || publishedM1RefreshedThisPass || materialized || historyWasConsumedThisPass || pendingOpsDidMutate || autoReclaimDidMutateThisPass || emergency,
+    prefixEditBesidesReasoningTrim: !!args.recoveryRebuildReason || prefixEditBesidesReasoningTrim || firstRenderBust || args.isCacheBusting || hasPendingMaterializeSignal || deferredMaterializationConsumedThisPass || foldBustsServedPrefixThisPass || publishedM1RefreshedThisPass || materialized || historyWasConsumedThisPass || pendingOpsDidMutate || autoReclaimDidMutateThisPass || emergency,
     targetCount: targets.size,
     reasoningWatermark: args.sessionMeta.clearedReasoningThroughTag ?? 0,
     activeTags,
@@ -41505,11 +44447,13 @@ function appendReminderToPiUserMessage(message, reminder) {
 function clearPiCompactionOffInMemoryState(sessionId) {
   historyRefreshSessions.delete(sessionId);
   deferredHistoryRefreshSessions.delete(sessionId);
-  pendingMaterializationSessions.delete(sessionId);
+  clearPendingMaterialization(pendingMaterializationSessions, sessionId);
   deferredMaterializationSessions.delete(sessionId);
   clearPiChannel1State(sessionId);
 }
 function clearContextHandlerSession(sessionId) {
+  clearPiHistoryBoundaryRepairSession(sessionId);
+  clearPiUpperReclaimSession(sessionId);
   invalidateTrueRawTokenCache({ sessionId, reason: "pi.branch.changed" });
   clearPiLiveUsageClassification(sessionId);
   clearPiLkgSessionState(sessionId);
@@ -41518,7 +44462,7 @@ function clearContextHandlerSession(sessionId) {
   clearAutoSearchForPiSession(sessionId);
   lastEmergencyNotificationAtMs.delete(sessionId);
   historyRefreshSessions.delete(sessionId);
-  pendingMaterializationSessions.delete(sessionId);
+  clearPendingMaterialization(pendingMaterializationSessions, sessionId);
   systemPromptRefreshSessions.delete(sessionId);
   deferredHistoryRefreshSessions.delete(sessionId);
   deferredMaterializationSessions.delete(sessionId);
@@ -41543,6 +44487,7 @@ function clearContextHandlerSession(sessionId) {
   piBranchProjectionBySession.delete(sessionId);
   piAlignmentMismatchLoggedSessions.delete(sessionId);
   clearPiOrdinalAlignmentSession(sessionId);
+  clearPiCompactionMarkerDrainLogState(sessionId);
   clearPiInjectionTokenCountCache(sessionId);
   clearPiMuralProcessCache(sessionId);
   clearPiTailHygieneContentMemo();
@@ -41624,947 +44569,6 @@ ${result}`;
       }, { sessionId, pendingBefore, result });
     }
   });
-}
-
-// ../plugin/src/features/magic-context/store-generation-rebase.ts
-var rebasesInFlight = new WeakMap;
-var repairCheckedSessions = new WeakMap;
-
-// ../plugin/src/hooks/magic-context/send-session-notification.ts
-var queuedIgnoredNotifications = new Map;
-var flushingIgnoredNotifications = new Set;
-var idleSessions = new Set;
-var lastDeliveredText = new Map;
-var activityEpoch = new Map;
-function notifyDelivered(sessionId, params) {
-  try {
-    params.onDelivered?.();
-  } catch (error) {
-    sessionLog2(sessionId, "notification delivery callback failed:", getErrorMessage(error));
-  }
-}
-function inferToastVariant(text) {
-  const lower = text.toLowerCase();
-  if (lower.includes("error") || lower.includes("failed") || lower.includes("alert"))
-    return "error";
-  if (lower.includes("warning") || lower.includes("⚠"))
-    return "warning";
-  if (lower.includes("complete") || lower.includes("success") || lower.includes("✓") || lower.includes("finished"))
-    return "success";
-  return "info";
-}
-function extractToastTitle(text) {
-  const headingMatch = text.match(/^#+\s+(.+)/m);
-  if (headingMatch)
-    return headingMatch[1].trim();
-  const firstLine = text.split(`
-`)[0].trim();
-  if (firstLine.length <= 80)
-    return firstLine;
-  return "Magic Context";
-}
-async function sendStatusNotification(_client, sessionId, text, params) {
-  try {
-    const { pushNotification } = await importPluginModule(() => import("./rpc-notifications-gm1mdpwh.js"));
-    pushNotification("toast", {
-      title: extractToastTitle(text),
-      message: text,
-      variant: inferToastVariant(text),
-      duration: params.toastDurationMs ?? 5000
-    }, sessionId);
-    notifyDelivered(sessionId, params);
-    return "sent";
-  } catch (error) {
-    sessionLog2(sessionId, "status RPC enqueue failed:", getErrorMessage(error));
-    return "failed";
-  }
-}
-
-// ../plugin/src/hooks/magic-context/compartment-runner-incremental.ts
-var inconsistentProducerWindows = new Set;
-var HISTORIAN_ALERT_COOLDOWN_MS2 = 60 * 1000;
-var lastHistorianAlertBySession2 = new Map;
-var STORED_COMPARTMENT_FAILURE_BACKOFF_MS = 30 * 60 * 1000;
-
-// ../plugin/src/hooks/magic-context/compartment-runner-recomp.ts
-function insertRecompCompartmentRows(db, sessionId, compartments, now) {
-  const stmt = db.prepare("INSERT INTO compartments (session_id, sequence, start_message, end_message, start_message_id, end_message_id, title, content, p1, p2, p3, p4, importance, episode_type, legacy, created_at, harness, start_block_index, end_block_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  for (const c of compartments) {
-    const hasTiers = typeof c.p1 === "string" && c.p1.length > 0;
-    stmt.run(sessionId, c.sequence, c.startMessage, c.endMessage, c.startMessageId, c.endMessageId, c.title, c.content, c.p1 ?? null, c.p2 ?? null, c.p3 ?? null, c.p4 ?? null, typeof c.importance === "number" ? c.importance : 50, c.episodeType ?? null, hasTiers ? 0 : 1, now, getHarness2(), c.startBlockIndex ?? null, c.endBlockIndex ?? null);
-  }
-}
-function promoteRecompStagingWithM0Mutation(db, sessionId, holderId) {
-  const now = Date.now();
-  db.exec("BEGIN IMMEDIATE");
-  const transactionStartedAt = performance.now();
-  let finished = false;
-  try {
-    if (!isCompartmentLeaseHeld(db, sessionId, holderId)) {
-      db.exec("ROLLBACK");
-      finished = true;
-      return null;
-    }
-    const staging = getRecompStaging(db, sessionId);
-    if (!staging || staging.compartments.length === 0) {
-      db.exec("ROLLBACK");
-      finished = true;
-      return null;
-    }
-    deleteChunkEmbedBackoffForSession(db, sessionId);
-    db.prepare("DELETE FROM compartments WHERE session_id = ?").run(sessionId);
-    db.prepare("DELETE FROM session_facts WHERE session_id = ?").run(sessionId);
-    insertRecompCompartmentRows(db, sessionId, staging.compartments, now);
-    queueM0Mutation(db, {
-      sessionId,
-      mutationType: "recomp_boundary_change",
-      targetId: null,
-      queuedAt: now
-    });
-    db.prepare("DELETE FROM recomp_compartments WHERE session_id = ?").run(sessionId);
-    db.prepare("DELETE FROM recomp_facts WHERE session_id = ?").run(sessionId);
-    clearCachedM0M1(db, sessionId);
-    db.exec("COMMIT");
-    finished = true;
-    invalidateAutoEmbedSession(sessionId);
-    logSlowWriteTransaction("historian-publish:recomp", transactionStartedAt);
-    return { compartments: staging.compartments, facts: staging.facts };
-  } finally {
-    if (!finished) {
-      try {
-        db.exec("ROLLBACK");
-      } catch {}
-    }
-  }
-}
-async function executeContextRecompInternal(deps) {
-  const {
-    client,
-    db,
-    sessionId,
-    historianChunkTokens,
-    directory,
-    historianTimeoutMs,
-    getNotificationParams
-  } = deps;
-  const notifParams = () => getNotificationParams?.() ?? {};
-  const holderId = deps.compartmentLeaseHolderId;
-  if (!holderId) {
-    return `## Magic Recomp — Skipped
-
-Could not acquire the compartment-state lease for this session.`;
-  }
-  const leaseHolderId = holderId;
-  if (!await prepareRawSessionOrdinals2(sessionId))
-    return `## Magic Recomp — Deferred
-
-Session ordinals are warming in the background. Retry shortly; no history was rebuilt.`;
-  const logPostPublishFailure = (step, error) => {
-    sessionLog2(sessionId, `recomp post-publish step=${step} failed; publication stands: ${getErrorMessage(error)}`);
-  };
-  const afterPublish = (step, run) => {
-    try {
-      run();
-    } catch (error) {
-      logPostPublishFailure(step, error);
-    }
-  };
-  const afterPublishAsync = async (step, run) => {
-    try {
-      await run();
-    } catch (error) {
-      logPostPublishFailure(step, error);
-    }
-  };
-  updateSessionMeta(db, sessionId, { compartmentInProgress: true });
-  try {
-    const rawMessageCount = getRawSessionMessageCount2(sessionId);
-    const boundarySnapshot = resolveOpenCodeProtectedTailBoundary({
-      db,
-      sessionId,
-      mode: "manual-full-recomp",
-      contextLimit: 128000,
-      executeThresholdPercentage: 65,
-      usage: null,
-      usageSource: "provisional-zero"
-    });
-    const protectedTailStart = Math.min(boundarySnapshot.protectedTailStart, rawMessageCount + 1);
-    if (rawMessageCount <= 0) {
-      return `## Magic Recomp
-
-No raw history exists, so nothing was rebuilt.`;
-    }
-    const parentSessionResponse = await client?.session.get({ path: { id: sessionId } }).catch(() => null);
-    const parentSession = normalizeSDKResponse(parentSessionResponse, null, { preferResponseOnMissingData: true });
-    const sessionDirectory = parentSession?.directory ?? directory;
-    const existingStaging = getRecompStaging(db, sessionId);
-    let candidateCompartments = existingStaging?.compartments ?? [];
-    let candidateFacts = existingStaging?.facts ?? [];
-    let offset = existingStaging ? existingStaging.lastEndMessage + 1 : 1;
-    let passCount = existingStaging?.passCount ?? 0;
-    let currentTokenBudget = historianChunkTokens;
-    let passAttempt = 1;
-    const resumed = existingStaging !== null;
-    if (resumed) {
-      await sendStatusNotification(client, sessionId, `## Magic Recomp — Resumed
-
-Found ${existingStaging.compartments.length} staged compartment(s) from ${existingStaging.passCount} previous pass(es), covering messages 1-${existingStaging.lastEndMessage}. Resuming from message ${offset}.`, notifParams());
-    }
-    const totalMessages = Math.max(0, protectedTailStart - 1);
-    const progressStartedAt = Date.now();
-    const emitProgress = (note) => {
-      try {
-        deps.onRecompProgress?.({
-          sessionId,
-          phase: "recomp",
-          processedMessages: Math.min(offset, totalMessages),
-          totalMessages,
-          passCount,
-          compartmentsCreated: candidateCompartments.length,
-          startedAt: progressStartedAt,
-          updatedAt: Date.now(),
-          note
-        });
-      } catch {}
-    };
-    emitProgress("Preparing…");
-    async function promoteAndFinalize(reason) {
-      if (passCount === 0 || candidateCompartments.length === 0)
-        return null;
-      const mergedError = validateStoredCompartments(candidateCompartments);
-      if (mergedError)
-        return null;
-      saveRecompStagingPass(db, sessionId, passCount, candidateCompartments, candidateFacts);
-      const lastCompartmentEnd = candidateCompartments[candidateCompartments.length - 1]?.endMessage ?? 0;
-      const compartmentTagKeys = lastCompartmentEnd > 0 ? await getRawSessionTagKeysThrough2(sessionId, lastCompartmentEnd, { db }) : null;
-      const promoted = promoteRecompStagingWithM0Mutation(db, sessionId, leaseHolderId);
-      if (!promoted)
-        return null;
-      afterPublish("compression-depth", () => clearCompressionDepth(db, sessionId));
-      if (deps.preserveInjectionCacheUntilConsumed !== true) {
-        clearInjectionCache(sessionId);
-      }
-      promoted.facts;
-      await afterPublishAsync("embedding", async () => {
-        const projectIdentity = resolveProjectIdentity(sessionDirectory);
-        await deps.ensureProjectRegistered?.(sessionDirectory, db);
-        const liveCompartments = getCompartments(db, sessionId);
-        const chunksToEmbed = liveCompartments.map((c) => ({
-          id: c.id,
-          startMessage: c.startMessage,
-          endMessage: c.endMessage
-        }));
-        embedAndStoreCompartmentChunks(db, sessionId, projectIdentity, chunksToEmbed);
-      });
-      if (lastCompartmentEnd > 0 && compartmentTagKeys) {
-        afterPublish("drop-queue", () => queueDropsForCompartmentalizedMessages(db, sessionId, lastCompartmentEnd, compartmentTagKeys));
-      }
-      afterPublish("publication-signal", () => deps.onCompartmentStatePublished?.(sessionId));
-      if (lastCompartmentEnd > 0) {
-        afterPublish("compaction-marker", () => {
-          const markerUpdated = (deps.compactionMarkerStrategy?.publish ?? updateCompactionMarkerAfterPublication)(db, sessionId, lastCompartmentEnd, deps.directory);
-          if (markerUpdated) {
-            const stalePending = getPendingCompactionMarkerState(db, sessionId);
-            if (stalePending) {
-              clearPendingCompactionMarkerStateIf(db, sessionId, stalePending);
-            }
-          }
-        });
-      }
-      sessionLog2(sessionId, `recomp partial code=${userFacingFailureCode("recomp_unavailable")} reason="${reason}"`);
-      return [
-        `Rebuilt ${promoted.compartments.length} history block${promoted.compartments.length === 1 ? "" : "s"} across ${passCount} successful pass${passCount === 1 ? "" : "es"}.`,
-        renderUserFacingFailure("recomp_unavailable")
-      ].join(`
-`);
-    }
-    while (offset < protectedTailStart) {
-      const promptFit = fitRecompHistorianPrompt({
-        model: deps.model,
-        fallbackModelId: deps.fallbackModelId,
-        language: deps.language,
-        requestedChunkTokens: currentTokenBudget,
-        sessionId,
-        chunkStart: offset,
-        lastOrdinal: protectedTailStart - 1,
-        sessionCompartments: candidateCompartments
-      });
-      if (!promptFit.ok) {
-        recordHistorianRun(db, {
-          sessionId,
-          harness: getHarness2(),
-          subagentInvocationId: null,
-          runKind: "recomp",
-          status: "failed",
-          failureReason: promptFit.reason,
-          chunkStartOrdinal: offset,
-          chunkEndOrdinal: null,
-          compartmentsProduced: 0
-        });
-        sessionLog2(sessionId, `recomp failed code=${userFacingFailureCode("historian_window_too_small")} reason="${promptFit.reason}"`);
-        const partial = await promoteAndFinalize(`the history model's window cannot hold a historian prompt: ${promptFit.reason}`);
-        if (partial) {
-          return `## Magic Recomp — Partial
-
-${partial}`;
-        }
-        return `## Magic Recomp — Failed
-
-${renderUserFacingFailure("historian_window_too_small")}`;
-      }
-      if (promptFit.trimmed || promptFit.chunkTokens < currentTokenBudget) {
-        sessionLog2(sessionId, `recomp prompt fit: ${describeHistorianPromptTrim(promptFit)} requestedChunkTokens=${currentTokenBudget}`);
-      }
-      const chunk = readSessionChunk2(sessionId, promptFit.chunkTokens, offset, protectedTailStart, { expandTools: deps.historianExpandTools });
-      if (!chunk.text || chunk.messageCount === 0 || chunk.endIndex < offset) {
-        const promoted = await promoteAndFinalize(`remaining messages ${offset}-${protectedTailStart - 1} were too few or all noise to form a historian chunk`);
-        if (promoted) {
-          return `## Magic Recomp — Complete
-
-${promoted}`;
-        }
-        return `## Magic Recomp — Failed
-
-Recomp stopped because raw history ${offset}-${protectedTailStart - 1} could not be turned into a valid historian chunk. Nothing was written.`;
-      }
-      const chunkCoverageError = validateChunkCoverage(chunk);
-      if (chunkCoverageError) {
-        const partial = await promoteAndFinalize(`chunk could not be represented safely: ${chunkCoverageError}`);
-        if (partial) {
-          return `## Magic Recomp — Partial
-
-${partial}`;
-        }
-        sessionLog2(sessionId, `recomp failed code=${userFacingFailureCode("recomp_unavailable")} reason="${chunkCoverageError}"`);
-        return `## Magic Recomp — Failed
-
-${renderUserFacingFailure("recomp_unavailable")}`;
-      }
-      const prompt = buildCompartmentAgentPrompt({
-        seedExamples: promptFit.seedExamples,
-        sessionReferences: promptFit.sessionReferences,
-        projectMemory: "",
-        inputSource: `Messages ${chunk.startIndex}-${chunk.endIndex}:
-
-${chunk.text}`,
-        memoryEnabled: false,
-        extractionFree: true
-      });
-      await sendStatusNotification(client, sessionId, `## Magic Recomp
-
-Historian pass ${passCount + 1}, attempt ${passAttempt} started for messages ${chunk.startIndex}-${chunk.endIndex}.`, notifParams());
-      emitProgress(`Running historian (pass ${passCount + 1})…`);
-      const validatedPass = await runValidatedHistorianPass({
-        client,
-        hiddenCompletionExecutor: deps.hiddenCompletionExecutor,
-        db,
-        parentSessionId: sessionId,
-        sessionDirectory,
-        prompt,
-        chunk,
-        priorCompartments: candidateCompartments,
-        sequenceOffset: candidateCompartments.length,
-        dumpLabelBase: `recomp-${sessionId}-${chunk.startIndex}-${chunk.endIndex}-pass-${passCount + 1}`,
-        timeoutMs: historianTimeoutMs,
-        model: deps.model,
-        fallbackModelId: deps.fallbackModelId,
-        fallbackModels: deps.fallbackModels,
-        twoPass: deps.historianTwoPass,
-        subagentKind: "recomp",
-        agentId: HISTORIAN_RECOMP_AGENT,
-        language: deps.language,
-        callbacks: {
-          onRepairRetry: async (error) => {
-            emitProgress(`Repair retry (pass ${passCount + 1})…`);
-            sessionLog2(sessionId, `recomp retry code=${userFacingFailureCode("recomp_unavailable")} reason="${error}"`);
-            await sendStatusNotification(client, sessionId, `## Magic Recomp
-
-History compression is retrying this pass. ${renderUserFacingFailure("recomp_unavailable")}`, notifParams());
-          },
-          onModelFallback: (modelId, index, total) => {
-            const short = modelId.includes("/") ? modelId.split("/").pop() : modelId;
-            emitProgress(`Trying fallback ${short} (${index}/${total})…`);
-          }
-        }
-      });
-      if (!validatedPass.ok) {
-        const reducedBudget = getReducedRecompTokenBudget(promptFit.chunkTokens);
-        if (reducedBudget !== null) {
-          const smallerChunk = readSessionChunk2(sessionId, reducedBudget, offset, protectedTailStart, { expandTools: deps.historianExpandTools });
-          if (smallerChunk.messageCount > 0 && smallerChunk.endIndex < chunk.endIndex) {
-            await sendStatusNotification(client, sessionId, `## Magic Recomp
-
-History compression is retrying with a smaller set of messages. ${renderUserFacingFailure("recomp_unavailable")}`, notifParams());
-            currentTokenBudget = reducedBudget;
-            passAttempt += 1;
-            continue;
-          }
-        }
-        recordHistorianRun(db, {
-          sessionId,
-          harness: getHarness2(),
-          subagentInvocationId: validatedPass.invocationId ?? null,
-          runKind: "recomp",
-          status: "failed",
-          failureReason: validatedPass.error,
-          chunkStartOrdinal: chunk.startIndex,
-          chunkEndOrdinal: chunk.endIndex,
-          compartmentsProduced: 0
-        });
-        sessionLog2(sessionId, `recomp failed code=${userFacingFailureCode("recomp_unavailable")} reason="${validatedPass.error}" messageRange=${chunk.startIndex}-${chunk.endIndex}`);
-        const partial = await promoteAndFinalize(`history model response did not validate for messages ${chunk.startIndex}-${chunk.endIndex}`);
-        if (partial) {
-          return `## Magic Recomp — Partial
-
-${partial}`;
-        }
-        return `## Magic Recomp — Failed
-
-${renderUserFacingFailure("recomp_unavailable")}`;
-      }
-      {
-        const passComps = validatedPass.compartments ?? [];
-        const passFacts = validatedPass.facts ?? [];
-        const imp = summarizeImportance(passComps.map((c) => c.importance ?? 50));
-        recordHistorianRun(db, {
-          sessionId,
-          harness: getHarness2(),
-          subagentInvocationId: validatedPass.invocationId ?? null,
-          runKind: "recomp",
-          status: "success",
-          chunkStartOrdinal: chunk.startIndex,
-          chunkEndOrdinal: chunk.endIndex,
-          unprocessedFrom: passComps[passComps.length - 1]?.endMessage ?? null,
-          compartmentsProduced: passComps.length,
-          factsEmitted: passFacts.length,
-          factsByCategory: passFacts.length > 0 ? tallyFactsByCategory(passFacts) : null,
-          eventsEmitted: (validatedPass.events ?? []).length,
-          importanceMin: imp.min,
-          importanceMax: imp.max,
-          importanceAvg: imp.avg
-        });
-      }
-      candidateCompartments = [
-        ...candidateCompartments,
-        ...validatedPass.compartments ?? []
-      ];
-      candidateFacts = validatedPass.facts ?? [];
-      passCount += 1;
-      currentTokenBudget = historianChunkTokens;
-      passAttempt = 1;
-      saveRecompStagingPass(db, sessionId, passCount, candidateCompartments, candidateFacts);
-      const nextOffset = (validatedPass.compartments?.[validatedPass.compartments.length - 1]?.endMessage ?? chunk.endIndex) + 1;
-      if (nextOffset <= offset) {
-        const partial = await promoteAndFinalize(`historian made no forward progress after messages ${chunk.startIndex}-${chunk.endIndex}`);
-        if (partial) {
-          return `## Magic Recomp — Partial
-
-${partial}`;
-        }
-        return `## Magic Recomp — Failed
-
-Recomp made no forward progress after messages ${chunk.startIndex}-${chunk.endIndex}. Nothing was written.`;
-      }
-      offset = nextOffset;
-      emitProgress();
-    }
-    const mergedValidationError = validateStoredCompartments(candidateCompartments);
-    if (mergedValidationError) {
-      clearRecompStaging(db, sessionId);
-      sessionLog2(sessionId, `recomp failed code=${userFacingFailureCode("recomp_unavailable")} reason="${mergedValidationError}"`);
-      return `## Magic Recomp — Failed
-
-${renderUserFacingFailure("recomp_unavailable")}`;
-    }
-    saveRecompStagingPass(db, sessionId, passCount, candidateCompartments, candidateFacts);
-    const lastCompartmentEnd = candidateCompartments[candidateCompartments.length - 1]?.endMessage ?? 0;
-    const compartmentTagKeys = lastCompartmentEnd > 0 ? await getRawSessionTagKeysThrough2(sessionId, lastCompartmentEnd, { db }) : null;
-    const promoted = promoteRecompStagingWithM0Mutation(db, sessionId, leaseHolderId);
-    if (!promoted) {
-      sessionLog2(sessionId, "recomp publish skipped: compartment lease no longer held");
-      return `## Magic Recomp — Skipped
-
-Another process acquired the compartment-state lease before recomp could publish. No state was written.`;
-    }
-    afterPublish("compression-depth", () => clearCompressionDepth(db, sessionId));
-    if (deps.preserveInjectionCacheUntilConsumed !== true) {
-      clearInjectionCache(sessionId);
-    }
-    const finalCompartments = promoted?.compartments ?? candidateCompartments;
-    const finalFacts = promoted?.facts ?? candidateFacts;
-    if (lastCompartmentEnd > 0 && compartmentTagKeys) {
-      afterPublish("drop-queue", () => queueDropsForCompartmentalizedMessages(db, sessionId, lastCompartmentEnd, compartmentTagKeys));
-    }
-    afterPublish("publication-signal", () => deps.onCompartmentStatePublished?.(sessionId));
-    await afterPublishAsync("embedding", async () => {
-      const projectIdentity = resolveProjectIdentity(sessionDirectory);
-      await deps.ensureProjectRegistered?.(sessionDirectory, db);
-      const liveCompartments = getCompartments(db, sessionId);
-      const chunksToEmbed = liveCompartments.map((c) => ({
-        id: c.id,
-        startMessage: c.startMessage,
-        endMessage: c.endMessage
-      }));
-      embedAndStoreCompartmentChunks(db, sessionId, projectIdentity, chunksToEmbed);
-    });
-    if (lastCompartmentEnd > 0) {
-      afterPublish("compaction-marker", () => {
-        const markerUpdated = (deps.compactionMarkerStrategy?.publish ?? updateCompactionMarkerAfterPublication)(db, sessionId, lastCompartmentEnd, deps.directory);
-        if (markerUpdated) {
-          const stalePending = getPendingCompactionMarkerState(db, sessionId);
-          if (stalePending) {
-            clearPendingCompactionMarkerStateIf(db, sessionId, stalePending);
-          }
-        }
-      });
-    }
-    return [
-      "## Magic Recomp — Complete",
-      "",
-      ...resumed ? ["Resumed from previous interrupted run."] : [],
-      `Rebuilt ${finalCompartments.length} compartment${finalCompartments.length === 1 ? "" : "s"} across ${passCount} historian pass${passCount === 1 ? "" : "es"}.`,
-      `Covered raw history 1-${lastCompartmentEnd} out of ${rawMessageCount} total messages, stopping before protected tail at ${protectedTailStart}.`
-    ].join(`
-`);
-  } catch (error) {
-    const message = getErrorMessage(error);
-    sessionLog2(sessionId, `recomp failed code=${userFacingFailureCode("recomp_unavailable")} reason="${message}"`);
-    return `## Magic Recomp — Failed
-
-${renderUserFacingFailure("recomp_unavailable")}`;
-  } finally {
-    updateSessionMeta(db, sessionId, { compartmentInProgress: false });
-  }
-}
-
-// ../plugin/src/hooks/magic-context/compartment-runner-partial-recomp.ts
-function snapRangeToCompartments(compartments, range) {
-  if (compartments.length === 0) {
-    return {
-      error: "No compartments exist yet for this session. Run `/ctx-recomp` (full) first, then use partial recomp to refine specific ranges."
-    };
-  }
-  const sorted = compartments.slice().sort((a, b) => a.sequence - b.sequence);
-  const { start, end } = range;
-  if (start < 1)
-    return { error: `Start must be >= 1 (got ${start}).` };
-  if (end < start)
-    return { error: `End must be >= start (got ${start}-${end}).` };
-  const firstEnclosingIdx = sorted.findIndex((c) => c.endMessage >= start);
-  if (firstEnclosingIdx === -1) {
-    const last = sorted[sorted.length - 1];
-    return {
-      error: `Range ${start}-${end} starts after the last compartment (which ends at message ${last.endMessage}). Nothing to rebuild.`
-    };
-  }
-  let lastEnclosingIdx = -1;
-  for (let i = sorted.length - 1;i >= 0; i--) {
-    if (sorted[i].startMessage <= end) {
-      lastEnclosingIdx = i;
-      break;
-    }
-  }
-  if (lastEnclosingIdx === -1 || lastEnclosingIdx < firstEnclosingIdx) {
-    return {
-      error: `Range ${start}-${end} does not overlap any compartment.`
-    };
-  }
-  return {
-    snapStart: sorted[firstEnclosingIdx].startMessage,
-    snapEnd: sorted[lastEnclosingIdx].endMessage,
-    priorCompartments: sorted.slice(0, firstEnclosingIdx),
-    rangeCompartments: sorted.slice(firstEnclosingIdx, lastEnclosingIdx + 1),
-    tailCompartments: sorted.slice(lastEnclosingIdx + 1)
-  };
-}
-function compartmentToInput(c, newSequence) {
-  return {
-    sequence: newSequence,
-    startMessage: c.startMessage,
-    endMessage: c.endMessage,
-    startMessageId: c.startMessageId,
-    endMessageId: c.endMessageId,
-    startBlockIndex: c.startBlockIndex,
-    endBlockIndex: c.endBlockIndex,
-    title: c.title,
-    content: c.content,
-    p1: c.p1,
-    p2: c.p2,
-    p3: c.p3,
-    p4: c.p4,
-    importance: c.importance,
-    episodeType: c.episodeType
-  };
-}
-async function executePartialRecompInternal(deps, range) {
-  const {
-    client,
-    db,
-    sessionId,
-    historianChunkTokens,
-    directory,
-    historianTimeoutMs,
-    getNotificationParams
-  } = deps;
-  const notifParams = () => getNotificationParams?.() ?? {};
-  const holderId = deps.compartmentLeaseHolderId;
-  if (!holderId) {
-    return `## Magic Recomp — Failed
-
-Could not acquire the compartment-state lease for this session.`;
-  }
-  const leaseHolderId = holderId;
-  updateSessionMeta(db, sessionId, { compartmentInProgress: true });
-  try {
-    let promoteFinal = function() {
-      const newBuilt = candidateCompartments.slice(priorCompartments.length);
-      if (newBuilt.length === 0)
-        return null;
-      const newBuiltError = (() => {
-        let expected = snapStart;
-        for (const c of newBuilt) {
-          if (c.startMessage !== expected) {
-            return c.startMessage < expected ? `overlap in rebuilt range near ${expected}` : `gap in rebuilt range before ${c.startMessage} (expected ${expected})`;
-          }
-          if (c.endMessage < c.startMessage) {
-            return `invalid range ${c.startMessage}-${c.endMessage}`;
-          }
-          expected = c.endMessage + 1;
-        }
-        if (expected - 1 !== snapEnd) {
-          return `rebuilt range ends at ${expected - 1} but snapped end is ${snapEnd}`;
-        }
-        return null;
-      })();
-      if (newBuiltError) {
-        log2(`[magic-context] partial recomp validation failed: ${newBuiltError}`);
-        return null;
-      }
-      const merged = [
-        ...candidateCompartments,
-        ...tailCompartments.map((c, idx) => compartmentToInput(c, candidateCompartments.length + idx))
-      ];
-      const mergedError = validateStoredCompartments(merged);
-      if (mergedError) {
-        log2(`[magic-context] partial recomp merged validation failed: ${mergedError}`);
-        return null;
-      }
-      saveRecompStagingPass(db, sessionId, passCount + 1, merged, stagedFacts);
-      const promoted = promoteRecompStagingWithM0Mutation(db, sessionId, leaseHolderId);
-      if (!promoted) {
-        log2("[magic-context] partial recomp promote returned null");
-        return null;
-      }
-      setRecompPartialRange(db, sessionId, null);
-      clearCompressionDepthRange(db, sessionId, snapStart, snapEnd);
-      if (deps.preserveInjectionCacheUntilConsumed !== true) {
-        clearInjectionCache(sessionId);
-      }
-      deps.onCompartmentStatePublished?.(sessionId);
-      {
-        const projectIdentity = resolveProjectIdentity(sessionDirectory);
-        const liveCompartments = getCompartments(db, sessionId);
-        const chunksToEmbed = liveCompartments.map((c) => ({
-          id: c.id,
-          startMessage: c.startMessage,
-          endMessage: c.endMessage
-        }));
-        Promise.resolve(deps.ensureProjectRegistered?.(sessionDirectory, db)).then(() => embedAndStoreCompartmentChunks(db, sessionId, projectIdentity, chunksToEmbed));
-      }
-      const lastEnd = merged[merged.length - 1]?.endMessage ?? snapEnd;
-      if (lastEnd > 0) {
-        const markerUpdated = (deps.compactionMarkerStrategy?.publish ?? updateCompactionMarkerAfterPublication)(db, sessionId, lastEnd, deps.directory);
-        if (markerUpdated) {
-          const stalePending = getPendingCompactionMarkerState(db, sessionId);
-          if (stalePending) {
-            clearPendingCompactionMarkerStateIf(db, sessionId, stalePending);
-          }
-        }
-      }
-      return { compartmentCount: merged.length, lastEndMessage: lastEnd };
-    };
-    const existingCompartments = getCompartments(db, sessionId);
-    const snapResult = snapRangeToCompartments(existingCompartments, range);
-    if ("error" in snapResult) {
-      return `## Magic Recomp — Failed
-
-${snapResult.error}`;
-    }
-    const { snapStart, snapEnd, priorCompartments, tailCompartments } = snapResult;
-    const storedRange = getRecompPartialRange(db, sessionId);
-    const existingStaging = getRecompStaging(db, sessionId);
-    if (existingStaging && storedRange && (storedRange.start !== snapStart || storedRange.end !== snapEnd)) {
-      return [
-        "## Magic Recomp — Failed",
-        "",
-        `An unfinished partial recomp is already staged for range ${storedRange.start}-${storedRange.end}, which does not match the requested range ${snapStart}-${snapEnd}.`,
-        "",
-        "Resume that range by running `/ctx-recomp` with the same original arguments,",
-        "or cancel it by running `/ctx-flush` before starting a new partial recomp."
-      ].join(`
-`);
-    }
-    if (existingStaging && !storedRange) {
-      return [
-        "## Magic Recomp — Failed",
-        "",
-        "An unfinished full recomp is already staged for this session.",
-        "Resume it by running `/ctx-recomp` without arguments,",
-        "or cancel it before starting a partial recomp."
-      ].join(`
-`);
-    }
-    const stagedFacts = [];
-    const parentSessionResponse = await client?.session.get({ path: { id: sessionId } }).catch(() => null);
-    const parentSession = normalizeSDKResponse(parentSessionResponse, null, { preferResponseOnMissingData: true });
-    const sessionDirectory = parentSession?.directory ?? directory;
-    let candidateCompartments;
-    let passCount;
-    let offset;
-    const resumed = existingStaging !== null && storedRange !== null;
-    if (resumed && existingStaging) {
-      candidateCompartments = existingStaging.compartments;
-      passCount = existingStaging.passCount;
-      const lastInStaging = existingStaging.lastEndMessage;
-      offset = lastInStaging >= snapStart ? lastInStaging + 1 : snapStart;
-    } else {
-      candidateCompartments = priorCompartments.map((c, idx) => compartmentToInput(c, idx));
-      passCount = 0;
-      offset = snapStart;
-      saveRecompStagingPass(db, sessionId, 0, candidateCompartments, stagedFacts);
-      setRecompPartialRange(db, sessionId, { start: snapStart, end: snapEnd });
-    }
-    let currentTokenBudget = historianChunkTokens;
-    let passAttempt = 1;
-    await sendStatusNotification(client, sessionId, resumed ? `## Magic Recomp — Resumed (Partial)
-
-Found ${candidateCompartments.length - priorCompartments.length} newly built compartment(s) from ${passCount} previous pass(es), covering messages ${snapStart}-${offset - 1}. Resuming from message ${offset} toward ${snapEnd}.` : `## Magic Recomp — Partial
-
-Snapped to compartment boundaries: rebuilding messages ${snapStart}-${snapEnd} (${tailCompartments.length} tail compartment(s) preserved).`, notifParams());
-    while (offset <= snapEnd) {
-      const promptFit = fitRecompHistorianPrompt({
-        model: deps.model,
-        fallbackModelId: deps.fallbackModelId,
-        language: deps.language,
-        requestedChunkTokens: currentTokenBudget,
-        sessionId,
-        chunkStart: offset,
-        lastOrdinal: snapEnd,
-        sessionCompartments: candidateCompartments
-      });
-      if (!promptFit.ok) {
-        log2(`[magic-context] partial recomp failed session=${sessionId} code=${userFacingFailureCode("historian_window_too_small")} reason="${promptFit.reason}"`);
-        return `## Magic Recomp — Failed
-
-${renderUserFacingFailure("historian_window_too_small")}`;
-      }
-      if (promptFit.trimmed || promptFit.chunkTokens < currentTokenBudget) {
-        log2(`[magic-context] partial recomp prompt fit session=${sessionId}: ${describeHistorianPromptTrim(promptFit)} requestedChunkTokens=${currentTokenBudget}`);
-      }
-      const chunk = readSessionChunk2(sessionId, promptFit.chunkTokens, offset, snapEnd + 1, { expandTools: deps.historianExpandTools });
-      if (!chunk.text || chunk.messageCount === 0 || chunk.endIndex < offset) {
-        return `## Magic Recomp — Failed
-
-Recomp stopped because raw history ${offset}-${snapEnd} could not be turned into a valid historian chunk. Partial recomp preserved original state (staging kept for retry).`;
-      }
-      const chunkCoverageError = validateChunkCoverage(chunk);
-      if (chunkCoverageError) {
-        log2(`[magic-context] partial recomp failed session=${sessionId} code=${userFacingFailureCode("recomp_unavailable")} reason="${chunkCoverageError}"`);
-        return `## Magic Recomp — Failed
-
-${renderUserFacingFailure("recomp_unavailable")}`;
-      }
-      const prompt = buildCompartmentAgentPrompt({
-        seedExamples: promptFit.seedExamples,
-        sessionReferences: promptFit.sessionReferences,
-        projectMemory: "",
-        inputSource: `Messages ${chunk.startIndex}-${chunk.endIndex}:
-
-${chunk.text}`,
-        memoryEnabled: false,
-        extractionFree: true
-      });
-      await sendStatusNotification(client, sessionId, `## Magic Recomp — Partial
-
-Historian pass ${passCount + 1}, attempt ${passAttempt} started for messages ${chunk.startIndex}-${chunk.endIndex}.`, notifParams());
-      const validatedPass = await runValidatedHistorianPass({
-        client,
-        hiddenCompletionExecutor: deps.hiddenCompletionExecutor,
-        db,
-        parentSessionId: sessionId,
-        sessionDirectory,
-        prompt,
-        chunk,
-        priorCompartments: candidateCompartments,
-        sequenceOffset: candidateCompartments.length,
-        dumpLabelBase: `partial-recomp-${sessionId}-${chunk.startIndex}-${chunk.endIndex}-pass-${passCount + 1}`,
-        timeoutMs: historianTimeoutMs,
-        model: deps.model,
-        fallbackModelId: deps.fallbackModelId,
-        fallbackModels: deps.fallbackModels,
-        twoPass: deps.historianTwoPass,
-        subagentKind: "recomp",
-        agentId: HISTORIAN_RECOMP_AGENT,
-        language: deps.language,
-        callbacks: {
-          onRepairRetry: async (error) => {
-            log2(`[magic-context] partial recomp retry session=${sessionId} code=${userFacingFailureCode("recomp_unavailable")} reason="${error}"`);
-            await sendStatusNotification(client, sessionId, `## Magic Recomp — Partial
-
-History compression is retrying this pass. ${renderUserFacingFailure("recomp_unavailable")}`, notifParams());
-          }
-        }
-      });
-      if (!validatedPass.ok) {
-        const reducedBudget = getReducedRecompTokenBudget(promptFit.chunkTokens);
-        if (reducedBudget !== null) {
-          const smallerChunk = readSessionChunk2(sessionId, reducedBudget, offset, snapEnd + 1, { expandTools: deps.historianExpandTools });
-          if (smallerChunk.messageCount > 0 && smallerChunk.endIndex < chunk.endIndex) {
-            await sendStatusNotification(client, sessionId, `## Magic Recomp — Partial
-
-History compression is retrying with a smaller set of messages. ${renderUserFacingFailure("recomp_unavailable")}`, notifParams());
-            currentTokenBudget = reducedBudget;
-            passAttempt += 1;
-            continue;
-          }
-        }
-        log2(`[magic-context] partial recomp failed session=${sessionId} code=${userFacingFailureCode("recomp_unavailable")} reason="${validatedPass.error}" messageRange=${chunk.startIndex}-${chunk.endIndex}`);
-        return `## Magic Recomp — Failed
-
-${renderUserFacingFailure("recomp_unavailable")}`;
-      }
-      candidateCompartments = [
-        ...candidateCompartments,
-        ...validatedPass.compartments ?? []
-      ];
-      passCount += 1;
-      currentTokenBudget = historianChunkTokens;
-      passAttempt = 1;
-      saveRecompStagingPass(db, sessionId, passCount, candidateCompartments, stagedFacts);
-      const nextOffset = (validatedPass.compartments?.[validatedPass.compartments.length - 1]?.endMessage ?? chunk.endIndex) + 1;
-      if (nextOffset <= offset) {
-        return `## Magic Recomp — Failed
-
-Partial recomp made no forward progress after messages ${chunk.startIndex}-${chunk.endIndex}. Staging kept for retry.`;
-      }
-      offset = nextOffset;
-    }
-    const finalResult = promoteFinal();
-    if (!finalResult) {
-      return `## Magic Recomp — Failed
-
-Partial recomp completed historian passes but the final compartment set failed validation. Original state preserved (staging kept for inspection).`;
-    }
-    return [
-      "## Magic Recomp — Partial Complete",
-      "",
-      ...resumed ? ["Resumed from previous interrupted partial run."] : [],
-      `Rebuilt compartments covering messages ${snapStart}-${snapEnd} using ${passCount} historian pass${passCount === 1 ? "" : "es"}.`,
-      `Preserved ${priorCompartments.length} prior compartment(s) and ${tailCompartments.length} tail compartment(s) unchanged.`,
-      `Total compartments: ${finalResult.compartmentCount}.`
-    ].join(`
-`);
-  } catch (error) {
-    const message = getErrorMessage(error);
-    log2(`[magic-context] partial recomp failed session=${sessionId} code=${userFacingFailureCode("recomp_unavailable")} reason="${message}"`);
-    return `## Magic Recomp — Failed
-
-${renderUserFacingFailure("recomp_unavailable")}`;
-  } finally {
-    updateSessionMeta(db, sessionId, { compartmentInProgress: false });
-    const leftoverStaging = getRecompStaging(db, sessionId);
-    const leftoverRange = getRecompPartialRange(db, sessionId);
-    if (leftoverStaging && leftoverRange) {} else if (leftoverStaging && !leftoverRange) {
-      log2(`[magic-context] partial recomp cleanup: clearing orphaned staging without range marker for session ${sessionId}`);
-      clearRecompStaging(db, sessionId);
-    }
-  }
-}
-
-// ../plugin/src/hooks/magic-context/compartment-runner.ts
-var activeRuns = new Map;
-function markActiveCompartmentRunPublished(sessionId) {
-  const activeRun = activeRuns.get(sessionId);
-  if (activeRun)
-    activeRun.published = true;
-}
-function withPublishedCallback(deps) {
-  return {
-    ...deps,
-    onCompartmentStatePublished: (sid) => {
-      markActiveCompartmentRunPublished(sid);
-      deps.onCompartmentStatePublished?.(sid);
-    }
-  };
-}
-function startLeaseRenewal(deps, holderId) {
-  return setInterval(() => {
-    try {
-      if (!renewCompartmentLease(deps.db, deps.sessionId, holderId)) {
-        sessionLog2(deps.sessionId, "compartment lease renewal failed; publish will be skipped if holder is stale");
-      }
-    } catch (err) {
-      sessionLog2(deps.sessionId, `compartment lease renewal threw; publish will be skipped if holder is stale (${err instanceof Error ? err.message : String(err)})`);
-    }
-  }, COMPARTMENT_LEASE_RENEWAL_MS);
-}
-async function executeContextRecompWithResult(deps, options = {}) {
-  const { sessionId } = deps;
-  if (isWrapupInProgress(deps.db, sessionId)) {
-    return {
-      message: "## Magic Recomp — Skipped\n\n/ctx-wrapup is already compacting this session. Wait for it to finish, then try `/ctx-recomp` again.",
-      published: false
-    };
-  }
-  if (activeRuns.has(sessionId)) {
-    return {
-      message: "## Magic Recomp — Skipped\n\nHistorian is already running for this session. Wait for it to finish, then try `/ctx-recomp` again.",
-      published: false
-    };
-  }
-  const holderId = crypto.randomUUID();
-  const lease = acquireCompartmentLease(deps.db, sessionId, holderId);
-  if (!lease) {
-    sessionLog2(sessionId, "recomp skipped: compartment lease held by another process");
-    return {
-      message: "## Magic Recomp — Skipped\n\nAnother process is already mutating compartment state for this session. Wait for it to finish, then try `/ctx-recomp` again.",
-      published: false
-    };
-  }
-  options.onLeaseAcquired?.();
-  if (isWrapupInProgress(deps.db, sessionId)) {
-    sessionLog2(sessionId, "recomp skipped: /ctx-wrapup became active");
-    releaseCompartmentLease(deps.db, sessionId, holderId);
-    return {
-      message: "## Magic Recomp — Skipped\n\n/ctx-wrapup is already compacting this session. Wait for it to finish, then try `/ctx-recomp` again.",
-      published: false
-    };
-  }
-  const renewal = startLeaseRenewal(deps, holderId);
-  const runnerDeps = withPublishedCallback({ ...deps, compartmentLeaseHolderId: holderId });
-  const promise = options.range ? executePartialRecompInternal(runnerDeps, options.range) : executeContextRecompInternal(runnerDeps);
-  const wrappedPromise = promise.then(() => {
-    return;
-  }).catch((err) => {
-    sessionLog2(sessionId, "compartment agent: recomp unhandled rejection:", err);
-  });
-  activeRuns.set(sessionId, { promise: wrappedPromise, published: false, kind: "recomp" });
-  try {
-    const message = await promise;
-    const published = activeRuns.get(sessionId)?.published === true;
-    const outcomeSummary = message.replace(/\s+/g, " ").trim().slice(0, 240);
-    sessionLog2(sessionId, `recomp finished (published=${published}): ${outcomeSummary}`);
-    return {
-      message,
-      published
-    };
-  } finally {
-    clearInterval(renewal);
-    releaseCompartmentLease(deps.db, sessionId, holderId);
-    if (activeRuns.get(sessionId)?.promise === wrappedPromise) {
-      activeRuns.delete(sessionId);
-    }
-  }
 }
 
 // src/pi-recomp-client-shared.ts
@@ -44186,112 +46190,6 @@ function buildStatusViewFor(check, options) {
     }, check.versions, options);
   }
 }
-// package.json
-var package_default = {
-  name: "@cortexkit/pi-magic-context",
-  version: "0.49.0",
-  type: "module",
-  description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
-  main: "dist/index.js",
-  license: "MIT",
-  author: "ualtinok",
-  keywords: [
-    "pi",
-    "pi-coding-agent",
-    "omp",
-    "oh-my-pi",
-    "extension",
-    "context",
-    "memory",
-    "magic-context",
-    "ai",
-    "llm"
-  ],
-  repository: {
-    type: "git",
-    url: "https://github.com/cortexkit/magic-context",
-    directory: "packages/pi-plugin"
-  },
-  files: [
-    "dist",
-    "README.md"
-  ],
-  "//": "The build intentionally bundles typebox (no --external typebox) and keeps it a regular dependency. OMP's extension loader rewrites every bare `typebox` import to its own omptype-based shim, whose schemas are callable objects rather than JSON Schema; they fail structuredClone during tool registration, so an external typebox import stops Magic Context loading on OMP. src/typebox-bundling.test.ts guards this.",
-  scripts: {
-    build: "bun ../../scripts/check-bun.mjs && tsc -p ../retina-local-fs/tsconfig.build.json && bun ../../scripts/clean-dist-chunks.mjs dist index.js subagent-entry.js historian-calibration-extension.js raw-ordinal-warmup-worker.js transformers-web.js transformers-node-wasm.js && bun build ../plugin/src/features/magic-context/memory/transformers-web-entry.ts --outfile dist/transformers-web.js --target browser --format esm --external onnxruntime-web && bun ../plugin/scripts/build-transformers-node-wasm.ts dist && bun build src/index.ts src/subagent-entry.ts src/historian-calibration-extension.ts ../plugin/src/features/magic-context/memory/embedding-worker.ts ../plugin/src/features/magic-context/migration-worker.ts ../plugin/src/hooks/magic-context/auto-search-worker.ts ../plugin/src/hooks/magic-context/raw-ordinal-warmup-worker.ts --outdir dist --entry-naming '[name].[ext]' --target node --format esm --splitting --external @earendil-works/pi-coding-agent --external @oh-my-pi/pi-coding-agent --external @earendil-works/pi-tui --external onnxruntime-node --external onnxruntime-web --external sharp --external node:sqlite",
-    "build:e2e-argv": `bun ../../scripts/clean-dist-chunks.mjs ../../tests/docker/.generated subagent-runner-e2e.mjs && bun build src/subagent-runner.ts --outdir ../../tests/docker/.generated --entry-naming 'subagent-runner-e2e.mjs' --splitting --target node --format esm --external node:sqlite && node --input-type=module -e 'const { __test } = await import("../../tests/docker/.generated/subagent-runner-e2e.mjs"); if (typeof __test.buildArgs !== "function" || typeof __test.resolvePiInvocation !== "function") throw new Error("argv renderer exports missing"); console.log("Node argv renderer: 2 exports loaded")'`,
-    typecheck: "tsc -p ../retina-local-fs/tsconfig.build.json && tsc --noEmit",
-    test: "bun ../../scripts/check-bun.mjs && bun install --frozen-lockfile && BUN_JSC_useOMGJIT=0 bun test --parallel=4 --timeout 30000",
-    "test:serial": "bun ../../scripts/check-bun.mjs && bun install --frozen-lockfile && BUN_JSC_useOMGJIT=0 bun test --parallel=1 --timeout 30000",
-    lint: "bun ../../scripts/check-bun.mjs && biome check src",
-    "lint:fix": "biome check --write src",
-    format: "biome format --write src",
-    "format:check": "biome format src",
-    clean: "bun ../../scripts/clean-dist-chunks.mjs dist index.js subagent-entry.js historian-calibration-extension.js embedding-worker.js migration-worker.js raw-ordinal-warmup-worker.js transformers-web.js transformers-node-wasm.js",
-    prepublishOnly: "bun run build"
-  },
-  "//test": "Test runs cap file-isolated workers at four (one for test:serial) and disable JSC's optimizing WebAssembly tier so per-file isolation does not pay its compilation cost on every file. These are not production settings and do not change host process engine options.",
-  dependencies: {
-    "@cortexkit/subc-client": "0.11.1",
-    "@jitl/quickjs-singlefile-cjs-release-asyncify": "0.32.0",
-    "ai-tokenizer": "^1.0.6",
-    "comment-json": "^5.0.0",
-    "onnxruntime-web": "1.26.0-dev.20260416-b7804b056c",
-    "quickjs-emscripten": "^0.32.0",
-    zod: "^4.1.8"
-  },
-  optionalDependencies: {
-    "onnxruntime-node": "1.30.0",
-    sharp: "^0.35.0"
-  },
-  devDependencies: {
-    "@biomejs/biome": "^2.5.1",
-    "@earendil-works/pi-ai": "0.83.0",
-    "@earendil-works/pi-coding-agent": "0.83.0",
-    "@earendil-works/pi-tui": "0.83.0",
-    "@huggingface/transformers": "^4.3.0",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/bun": "^1.3.10",
-    "@types/node": "^22.20.0",
-    "pi-agent-core-087": "npm:@earendil-works/pi-agent-core@0.87.1",
-    "pi-ai-086": "npm:@earendil-works/pi-ai@0.86.0",
-    "pi-coding-agent-086": "npm:@earendil-works/pi-coding-agent@0.86.0",
-    "pi-coding-agent-087": "npm:@earendil-works/pi-coding-agent@0.87.1",
-    typebox: "^1.3.1",
-    typescript: "^5.8.0"
-  },
-  peerDependencies: {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
-    typebox: "*"
-  },
-  peerDependenciesMeta: {
-    "@earendil-works/pi-coding-agent": {
-      optional: true
-    },
-    "@earendil-works/pi-tui": {
-      optional: true
-    },
-    typebox: {
-      optional: true
-    }
-  },
-  exports: {
-    ".": {
-      import: "./dist/index.js"
-    }
-  },
-  pi: {
-    extensions: [
-      "./dist/index.js"
-    ]
-  },
-  omp: {
-    extensions: [
-      "./dist/index.js"
-    ]
-  }
-};
 
 // src/dialogs/status-dialog.ts
 var REFRESH_INTERVAL_MS = 1000;
@@ -45186,6 +47084,7 @@ async function runPiWrapup(pi, deps, ctx, sessionId, messagesToKeep) {
   if (isPiRecompInFlight(sessionId)) {
     return "## Magic Wrapup — Skipped\n\nA recomp or upgrade is already running for this session. Wait for it to finish, then try `/ctx-wrapup` again.";
   }
+  repairPiHistoryBoundary(deps.db, sessionId, ctx);
   const ordinalAlignment = resolvePiOrdinalAlignmentForContext(deps.db, sessionId, ctx);
   if (isPiOrdinalAlignmentUnanchored(ordinalAlignment)) {
     return `## Magic Wrapup — Skipped
@@ -45904,6 +47803,7 @@ function withTimeout(p, ms) {
 }
 
 // src/index.ts
+registerStandalonePluginMarker(package_default.version);
 var PI_HARNESS_DETECTION = await resolvePiHarnessDetection();
 var PI_HARNESS_KIND = PI_HARNESS_DETECTION.kind;
 var PREFIX2 = `[magic-context][${PI_HARNESS_KIND}]`;
@@ -46188,8 +48088,16 @@ function registerConfiguredTodoLifecycle(pi, options) {
   });
   return options.overlay ? registerTodoOverlay(pi, { readLastTodoState: options.readLastTodoState }) : undefined;
 }
+var PI_MARKER_REHYDRATION_SESSION_ID_LIMIT = 5;
+function formatPiMarkerRehydrationLine(sessionIds, activeSessionId) {
+  const shownIds = sessionIds.slice(0, PI_MARKER_REHYDRATION_SESSION_ID_LIMIT);
+  const omitted = sessionIds.length - shownIds.length;
+  const suffix = omitted > 0 ? ` +${omitted} more` : "";
+  return `${PREFIX2} rehydrated ${sessionIds.length} Pi deferred compaction marker session(s)` + `; sessionIds=${shownIds.join(",")}${suffix}` + `; activeSessionIncluded=${sessionIds.includes(activeSessionId)}`;
+}
 var __test = {
   logPiConfigLoad,
+  formatPiMarkerRehydrationLine,
   resetLoggedPiConfigDirs() {
     loggedPiConfigDirs.clear();
   },
@@ -46233,6 +48141,7 @@ function resolvePiPressureContextLimit(args) {
   }) ?? 0;
 }
 async function persistPiPressureFromMessageEnd(args) {
+  acknowledgePiSystemPromptResponse(args.sessionId, args.message);
   if (piMessageAnchorsLiveUsage(args.message)) {
     recordPiLiveUsageClassification(args.sessionId, false);
   } else if (typeof args.piTokensIsRawBranchEstimate === "boolean") {
@@ -46461,7 +48370,6 @@ async function src_default(pi) {
     info("plugin DISABLED via config (enabled: false) — skipping registration");
     return;
   }
-  reloadWindowOverlay(bootConfig.config.models?.window_overlay_path);
   setStoragePrivatePermissionEnforcement(bootConfig.config.storage.enforce_private_permissions);
   setSqlitePragmaConfig({
     cacheSizeMb: bootConfig.config.sqlite.cache_size_mb,
@@ -46588,14 +48496,13 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
   info(`loaded v${PLUGIN_VERSION} | harness=${PI_HARNESS_KIND} (via ${PI_HARNESS_DETECTION.via}) | db=${dbPath} | ` + `project=${projectIdentity || "(none)"} | dir=${projectDir}`);
   const compactionOff = !isCompactionEnabled(config);
   setCtxReduceRegisteredGlobally(!compactionOff);
+  let pendingPiMarkerSessions = [];
+  let piMarkerRehydrationLogged = false;
   if (!compactionOff) {
     try {
-      const pendingPiMarkerSessions = getSessionsWithPendingPiMarker(db);
+      pendingPiMarkerSessions = getSessionsWithPendingPiMarker(db);
       for (const sid of pendingPiMarkerSessions) {
         signalPiDeferredCompactionMarkerDrain(sid);
-      }
-      if (pendingPiMarkerSessions.length > 0) {
-        log2(`${PREFIX2} rehydrated ${pendingPiMarkerSessions.length} Pi deferred compaction marker session(s)`);
       }
     } catch (err) {
       warn(`Magic Context (pi) failed to rehydrate deferred Pi compaction markers: ${err instanceof Error ? err.message : String(err)}`);
@@ -46897,6 +48804,10 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
     promptSurfaceRuntime
   });
   info(compactionOff ? todowriteEnabled ? "registered tools: ctx_search, ctx_memory, ctx_note, ctx_expand, todowrite; registered /todos (ctx_reduce unavailable in compaction-off mode)" : "registered tools: ctx_search, ctx_memory, ctx_note, ctx_expand (ctx_reduce unavailable in compaction-off mode; todowrite disabled)" : todowriteEnabled ? "registered tools: ctx_search, ctx_memory, ctx_note, ctx_expand, todowrite, ctx_reduce; registered /todos" : "registered tools: ctx_search, ctx_memory, ctx_note, ctx_expand, ctx_reduce (todowrite disabled)");
+  registerPiCloneSessionTransitions(pi.on.bind(pi), {
+    db,
+    signalPendingMarker: signalPiDeferredCompactionMarkerDrain
+  });
   pi.on("session_start", async (event, ctx) => {
     bindStaleBuildNotice(ctx, import.meta.url);
     ensurePiNativeConfigLink();
@@ -46915,7 +48826,15 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
     if (ctx.hasUI && current.hasDeprecatedProtectedTags && claimProtectedTagsDeprecationNoticeOnce()) {
       ctx.ui.notify(formatProtectedTagsDeprecationNotice(), "warning");
     }
+    await handlePiCloneSessionStart(event, ctx, {
+      db,
+      signalPendingMarker: signalPiDeferredCompactionMarkerDrain
+    });
     const sessionId = resolveSessionId(ctx);
+    if (!piMarkerRehydrationLogged && pendingPiMarkerSessions.length > 0 && sessionId) {
+      log2(formatPiMarkerRehydrationLine(pendingPiMarkerSessions, sessionId));
+      piMarkerRehydrationLogged = true;
+    }
     const model = ctx.model;
     if (sessionId && model?.provider && model.id) {
       seedSessionCacheTtlIfUnsynced({
@@ -46925,10 +48844,6 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
         modelKey: canonicalPiModelKey(model.provider, model.id)
       });
     }
-    await handlePiCloneSessionStart(event, ctx, {
-      db,
-      signalPendingMarker: signalPiDeferredCompactionMarkerDrain
-    });
   });
   pi.on("agent_start", (_event, ctx) => {
     setEmbeddingSessionBusy2(ctx.sessionManager.getSessionId(), true);
@@ -47306,9 +49221,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
         promptSurfacePreset: promptSurface.preset
       });
       if (result.hashChanged) {
-        signalPiHistoryRefresh(sessionId);
-        signalPiSystemPromptRefresh(sessionId);
-        signalPiPendingMaterialization(sessionId);
+        signalPiSystemHashChange(sessionId, result.currentHash);
       }
       if (isCacheBusting) {
         clearSystemPromptRefresh(sessionId);
@@ -47324,6 +49237,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
   });
   info("registered before_agent_start system prompt injector");
   pi.on("agent_end", (event, ctx) => {
+    acknowledgePiPendingSystemPromptResponses(ctx.sessionManager.getSessionId());
     setEmbeddingSessionBusy2(ctx.sessionManager.getSessionId(), false);
     log2("agent_end: returning synchronously (background work continues)");
     try {

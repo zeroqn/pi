@@ -4,17 +4,17 @@ import {
 import {
   log2
 } from "./index-x3dcnxh0.js";
+import"./index-cyrnv16r.js";
+import"./index-xkf1qyj1.js";
+import"./index-vaah9fbg.js";
 import {
   resolveLocalEmbeddingWorkerRuntime,
   getLocalEmbeddingNativeMemoryStats,
   LocalEmbeddingProvider
-} from "./index-eb3n6ysg.js";
-import"./index-bgmv2kaf.js";
-import"./index-xkf1qyj1.js";
-import"./index-vaah9fbg.js";
+} from "./index-32qfekbw.js";
 import {
   setStoragePrivatePermissionEnforcement
-} from "./index-vf38qhee.js";
+} from "./index-81nthk8j.js";
 
 // ../plugin/src/features/magic-context/memory/embedding-worker.ts
 import { parentPort, workerData } from "node:worker_threads";

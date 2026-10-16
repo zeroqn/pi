@@ -7,14 +7,31 @@ var input = workerData;
 port.postMessage({ kind: "accepted" });
 var [{ Database }, { scanRawSessionSummaryRows }] = await Promise.all([
   import("./sqlite-3yye76ht.js"),
-  import("./read-session-raw-npx3920c.js")
+  import("./read-session-raw-527m0yxx.js")
 ]);
 var db;
 var reply;
 try {
-  db = input.indexMessage ? new Database(input.path) : new Database(input.path, { readonly: true });
+  db = input.indexMessage || input.orphanSweep ? new Database(input.path) : new Database(input.path, { readonly: true });
   db.exec("PRAGMA busy_timeout = 250");
-  if (input.indexMessage) {
+  if (input.orphanSweep) {
+    const [
+      { setHarness },
+      { sweepOrphanedOpenCodeMessageIndexes },
+      { configureContextDatabasePragmas }
+    ] = await Promise.all([
+      import("./harness-9872e0ym.js"),
+      import("./message-index-rp0nsk6n.js"),
+      import("./sqlite-context-pragmas-gcgch6qz.js")
+    ]);
+    setHarness(input.harness ?? "opencode");
+    configureContextDatabasePragmas(db);
+    const sourcePath = input.orphanSweep.sourcePath;
+    reply = {
+      kind: "orphan-sweep",
+      result: sweepOrphanedOpenCodeMessageIndexes(db, () => sourcePath ? new Database(sourcePath, { readonly: true }) : null, input.orphanSweep.options)
+    };
+  } else if (input.indexMessage) {
     const { setHarness } = await import("./harness-9872e0ym.js");
     setHarness(input.harness ?? "opencode");
     const [
@@ -22,7 +39,7 @@ try {
       { configureContextDatabasePragmas },
       { registerSqliteDiagnosticSink }
     ] = await Promise.all([
-      import("./message-index-bounded-7ew2ye8s.js"),
+      import("./message-index-bounded-ht45p3n7.js"),
       import("./sqlite-context-pragmas-gcgch6qz.js"),
       import("./sqlite-3yye76ht.js")
     ]);
@@ -35,7 +52,7 @@ try {
     const result = await indexMessageInShortChunks(writer, input.sessionId, message, input, () => !cancellation || Atomics.load(cancellation, 0) === 0);
     reply = { kind: "indexed", inserted: result.inserted, measurements: result.measurements };
   } else if (input.tagRatio !== undefined) {
-    const { scanTagOwnerSummary, scanTagOwnerDelta } = await import("./storage-tags-4w8sfwfa.js");
+    const { scanTagOwnerSummary, scanTagOwnerDelta } = await import("./storage-tags-apgmj0m3.js");
     const delta = input.tagState ? scanTagOwnerDelta(db, input.sessionId, input.tagState) : null;
     if (delta)
       reply = { kind: "tag-delta", delta };
