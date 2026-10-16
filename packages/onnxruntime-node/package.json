@@ -1,0 +1,24 @@
+{
+  "name": "onnxruntime-node",
+  "version": "1.24.3",
+  "description": "ONNXRuntime Node.js binding",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "dependencies": {
+    "onnxruntime-common": "1.24.3"
+  },
+  "repository": {
+    "url": "git+https://github.com/Microsoft/onnxruntime.git",
+    "type": "git"
+  },
+  "keywords": [
+    "ONNX",
+    "ONNXRuntime",
+    "ONNX Runtime"
+  ],
+  "author": {
+    "name": "fs-eire"
+  },
+  "homepage": "https://github.com/Microsoft/onnxruntime#readme"
+}
