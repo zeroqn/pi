@@ -27,6 +27,15 @@ concurrency:
   group: check-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  # Bump when the *staging rules* change (which files are copied, or how they are
+  # normalized) rather than the submodule: the staleness check below reads this back
+  # from builtFrom.stageVersion, so the change itself forces a rebuild instead of
+  # waiting for the next submodule bump.
+  #   1: the original staging (three transformers bundles skipped)
+  #   2: everything in dist is staged; those paths are excluded from secret scanning
+  STAGE_VERSION: "2"
+
 jobs:
   # Regenerates packages/magic-context from the vendor/magic-context submodule and
   # commits the result back to main. The submodule is the single source of truth;
@@ -55,13 +64,21 @@ jobs:
             const { execFileSync } = require("node:child_process");
             const fs = require("node:fs");
             const read = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
-            const stamp = read("packages/magic-context/package.json").builtFrom?.commit;
+            const builtFrom = read("packages/magic-context/package.json").builtFrom ?? {};
             const pin = execFileSync("git", ["rev-parse", "HEAD:vendor/magic-context"], { encoding: "utf8" }).trim();
-            const stale = stamp !== pin;
+            const stage = Number(process.env.STAGE_VERSION);
+            const reasons = [];
+            if (builtFrom.commit !== pin) {
+              reasons.push("submodule " + String(builtFrom.commit).slice(0, 8) + " -> " + pin.slice(0, 8));
+            }
+            if (Number(builtFrom.stageVersion ?? 0) !== stage) {
+              reasons.push("staging rules v" + Number(builtFrom.stageVersion ?? 0) + " -> v" + stage);
+            }
+            const stale = reasons.length > 0;
             fs.appendFileSync(process.env.GITHUB_OUTPUT, "stale=" + stale + "\n");
             console.log(stale
-              ? "stale: built from " + String(stamp).slice(0, 8) + ", pinned at " + pin.slice(0, 8)
-              : "current: prebuilt package matches submodule " + pin.slice(0, 8));
+              ? "stale: " + reasons.join("; ")
+              : "current: prebuilt package matches submodule " + pin.slice(0, 8) + " at staging v" + stage);
           '
 
       - name: Check out the submodule
@@ -91,14 +108,17 @@ jobs:
           set -euo pipefail
           src=vendor/magic-context/packages/pi-plugin/dist
           dest=packages/magic-context
-          # Keep the three transformers bundles out of git: their model-class
-          # tables trip GitHub push protection (a 32-char identifier beginning
-          # "Mistral" reads as an API key). See packages/magic-context/README.md.
+          # Everything in dist is staged, including the three transformers bundles.
+          # They must be here: the plugin's local embeddings import one of them
+          # dynamically, so without them no runtime loads (the failure is reported as
+          # a stale build, which it is not). Their model-class tables contain a
+          # 32-character Hugging Face class name beginning with the vendor prefix
+          # "Mistral" - a model class, not an API key, but the Mistral-key detector
+          # cannot tell - so those three paths are excluded from secret scanning and
+          # push protection in .github/secret_scanning.yml. The guard below still
+          # fails the build if any *other* staged file matches a key shape.
           rm -rf "$dest"/index*.js "$dest"/*.js
           for f in "$src"/*.js; do
-            case "$(basename "$f")" in
-              transformers-web.js|transformers-node-wasm.js|transformers.node-*.js) continue ;;
-            esac
             cp "$f" "$dest"/
           done
           # The singlefile quickjs bundle is CJS, and its emscripten wrapper does
@@ -119,11 +139,18 @@ jobs:
         if: steps.stale.outputs.stale == 'true'
         run: |
           set -euo pipefail
-          if grep -rlE 'Mistral[A-Za-z0-9]{25}' packages/magic-context/ ; then
+          # The three transformers bundles are expected to match the Mistral key shape -
+          # they are the reason .github/secret_scanning.yml excludes those paths - and
+          # they are also the only files allowed to. Anything else matching, anywhere in
+          # the staged package, is still a hard failure.
+          if grep -rlE 'Mistral[A-Za-z0-9]{25}' packages/magic-context/ \
+               --exclude='transformers-web.js' \
+               --exclude='transformers-node-wasm.js' \
+               --exclude='transformers.node-*.js' ; then
             echo "::error::a committed file matches the Mistral key shape; refusing to push"
             exit 1
           fi
-          echo "clean"
+          echo "clean (the three vendored transformers bundles are expected to match)"
 
       - name: Stamp the version and submodule commit
         if: steps.stale.outputs.stale == 'true'
@@ -143,6 +170,8 @@ jobs:
               submodule: "vendor/magic-context",
               commit: execFileSync("git", ["-C", "vendor/magic-context", "rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
               pluginVersion: plugin.version,
+              // Which staging rules produced this tree; see STAGE_VERSION above.
+              stageVersion: Number(process.env.STAGE_VERSION),
             };
             fs.writeFileSync(p, JSON.stringify(pkg, null, "\t") + "\n");
             console.log("stamped " + pkg.version + " @ " + pkg.builtFrom.commit.slice(0, 8));
