@@ -44,10 +44,28 @@ reached through the `libonnxrtabi24.so.1` ABI shim in `shell/onnxruntime-shim` (
 pointed at it by `LD_LIBRARY_PATH` from the devshell; `ONNXRUNTIME_LIB_PATH` picks which ONNX
 Runtime the shim forwards to). `packages/onnxruntime-node/test/vendored.test.ts` enforces that the
 member — and never a registry copy — is what a consumer resolves, and `packages/onnxruntime-node/README.md`
-carries the provenance. `docs/adr/0011-the-native-dependency-a-prebuilt-package-loads.md` is the
+carries the provenance. `docs/adr/0011-a-prebuilt-packages-native-library-comes-from-the-environment.md` is the
 decision and its trade-offs.
 
-What remains heavy is the *web* side of the same library and the image codec: `onnxruntime-web`
-(130 MB unpacked, the wasm path this build cannot reach anyway), `sharp` with
-`@img/sharp-libvips-linux-x64` (~19 MB) and `ai-tokenizer` (31 MB). Those are still registry
+**`onnxruntime-web` is gone too** (2026-10-17), and with it the last 130 MB: this package's
+dependencies now carry no ONNX engine of their own beyond the 384 KB binding above. The wasm engine
+was the fallback for a host where the native binding cannot load — the plugin's resolver takes it
+under Bun < 1.4 (a native teardown panic upstream guards against), in Electron, and after a native
+load failure — and this workspace runs a **node** pi (`.#pi`, or `.#pi-bun` on bun 1.4.2), where the
+resolver returns `native`. The evidence that it is the native path in the running process is a
+`/proc/<pid>/maps` read, not a log line: the live pi maps
+`packages/onnxruntime-node/bin/napi-v6/linux/x64/onnxruntime_binding.node`, the
+`libonnxrtabi24.so.1` shim and the pinned `libonnxruntime.so.1.27.1`, and no wasm engine at all.
+
+Two consequences to know before updating pi:
+
+  * a host on **bun < 1.4** (today, pi's own release binary: upstream pins bun 1.3.14) would now find
+    **no** local embedding engine — `transformers-node-wasm.js` is still shipped, but its
+    `import "onnxruntime-web/webgpu"` no longer resolves. That is a deliberate trade, verified
+    before each pi update: if the native path ever stops being the one taken, put the dependency
+    back (one line — see `git log -p packages/magic-context/package.json`);
+  * the same applies to Electron and to any consumer of this package outside this workspace.
+
+What remains heavy is the image codec and the tokenizer: `sharp` with
+`@img/sharp-libvips-linux-x64` (~19 MB) and `ai-tokenizer` (31 MB). Both are still registry
 dependencies, and the same question is open for them.

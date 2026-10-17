@@ -166,6 +166,28 @@ describe("the vendored onnxruntime-node is the one that gets loaded", () => {
     expect(untracked).toEqual([]);
   });
 
+  // The pair to the native runtime: we ship no wasm ONNX engine, so the 130 MB
+  // `onnxruntime-web` is not a dependency of the prebuilt. Its only consumers are the two wasm
+  // chunks (top-level `import "onnxruntime-web/webgpu"`) and `injectWasmOrt`; the native chunk
+  // imports nothing of it. It was removed 2026-10-17 because this workspace's pi is node (or bun
+  // 1.4.2), where the resolver returns `native` - a host on bun < 1.4 or Electron now has no local
+  // engine, which is the deliberate trade. A re-add is a regression to catch, not a silent 130 MB.
+  test("no manifest in the repository depends on onnxruntime-web", () => {
+    const manifests = [
+      "package.json",
+      "packages/magic-context/package.json",
+      "packages/onnxruntime-node/package.json",
+    ];
+    const offenders: string[] = [];
+    for (const rel of manifests) {
+      const manifest = JSON.parse(readFileSync(join(repoRoot, rel), "utf8"));
+      for (const field of ["dependencies", "optionalDependencies", "devDependencies", "peerDependencies"]) {
+        if (manifest[field]?.["onnxruntime-web"]) offenders.push(`${rel}: ${field}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   test("bun.lock has no registry form of the name", () => {
     const lock = readFileSync(join(repoRoot, "bun.lock"), "utf8");
     expect(lock.match(/"onnxruntime-node": \["onnxruntime-node@\d[^"]*"/g) ?? []).toEqual([]);
