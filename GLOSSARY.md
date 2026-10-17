@@ -65,6 +65,15 @@ turn, which a worker waiting on our callback never makes. At the budget the cloc
 **lease**, which bounds a background shell the model can still act on.
 _Avoid_: feed budget (that is monty's own limit, the same number), timeout (that is a call's declared bound)
 
+**Foreground record**:
+The write-ahead line a process-owning **foreground** call leaves behind: its pid, its pid's start time and
+its label at spawn, and a done line when the call returns. It exists because a foreground call is journalled
+only when the cell returns, so a cell killed mid-call (SIGKILL, OOM, a crash) leaves no trace of the process
+it started — while a **background handle** is journalled as it goes, and is therefore recoverable. The next
+session resolves the file: a verified stray is killed and reported, an unprovable pid is reported and left
+alone. A witness, never a promise — losing the record is a smaller failure than failing a call.
+_Avoid_: call log, process table, lease (a stray is killed, not leased)
+
 **Foreground bound**:
 What a foreground `bash` gets when its caller declared no `timeout=`: ten minutes
 (`DEFAULT_FOREGROUND_SECONDS`). A foreground call is turn-owned and the model cannot act while it runs —

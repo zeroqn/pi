@@ -15,7 +15,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
-import { run, spill, truncate, type RunRegistry } from "./output";
+import { run, spill, truncate } from "./output";
 import { SHELL } from "./shell";
 import { bool, num, str } from "./util";
 import {
@@ -541,8 +541,14 @@ export function makeHost(options: {
 	signal?: AbortSignal;
 	/** The bound an undeclared foreground `bash` is given ({@link DEFAULT_FOREGROUND_SECONDS}). */
 	foregroundSeconds?: number;
-	/** Where a spawned process registers its kill, for the exit reaper (see `RunRegistry`). */
-	registry?: RunRegistry;
+	/**
+	 * The witness factory: given a call's label, answer the hook that records the process it spawns.
+	 *
+	 * The *label* is the caller's because the label is the call's meaning — `bash`'s first command line,
+	 * `find`'s pattern — and this file is the only place that knows which argv built it. What the hook then
+	 * does (register a kill, write a record, both) belongs to the kernel (`foreground.ts`).
+	 */
+	witness?: (label: string) => ((pid: number, kill: () => void) => (() => void) | void) | undefined;
 }): HostFns {
 	const {
 		root,
@@ -555,7 +561,7 @@ export function makeHost(options: {
 		engine,
 		signal,
 		foregroundSeconds = DEFAULT_FOREGROUND_SECONDS,
-		registry,
+		witness,
 	} = options;
 	const base: HostFns = {
 		async bash_host(...args: unknown[]) {
@@ -576,7 +582,7 @@ export function makeHost(options: {
 			const result = await run(SHELL, ["-lc", str(command)], {
 				cwd: root,
 				timeoutSeconds: bound,
-				registry,
+				onSpawn: witness?.(str(command).split("\n")[0]?.slice(0, 120) ?? ""),
 				// The abort kills this call's group (01). A `background=True` call never reaches here,
 				// which is what keeps a handle session-owned.
 				signal,
@@ -626,7 +632,11 @@ export function makeHost(options: {
 					/* the fallback is the rule, not a failure path */
 				}
 			}
-			const result = await run(FIND, findArgv(FIND_KIND, query), { cwd: root, signal, registry });
+			const result = await run(FIND, findArgv(FIND_KIND, query), {
+				cwd: root,
+				signal,
+				onSpawn: witness?.(`find ${query.pattern}`),
+			});
 			if (result.exitCode !== 0 && !result.stdout.trim()) {
 				throw new Error(`find failed: ${result.stderr.trim() || `exit ${result.exitCode}`}`);
 			}
@@ -676,7 +686,11 @@ export function makeHost(options: {
 					/* the fallback is the rule, not a failure path */
 				}
 			}
-			const result = await run(GREP, grepArgv(GREP_KIND, query), { cwd: root, signal, registry });
+			const result = await run(GREP, grepArgv(GREP_KIND, query), {
+				cwd: root,
+				signal,
+				onSpawn: witness?.(`grep ${query.pattern}`),
+			});
 			const matches = parseGrepOutput(result.stdout);
 			if (matches.length > 0) return matches.slice(0, limit);
 			// Both engines answer exit 1 with nothing on stdout when the pattern is simply not

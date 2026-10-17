@@ -25,6 +25,7 @@ import { spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { SHELL } from "./shell";
+import { probePid, readPidStart } from "./util";
 
 export type BgStatus = "running" | "done" | "failed" | "killed" | "timeout" | "unverified";
 
@@ -109,58 +110,14 @@ export type LeaseWhy = "undeclared" | "orphan";
 const MAX_MEMORY_OUTPUT = 64 * 1024;
 
 /**
- * A running process's start time, as Linux reports it in `/proc/<pid>/stat`'s 22nd field — clock ticks
- * since boot, immutable for the life of the process, which is what makes it an identity rather than a
- * timestamp. `null` where it cannot be read: another platform, a pid that is gone, an unreadable
- * `/proc`. A caller must treat `null` as *cannot say*, never as *not the same process*.
- *
- * Read from `/proc` rather than by shelling out to `ps` for the same reason `killProcess` uses
- * `process.kill`: this runs at spawn and at restore, and a subprocess there would be a process to
- * reap in order to learn about processes.
- */
-function readPidStart(pid: number): number | null {
-	try {
-		const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-		// The comm field is parenthesised and may itself contain spaces and parens, so count fields
-		// from the *last* ")" rather than splitting on whitespace from the front.
-		const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
-		const starttime = Number(fields[19]);
-		return Number.isFinite(starttime) ? starttime : null;
-	} catch {
-		return null;
-	}
-}
-
-/**
- * What a record's pid says about the process now (see `restore`, which is the only caller).
- *
- * `process.kill(pid, 0)` is the existence probe: it throws `ESRCH` for a pid nothing holds and `EPERM`
- * for one this user does not own — and *both* mean this record's process is gone, since a child we
- * spawned is ours. A live pid is then matched against the start time recorded at spawn; a record with
- * no such token (an older one, or another platform) can only ever be `unverified`.
+ * What a record's pid says about the process now — `probePid` (`util.ts`), the one probe both ledgers
+ * ask, so they cannot drift into two answers about one pid. `util.ts` also holds `readPidStart`, which
+ * `start` uses at spawn to record the identity this compares against.
  */
 function probeRestored(record: BgHandleInfo): "gone" | "live" | "unverified" {
-	const pid = record.pid;
-	if (pid === null || pid <= 0) return "gone";
-	try {
-		process.kill(pid, 0);
-	} catch {
-		return "gone";
-	}
-	const expected = record.pid_start ?? null;
-	const actual = readPidStart(pid);
-	return expected !== null && actual !== null && actual === expected ? "live" : "unverified";
+	return probePid(record.pid, record.pid_start ?? null);
 }
 
-/**
- * The soft bound an **undeclared** background shell gets, and the grace it has to be judged in.
- *
- * The soft bound is not a kill: at it the handle is announced (`deps.onLease`) and the countdown
- * that *will* kill it starts, so a job nobody attends to stops instead of burning a machine, while
- * a job the model is watching is kept by one call (`extend`). Both are module constants rather than
- * knobs — a value a caller could pass is one more thing to get wrong — and a test drives them
- * through `deps`, the seam `limits?` already is elsewhere.
- */
 export const SOFT_BOUND_SECONDS = 3600;
 export const LEASE_GRACE_SECONDS = 600;
 
@@ -473,6 +430,12 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 		restore(previous: BgHandleInfo[]): void {
 			for (const record of previous) {
 				if (records.has(record.id)) continue;
+				// Ids are re-derived here rather than allocated, so the counter has to be moved past them:
+				// `start` allocates `bg-${++counter}`, and a counter still at the last *live* handle would
+				// hand a fresh shell the id of a restored one, shadowing it in this map and in the model's
+				// view of the session (found 2026-10-17 while adding the foreground record).
+				const suffix = Number(/^bg-(\d+)$/.exec(record.id)?.[1] ?? 0);
+				if (Number.isFinite(suffix) && suffix > counter) counter = suffix;
 				const running = record.status === "running";
 				const verdict = running ? probeRestored(record) : "gone";
 				const restored: BgRecord = {

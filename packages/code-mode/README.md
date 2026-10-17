@@ -23,6 +23,12 @@ way to run it; `packages/web-access` adds web host functions the same way.
 - **The prelude's base half**: `ROOT`/`SCRATCH` and the file helpers (`read_text`, `write_text`,
   `edit_text`, `walk`, `read_json`, `write_json`, `exists`, `mkdirp`, all sync), plus `BgHandle`
   and `bash`. The delegation half is contributed — see below.
+- **The foreground record** (`.scratch/bg-lease/REPORT.md`): every process-owning call writes a line at
+  spawn and a line when it returns, so a session that starts on the same transcript can find a call an
+  earlier one was running when it died. A verified stray (pid alive *and* its start time is the recorded
+  one) is killed at that start and reported; an unprovable pid is reported and never touched. It is a
+  witness, never a promise: no session file, or an unwritable one, records nothing and the call runs
+  exactly as before.
 - **The cell clock and the foreground bound** (`.scratch/bg-lease/REPORT.md`): a cell is bounded by the
   kernel's own `maxFeedDurationSecs` clock *whatever* it is waiting on — monty's budget is checked at
   interpreter checkpoints and its duration backstop compares a time the worker reports per protocol turn,

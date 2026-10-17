@@ -19,12 +19,13 @@ import { makeHost, bind, plainArgs, hostDeclarers, ownsProcess, DEFAULT_FOREGROU
 import { appendJournal, readJournal, readJournals, recordingHost, replayHost, restoredLine } from "./journal";
 import type { CellRecord, HostCallRecord, HostFns, RestoreReport } from "./journal";
 import { clientVersion, loadMonty } from "./monty";
-import { createRunRegistry, spill, truncate } from "./output";
+import { spill, truncate } from "./output";
 import { prelude } from "./prelude";
 import { remedyFor } from "./remedy";
 import { renderValue } from "./render";
 import { shellProblem } from "./shell";
 import { withToolDispatch } from "./tool-host";
+import { createForegroundLedger, createProcessRegistry } from "./foreground";
 import { errorText } from "./util";
 
 // ---------------------------------------------------------------------------
@@ -455,7 +456,13 @@ export function createKernel(options: {
 	 * (`killForegrounds`, and the contract's reaper). A background handle has its manager; a foreground
 	 * call has only this, because its normal reaper is the abort — which a dead process cannot send.
 	 */
-	const foreground = createRunRegistry();
+	const foreground = createProcessRegistry();
+	/**
+	 * The same processes, written down (`.scratch/bg-lease/REPORT.md`). A kill registry dies with the
+	 * process, which is the half of the problem a handler-less death leaves behind; the record is what
+	 * lets a *later* session find what this one was running when it was destroyed, and end it.
+	 */
+	const foregroundLedger = createForegroundLedger({ path: () => (journalPath ? `${journalPath}.fg` : "") });
 	const background = createBackgroundManager({
 		cwd: () => root || process.cwd(),
 		logDir: () => (journalPath ? `${journalPath}.bg` : join(tmpdir(), `rlm-bg-${process.pid}`)),
@@ -539,6 +546,27 @@ export function createKernel(options: {
 	 * and cleared with it: between cells it is `undefined`, the same emptiness rule `activity()` keeps.
 	 */
 	let currentRunSignal: AbortSignal | undefined;
+	/**
+	 * How a foreground call's process is witnessed: registered for the exit reaper, and written down.
+	 *
+	 * Both halves in one place because they answer one event, and they fail differently — the registry is
+	 * what ends the process when *this* process can still act, the record is what ends it when this process
+	 * is already gone. Either alone leaves a case open, and the case they close is the same one.
+	 */
+	function witnessFor(label: string) {
+		return (pid: number, kill: () => void) => {
+			if (pid <= 0) return undefined;
+			// The run's own kill, so an exit-hook kill is still reported as one (`killed: true`) rather than
+			// looking like a command that exited on its own.
+			const unregister = foreground.add(kill);
+			const done = foregroundLedger.open(pid, label);
+			return () => {
+				done();
+				unregister();
+			};
+		};
+	}
+
 	function raiseNotice(notice: Notice) {
 		if (ledger.notify(notice)) return;
 		ownNotices.push(notice);
@@ -675,6 +703,20 @@ export function createKernel(options: {
 		const sessionFile = sessionFilePath(ctx);
 		journalPath = sessionFile ? `${sessionFile}.rlm-journal.jsonl` : "";
 		dumpPath = sessionFile ? `${sessionFile}.rlm-dump.bin` : "";
+		// What an earlier session was running in the *foreground* when it stopped — now that the path is
+		// known. A process-owning call is written down at spawn and marked done when it returns, so an open
+		// record means a process may still be out there holding a machine with nobody who knows it exists.
+		// Verified strays are ended here; the report goes out with the first cell, like a lease's.
+		for (const stray of foregroundLedger.resolve()) {
+			const record = stray.record;
+			raiseNotice({
+				key: `foreground-stray:${record.pid}`,
+				content:
+					stray.verdict === "live"
+						? `an earlier session was running this in the foreground and its process was still alive (pid ${record.pid}), so its process group has been killed — its output went with that session.\ncommand: ${record.command}`
+						: `a process with pid ${record.pid} is alive, and this session cannot prove it is the one an earlier session recorded for\ncommand: ${record.command}\n— leaving it alone.`,
+			});
+		}
 		currentProgress = undefined;
 		// The window closes with the kernel: the prelude is fed once, so a contribution that
 		// arrived later could only half-arrive (ticket 01 §4).
@@ -1215,7 +1257,7 @@ export function createKernel(options: {
 					// process that is already gone.
 					signal: cellSignal,
 					foregroundSeconds,
-					registry: foreground,
+					witness: witnessFor,
 				});
 				const feedOptions = {
 					mount: [resolved.mount, scratchMount],
@@ -1402,6 +1444,10 @@ export function createKernel(options: {
 	async function shutdown(): Promise<void> {
 		await dumpKernel();
 		await background.shutdownAll();
+		// ...and the same for whatever a foreground call is still running: the exit hook covers a process
+		// that ends, but this one may not — `/new`, a fork, a mode change — and the call's own reaper is
+		// the abort, which nobody sent. Its promise settles as killed, because `run()` resolves on a kill.
+		foreground.killAll();
 		try {
 			await session?.close();
 		} catch {

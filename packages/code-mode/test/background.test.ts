@@ -308,6 +308,36 @@ describe("the lease on a shell that declared no bound (2026-10-17)", () => {
 	});
 });
 
+describe("a restored handle's id is not handed out twice", () => {
+	it("moves the allocator past the ids a previous session used", async () => {
+		// Found 2026-10-17 while adding the foreground record: `restore` re-derives ids but did not move the
+		// counter, so the next `start` allocated `bg-1` again and shadowed the restored handle — a shell the
+		// model had been told about, silently replaced in the manager's map.
+		const first = harness();
+		const second = harness();
+		try {
+			const one = first.manager.start("sleep 30", null);
+			const two = first.manager.start("sleep 30", null);
+			expect([one.id, two.id]).toEqual(["bg-1", "bg-2"]);
+			const records = [one, two].map((handle) => first.manager.poll(handle.id));
+			// A later session reads those records back and then starts a shell of its own.
+			second.manager.restore(records);
+			expect(second.manager.poll("bg-1").status).toBe("running");
+			expect(second.manager.poll("bg-2").status).toBe("running");
+			const fresh = second.manager.start("sleep 30", null);
+			expect(fresh.id).toBe("bg-3");
+			// The restored handle is still the one the model was told about, not a shadow of the new one.
+			expect(second.manager.poll("bg-1").command).toBe("sleep 30");
+			expect(second.manager.list().length).toBe(3);
+		} finally {
+			await first.manager.shutdownAll();
+			await second.manager.shutdownAll();
+			first.done();
+			second.done();
+		}
+	});
+});
+
 describe("restoring tells the truth about a process that outlived its session (2026-10-17)", () => {
 	/**
 	 * The verdict used to be unconditional: a record that was `running` when the previous session ended
