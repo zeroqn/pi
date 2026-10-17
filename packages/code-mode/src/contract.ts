@@ -249,6 +249,17 @@ export type BackgroundInfo = {
 	started_at: string;
 	age_ms: number | null;
 	timeout_s: number | null;
+	/**
+	 * Seconds until an **unattended** shell is killed — the lease's countdown, or `null` when there is no
+	 * such deadline (a declared bound, a finished handle, one restored from an earlier session).
+	 *
+	 * Here rather than only on the model's own `bg_poll` because a *reader* needs it too: rlm's footer
+	 * paints `age_scores/timeout_s`, and an hour-old leased shell has no `timeout_s` at all — so without
+	 * this the human's line shows an age and no deadline, which is exactly the reading the lease exists to
+	 * prevent (`long-work` 03's "an age says only *old*"). Optional, and unbumped: an added optional
+	 * member is a shape every reader already tolerates, and an older code mode answers none.
+	 */
+	lease_s?: number | null;
 };
 
 /** One host call a session is waiting on, as another session can see it (rlm-stop ticket 05). */
@@ -397,6 +408,57 @@ export type RegistryEntry = {
 	 */
 	childExtension?: () => ((pi: unknown) => void) | undefined;
 };
+
+/**
+ * The process-level reaper: what happens to a background shell when pi itself goes away.
+ *
+ * A background shell is **detached** — that is what lets its process group be killed as a unit — so it
+ * outlives pi. Every other ending is already handled: the abort leaves it alone by design, a read-only
+ * mode change kills it, `session_shutdown` kills it, and a later session reaps a kernel whose session is
+ * gone. What none of those cover is the process simply **ending** with shells still running, which is
+ * how a leaked shell becomes an orphan nobody owns. These two functions are that last ending.
+ */
+
+/** Once per process, keyed like every other cross-instance rendezvous in this repo. */
+const EXIT_REAPER = Symbol.for("pi-code-mode:exit-reaper");
+
+/**
+ * Kill every running background shell of every mounted kernel, now.
+ *
+ * `killBackgrounds` performs its kill before its first `await` (`kernel.ts`'s implementation has none),
+ * which is what makes it usable here at all — an `exit` handler cannot await anything. That is a
+ * property rather than an accident, so `test/exit-hook.test.ts` pins it against a real shell: a later
+ * edit that puts an `await` in front of the kill would be caught there rather than in the field.
+ */
+export function reapBackgrounds(sessions: Map<string, KernelHandle>): void {
+	for (const handle of sessions.values()) {
+		try {
+			void handle.killBackgrounds?.();
+		} catch {
+			// One session's failure must not spare the next one's shells.
+		}
+	}
+}
+
+/**
+ * Install {@link reapBackgrounds} as the process's own `exit` handler, once per process.
+ *
+ * **Why `exit`, and not a signal.** A listener for SIGTERM, SIGINT or SIGHUP *replaces* that signal's
+ * default action — Node will not terminate on a signal that has a listener — so an extension that
+ * installed one would silently change how pi shuts down, and re-raising would fight a handler pi may
+ * already have. `exit` carries no such meaning: it runs on every path that ends the process through
+ * `process.exit()`, including pi's own signal handling, and adding a listener changes nothing else.
+ *
+ * Its limits, stated rather than implied: SIGKILL reaches no handler at all, and a default-signal
+ * termination runs none either. That is why a shell that does leak is *also* bounded after the fact —
+ * the next session's `restore` finds it, reports it as running, and leases it (`background.ts`).
+ */
+export function installExitReaper(sessions: Map<string, KernelHandle>): void {
+	const glob = globalThis as Record<symbol, unknown>;
+	if (glob[EXIT_REAPER]) return;
+	glob[EXIT_REAPER] = true;
+	process.on("exit", () => reapBackgrounds(sessions));
+}
 
 /** The names code mode's own kernel answers. No contribution may take one. */
 export const BASE_HOST_FNS = [

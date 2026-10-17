@@ -36,19 +36,21 @@ function textOf(result: unknown): string {
 	return parts.map((part) => part.text ?? "").join("");
 }
 
-async function kernelWithLease(soft: number, grace: number) {
+async function kernelWithLease(soft: number, grace: number, entries?: any[]) {
 	const dir = mkdtempSync(join(tmpdir(), "cm-lease-"));
 	const sessionFile = join(dir, "lease.jsonl");
 	writeFileSync(sessionFile, `${JSON.stringify({ type: "session", version: 3, id: "x", timestamp: "", cwd: dir })}\n`);
 	// What reaches the model: the kernel raises the notice and `pi.sendMessage` is how a session with no
 	// rlm listens. rlm's own dispatcher (`index.ts`) uses the same call with the same options.
 	const sent: Array<{ content: string; customType?: string; options: Record<string, unknown> }> = [];
+	/** What the kernel wrote to the transcript — the record a *later* session reads back (`restore`). */
+	const appended: any[] = [];
 	const pi = {
-		appendEntry: () => {},
+		appendEntry: (customType: string, data: any) => appended.push({ type: "custom", customType, data }),
 		sendMessage: (message: { content?: string; customType?: string }, options: Record<string, unknown>) =>
 			sent.push({ content: message?.content ?? "", customType: message?.customType, options }),
 	};
-	const ctx = { cwd: dir, sessionManager: { getSessionFile: () => sessionFile, getEntries: () => [] } };
+	const ctx = { cwd: dir, sessionManager: { getSessionFile: () => sessionFile, getEntries: () => entries ?? [] } };
 	const ledger = createLedger({
 		reserved: [...BASE_HOST_FNS],
 		base: { description: BASE_DESCRIPTION, snippet: BASE_SNIPPET, guidelines: BASE_GUIDELINES },
@@ -59,7 +61,7 @@ async function kernelWithLease(soft: number, grace: number) {
 		ledger,
 		limits: { softBoundSeconds: soft, leaseGraceSeconds: grace },
 	});
-	return { dir, ctx, kernel, sent };
+	return { dir, ctx, kernel, sent, appended };
 }
 
 async function until(predicate: () => boolean, timeoutMs = 8000): Promise<void> {
@@ -145,6 +147,75 @@ describe.skipIf(!montyReady)("a background shell with no declared bound", () => 
 		} finally {
 			await kernel.shutdown();
 			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("announces an orphan a previous session left running, and kills it unless it is kept", async () => {
+		// The incident's own shape, one session later: the shell is still alive, its session is not, and
+		// nobody is left to notice. The first kernel stands in for the session that died; the second mounts
+		// on what it wrote, which is exactly what a resume does (`startSession`).
+		const first = await kernelWithLease(3600, 600);
+		const second = await kernelWithLease(1, 1, first.appended);
+		try {
+			const started = textOf(await first.kernel.execute({ code: 'h = await bash("sleep 30", background=True)\nprint(h.id, (await h.poll())["pid_start"] is not None)' }, undefined, first.ctx));
+			expect(started).toContain("bg-1 True");
+			const record = first.appended.find((entry) => entry.customType === "rlm-bg")?.data;
+			expect(record.status).toBe("running");
+			const pid = record.pid as number;
+			const alive = () => {
+				try {
+					process.kill(pid, 0);
+					return true;
+				} catch {
+					return false;
+				}
+			};
+			expect(alive()).toBe(true);
+			// The resume: the second kernel reads the first one's transcript entries.
+			await second.kernel.startSession(second.ctx);
+			// Truthfully still running — not "killed", which is what a resumed session used to report.
+			expect(textOf(await second.kernel.execute({ code: 'print((await bg_poll("bg-1"))["status"])' }, undefined, second.ctx))).toContain("running");
+			// Announced at once, and named as what it is.
+			await until(() => second.sent.length === 1, 5000);
+			expect(second.sent[0]!.content).toContain("an earlier session started this shell");
+			expect(second.sent[0]!.content).toContain(`(pid ${pid})`);
+			expect(second.sent[0]!.content).toContain("its output is not readable here");
+			expect(second.sent[0]!.content).toContain('bg_extend("bg-1", seconds)');
+			expect(second.sent[0]!.content).toContain("killed in 1s");
+			// Unjudged: the process really is stopped, and the verdict names its provenance.
+			await until(() => !alive(), 8000);
+			const settled = textOf(await second.kernel.execute({ code: 'print((await bg_poll("bg-1"))["status"], (await bg_poll("bg-1"))["reason"])' }, undefined, second.ctx));
+			expect(settled).toContain("killed unattended: an earlier session started it");
+		} finally {
+			await first.kernel.shutdown();
+			await second.kernel.shutdown();
+			rmSync(first.dir, { recursive: true, force: true });
+			rmSync(second.dir, { recursive: true, force: true });
+		}
+	});
+
+	it("keeps an orphan the model grants more time to", async () => {
+		// The other half of the judgement: a shell the human *wanted* to survive a restart is kept by one
+		// call, exactly as an undeclared one is.
+		const first = await kernelWithLease(3600, 600);
+		const second = await kernelWithLease(1, 1, first.appended);
+		try {
+			await first.kernel.execute({ code: 'h = await bash("sleep 30", background=True)' }, undefined, first.ctx);
+			const record = first.appended.find((entry) => entry.customType === "rlm-bg")?.data;
+			const pid = record.pid as number;
+			await second.kernel.startSession(second.ctx);
+			await until(() => second.sent.length === 1, 5000);
+			const kept = textOf(await second.kernel.execute({ code: 'print((await bg_extend("bg-1", 30))["timeout_s"])' }, undefined, second.ctx));
+			expect(kept).toContain("30");
+			await sleep(2500);
+			// Alive past the moment the grace would have killed it.
+			expect(() => process.kill(pid, 0)).not.toThrow();
+			expect(textOf(await second.kernel.execute({ code: 'print((await bg_poll("bg-1"))["status"])' }, undefined, second.ctx))).toContain("running");
+		} finally {
+			await first.kernel.shutdown();
+			await second.kernel.shutdown();
+			rmSync(first.dir, { recursive: true, force: true });
+			rmSync(second.dir, { recursive: true, force: true });
 		}
 	});
 

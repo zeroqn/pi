@@ -472,16 +472,25 @@ export function createKernel(options: {
 		 * the countdown this sentence names has already been armed by the manager — the notice reports a
 		 * deadline, it does not create one, so a session with no turn coming is still bound by it.
 		 *
+		 * Two sentences, one mechanism: a shell whose caller declared no bound (`undeclared`), and a shell
+		 * an **earlier** session started that this one found still alive (`orphan`) — the second arrives
+		 * the moment a resuming session mounts, which is the earliest anyone can be told about it.
+		 *
 		 * A key of its own rather than the finish notice's, because the two are not each other's
 		 * replacements; and deliberately **not** withdrawn by a read the way the finish notice is: reading
 		 * a handle is looking at it, and looking is not judging.
 		 */
-		onLease: (record, graceSeconds) =>
-			raiseNotice({
-				key: `bg-lease:${record.id}`,
-				// The id form of the grant, not `h.extend`: by the time this arrives the handle may not be in the
-				// namespace at all (a rotation, a resume, another cell's name for it), and the id is what survives.
-				content: `[${record.id}] still running ${spanText((record.age_ms ?? 0) / 1000)} with no declared bound — keep it with bg_extend("${record.id}", seconds), which becomes its bound, or stop it with bg_kill("${record.id}"). It is killed in ${spanText(graceSeconds)} if you do neither.\ncommand: ${record.command.split("\n")[0]?.slice(0, 120) ?? ""}${record.log_path ? `\noutput: ${record.log_path}` : ""}`,
+		onLease: (record, graceSeconds, why) => {
+			const head =
+				why === "orphan"
+					? `[${record.id}] an earlier session started this shell and it is still running (pid ${record.pid}); its output is not readable here`
+					: `[${record.id}] still running ${spanText((record.age_ms ?? 0) / 1000)} with no declared bound`;
+			// The id form of the grant, not `h.extend`: by the time this arrives the handle may not be in the
+			// namespace at all (a rotation, a resume, another cell's name for it), and the id is what survives.
+			const tail = `keep it with bg_extend("${record.id}", seconds), which becomes its bound, or stop it with bg_kill("${record.id}"). It is killed in ${spanText(graceSeconds)} if you do neither.`;
+			return raiseNotice({
+				key: why === "orphan" ? `bg-orphan:${record.id}` : `bg-lease:${record.id}`,
+				content: `${head} — ${tail}\ncommand: ${record.command.split("\n")[0]?.slice(0, 120) ?? ""}${record.log_path ? `\noutput: ${record.log_path}` : ""}`,
 				cancelled: () => {
 					try {
 						const settled = background.poll(record.id);
@@ -490,7 +499,8 @@ export function createKernel(options: {
 						return true;
 					}
 				},
-			}),
+			});
+		},
 	});
 
 	/**
@@ -1432,6 +1442,9 @@ export function createKernel(options: {
 				// `bg_poll` reads, and one clock produced it (04).
 				age_ms: handle.age_ms,
 				timeout_s: handle.timeout_s,
+				// The lease's clock, so a footer can print the deadline a leased shell has and a declared one
+				// does not (see `BackgroundInfo.lease_s`).
+				lease_s: handle.lease_s,
 			})),
 		killBackgrounds: async (ids?: string[]) => {
 			const wanted = ids && ids.length > 0 ? new Set(ids.map(String)) : null;

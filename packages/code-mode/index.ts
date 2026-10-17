@@ -17,6 +17,7 @@ import {
 	PUBLISHER,
 	createLedger,
 	createMounter,
+	installExitReaper,
 	createSessionKeys,
 	publish,
 	registrySessions,
@@ -62,6 +63,10 @@ function createInstance(pi: any, publishEntry: boolean) {
 	// Read the sessions map off the registry *before* publishing: a `/reload` re-imports this
 	// entry, and the reloaded instance has to join the map the live consumers already hold.
 	const sessions = registrySessions();
+	// The last ending there is: the process going away with shells still running. A background shell is
+	// detached, so nothing else ends it — not the abort, not the kernel's own shutdown (which never ran),
+	// not a later session (there may not be one in this process). Idempotent per process.
+	installExitReaper(sessions);
 
 	/**
 	 * The kernel for a session, from the **shared** map rather than a per-instance one.

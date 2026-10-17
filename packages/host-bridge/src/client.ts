@@ -52,6 +52,8 @@ export type KernelBackground = {
 	started_at: string;
 	age_ms: number | null;
 	timeout_s: number | null;
+	/** The lease's countdown, when the shell has one — see code mode's `BackgroundInfo.lease_s`. */
+	lease_s?: number | null;
 };
 
 /** One host call, as the kernel is about to make it. Code mode's own shape, mirrored. */

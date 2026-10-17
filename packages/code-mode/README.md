@@ -26,9 +26,13 @@ way to run it; `packages/web-access` adds web host functions the same way.
 - **Host functions**: `bash_host`, `find`, `grep`, `read_image` — async, all awaited — and the
   background handles behind `await bash(cmd, background=True)`: `bg_poll`, `bg_read`, `bg_kill`,
   `bg_list`, `bg_extend`, cap 8 live, one notice per finished handle, killed at shutdown with the
-  record kept and restored read-only after a resume (never re-executed). A shell started with no
-  `timeout=` gets a **lease** instead of nothing: noticed at an hour and killed ten minutes later
-  unless `bg_extend(id, seconds)` (or `h.extend(seconds)`) grants more, which then *is* its bound
+  record kept and restored after a resume (never re-executed). A shell started with no `timeout=` gets
+  a **lease** instead of nothing: noticed at an hour and killed ten minutes later unless
+  `bg_extend(id, seconds)` (or `h.extend(seconds)`) grants more, which then *is* its bound. A resumed
+  session **probes** what it restores rather than assuming it died — gone reads `killed`, alive and
+  verified by the process's own start time is leased at once as an orphan, and alive-but-unprovable
+  reads `unverified` and is never killed — and the process's own `exit` reaps every mounted session's
+  running shells, since a detached shell would otherwise outlive pi
   (`.scratch/bg-lease/REPORT.md`).
 - **Progress updates** for long host calls, so a slow cell is not opaque.
 - **Journal-and-replay durability** (`.scratch/rlm-extension/` ticket 04): successful cells are

@@ -26,7 +26,7 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path";
 import { SHELL } from "./shell";
 
-export type BgStatus = "running" | "done" | "failed" | "killed" | "timeout";
+export type BgStatus = "running" | "done" | "failed" | "killed" | "timeout" | "unverified";
 
 export interface BgHandleInfo {
 	id: string;
@@ -64,9 +64,19 @@ export interface BgHandleInfo {
 	 * such deadline*, never *no deadline at all*.
 	 */
 	lease_s: number | null;
+	/**
+	 * The process's own start time, as the host's OS reports it (`/proc/<pid>/stat`'s `starttime`, in
+	 * clock ticks since boot), recorded so a **later** session can tell this process from a different
+	 * one that inherited the pid.
+	 *
+	 * `null` where the host cannot say — no `/proc`, or a record written before this field existed —
+	 * and that absence is honest rather than assumed: a resumed session that cannot prove a live pid is
+	 * *this* process reports `unverified` and kills nothing (see `restore`).
+	 */
+	pid_start: number | null;
 }
 
-interface BgRecord extends Omit<BgHandleInfo, "age_ms" | "timeout_s" | "lease_s" | "bytes_out"> {
+interface BgRecord extends Omit<BgHandleInfo, "age_ms" | "timeout_s" | "lease_s" | "pid_start" | "bytes_out"> {
 	child?: ReturnType<typeof spawn>;
 	output: string;
 	timeoutSeconds: number | null;
@@ -80,12 +90,67 @@ interface BgRecord extends Omit<BgHandleInfo, "age_ms" | "timeout_s" | "lease_s"
 	 * announced window. `lease_s` is this read against the clock rather than a second countdown.
 	 */
 	leaseKillAtMonotonic: number | null;
+	/** Why this handle is leased — the text differs, the mechanism does not ({@link LeaseWhy}). */
+	leaseWhy: LeaseWhy;
+	/** The process's start time as the OS reports it (see {@link BgHandleInfo.pid_start}). */
+	pidStart: number | null;
 	/** `null` for a restored record: the process it describes did not run here. */
 	startedMonotonic: number | null;
 	bytesOut: number;
 }
 
+/**
+ * Why a handle is serving a lease: its own caller declared no bound, or an **earlier session** started
+ * it and this one found it still running. One mechanism and two sentences — the model is told which,
+ * because "you never bounded this" and "this outlived a session" call for different judgement.
+ */
+export type LeaseWhy = "undeclared" | "orphan";
+
 const MAX_MEMORY_OUTPUT = 64 * 1024;
+
+/**
+ * A running process's start time, as Linux reports it in `/proc/<pid>/stat`'s 22nd field — clock ticks
+ * since boot, immutable for the life of the process, which is what makes it an identity rather than a
+ * timestamp. `null` where it cannot be read: another platform, a pid that is gone, an unreadable
+ * `/proc`. A caller must treat `null` as *cannot say*, never as *not the same process*.
+ *
+ * Read from `/proc` rather than by shelling out to `ps` for the same reason `killProcess` uses
+ * `process.kill`: this runs at spawn and at restore, and a subprocess there would be a process to
+ * reap in order to learn about processes.
+ */
+function readPidStart(pid: number): number | null {
+	try {
+		const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+		// The comm field is parenthesised and may itself contain spaces and parens, so count fields
+		// from the *last* ")" rather than splitting on whitespace from the front.
+		const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+		const starttime = Number(fields[19]);
+		return Number.isFinite(starttime) ? starttime : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * What a record's pid says about the process now (see `restore`, which is the only caller).
+ *
+ * `process.kill(pid, 0)` is the existence probe: it throws `ESRCH` for a pid nothing holds and `EPERM`
+ * for one this user does not own — and *both* mean this record's process is gone, since a child we
+ * spawned is ours. A live pid is then matched against the start time recorded at spawn; a record with
+ * no such token (an older one, or another platform) can only ever be `unverified`.
+ */
+function probeRestored(record: BgHandleInfo): "gone" | "live" | "unverified" {
+	const pid = record.pid;
+	if (pid === null || pid <= 0) return "gone";
+	try {
+		process.kill(pid, 0);
+	} catch {
+		return "gone";
+	}
+	const expected = record.pid_start ?? null;
+	const actual = readPidStart(pid);
+	return expected !== null && actual !== null && actual === expected ? "live" : "unverified";
+}
 
 /**
  * The soft bound an **undeclared** background shell gets, and the grace it has to be judged in.
@@ -111,7 +176,7 @@ export interface BackgroundManagerDeps {
 	 * judge it in. A notice, not a kill: the caller composes the sentence, because it is the one that
 	 * knows how this session speaks to the model (`kernel.ts`'s `raiseNotice`).
 	 */
-	onLease?: (record: BgHandleInfo, graceSeconds: number) => void;
+	onLease?: (record: BgHandleInfo, graceSeconds: number, why: LeaseWhy) => void;
 	/** Test seams for the two constants; production takes the module values. */
 	softBoundSeconds?: number;
 	leaseGraceSeconds?: number;
@@ -154,6 +219,7 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 					? Math.max(0, Math.round(now - startedMonotonic))
 					: null,
 			timeout_s: timeoutSeconds,
+			pid_start: record.pidStart,
 			// Only a running handle inside the announced window has a countdown; everywhere else the
 			// answer is an absence (see the field).
 			lease_s:
@@ -218,14 +284,18 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 	 * still gets the deadline it was told about, which is the whole reason this exists (a notice that
 	 * waits for a turn would leave the case that started this file's header exactly as it was).
 	 */
-	function armLease(record: BgRecord, seconds: number): void {
+	function armLease(record: BgRecord, seconds: number, why: LeaseWhy = "undeclared"): void {
+		record.leaseWhy = why;
 		record.softTimer = setTimeout(() => {
 			if (record.status !== "running") return;
 			record.leaseKillAtMonotonic = performance.now() + leaseGraceSeconds * 1000;
-			deps.onLease?.(info(record), leaseGraceSeconds);
+			deps.onLease?.(info(record), leaseGraceSeconds, why);
 			record.leaseTimer = setTimeout(() => {
 				if (record.status !== "running") return;
-				record.reason = `unattended: no bound was declared and none was granted within ${leaseGraceSeconds}s of the ${seconds}s soft bound`;
+				record.reason =
+					why === "orphan"
+						? `unattended: an earlier session started it and no more time was granted within ${leaseGraceSeconds}s`
+						: `unattended: no bound was declared and none was granted within ${leaseGraceSeconds}s of the ${seconds}s soft bound`;
 				killProcess(record);
 				finish(record, "killed", record.reason, null);
 			}, leaseGraceSeconds * 1000);
@@ -259,6 +329,10 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 			timeoutSeconds,
 			startedMonotonic: performance.now(),
 			leaseKillAtMonotonic: null,
+			leaseWhy: "undeclared",
+			// Read here, at spawn: a start time is fixed at fork, so this is the one moment it is both
+			// available and cheap, and it is what lets a *later* session prove this pid is this process.
+			pidStart: readPidStart(child.pid ?? -1),
 			bytesOut: 0,
 		};
 		const append = (chunk: Buffer) => {
@@ -373,22 +447,56 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 			return [...records.values()].map(info);
 		},
 
-		/** Read-only restoration for a resumed session: nothing is re-executed. */
+		/**
+		 * Restoration for a resumed session: nothing is re-executed, and — since 2026-10-17 — nothing is
+		 * **misreported** either.
+		 *
+		 * It used to call every record that was `running` when the previous session ended `killed` with
+		 * *"the process did not survive the session that started it"*, without asking. That is true of a
+		 * session that ended cleanly (`shutdownAll` killed them) and false of a **leaked** one: the
+		 * incident in this file's header left two shells holding a machine for eighteen hours, and a
+		 * resumed session describing them as dead is what made the leak invisible. So the record is
+		 * *probed* now, and the three answers are different:
+		 *
+		 * - **gone** — no process with that pid, or one this user does not own: `killed`, with the same
+		 *   sentence as before, which is now something this session checked.
+		 * - **live** — the pid's start time matches the one recorded at spawn, so this *is* the process the
+		 *   record describes: it stays `running`, and it gets the **lease** at once (`soft = 0`), because
+		 *   an orphan has already had all the soft bound it is going to get. Announced immediately, killed
+		 *   in the grace unless the model grants more — the same consequence for the same inaction, now
+		 *   reaching the leaks a session cannot be asked about.
+		 * - **unverified** — a process has the pid but nothing proves it is this one (a reused pid, another
+		 *   platform, or a record written before `pid_start` existed). Reported as such, with the pid in
+		 *   the reason, and **never killed**: `killProcess` is only reached from a `running` record, so a
+		 *   misevaluated pid cannot become a kill.
+		 */
 		restore(previous: BgHandleInfo[]): void {
 			for (const record of previous) {
 				if (records.has(record.id)) continue;
-				records.set(record.id, {
+				const running = record.status === "running";
+				const verdict = running ? probeRestored(record) : "gone";
+				const restored: BgRecord = {
 					...record,
-					status: record.status === "running" ? "killed" : record.status,
-					reason: record.status === "running" ? "the process did not survive the session that started it" : record.reason,
+					status: running ? (verdict === "live" ? "running" : verdict === "unverified" ? "unverified" : "killed") : record.status,
+					reason: !running
+						? record.reason
+						: verdict === "live"
+							? `started by an earlier session (pid ${record.pid}); its output is not readable here`
+							: verdict === "unverified"
+								? `a process with pid ${record.pid} is alive, and this session cannot prove it is the one this record describes`
+								: "the process did not survive the session that started it",
 					output: "",
 					timeoutSeconds: null,
 					// Nothing here ran in this process: no duration to report, no bytes watched, and no
-					// lease to serve — whatever is still on the host is not this process's to kill.
+					// lease yet — a verified orphan is armed below, an unverified one never is.
 					startedMonotonic: null,
 					leaseKillAtMonotonic: null,
+					leaseWhy: "orphan",
+					pidStart: record.pid_start ?? null,
 					bytesOut: 0,
-				});
+				};
+				records.set(record.id, restored);
+				if (verdict === "live") armLease(restored, 0, "orphan");
 			}
 		},
 

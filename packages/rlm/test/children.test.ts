@@ -1289,6 +1289,20 @@ describe("the footer's own work in flight (long-work tickets 04 and 09)", () => 
 		expect(statusLine(true, 0, undefined, undefined, { backgrounds: [{ command: "restored", age_ms: null, timeout_s: null }] })).toBe(
 			"rlm: code-mode (monty) · bg: restored",
 		);
+
+		// A leased shell declared no bound and has a deadline anyway (`.scratch/bg-lease/REPORT.md`): the
+		// denominator is the lease's countdown, because the question the number answers is *when it dies*.
+		expect(
+			statusLine(true, 0, undefined, undefined, { backgrounds: [{ command: "run-e-stress.sh", age_ms: 3_600_000, timeout_s: null, lease_s: 600 }] }),
+		).toBe("rlm: code-mode (monty) · bg: run-e-stress.sh 1h/10m");
+		// A declared bound is the caller's own promise and wins over any lease.
+		expect(
+			statusLine(true, 0, undefined, undefined, { backgrounds: [{ command: "bun test", age_ms: 240_000, timeout_s: 7200, lease_s: 600 }] }),
+		).toBe("rlm: code-mode (monty) · bg: bun test 4m/2h");
+		// An older code mode answers no `lease_s` at all, which is the same shape as one with no deadline.
+		expect(
+			statusLine(true, 0, undefined, undefined, { backgrounds: [{ command: "bun test", age_ms: 240_000, timeout_s: null }] }),
+		).toBe("rlm: code-mode (monty) · bg: bun test 4m");
 	});
 
 	it("keeps one order, and a long command short", () => {
@@ -1357,12 +1371,18 @@ describe("reading the session's own kernel for the footer (long-work ticket 04)"
 			backgrounds: () => [
 				{ id: "bg-1", command: "bun test", status: "running", started_at: "", age_ms: 1_140_000, timeout_s: null },
 				{ id: "bg-2", command: "done already", status: "done", started_at: "", age_ms: null, timeout_s: null },
+				// A leased shell: still running, no declared bound, and a deadline the footer prints. The
+				// reader passes the whole record through, so `lease_s` reaches the painter intact.
+				{ id: "bg-3", command: "run-e-stress.sh", status: "running", started_at: "", age_ms: 3_600_000, timeout_s: null, lease_s: 600 },
 			],
 		});
 		try {
 			expect(flightOf(ctx)).toEqual({
 				call: { detail: "bun test", age_ms: 240_000, timeout_s: 600 },
-				backgrounds: [{ id: "bg-1", command: "bun test", status: "running", started_at: "", age_ms: 1_140_000, timeout_s: null }],
+				backgrounds: [
+					{ id: "bg-1", command: "bun test", status: "running", started_at: "", age_ms: 1_140_000, timeout_s: null },
+					{ id: "bg-3", command: "run-e-stress.sh", status: "running", started_at: "", age_ms: 3_600_000, timeout_s: null, lease_s: 600 },
+				],
 			});
 			// With a call to name, the cell's own age adds nothing: `call` and `cell` do not both appear.
 			expect(flightOf(ctx)?.cell).toBeUndefined();

@@ -1477,6 +1477,13 @@ function flightClauses(flight?: Flight): string {
 	if (!flight) return "";
 	const bound = (seconds: number | null | undefined) =>
 		typeof seconds === "number" && seconds > 0 ? `/${ageText(seconds)}` : "";
+	/**
+	 * The denominator a shell is read against: the bound it declared, or — when it declared none — the
+	 * lease's countdown, since a leased shell is killed too (`.scratch/bg-lease/REPORT.md`). Either way
+	 * the useful number is *when it dies*, which an age alone cannot say.
+	 */
+	const shellBound = (shell: { timeout_s: number | null; lease_s?: number | null }) =>
+		bound(shell.timeout_s) || bound(shell.lease_s);
 	const clauses: string[] = [];
 	if (flight.call) {
 		clauses.push(`run: ${shortCommand(flight.call.detail)} ${ageText(flight.call.age_ms / 1000)}${bound(flight.call.timeout_s)}`);
@@ -1487,12 +1494,12 @@ function flightClauses(flight?: Flight): string {
 	const shells = flight.backgrounds ?? [];
 	if (shells.length === 1) {
 		const only = shells[0]!;
-		clauses.push(`bg: ${shortCommand(only.command)}${only.age_ms === null ? "" : ` ${ageText(only.age_ms / 1000)}`}${bound(only.timeout_s)}`);
+		clauses.push(`bg: ${shortCommand(only.command)}${only.age_ms === null ? "" : ` ${ageText(only.age_ms / 1000)}`}${shellBound(only)}`);
 	} else if (shells.length > 1) {
 		// The oldest first: an age is only useful as *how long*, so the worst is the largest one.
 		const worst = [...shells].sort((a, b) => (b.age_ms ?? -1) - (a.age_ms ?? -1))[0]!;
 		clauses.push(
-			`bg: ${shells.length} running · worst ${shortCommand(worst.command)}${worst.age_ms === null ? "" : ` ${ageText(worst.age_ms / 1000)}`}${bound(worst.timeout_s)}`,
+			`bg: ${shells.length} running · worst ${shortCommand(worst.command)}${worst.age_ms === null ? "" : ` ${ageText(worst.age_ms / 1000)}`}${shellBound(worst)}`,
 		);
 	}
 	return clauses.length > 0 ? ` · ${clauses.join(" · ")}` : "";
@@ -1542,8 +1549,12 @@ export type StaleSummary = { count: number; name: string; idle_seconds: number }
 export type Flight = {
 	/** The session's oldest call in flight: what it is doing, how long, and the bound it declared. */
 	call?: { detail?: string; age_ms: number; timeout_s: number | null };
-	/** Shells the session is holding that are still running. */
-	backgrounds?: Array<{ command: string; age_ms: number | null; timeout_s: number | null }>;
+	/**
+	 * Shells the session is holding that are still running. `lease_s` is the deadline a shell whose
+	 * caller declared **no** bound has (code mode's `BackgroundInfo.lease_s`), so a leased shell still
+	 * prints a denominator rather than only an age.
+	 */
+	backgrounds?: Array<{ command: string; age_ms: number | null; timeout_s: number | null; lease_s?: number | null }>;
 	/** A cell driving with no call to name — the shape a spin has. */
 	cell?: { age_ms: number; budget_s: number };
 };

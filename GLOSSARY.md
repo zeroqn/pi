@@ -52,8 +52,16 @@ The stand-in bound a background shell gets when its caller declared no `timeout=
 notice while it is still going, then ten minutes in which the model may grant more
 (`await h.extend(seconds)`) before the handle is killed as *unattended*. The grant **becomes** the
 declared bound, so one call leaves the handle bounded exactly as if the caller had declared it; a shell
-that declared a `timeout=` is never leased.
+that declared a `timeout=` is never leased. A shell an **earlier** session started is leased the moment
+the next session finds it (2026-10-17) — see **Orphan**.
 _Avoid_: deadline, idle timeout (a lease is not the caller's bound, and it is not about silence)
+
+**Orphan**:
+A background shell found still alive by a **different** session from the one that started it. The next
+session probes the recorded pid and answers three ways: gone (`killed`, the old sentence, now checked),
+alive and verified by the process's own start time (`running`, and leased at once), or alive and
+unprovable — status **`unverified`** — which is reported and never killed, because a pid can be reused.
+_Avoid_: zombie, leftover (an orphan may be perfectly healthy work)
 
 ## The seam between packages
 
