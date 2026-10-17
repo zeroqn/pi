@@ -15,11 +15,11 @@
  *   MONTY_BIN=$(nix build --no-link --print-out-paths /workspace/pi/monty#monty-bin)/bin/monty bun test
  */
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { BASE_HOST_FNS, createLedger, installExitReaper, reapBackgrounds, type KernelHandle } from "../src/contract";
+import { BASE_HOST_FNS, createLedger, installExitReaper, reapProcesses, type KernelHandle } from "../src/contract";
 import { createKernel } from "../src/kernel";
 import { BASE_DESCRIPTION, BASE_GUIDELINES, BASE_SNIPPET } from "../src/surface";
 
@@ -39,6 +39,35 @@ async function until(predicate: () => boolean, timeoutMs = 4000): Promise<void> 
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 	throw new Error("condition not reached in time");
+}
+
+/**
+ * Whether the process is actually *running*: `/proc/<pid>/stat`'s state field, not a signal probe. A
+ * SIGKILLed child of this process stays a zombie until it is reaped, and `process.kill(pid, 0)` succeeds
+ * on a zombie — so `expect(() => kill(pid, 0)).toThrow()` passes or fails on timing rather than on facts.
+ */
+function running(pid: number): boolean {
+	try {
+		const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+		const state = stat.slice(stat.lastIndexOf(") ") + 2).split(" ")[0];
+		return state !== "Z" && state !== "X";
+	} catch {
+		return false;
+	}
+}
+
+async function until(predicate: () => boolean, timeoutMs = 8000): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		if (predicate()) return;
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+	throw new Error("condition not reached in time");
+}
+
+function textOf(result: unknown): string {
+	const parts = (result as { content?: Array<{ text?: string }> })?.content ?? [];
+	return parts.map((part) => part.text ?? "").join("");
 }
 
 function fakeHandle(kill: () => unknown): KernelHandle {
@@ -64,7 +93,7 @@ describe("reaping every session's shells at the process's exit", () => {
 			["c", {} as unknown as KernelHandle],
 			["d", fakeHandle(() => called.push("d"))],
 		]);
-		expect(() => reapBackgrounds(sessions)).not.toThrow();
+		expect(() => reapProcesses(sessions)).not.toThrow();
 		expect(called).toEqual(["a", "d"]);
 	});
 
@@ -121,6 +150,49 @@ describe.skipIf(!montyReady)("the kill an exit handler has to be able to make", 
 					return true;
 				}
 			}, 4000);
+		} finally {
+			await kernel.shutdown();
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("the exit reaper and a foreground call in flight", () => {
+	it("kills the process group a cell is waiting on, which has no record for a later session to probe", async () => {
+		// The measured gap: a foreground call is `detached`, its only reaper is the abort, and a SIGKILLed
+		// pi sends none — so `sleep 300` under `bash -lc` survives and is reparented to init. Unlike a
+		// background shell, a leaked foreground call has **no record**: a call writes its journal entry only
+		// when the cell returns, so nothing a later session reads could find it either.
+		const dir = mkdtempSync(join(tmpdir(), "cm-exit-fg-"));
+		const pidFile = join(dir, "call.pid");
+		const sessionFile = join(dir, "fg.jsonl");
+		writeFileSync(sessionFile, `${JSON.stringify({ type: "session", version: 3, id: "x", timestamp: "", cwd: dir })}\n`);
+		const ctx = { cwd: dir, sessionManager: { getSessionFile: () => sessionFile, getEntries: () => [] } };
+		const ledger = createLedger({
+			reserved: [...BASE_HOST_FNS],
+			base: { description: BASE_DESCRIPTION, snippet: BASE_SNIPPET, guidelines: BASE_GUIDELINES },
+		});
+		const kernel = createKernel({ pi: { appendEntry: () => {}, sendMessage: () => {} }, sessionKey: sessionFile, ledger });
+		try {
+			// The cell is left in flight — exactly what a reaper meets.
+			const cell = kernel.execute({ code: `r = await bash("echo $$ > ${pidFile}; sleep 60")\nprint("killed:", r["killed"])` }, undefined, ctx);
+			await until(() => existsSync(pidFile), 20_000);
+			const pid = Number(readFileSync(pidFile, "utf8").trim());
+			expect(pid).toBeGreaterThan(0);
+			expect(running(pid)).toBe(true);
+
+			// What the process's own `exit` handler calls, with the real kernel standing in for the handle
+			// the sessions map holds.
+			reapProcesses(new Map([["session", kernel as unknown as KernelHandle]]));
+			// The signal takes an instant and `kill(pid, 0)` answers *true* for a zombie, so the honest
+			// question is the process's state — the trap this repo has already paid for twice.
+			await until(() => !running(pid), 4000);
+			expect(running(pid)).toBe(false);
+
+			// And the cell is honest about it: the call came back killed, because `run()` resolves on a kill
+			// rather than pretending the command returned.
+			const text = textOf(await cell);
+			expect(text).toContain("killed: True");
 		} finally {
 			await kernel.shutdown();
 			rmSync(dir, { recursive: true, force: true });

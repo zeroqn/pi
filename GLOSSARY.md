@@ -56,6 +56,22 @@ that declared a `timeout=` is never leased. A shell an **earlier** session start
 the next session finds it (2026-10-17) — see **Orphan**.
 _Avoid_: deadline, idle timeout (a lease is not the caller's bound, and it is not about silence)
 
+**Cell clock**:
+The kernel's own host-side timer over a cell, at the cell budget (`MAX_FEED_SECONDS`, an hour). It exists
+because the sandbox's own budget cannot see a cell parked in a host call: monty's check runs at
+interpreter checkpoints and its duration backstop compares a time the worker reports on each protocol
+turn, which a worker waiting on our callback never makes. At the budget the clock ends the cell with a
+`TimeoutError` naming the call it was waiting on and kills that call's process group. Distinct from the
+**lease**, which bounds a background shell the model can still act on.
+_Avoid_: feed budget (that is monty's own limit, the same number), timeout (that is a call's declared bound)
+
+**Foreground bound**:
+What a foreground `bash` gets when its caller declared no `timeout=`: ten minutes
+(`DEFAULT_FOREGROUND_SECONDS`). A foreground call is turn-owned and the model cannot act while it runs —
+the tool call has not returned — so this is the one place where the bound has to be automatic rather than
+announced; `timeout=N` or `background=True` are the remedies named in the error it produces.
+_Avoid_: default timeout, hard limit
+
 **Orphan**:
 A background shell found still alive by a **different** session from the one that started it. The next
 session probes the recorded pid and answers three ways: gone (`killed`, the old sentence, now checked),

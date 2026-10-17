@@ -14,12 +14,12 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type * as MontyModule from "@pydantic/monty/node";
 import { createBackgroundManager } from "./background";
-import { BASE_HOST_FNS, type Ledger, type KernelHandleCore, type MountMode, type Notice, type Provenance } from "./contract";
-import { makeHost, bind, plainArgs, HOST_DECLARERS, type Attachment, type CallDeclaration, type HostDeclarer } from "./host";
+import { BASE_HOST_FNS, budgetEnded, type Ledger, type KernelHandleCore, type MountMode, type Notice, type Provenance } from "./contract";
+import { makeHost, bind, plainArgs, hostDeclarers, ownsProcess, DEFAULT_FOREGROUND_SECONDS, type Attachment, type CallDeclaration, type HostDeclarer } from "./host";
 import { appendJournal, readJournal, readJournals, recordingHost, replayHost, restoredLine } from "./journal";
 import type { CellRecord, HostCallRecord, HostFns, RestoreReport } from "./journal";
 import { clientVersion, loadMonty } from "./monty";
-import { spill, truncate } from "./output";
+import { createRunRegistry, spill, truncate } from "./output";
 import { prelude } from "./prelude";
 import { remedyFor } from "./remedy";
 import { renderValue } from "./render";
@@ -208,7 +208,7 @@ type HostChain = ReturnType<typeof newHostChain>;
  * `async`: monty has to receive the very promise its driver registers as a future, and the settle
  * handler has to be attached before monty's own so the flag is never behind it.
  */
-function countHostCalls(host: HostFns, chain: HostChain, declarers: Record<string, HostDeclarer> = HOST_DECLARERS): HostFns {
+function countHostCalls(host: HostFns, chain: HostChain, declarers: Record<string, HostDeclarer>): HostFns {
 	const wrapped: HostFns = {};
 	for (const [name, fn] of Object.entries(host)) {
 		const wrapper = (...args: unknown[]): Promise<unknown> => {
@@ -391,11 +391,14 @@ export function createKernel(options: {
 		/** The background lease's two clocks, at seconds instead of an hour (`.scratch/bg-lease/REPORT.md`). */
 		softBoundSeconds?: number;
 		leaseGraceSeconds?: number;
+		/** The bound an undeclared foreground `bash` gets (`DEFAULT_FOREGROUND_SECONDS`), for a test. */
+		foregroundSeconds?: number;
 	};
 }): Kernel {
 	const { pi, ledger } = options;
 	const maxSuspensions = options.limits?.maxSuspensions ?? MAX_SUSPENSIONS;
 	const maxFeedDurationSecs = options.limits?.maxFeedDurationSecs ?? MAX_FEED_SECONDS;
+	const foregroundSeconds = options.limits?.foregroundSeconds ?? DEFAULT_FOREGROUND_SECONDS;
 	const checkoutLimits = {
 		maxMemory: options.limits?.maxMemory ?? CHECKOUT_LIMITS.maxMemory,
 		maxSuspensions,
@@ -447,6 +450,12 @@ export function createKernel(options: {
 	let problemsPromise: Promise<string[]> | null = null;
 	/** A finished handle is withdrawn from a notice queue when a cell read it (the read rule). */
 	const bgReads = new Set<string>();
+	/**
+	 * The foreground process groups in flight, so the process's own exit can end them
+	 * (`killForegrounds`, and the contract's reaper). A background handle has its manager; a foreground
+	 * call has only this, because its normal reaper is the abort — which a dead process cannot send.
+	 */
+	const foreground = createRunRegistry();
 	const background = createBackgroundManager({
 		cwd: () => root || process.cwd(),
 		logDir: () => (journalPath ? `${journalPath}.bg` : join(tmpdir(), `rlm-bg-${process.pid}`)),
@@ -1171,6 +1180,20 @@ export function createKernel(options: {
 				cellRotateFailure = null;
 				cellAbort = null;
 				cellRebuild = null;
+				// The kernel's own clock over the cell (2026-10-17). monty's budget cannot see a cell parked in
+				// a host call: its in-sandbox check runs at interpreter checkpoints, and its duration backstop
+				// compares a time the worker reports *on each protocol turn* — which a worker waiting on our
+				// callback never makes (`monty/docs/resource-limits.md`). So the host owes its own callbacks a
+				// clock: this one, at the same number, which ends the cell and kills what it was waiting on.
+				const clock = new AbortController();
+				const cellSignal = signal ? AbortSignal.any([signal, clock.signal]) : clock.signal;
+				const budgetTimer = setTimeout(() => {
+					// The call it was waiting on, so the model reads *what* ran past the budget rather than only
+					// that something did — the reader in `activity()` holds the same chain.
+					const waiting = hostChain.outstanding()[0];
+					clock.abort(budgetEnded(maxFeedDurationSecs, waiting?.name ?? null, waiting ? ownsProcess(waiting.name) : false));
+				}, maxFeedDurationSecs * 1000);
+				budgetTimer.unref?.();
 				const hostFns = makeHost({
 					root,
 					attachments,
@@ -1187,8 +1210,12 @@ export function createKernel(options: {
 					// The session's engine, if any owner declared one: `grep`/`find` try it first and fall
 					// back to rg/fd (fff-search ticket 05).
 					engine: ledger.search(),
-					// This tool call's own signal, when pi passed one (rlm-wait ticket 06).
-					signal,
+					// This tool call's own signal, when pi passed one (rlm-wait ticket 06), composed with the
+					// cell clock above: both end the cell the same way, and only one of them can be sent by a
+					// process that is already gone.
+					signal: cellSignal,
+					foregroundSeconds,
+					registry: foreground,
 				});
 				const feedOptions = {
 					mount: [resolved.mount, scratchMount],
@@ -1206,6 +1233,7 @@ export function createKernel(options: {
 							cellCalls.push(error ? { name, args, error } : { name, args, result });
 						})),
 						hostChain,
+						hostDeclarers(foregroundSeconds),
 					),
 					os: (name: string) => {
 						if (/getenv|environ/i.test(name)) {
@@ -1220,7 +1248,7 @@ export function createKernel(options: {
 				};
 				cellDriving = true;
 				cellStartedMonotonic = performance.now();
-				currentRunSignal = signal;
+				currentRunSignal = cellSignal;
 				try {
 					value = await driveCell(params.code, feedOptions);
 				} catch (error) {
@@ -1254,6 +1282,10 @@ export function createKernel(options: {
 						const remedy = remedyFor(error.exception.typeName, error.exception.message);
 						if (remedy !== null) failure = failure === null ? remedy : `${failure}\n${remedy}`;
 					}
+				} finally {
+					// The clock is the cell's, so it goes with the cell: a timer that outlived its feed would
+					// abort the *next* cell's signal the moment it fired.
+					clearTimeout(budgetTimer);
 				}
 
 				if (!failure) journalCell(params.code, cellCalls, Date.now() - started);
@@ -1457,5 +1489,13 @@ export function createKernel(options: {
 			}
 			return killed;
 		},
+		/**
+		 * Kill the process groups of the foreground calls in flight right now.
+		 *
+		 * Synchronous and unawaited on purpose: its caller is the process's `exit` handler, which cannot
+		 * await anything (`contract.ts`, `installExitReaper`). That works because each kill is a signal —
+		 * the runs' own promises then settle on their own, in a process that is going away anyway.
+		 */
+		killForegrounds: () => foreground.killAll(),
 	};
 }

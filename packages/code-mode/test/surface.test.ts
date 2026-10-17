@@ -77,6 +77,15 @@
  * that describes the kernel rather than what a cell should write — carries the rule, and the
  * description's handle list gains `await h.extend(seconds)`. Both hashes move; the first six and the
  * snippet keep theirs.
+ * Then the unbounded-foreground-call amendment, later the same day: guideline 10 said *a foreground
+ * `bash` waits forever unless you pass `timeout=`* and that was literally true — monty's budget is
+ * checked at interpreter checkpoints and its duration backstop compares a time the worker reports on
+ * each protocol turn, so a cell parked in a host call reaches neither (measured, one kernel, same 2s
+ * budget: a `while True: pass` ended at 2.4s, `await bash("sleep 60")` was still running at 90s). A
+ * foreground call now gets `DEFAULT_FOREGROUND_SECONDS` (ten minutes) when the caller declared nothing,
+ * and the kernel's own clock ends the cell at the cell's budget and kills what it was waiting on — both
+ * of which the model has to know, so guideline 10 carries them. Only the whole-array hash moves; the
+ * first six, the description and the snippet keep theirs.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -108,7 +117,7 @@ describe("the base surface (acceptance check 2)", () => {
 	// that had no business being in the foreground.
 	it("carries the four added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(10);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("8e1d67676af0771b696a74396d6c9eb0fa49e533701a4cc21ab10ac78bbf192a");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("4f587c4ab955406dc884f0cb4765204f3aefc92d3f4bfee2bc2720260413aa7a");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, path tests come from `pathlib`");

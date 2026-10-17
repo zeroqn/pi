@@ -10,6 +10,40 @@ import { join } from "node:path";
 export const MAX_LINES = 2000;
 export const MAX_BYTES = 50 * 1024;
 
+/**
+ * The kills currently in flight, so a caller that is not the run can end them.
+ *
+ * The one caller is the kernel's exit reaper: a foreground call is `detached` (that is what lets its
+ * group be killed as a unit) and its only reaper is the abort — which a dead process cannot send — so
+ * a SIGKILLed pi leaves the group running. Measured: `sleep 300` under `bash -lc` survives the
+ * parent's SIGKILL and is reparented to init. This is the handle that lets the exit hook end it.
+ */
+export type RunRegistry = {
+	add(kill: () => void): () => void;
+	killAll(): void;
+};
+
+export function createRunRegistry(): RunRegistry {
+	const kills = new Set<() => void>();
+	return {
+		add(kill) {
+			kills.add(kill);
+			return () => {
+				kills.delete(kill);
+			};
+		},
+		killAll() {
+			for (const kill of [...kills]) {
+				try {
+					kill();
+				} catch {
+					// One run's failure must not spare the next one's process.
+				}
+			}
+		},
+	};
+}
+
 export type RunResult = { stdout: string; stderr: string; exitCode: number | null; killed: boolean };
 
 export function truncate(text: string, maxLines = MAX_LINES, maxBytes = MAX_BYTES) {
@@ -63,6 +97,12 @@ export function run(
 		 * wrapper that knows nothing about processes.
 		 */
 		signal?: AbortSignal;
+		/**
+		 * Where this run registers its kill, so something *outside* the call can end it — the kernel's
+		 * process-exit reaper, which kills work in flight when pi goes away (`.scratch/bg-lease/REPORT.md`).
+		 * Absent leaves the run exactly as it was.
+		 */
+		registry?: RunRegistry;
 	} = {},
 ): Promise<RunResult> {
 	return new Promise<RunResult>((resolvePromise) => {
@@ -109,10 +149,14 @@ export function run(
 				}
 			}
 		};
+		// Registered as soon as there is something to kill, and withdrawn when the call is over: the
+		// registry outlives the run, so a stale entry would be a kill aimed at a recycled pid.
+		const unregister = options.registry?.add(kill);
 		const cleanup = () => {
 			if (timer) clearTimeout(timer);
 			if (idleTimer) clearTimeout(idleTimer);
 			options.signal?.removeEventListener("abort", kill);
+			unregister?.();
 		};
 		const finish = (code: number | null, error: string | null) => {
 			if (settled) return;

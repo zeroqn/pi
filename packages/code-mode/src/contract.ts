@@ -333,6 +333,14 @@ export type KernelHandleCore = {
 	/** Kill the running ones — all of them, or exactly `ids` — answering with what it killed. */
 	killBackgrounds?: (ids?: string[]) => Promise<string[]>;
 	/**
+	 * Kill the process groups of the foreground calls running right now.
+	 *
+	 * Synchronous, because its caller is the process's `exit` handler ({@link installExitReaper}), which
+	 * cannot await. Optional and unbumped, like the readers around it: an older code mode answers none, and
+	 * a reaper that finds nothing is exactly a session with no foreground call in flight.
+	 */
+	killForegrounds?: () => void;
+	/**
 	 * What this kernel is waiting on *right now* (rlm-stop ticket 05), computed at read time from the
 	 * driver's own future map and the per-call bounds the host functions declared.
 	 *
@@ -410,38 +418,48 @@ export type RegistryEntry = {
 };
 
 /**
- * The process-level reaper: what happens to a background shell when pi itself goes away.
+ * The process-level reaper: what happens to the work a session has in flight when pi itself goes away.
  *
- * A background shell is **detached** — that is what lets its process group be killed as a unit — so it
- * outlives pi. Every other ending is already handled: the abort leaves it alone by design, a read-only
- * mode change kills it, `session_shutdown` kills it, and a later session reaps a kernel whose session is
- * gone. What none of those cover is the process simply **ending** with shells still running, which is
- * how a leaked shell becomes an orphan nobody owns. These two functions are that last ending.
+ * Both shapes are `detached` — that is what lets their process group be killed as a unit — so both
+ * outlive pi. Every other ending is already handled: the abort leaves a background shell alone by
+ * design, a read-only mode change kills it, `session_shutdown` kills it, and a later session reaps a
+ * kernel whose session is gone. What none of those cover is the process simply **ending** with work
+ * still running, and there the two shapes differ in a way worth stating:
+ *
+ *  - a **background shell** becomes an orphan nobody owns, and the *next* session's `restore` finds it;
+ *  - a **foreground call** is turn-owned and has no record at all — a call writes its journal entry only
+ *    when the cell returns — so a leaked one is invisible to every later session. Measured: `sleep 300`
+ *    under `bash -lc` survives a SIGKILLed pi and is reparented to init. Only this hook can end it.
  */
 
 /** Once per process, keyed like every other cross-instance rendezvous in this repo. */
 const EXIT_REAPER = Symbol.for("pi-code-mode:exit-reaper");
 
 /**
- * Kill every running background shell of every mounted kernel, now.
+ * Kill everything running for every mounted kernel, now: background shells and the process groups of
+ * foreground calls in flight.
  *
- * `killBackgrounds` performs its kill before its first `await` (`kernel.ts`'s implementation has none),
- * which is what makes it usable here at all — an `exit` handler cannot await anything. That is a
- * property rather than an accident, so `test/exit-hook.test.ts` pins it against a real shell: a later
- * edit that puts an `await` in front of the kill would be caught there rather than in the field.
+ * Both kills happen before their first `await` (`kernel.ts` has none in either), which is what makes
+ * this usable at all — an `exit` handler cannot await anything. That is a property rather than an
+ * accident, and `test/exit-hook.test.ts` pins it against a real shell: a later edit that puts an `await`
+ * in front of a kill would leave the work running while the process died.
  */
-export function reapBackgrounds(sessions: Map<string, KernelHandle>): void {
-	for (const handle of sessions.values()) {
+export function reapProcesses(sessions: Map<string, KernelHandle>): void {
+	const kill = (fn: (() => unknown) | undefined) => {
 		try {
-			void handle.killBackgrounds?.();
+			void fn?.();
 		} catch {
-			// One session's failure must not spare the next one's shells.
+			// One session's failure must not spare the next one's processes.
 		}
+	};
+	for (const handle of sessions.values()) {
+		kill(handle.killBackgrounds);
+		kill(handle.killForegrounds);
 	}
 }
 
 /**
- * Install {@link reapBackgrounds} as the process's own `exit` handler, once per process.
+ * Install {@link reapProcesses} as the process's own `exit` handler, once per process.
  *
  * **Why `exit`, and not a signal.** A listener for SIGTERM, SIGINT or SIGHUP *replaces* that signal's
  * default action — Node will not terminate on a signal that has a listener — so an extension that
@@ -457,7 +475,7 @@ export function installExitReaper(sessions: Map<string, KernelHandle>): void {
 	const glob = globalThis as Record<symbol, unknown>;
 	if (glob[EXIT_REAPER]) return;
 	glob[EXIT_REAPER] = true;
-	process.on("exit", () => reapBackgrounds(sessions));
+	process.on("exit", () => reapProcesses(sessions));
 }
 
 /** The names code mode's own kernel answers. No contribution may take one. */
@@ -899,6 +917,35 @@ export function refusal(reason: string): Error {
  * abandoned, not cancelled. The model is holding this message and nothing else, so it has to say which
  * one happened.
  */
+/**
+ * The abort reason the **kernel's own cell clock** raises, recognized by `abortable`.
+ *
+ * An abort may carry a reason, and this is the only reason this repo raises: a bare
+ * `controller.abort()` produces a DOM `AbortError`, whose `.name` monty does not know as a Python
+ * exception (`jsErrorParts`, the list `refusal`/`aborted` rely on), so replacing the standard abort
+ * message with *any* reason would break the abort path. `TimeoutError` is on that list, is what monty
+ * itself raises for a cell that overran its budget, and is catchable — which is fine here, and
+ * deliberately unlike `aborted`: a cell that catches it can keep computing, but every later host call in
+ * that cell is refused (the signal stays aborted) and monty's own clock ends it at the same number.
+ */
+export function budgetEnded(seconds: number, who: string | null, killedProcess: boolean): Error {
+	const waiting = who ? ` while waiting for ${who}(...)` : "";
+	const error = new Error(
+		`the cell ran past its feed budget (${seconds}s)${waiting}${killedProcess ? "; its process group was killed" : ""}`,
+	);
+	error.name = "TimeoutError";
+	return error;
+}
+
+/**
+ * The reason an abort carries, when it is one of this repo's own — the one case in which the standard
+ * message is replaced (`abortable` asks; see {@link budgetEnded} for why the check is by name).
+ */
+export function abortReason(signal: AbortSignal): Error | null {
+	const reason: unknown = signal.reason;
+	return reason instanceof Error && reason.name === "TimeoutError" ? reason : null;
+}
+
 export function aborted(who: string, waited: boolean, killedProcess = false): Error {
 	const error = new Error(
 		waited

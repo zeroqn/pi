@@ -15,10 +15,11 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
-import { run, spill, truncate } from "./output";
+import { run, spill, truncate, type RunRegistry } from "./output";
 import { SHELL } from "./shell";
 import { bool, num, str } from "./util";
 import {
+	abortReason,
 	aborted,
 	type Egress,
 	type Fence,
@@ -77,6 +78,31 @@ const MIME: Record<string, string> = {
  * contributor instead is the run's signal (`KernelHandleCore.runSignal`, ticket 08).
  */
 const SPAWNING: ReadonlySet<string> = new Set(["bash_host", "find", "grep"]);
+
+/** Whether a host call owns a process — the one question a caller outside this file asks of that set. */
+export function ownsProcess(name: string): boolean {
+	return SPAWNING.has(name);
+}
+
+/**
+ * What a **foreground** `bash` gets when its caller declared no bound, and the bound that makes the
+ * old promise false: *"a foreground `bash` waits forever unless you pass `timeout=`"* was true, and it
+ * is the hole this closes.
+ *
+ * Why a default rather than the model's own care: a foreground call is turn-owned, and the model
+ * cannot act while it runs — the tool call has not returned, so it cannot send a notice's remedy, and
+ * nothing else in the stack bounds the call (measured: `maxFeedDurationSecs` does not reach a cell
+ * parked in a host call, because monty's budget is checked at interpreter checkpoints and its duration
+ * backstop compares a time the worker reports *on each protocol turn*, which a worker waiting on our
+ * callback never makes — `monty/docs/resource-limits.md`). The model is the actor everywhere a notice
+ * can reach it; a call it is blocked inside is the one place an automatic bound has to exist.
+ *
+ * Ten minutes, so a hang costs a retry rather than an afternoon, with two remedies in the error: a
+ * declared `timeout=N` for work known to be long, or `background=True` for work that should outlive
+ * attention. Nothing may outlive the cell either — its own budget (an hour) ends whatever the cell is
+ * waiting on, this bound included.
+ */
+export const DEFAULT_FOREGROUND_SECONDS = 600;
 
 export type TextPart = { type: "text"; text: string };
 export type ImagePart = { type: "image"; data: string; mimeType: string };
@@ -411,12 +437,15 @@ export function abortable(host: HostFns, signal?: AbortSignal): HostFns {
 	const wrapped: HostFns = {};
 	for (const [name, fn] of Object.entries(host)) {
 		const wrapper = (...args: unknown[]): Promise<unknown> => {
-			if (signal.aborted) return Promise.reject(aborted(name, false));
+			// An abort this repo raised may carry its own reason (the cell clock: `budgetEnded`), and that
+			// reason says more than the generic message — *why* the cell is over. Any other reason (pi's own
+			// Esc, whose DOM `AbortError` has no Python exception name) is ignored.
+			if (signal.aborted) return Promise.reject(abortReason(signal) ?? aborted(name, false));
 			let rejectAbort: (error: unknown) => void = () => {};
 			const cancelled = new Promise<never>((_resolve, reject) => {
 				rejectAbort = reject;
 			});
-			const onAbort = () => rejectAbort(aborted(name, true, SPAWNING.has(name)));
+			const onAbort = () => rejectAbort(abortReason(signal) ?? aborted(name, true, SPAWNING.has(name)));
 			signal.addEventListener("abort", onAbort, { once: true });
 			let work: Promise<unknown>;
 			try {
@@ -467,22 +496,31 @@ export type HostDeclarer = (args: unknown[]) => CallDeclaration | undefined;
  * What each host function says about itself, keyed by the name the counter sees. One entry per
  * function that knows something a reader wants: a bound it will enforce, and what it is doing.
  */
-export const HOST_DECLARERS: Record<string, HostDeclarer> = {
-	bash_host: (args) => {
-		try {
-			const { command, timeout } = bind(args, ["command", "timeout", "background"], "bash");
-			// Unbounded is the default, deliberately kept (`None` waits forever), so a *declared* bound
-			// has to be published as one — an hour of silence inside a call that promised two minutes is
-			// not the same fact as an hour inside a call that promised nothing.
-			return {
-				timeout_s: timeout === null ? null : num(timeout, 0) || null,
-				detail: str(command).split("\n")[0]?.slice(0, 120),
-			};
-		} catch {
-			return undefined;
-		}
-	},
-};
+/**
+ * What each call *is*, read from the arguments before it runs — the bound it will be killed at and
+ * the command it is doing that with.
+ *
+ * A function rather than a constant since the foreground default exists: the declaration has to report
+ * the bound the call will actually be killed at (`DEFAULT_FOREGROUND_SECONDS` when the caller declared
+ * none), and the kernel's own seam has to be able to change that number for a test. A background call
+ * declares nothing here — its bound belongs to the handle, which reports its own `timeout_s`/`lease_s`.
+ */
+export function hostDeclarers(foregroundSeconds = DEFAULT_FOREGROUND_SECONDS): Record<string, HostDeclarer> {
+	return {
+		bash_host: (args) => {
+			try {
+				const { command, timeout, background } = bind(args, ["command", "timeout", "background"], "bash");
+				const declared = timeout === null || timeout === undefined ? null : num(timeout, 0) || null;
+				return {
+					timeout_s: background === true ? declared : (declared ?? foregroundSeconds),
+					detail: str(command).split("\n")[0]?.slice(0, 120),
+				};
+			} catch {
+				return undefined;
+			}
+		},
+	};
+}
 
 export function makeHost(options: {
 	root: string;
@@ -498,11 +536,27 @@ export function makeHost(options: {
 	/** What answers `grep`/`find` before rg/fd, when the session declared an engine
 	 * (`fff-search` ticket 05). Absent is the ordinary state, and leaves both primitives as they were. */
 	engine?: SearchEngine;
-	/** pi's own signal for the tool call that is running this cell (`rlm-wait` ticket 06). Absent
-	 * when the host passed none, which leaves every function exactly as it was. */
+	/** The signal driving this cell: pi's own (`rlm-wait` ticket 06), composed with the kernel's own
+	 * cell clock. Absent when neither exists, which leaves every function exactly as it was. */
 	signal?: AbortSignal;
+	/** The bound an undeclared foreground `bash` is given ({@link DEFAULT_FOREGROUND_SECONDS}). */
+	foregroundSeconds?: number;
+	/** Where a spawned process registers its kill, for the exit reaper (see `RunRegistry`). */
+	registry?: RunRegistry;
 }): HostFns {
-	const { root, attachments, progress, extra, background: backgroundManager, guard, egress, engine, signal } = options;
+	const {
+		root,
+		attachments,
+		progress,
+		extra,
+		background: backgroundManager,
+		guard,
+		egress,
+		engine,
+		signal,
+		foregroundSeconds = DEFAULT_FOREGROUND_SECONDS,
+		registry,
+	} = options;
 	const base: HostFns = {
 		async bash_host(...args: unknown[]) {
 			const { command, timeout, background } = bind(args, ["command", "timeout", "background"], "bash");
@@ -514,9 +568,15 @@ export function makeHost(options: {
 			}
 			const startedAt = Date.now();
 			progress?.(`bash: ${str(command).split("\n")[0].slice(0, 100)} — running`);
+			// `None`, `0` and an omitted argument all mean "declared nothing" — the prelude's own wrapper
+			// passes `timeout=None` by default, so the three cannot be told apart at this boundary, and a
+			// bound of zero is not a bound. Any of them gets the default; only a positive number is one.
+			const declared = timeout === null || timeout === undefined ? null : num(timeout, 0) || null;
+			const bound = declared === null ? foregroundSeconds : declared;
 			const result = await run(SHELL, ["-lc", str(command)], {
 				cwd: root,
-				timeoutSeconds: timeout === null ? null : num(timeout, 0) || null,
+				timeoutSeconds: bound,
+				registry,
 				// The abort kills this call's group (01). A `background=True` call never reaches here,
 				// which is what keeps a handle session-owned.
 				signal,
@@ -533,6 +593,13 @@ export function makeHost(options: {
 				// call whose output was merely long are different facts, and folding them together left
 				// the model unable to tell which had happened (01).
 				killed: result.killed,
+				// Why it was killed, when the reason is not the one the caller declared. A model that has
+				// just lost a build it expected to finish on its own has to be told the default exists, or
+				// the only lesson available is "bash is unreliable".
+				note:
+					result.killed && declared === null
+						? `${bound}s is the default bound for a foreground bash call — pass timeout=N for work you know takes longer, or run it with background=True`
+						: null,
 				full_output_path: cut.truncated ? spill(combined, "bash") : null,
 			};
 		},
@@ -559,7 +626,7 @@ export function makeHost(options: {
 					/* the fallback is the rule, not a failure path */
 				}
 			}
-			const result = await run(FIND, findArgv(FIND_KIND, query), { cwd: root, signal });
+			const result = await run(FIND, findArgv(FIND_KIND, query), { cwd: root, signal, registry });
 			if (result.exitCode !== 0 && !result.stdout.trim()) {
 				throw new Error(`find failed: ${result.stderr.trim() || `exit ${result.exitCode}`}`);
 			}
@@ -609,7 +676,7 @@ export function makeHost(options: {
 					/* the fallback is the rule, not a failure path */
 				}
 			}
-			const result = await run(GREP, grepArgv(GREP_KIND, query), { cwd: root, signal });
+			const result = await run(GREP, grepArgv(GREP_KIND, query), { cwd: root, signal, registry });
 			const matches = parseGrepOutput(result.stdout);
 			if (matches.length > 0) return matches.slice(0, limit);
 			// Both engines answer exit 1 with nothing on stdout when the pattern is simply not

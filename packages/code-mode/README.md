@@ -23,6 +23,13 @@ way to run it; `packages/web-access` adds web host functions the same way.
 - **The prelude's base half**: `ROOT`/`SCRATCH` and the file helpers (`read_text`, `write_text`,
   `edit_text`, `walk`, `read_json`, `write_json`, `exists`, `mkdirp`, all sync), plus `BgHandle`
   and `bash`. The delegation half is contributed — see below.
+- **The cell clock and the foreground bound** (`.scratch/bg-lease/REPORT.md`): a cell is bounded by the
+  kernel's own `maxFeedDurationSecs` clock *whatever* it is waiting on — monty's budget is checked at
+  interpreter checkpoints and its duration backstop compares a time the worker reports per protocol turn,
+  so a cell parked in a host call reaches neither (measured: a spin ended at 2.4s against a 2s budget; a
+  parked `await bash("sleep 60")` was still running at 90s) — and a foreground `bash` with no `timeout=`
+  gets `DEFAULT_FOREGROUND_SECONDS` (ten minutes) instead of nothing, with `timeout=N` or
+  `background=True` as the remedies its error names.
 - **Host functions**: `bash_host`, `find`, `grep`, `read_image` — async, all awaited — and the
   background handles behind `await bash(cmd, background=True)`: `bg_poll`, `bg_read`, `bg_kill`,
   `bg_list`, `bg_extend`, cap 8 live, one notice per finished handle, killed at shutdown with the
