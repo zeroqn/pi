@@ -19,7 +19,7 @@ import {
   Database2,
   withSqliteBackgroundWriter2,
   withoutSqliteTransformPass2
-} from "./index-3cgbv47m.js";
+} from "./index-7ptxvfc5.js";
 import {
   getDataDir,
   getMagicContextStorageDir,
@@ -32,7 +32,7 @@ import {
 } from "./index-8976mezv.js";
 import {
   noteRawSessionSummaryRowWritten2
-} from "./index-2apf1afe.js";
+} from "./index-7mm27xdc.js";
 import {
   MERGED_REASONING_PARTS_PREFIX,
   decodeMergedReasoningParts,
@@ -56,44 +56,19 @@ import {
   serializeStrippedPlaceholderState,
   THINKING_BINDING_RECOVERY_FROZEN_PREFIX,
   THINKING_BINDING_STRIP_ORDER_END_MARKER,
+  parseProcessedImageMarkers,
+  serializeProcessedImageMarkers,
+  getPendingPiCompactionMarkerState,
+  logPiCompactionMarkerClear,
   withReadOnlySessionDb,
   expandToolPart,
   hasRawMessageProvider2,
   setRawMessageProvider2,
   visitRawSessionMessages2,
+  readRawSessionMessageIdOrdinalsForRange2,
   readRawSessionMessageById2,
   readSessionChunk2
-} from "./index-s1bev2xq.js";
-import {
-  piHarnessKindFromExecutable,
-  isPidAlive
-} from "./index-kgd6t63g.js";
-import {
-  BoundedSessionMap,
-  clearLkgFenceProcessState,
-  commitLkgWithRecoveryFence,
-  clearLkgRecoveryFence,
-  deleteSessionScopedRows,
-  getLastIndexedOrdinal2
-} from "./index-sv5yv3gc.js";
-import {
-  estimateTokens
-} from "./index-vaah9fbg.js";
-import {
-  SubcClient,
-  connectionFileExists,
-  SYNAPSE_DEFAULT_MODEL,
-  toSynapseLaneDescriptor,
-  SynapseEmbeddingProvider
-} from "./index-xkf1qyj1.js";
-import {
-  sameProjectDirectory
-} from "./index-knxngpvf.js";
-import {
-  stableStringify,
-  closeQuietly,
-  getTableColumnNames
-} from "./index-nmsb3x01.js";
+} from "./index-774944sz.js";
 import {
   isRecord,
   providerVisibleMessage,
@@ -107,10 +82,40 @@ import {
   getTagNumberByMessageId2,
   getTagsBySession2,
   getTagById2
-} from "./index-2s0s8mca.js";
+} from "./index-jg7jwy8c.js";
+import {
+  estimateTokens
+} from "./index-vaah9fbg.js";
+import {
+  stableStringify,
+  closeQuietly,
+  getTableColumnNames
+} from "./index-nmsb3x01.js";
+import {
+  piHarnessKindFromExecutable,
+  isPidAlive
+} from "./index-kgd6t63g.js";
+import {
+  BoundedSessionMap,
+  clearLkgFenceProcessState,
+  commitLkgWithRecoveryFence,
+  clearLkgRecoveryFence,
+  deleteSessionScopedRows,
+  getLastIndexedOrdinal2
+} from "./index-k3f0x2pv.js";
+import {
+  SubcClient,
+  connectionFileExists,
+  SYNAPSE_DEFAULT_MODEL,
+  toSynapseLaneDescriptor,
+  SynapseEmbeddingProvider
+} from "./index-xkf1qyj1.js";
+import {
+  sameProjectDirectory
+} from "./index-j36vpt39.js";
 import {
   getErrorMessage
-} from "./index-35sd5btx.js";
+} from "./index-a4r62vfn.js";
 import {
   V2_MEMORY_CATEGORIES,
   CATEGORY_PRIORITY,
@@ -124,13 +129,13 @@ import {
   expandWorkspaceIdentitySetWithAliases,
   resolveStoredPathWorkspaceIdentity,
   storedPathBelongsToWorkspace
-} from "./index-krhpcm6f.js";
+} from "./index-pznwj7hn.js";
 import {
   directoryHasGitMetadata,
   resolveProjectIdentityForSession,
   normalizeStoredProjectPath,
   storedPathBelongsToIdentity
-} from "./index-fgabebe5.js";
+} from "./index-mfysz78d.js";
 import {
   drainBackgroundBatches,
   markProjectLoadUntrusted2,
@@ -142,7 +147,7 @@ import {
   unregisterProjectEmbedding2,
   getProjectEmbeddingSnapshot2,
   embedTextForProject2
-} from "./index-gt5en5ta.js";
+} from "./index-kmdweafv.js";
 import {
   getNoteByIdInScope,
   getNotes,
@@ -153,12 +158,13 @@ import {
   updateNote,
   dismissNotes,
   dismissNote,
+  withMessageFtsSessionFilter,
   createUnifiedSearchDiagnostics2,
   parseIdShapedQuery2,
   resolveMemoriesByIdsForSearch2,
   unifiedSearch2,
   formatSearchResults2
-} from "./index-x0kmye0f.js";
+} from "./index-f6a73ytb.js";
 import {
   saveEmbedding,
   invalidateMemory2
@@ -178,12 +184,12 @@ import {
   supersededMemory2,
   mergeMemoryStats2,
   archiveMemory2
-} from "./index-xjqheg7a.js";
+} from "./index-dj784nyr.js";
 import {
   isMarkerCandidateBasisCurrent2,
   invalidateMarkerCandidateBasis2,
   readMarkerCandidateBasis2
-} from "./index-g3600tpw.js";
+} from "./index-dj8hpkz7.js";
 import {
   computeNormalizedHash
 } from "./index-9x1f96r8.js";
@@ -3432,13 +3438,17 @@ async function retryPendingRustSessionCleanupsForProject(db, projectPath, delete
 function clearSession(db, sessionId, rustModuleCleanupAcknowledged = false, permanentlyDeleted = false) {
   cancelAutoSearchWork(sessionId);
   let transactionStartedAt = 0;
+  let clearedMarker = null;
   withoutSqliteTransformPass2(() => withSqliteBackgroundWriter2(() => db.transaction(() => {
     transactionStartedAt = performance.now();
+    clearedMarker = getPendingPiCompactionMarkerState(db, sessionId);
     deleteSessionScopedRows(db, [sessionId], undefined, {
       rustModuleCleanupAcknowledged,
       preserveTagRevisionTombstones: !permanentlyDeleted
     });
   }).immediate()));
+  if (clearedMarker)
+    logPiCompactionMarkerClear(sessionId, clearedMarker, "session-reset");
   clearUnpublishedAutoSearchNoHints(sessionId);
   logSlowWriteTransaction("clear-session", transactionStartedAt);
 }
@@ -4221,6 +4231,9 @@ function persistLkgSlot(db, sessionId, slot, publishMetadata) {
   }
   const layout = layoutLkgPrefix(slot.jsonPrefix);
   try {
+    const inputIdSeq = JSON.stringify(slot.piOutputEntryIds ? { version: 1, inputIds: slot.inputIdSeq, piOutputEntryIds: slot.piOutputEntryIds } : slot.inputIdSeq);
+    const inputContentDigests = JSON.stringify(slot.inputContentDigests);
+    const inputContentSignatures = slot.inputContentSignatures ? JSON.stringify(slot.inputContentSignatures) : null;
     db.transaction(() => {
       const storedHashes = new Map;
       for (const row of db.prepare("SELECT chunk, hash FROM lkg_slot_chunks WHERE session_id = ?").all(sessionId)) {
@@ -4252,11 +4265,7 @@ function persistLkgSlot(db, sessionId, slot, publishMetadata) {
                     provider_key = excluded.provider_key,
                     captured_at = excluded.captured_at,
                     row_version = excluded.row_version,
-                    capture_sequence = excluded.capture_sequence`).run(sessionId, layout.chars, layout.chunks.length, layout.hash, JSON.stringify(slot.piOutputEntryIds ? {
-        version: 1,
-        inputIds: slot.inputIdSeq,
-        piOutputEntryIds: slot.piOutputEntryIds
-      } : slot.inputIdSeq), JSON.stringify(slot.inputContentDigests), slot.inputContentSignatures ? JSON.stringify(slot.inputContentSignatures) : null, slot.lastInputMessageId, slot.modelKey, slot.providerKey, slot.capturedAt, slot.rowVersion ?? null, slot.captureSequence ?? null);
+                    capture_sequence = excluded.capture_sequence`).run(sessionId, layout.chars, layout.chunks.length, layout.hash, inputIdSeq, inputContentDigests, inputContentSignatures, slot.lastInputMessageId, slot.modelKey, slot.providerKey, slot.capturedAt, slot.rowVersion ?? null, slot.captureSequence ?? null);
       publishMetadata?.();
     }).immediate();
     rememberFingerprint(db, sessionId, fingerprint);
@@ -5754,6 +5763,9 @@ function filterIdBlob(raw, filter) {
     return "";
   }
 }
+function filterProcessedImageBlob(raw, filter) {
+  return serializeProcessedImageMarkers(new Map([...parseProcessedImageMarkers(raw)].filter(([id]) => filter.includeMessageId(id)).map(([id, marker]) => [mapMessageId(filter, id) ?? id, marker])));
+}
 function filterStrippedPlaceholderBlob(raw, filter) {
   const state = parseStrippedPlaceholderState(raw);
   const keep = (ids) => ids.filter((id) => filter.includeMessageId(id)).map((id) => mapMessageId(filter, id) ?? id);
@@ -5835,7 +5847,8 @@ function clampWatermark(value, maxCopiedTag) {
   return Math.min(Math.floor(value), maxCopiedTag);
 }
 function copySessionStateForClone(db, sourceSessionId, destinationSessionId, filter) {
-  return runImmediate(db, () => {
+  let clearedMarker = null;
+  const result = runImmediate(db, () => {
     const hasTemporalDecisions = tableExists(db, "temporal_decisions");
     if (filter.requireEmptyDestinationMeta === true && countRows(db, "session_meta", destinationSessionId) > 0 || countRows(db, "compartments", destinationSessionId) > 0 || countRows(db, "tags", destinationSessionId) > 0 || hasTemporalDecisions && countRows(db, "temporal_decisions", destinationSessionId) > 0 || filter.copySessionNotesAndFacts === true && (tableExists(db, "notes") && countRows(db, "notes", destinationSessionId) > 0 || tableExists(db, "session_facts") && countRows(db, "session_facts", destinationSessionId) > 0)) {
       return {
@@ -5947,6 +5960,8 @@ function copySessionStateForClone(db, sourceSessionId, destinationSessionId, fil
                    FROM session_meta WHERE session_id = ?`).get(sourceSessionId);
     const maxCopiedTag = copiedTagNumbers.reduce((max, value) => Math.max(max, value), 0);
     const pendingMarker = filter.selectPendingPiMarker(meta?.pending_pi_compaction_marker_state ?? null, copiedCompartments);
+    if (pendingMarker === null)
+      clearedMarker = getPendingPiCompactionMarkerState(db, destinationSessionId);
     const todoAnchor = meta?.todo_synthetic_anchor_message_id ?? "";
     const migrateTodo = todoAnchor.length > 0 && filter.includeMessageId(todoAnchor);
     db.prepare(`INSERT INTO session_meta
@@ -5973,7 +5988,7 @@ function copySessionStateForClone(db, sourceSessionId, destinationSessionId, fil
                 todo_synthetic_anchor_message_id = excluded.todo_synthetic_anchor_message_id,
                 todo_synthetic_state_json = excluded.todo_synthetic_state_json,
                 cached_m0_bytes = NULL,
-                cached_m1_bytes = NULL`).run(destinationSessionId, getHarness2(), maxCopiedTag, clampWatermark(meta?.cleared_reasoning_through_tag ?? null, maxCopiedTag), clampWatermark(meta?.tool_reclaim_watermark ?? null, maxCopiedTag), typeof meta?.pi_stable_id_scheme === "number" && Number.isFinite(meta.pi_stable_id_scheme) ? meta.pi_stable_id_scheme : null, filterStrippedPlaceholderBlob(meta?.stripped_placeholder_ids ?? null, filter), filterIdBlob(meta?.stale_reduce_stripped_ids ?? null, filter), filterIdBlob(meta?.processed_image_stripped_ids ?? null, filter), clonePiContentDecisions(meta?.merged_reasoning_stripped_ids ?? null, filter), pendingMarker, migrateTodo ? meta?.last_todo_state ?? "" : "", migrateTodo ? meta?.todo_synthetic_call_id ?? "" : "", migrateTodo ? mapMessageId(filter, todoAnchor) ?? "" : "", migrateTodo ? meta?.todo_synthetic_state_json ?? "" : "");
+                cached_m1_bytes = NULL`).run(destinationSessionId, getHarness2(), maxCopiedTag, clampWatermark(meta?.cleared_reasoning_through_tag ?? null, maxCopiedTag), clampWatermark(meta?.tool_reclaim_watermark ?? null, maxCopiedTag), typeof meta?.pi_stable_id_scheme === "number" && Number.isFinite(meta.pi_stable_id_scheme) ? meta.pi_stable_id_scheme : null, filterStrippedPlaceholderBlob(meta?.stripped_placeholder_ids ?? null, filter), filterIdBlob(meta?.stale_reduce_stripped_ids ?? null, filter), filterProcessedImageBlob(meta?.processed_image_stripped_ids ?? null, filter), clonePiContentDecisions(meta?.merged_reasoning_stripped_ids ?? null, filter), pendingMarker, migrateTodo ? meta?.last_todo_state ?? "" : "", migrateTodo ? meta?.todo_synthetic_call_id ?? "" : "", migrateTodo ? mapMessageId(filter, todoAnchor) ?? "" : "", migrateTodo ? meta?.todo_synthetic_state_json ?? "" : "");
     const metaColumnRows = db.prepare("PRAGMA table_info(session_meta)").all();
     const metaColumns = new Set(metaColumnRows.map((column) => column.name));
     if (metaColumns.has("trailing_blank_decisions")) {
@@ -5991,6 +6006,9 @@ function copySessionStateForClone(db, sourceSessionId, destinationSessionId, fil
       pendingMarkerMigrated: pendingMarker !== null
     };
   });
+  if (clearedMarker)
+    logPiCompactionMarkerClear(destinationSessionId, clearedMarker, "clone-replaced");
+  return result;
 }
 // ../plugin/src/features/magic-context/historian-failure-reason.ts
 var MAX_HISTORIAN_FAILURE_REASON_LENGTH = 512;
@@ -10622,6 +10640,56 @@ function renderItemByTag(db, sessionId, number, textIndexDomain = "part") {
   return selected ? renderPartFull(selected) ?? "" : `Tag ${number}'s original text part is no longer in stored history.`;
 }
 
+// ../plugin/src/tools/ctx-expand/search-archive.ts
+function renderSearchArchive(db, sessionId, start, end, tokenBudget, archiveOnly = false) {
+  return withMessageFtsSessionFilter(db, sessionId, (sessionFirst) => {
+    let rawIds;
+    const rows = db.prepare(sessionFirst ? `SELECT f.message_ordinal AS ordinal, f.message_id AS id, f.role, f.content
+                   FROM message_fts_rowid_map AS m
+                   JOIN message_history_fts AS f ON f.rowid = m.fts_rowid
+                   WHERE m.session_id = ?1 AND m.message_ordinal BETWEEN ?2 AND ?3
+                     AND f.session_id = ?1 AND f.message_ordinal BETWEEN ?2 AND ?3
+                   ORDER BY m.message_ordinal` : `SELECT message_ordinal AS ordinal, message_id AS id, role, content
+                   FROM message_history_fts
+                   WHERE session_id = ?1 AND message_ordinal BETWEEN ?2 AND ?3
+                   ORDER BY CAST(message_ordinal AS INTEGER)`);
+    const blocks = [];
+    let tokens = 0;
+    let lastOrdinal = start - 1;
+    let truncated = false;
+    for (const row of rows.iterate(sessionId, start, end)) {
+      if (!row.content)
+        continue;
+      if (!archiveOnly) {
+        rawIds ??= readRawSessionMessageIdOrdinalsForRange2(sessionId, start, end);
+        if (rawIds.get(row.id) === row.ordinal)
+          continue;
+      }
+      const block = `[${row.ordinal}] ${row.role === "user" ? "U" : "A"}: ${row.content}`;
+      const cost = estimateTokens(block);
+      if (blocks.length > 0 && tokens + cost > tokenBudget) {
+        truncated = true;
+        break;
+      }
+      blocks.push(block);
+      tokens += cost;
+      lastOrdinal = row.ordinal;
+    }
+    if (blocks.length === 0)
+      return null;
+    const text = [
+      "From the search archive: indexed text only; no surrounding messages or tool output.",
+      "",
+      ...blocks
+    ];
+    if (truncated) {
+      text.push("", `Truncated at message ${lastOrdinal} (budget: ~${tokenBudget} tokens). Call ctx_expand(start=${lastOrdinal + 1}, end=${end}) for more archived text.`);
+    }
+    return text.join(`
+`);
+  });
+}
+
 // ../plugin/src/tools/unwrap-imitated-reduced-args.ts
 var MAX_DECODED_STRING_LENGTH = 1024 * 1024;
 var MAX_DECODED_ARRAY_ITEMS = 100;
@@ -10882,7 +10950,47 @@ function unreachablePiOrdinalSlot(ordinal) {
   });
   return slot;
 }
+var READ_ENTRY = Symbol("read Pi entry");
+var END_ENTRIES = Symbol("end Pi entries");
 function* iterateEntriesToRawMessageRange(entries, afterOrdinal, limit, finalWatermark, ordinalOffset = 0) {
+  const input = entries[Symbol.iterator]();
+  const converter = convertEntryStream(afterOrdinal, limit, finalWatermark, ordinalOffset);
+  let next;
+  try {
+    while (true) {
+      const step = converter.next(next);
+      if (step.done)
+        return;
+      if (step.value === READ_ENTRY) {
+        const entry = input.next();
+        next = entry.done ? END_ENTRIES : entry.value;
+      } else
+        yield step.value;
+    }
+  } finally {
+    input.return?.();
+  }
+}
+async function* iterateAsyncEntriesToRawMessageRange(entries, afterOrdinal, limit, finalWatermark) {
+  const input = entries[Symbol.asyncIterator]();
+  const converter = convertEntryStream(afterOrdinal, limit, finalWatermark, 0);
+  let next;
+  try {
+    while (true) {
+      const step = converter.next(next);
+      if (step.done)
+        return;
+      if (step.value === READ_ENTRY) {
+        const entry = await input.next();
+        next = entry.done ? END_ENTRIES : entry.value;
+      } else
+        yield step.value;
+    }
+  } finally {
+    await input.return?.();
+  }
+}
+function* convertEntryStream(afterOrdinal, limit, finalWatermark, ordinalOffset = 0) {
   let emitted = 0;
   const normalizedAfter = Math.max(0, Math.floor(afterOrdinal));
   const normalizedLimit = Math.max(1, Math.floor(limit));
@@ -10919,7 +11027,10 @@ function* iterateEntriesToRawMessageRange(entries, afterOrdinal, limit, finalWat
     }
     return emitted >= normalizedLimit || nextOrdinal > normalizedWatermark;
   };
-  for (const entry of entries) {
+  while (true) {
+    const entry = yield READ_ENTRY;
+    if (entry === END_ENTRIES)
+      break;
     if (!isMessageEntry(entry))
       continue;
     const msg = entry.message;
@@ -11374,11 +11485,17 @@ function createCtxExpandTool(deps) {
         }
         const alignment = resolvePiOrdinalAlignmentForContext(deps.db, sessionId, ctx);
         if (isPiOrdinalAlignmentUnanchored(alignment)) {
+          const archived = renderSearchArchive(deps.db, sessionId, mode.kind === "message" ? mode.message : mode.start, mode.kind === "message" ? mode.message : mode.end, CTX_EXPAND_TOKEN_BUDGET, true);
+          if (archived)
+            return ok(archived);
           return err("This session's history numbering can't be verified right now, so message ordinals can't be expanded. Tags (ctx_expand tag=N) still work.");
         }
         const lostThrough = alignment.offset;
         const firstAvailable = lostThrough + 1;
         if (mode.kind === "message") {
+          const archived = renderSearchArchive(deps.db, sessionId, mode.message, mode.message, CTX_EXPAND_TOKEN_BUDGET);
+          if (archived)
+            return ok(archived);
           if (mode.message <= lostThrough) {
             return ok(`No message at ordinal ${mode.message}: it is no longer in this session's history, which now starts at message ${firstAvailable}.`);
           }
@@ -11391,6 +11508,9 @@ function createCtxExpandTool(deps) {
           return ok(`Range ${requestedStart}-${end} is entirely within the live tail (after the last compacted message ${lastCompartmentEnd}); those messages are already visible in context.`);
         }
         const effectiveEnd = lastCompartmentEnd >= 0 ? Math.min(end, lastCompartmentEnd) : end;
+        const archived = renderSearchArchive(deps.db, sessionId, requestedStart, effectiveEnd, CTX_EXPAND_TOKEN_BUDGET);
+        if (archived)
+          return ok(archived);
         if (effectiveEnd <= lostThrough) {
           return ok(`No messages found in range ${requestedStart}-${effectiveEnd}: those messages are no longer in this session's history, which now starts at message ${firstAvailable}.`);
         }
@@ -14462,7 +14582,7 @@ function parseUserMemoryRow(row) {
 
 // ../plugin/src/features/magic-context/compaction-marker.ts
 import { createHash as createHash10 } from "node:crypto";
-import { existsSync as existsSync9 } from "node:fs";
+import { existsSync as existsSync9, statSync as statSync7 } from "node:fs";
 var BASE62_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 var ID_PREFIX_HEX_LENGTH = 12;
 var ID_SUFFIX_LENGTH = 14;
@@ -14497,6 +14617,7 @@ var MARKER_REMOVAL_BUSY_TIMEOUT_MS = 5000;
 function runMarkerWriteTransaction(db, site, operation) {
   if (db.inTransaction)
     return db.transaction(operation).immediate();
+  const walBefore = markerWalPages(db);
   const startedAt = performance.now();
   let acquiredAt;
   let workFinishedAt;
@@ -14520,7 +14641,20 @@ function runMarkerWriteTransaction(db, site, operation) {
     const endMs = workFinishedAt === undefined ? 0 : finishedAt - workFinishedAt;
     try {
       log2(`[magic-context] sqlite writer site=${site} db=opencode acquire_ms=${Math.round(acquireMs)} hold_ms=${Math.round(holdMs)} work_ms=${Math.round(workMs)} end_ms=${Math.round(endMs)} outcome=${acquiredAt === undefined ? "not_acquired" : committed ? "committed" : "failed"}`);
+      if (finishedAt - startedAt > 100) {
+        const autoCheckpoint = db.prepare("PRAGMA wal_autocheckpoint").get();
+        log2(`[magic-context] compaction-marker slow writer site=${site} acquire_ms=${acquireMs.toFixed(1)} statements_ms=${workMs.toFixed(1)} ${committed ? "commit" : "rollback"}_ms=${endMs.toFixed(1)} wal_autocheckpoint=${autoCheckpoint.wal_autocheckpoint} wal_pages_before=${walBefore ?? "unknown"} wal_pages_after=${markerWalPages(db) ?? "unknown"}`);
+      }
     } catch {}
+  }
+}
+function markerWalPages(db) {
+  try {
+    const row = db.prepare("PRAGMA page_size").get();
+    const bytes = statSync7(`${getOpenCodeDbPath()}-wal`).size;
+    return Math.max(0, Math.floor((bytes - 32) / (row.page_size + 24)));
+  } catch {
+    return null;
   }
 }
 var REQUIRED_MESSAGE_COLUMNS = ["id", "session_id", "time_created", "time_updated", "data"];
@@ -14583,6 +14717,7 @@ function getWritableOpenCodeDb(purpose = "publication") {
   const timeoutMs = purpose === "removal" ? MARKER_REMOVAL_BUSY_TIMEOUT_MS : MARKER_BUSY_TIMEOUT_MS;
   db.exec(`PRAGMA busy_timeout=${timeoutMs}`);
   db.exec("PRAGMA journal_mode=WAL");
+  db.exec("PRAGMA wal_autocheckpoint=0");
   if (purpose === "removal")
     cachedRemovalDb = { path: dbPath, db };
   else
@@ -15884,4 +16019,4 @@ function registerMagicContextTools(pi, opts) {
   ]);
 }
 
-export { COMPACTION_ENABLED_PATH, isDreamerRunnable, isCompactionEnabled, formatConfigParseStatusLine, formatConfigParseNotice, claimConfigParseFailuresOnce, parseJsoncRecovering, detectConfigFile, MIN_PLAUSIBLE_CONTEXT_LIMIT, catalogOutputReserve, deriveWindowGeometry, hasTrustedAbsoluteWall, applyProvenInputFloor, formatWindowDerivationLine, formatWindowSource, isSaneLimit, resolveOutputReserve, getSdkWindowGeometry, getSdkContextLimit, getSdkOutputLimit, getSdkInputLimit, cortexKitUserConfigBasePath, cortexKitProjectConfigBasePath, migrateMagicContextConfigLocations, getProtectedTokensTierOverrides, rememberUnpublishedAutoSearchNoHint, getUnpublishedAutoSearchNoHint, forgetUnpublishedAutoSearchNoHint, registerAutoSearchWork, cancelAutoSearchWork, readSessionMeta, getOrCreateSessionMeta, updateSessionMeta, advanceToolReclaimWatermark, retryPendingSessionCleanups, retryPendingRustSessionCleanupsForProject, embedPauseBySession, embedRunStateBySession, autoEmbedAttemptedBySession, autoEmbedIdentityBySession, invalidateAutoEmbedSession, getEmbedDrainUiStatus, COMPARTMENT_LEASE_RENEWAL_MS, acquireCompartmentLease, renewCompartmentLease, releaseCompartmentLease, releaseCompartmentLeaseBestEffort, isCompartmentLeaseHeld, isNoContentCompartment, HAS_COMPARTMENT_CONTENT_SQL, queueM0Mutation, getMaxM0MutationId, getCompartments, getLastCompartmentEndMessage, getLastCompartmentEndMessageId, getCompartmentsByEndMessageId, appendCompartments, saveRecompStagingPass, getRecompStaging, clearRecompStaging, getRecompPartialRange, setRecompPartialRange, escapeXmlAttr, escapeXmlContent, getUncoveredCompartmentEndThrough, isPartialCompartmentEnd, readProjectDocsCanonical, providerResponseFailed, isSuccessfulProviderCompletion, requestPendingMaterialization, pendingMaterializationOrigin, clearPendingMaterialization, recordSystemRefreshOwnership, recordSystemPromptForRequest, recordHeldHeadForRequest, bindSystemPromptResponse, acknowledgeSystemPromptDelivery, deferDeliveredSystemRefresh, clearSystemPromptDelivery, saveLkgSlotToDb, loadPersistedLkgSlot, drainStaleLkgSlots, createDbLkgPersistence, replayLkg, registerLkgPersistence, LKG_SNAPSHOT_ARRAY, LKG_SNAPSHOT_OBJECT, LKG_SNAPSHOT_KEY, LKG_SNAPSHOT_STRING, LKG_SNAPSHOT_NUMBER, LKG_SNAPSHOT_BOOLEAN, LKG_SNAPSHOT_NULL, LKG_SNAPSHOT_UNDEFINED, contentSnapshotValue, signatureForFields, lkgContentFields, lkgContentDigestFromFields, isLegacyLkgDigest, legacyLkgDigestFromFields, lkgFieldsMatchDigest, exactReusablePrefix, incrementalLkgContentDigests, lkgSlotRejection, captureSlot, getInMemorySlot, getSlot, dropSlot, TOOL_SWEEP_SCOPED_MARKER, encodePiContentDecision, decodePiContentDecision, getPiContentDecisions, freezePiContentDecision, getNativeReplayState, saveNativeToolInputs, addNativeReasoningIds, copySessionStateForClone, externalHistorianFailureReason, subprocessExitHistorianFailureReason, countHistorianRuns, recordHistorianRun, summarizeImportance, tallyFactsByCategory, queueMemoryMutation, getMemoryMutationsForRender, getMemoryMutationsForRenderByProjects, getMaxMemoryMutationId, getMaxMemoryMutationIdForProjects, GLOBAL_USER_PROFILE_PROJECT_PATH, getProjectState, bumpProjectUserProfileVersion, saveSourceContent, getSourceContents, recordSubagentInvocation, getLatestHistorianInvocationId, noteTouchedAt, noteNudgePickIndex, formatNoteNudge, promptSurfaceHashMaterial, createPromptSurfaceRuntime, createPromptSurfaceGuidanceEpochCache, cellToolCalls, cellReduceFilingName, SYNTH_USER_ID_PREFIX, resolvePiStableId, resolvePiRealStableId, isPiContentFallbackId, isPiIndexFallbackId, piContentFallbackIds, readPiSessionSnapshot, readPiSessionMessages, readPiSessionMessagePage, findRestartModelSeedFromBranch, iterateEntriesToRawMessageRange, convertEntriesToRawMessages, convertPiAssistantEntryById, convertEntriesToRawMessagePage, countPiRawMessages, USER_MEMORY_CANDIDATE_TTL_MS, insertUserMemoryCandidates, getUserMemoryCandidates, deleteUserMemoryCandidates, pruneExpiredUserMemoryCandidates, insertUserMemory, getActiveUserMemories, updateUserMemoryContent, dismissUserMemory, getTaskScheduleState, getFailingDreamTasks, getSkippedDreamTasks, getMostRecentTaskRunAt, pruneNonCanonicalTaskRows, deleteTaskScheduleRowsForProject, seedTaskScheduleState, writeTaskScheduleState, isRetrospectiveWindowProcessed, recordRetrospectiveWindowProcessed, curateCategoryForMemoryCategory, peekCurateCategoryScope, beginCurateCategoryRun, curateTaskStateAfterSuccess, MEMORY_MURAL_BLOCK, buildMagicContextSection, resolveMuralWire, updateCompactionMarkerAfterPublication, COMPARTMENT_RENDER_EPOCH, MEMORY_RENDER_FORMAT_EPOCH, encodeCachedM0UpgradeIdentity, decodeCachedM0UpgradeIdentity, withCachedM0MemoryIds, readCachedM0MemoryIds, renderBudgetIdentityChanged, renderedBudgetSnapshot, renderedBudgetShrinkReason, DEFAULT_HISTORY_BUDGET_TOKENS, renderCompartmentAtTier, renderDecayedCompartments, extractM0Block, TEMPORAL_MARKER_PATTERN, TEMPORAL_MARKER_REPLAY_PATTERN, temporalMarkerPrefix, renderUserProfileContent, clearInjectionCache, getVisibleMemoryIds, orderHistorianMemories, renderHistorianMemoryBlock, DEFAULT_MEMORY_BUDGET_TOKENS, DEFAULT_USER_PROFILE_BUDGET_TOKENS, trimMemoriesToBudgetV2, trimWorkspaceMemoriesToBudgetV2, trimUserMemoriesToBudget, renderMemoryBlockV2, stripMemoryMuralBlock, resetPrefixTrimFallbackState, isDirectiveShapedProjectRule, takeCurateSafetyRefusalCount, wakePlaneStatus, loadPiConfig, loadPiConfigDetailed, unregisterPiProjectEmbeddings, ensureProjectRegisteredFromPiDirectory, resolvePiHarnessDetection, resolvePiHarnessKind, resolvePiOrdinalAlignment, piRawOrdinalOffsetSource, resolvePiOrdinalAlignmentForContext, isPiOrdinalAlignmentUnanchored, clearPiOrdinalAlignmentSession, narrowCatalogueForChild, shouldLogTagSentence, ensureChildTagSentence, isBoundChild, registerPiRegistry, noteTodoWrite, noteToolCall, TODO_TOOL_NAME, rememberTodowriteToolCallTodos, parseTodos, setTodoSnapshot, registerTodoOverlay, registerTodoStateLifecycle, createTodowriteTool, syncCtxMemoryToolEnabled, registerMagicContextTools };
+export { COMPACTION_ENABLED_PATH, isDreamerRunnable, isCompactionEnabled, formatConfigParseStatusLine, formatConfigParseNotice, claimConfigParseFailuresOnce, parseJsoncRecovering, detectConfigFile, MIN_PLAUSIBLE_CONTEXT_LIMIT, catalogOutputReserve, deriveWindowGeometry, hasTrustedAbsoluteWall, applyProvenInputFloor, formatWindowDerivationLine, formatWindowSource, isSaneLimit, resolveOutputReserve, getSdkWindowGeometry, getSdkContextLimit, getSdkOutputLimit, getSdkInputLimit, cortexKitUserConfigBasePath, cortexKitProjectConfigBasePath, migrateMagicContextConfigLocations, getProtectedTokensTierOverrides, rememberUnpublishedAutoSearchNoHint, getUnpublishedAutoSearchNoHint, forgetUnpublishedAutoSearchNoHint, registerAutoSearchWork, cancelAutoSearchWork, readSessionMeta, getOrCreateSessionMeta, updateSessionMeta, advanceToolReclaimWatermark, retryPendingSessionCleanups, retryPendingRustSessionCleanupsForProject, embedPauseBySession, embedRunStateBySession, autoEmbedAttemptedBySession, autoEmbedIdentityBySession, invalidateAutoEmbedSession, getEmbedDrainUiStatus, COMPARTMENT_LEASE_RENEWAL_MS, acquireCompartmentLease, renewCompartmentLease, releaseCompartmentLease, releaseCompartmentLeaseBestEffort, isCompartmentLeaseHeld, isNoContentCompartment, HAS_COMPARTMENT_CONTENT_SQL, queueM0Mutation, getMaxM0MutationId, getCompartments, getLastCompartmentEndMessage, getLastCompartmentEndMessageId, getCompartmentsByEndMessageId, appendCompartments, saveRecompStagingPass, getRecompStaging, clearRecompStaging, getRecompPartialRange, setRecompPartialRange, escapeXmlAttr, escapeXmlContent, getUncoveredCompartmentEndThrough, isPartialCompartmentEnd, readProjectDocsCanonical, providerResponseFailed, isSuccessfulProviderCompletion, requestPendingMaterialization, pendingMaterializationOrigin, clearPendingMaterialization, recordSystemRefreshOwnership, recordSystemPromptForRequest, recordHeldHeadForRequest, bindSystemPromptResponse, acknowledgeSystemPromptDelivery, deferDeliveredSystemRefresh, clearSystemPromptDelivery, saveLkgSlotToDb, loadPersistedLkgSlot, drainStaleLkgSlots, createDbLkgPersistence, replayLkg, registerLkgPersistence, LKG_SNAPSHOT_ARRAY, LKG_SNAPSHOT_OBJECT, LKG_SNAPSHOT_KEY, LKG_SNAPSHOT_STRING, LKG_SNAPSHOT_NUMBER, LKG_SNAPSHOT_BOOLEAN, LKG_SNAPSHOT_NULL, LKG_SNAPSHOT_UNDEFINED, contentSnapshotValue, signatureForFields, lkgContentFields, lkgContentDigestFromFields, isLegacyLkgDigest, legacyLkgDigestFromFields, lkgFieldsMatchDigest, exactReusablePrefix, incrementalLkgContentDigests, lkgSlotRejection, captureSlot, getInMemorySlot, getSlot, dropSlot, TOOL_SWEEP_SCOPED_MARKER, encodePiContentDecision, decodePiContentDecision, getPiContentDecisions, freezePiContentDecision, getNativeReplayState, saveNativeToolInputs, addNativeReasoningIds, copySessionStateForClone, externalHistorianFailureReason, subprocessExitHistorianFailureReason, countHistorianRuns, recordHistorianRun, summarizeImportance, tallyFactsByCategory, queueMemoryMutation, getMemoryMutationsForRender, getMemoryMutationsForRenderByProjects, getMaxMemoryMutationId, getMaxMemoryMutationIdForProjects, GLOBAL_USER_PROFILE_PROJECT_PATH, getProjectState, bumpProjectUserProfileVersion, saveSourceContent, getSourceContents, recordSubagentInvocation, getLatestHistorianInvocationId, noteTouchedAt, noteNudgePickIndex, formatNoteNudge, promptSurfaceHashMaterial, createPromptSurfaceRuntime, createPromptSurfaceGuidanceEpochCache, cellToolCalls, cellReduceFilingName, SYNTH_USER_ID_PREFIX, resolvePiStableId, resolvePiRealStableId, isPiContentFallbackId, isPiIndexFallbackId, piContentFallbackIds, readPiSessionSnapshot, readPiSessionMessages, readPiSessionMessagePage, findRestartModelSeedFromBranch, iterateEntriesToRawMessageRange, iterateAsyncEntriesToRawMessageRange, convertEntriesToRawMessages, convertPiAssistantEntryById, convertEntriesToRawMessagePage, countPiRawMessages, USER_MEMORY_CANDIDATE_TTL_MS, insertUserMemoryCandidates, getUserMemoryCandidates, deleteUserMemoryCandidates, pruneExpiredUserMemoryCandidates, insertUserMemory, getActiveUserMemories, updateUserMemoryContent, dismissUserMemory, getTaskScheduleState, getFailingDreamTasks, getSkippedDreamTasks, getMostRecentTaskRunAt, pruneNonCanonicalTaskRows, deleteTaskScheduleRowsForProject, seedTaskScheduleState, writeTaskScheduleState, isRetrospectiveWindowProcessed, recordRetrospectiveWindowProcessed, curateCategoryForMemoryCategory, peekCurateCategoryScope, beginCurateCategoryRun, curateTaskStateAfterSuccess, MEMORY_MURAL_BLOCK, buildMagicContextSection, resolveMuralWire, updateCompactionMarkerAfterPublication, COMPARTMENT_RENDER_EPOCH, MEMORY_RENDER_FORMAT_EPOCH, encodeCachedM0UpgradeIdentity, decodeCachedM0UpgradeIdentity, withCachedM0MemoryIds, readCachedM0MemoryIds, renderBudgetIdentityChanged, renderedBudgetSnapshot, renderedBudgetShrinkReason, DEFAULT_HISTORY_BUDGET_TOKENS, renderCompartmentAtTier, renderDecayedCompartments, extractM0Block, TEMPORAL_MARKER_PATTERN, TEMPORAL_MARKER_REPLAY_PATTERN, temporalMarkerPrefix, renderUserProfileContent, clearInjectionCache, getVisibleMemoryIds, orderHistorianMemories, renderHistorianMemoryBlock, DEFAULT_MEMORY_BUDGET_TOKENS, DEFAULT_USER_PROFILE_BUDGET_TOKENS, trimMemoriesToBudgetV2, trimWorkspaceMemoriesToBudgetV2, trimUserMemoriesToBudget, renderMemoryBlockV2, stripMemoryMuralBlock, resetPrefixTrimFallbackState, isDirectiveShapedProjectRule, takeCurateSafetyRefusalCount, wakePlaneStatus, loadPiConfig, loadPiConfigDetailed, unregisterPiProjectEmbeddings, ensureProjectRegisteredFromPiDirectory, resolvePiHarnessDetection, resolvePiHarnessKind, resolvePiOrdinalAlignment, piRawOrdinalOffsetSource, resolvePiOrdinalAlignmentForContext, isPiOrdinalAlignmentUnanchored, clearPiOrdinalAlignmentSession, narrowCatalogueForChild, shouldLogTagSentence, ensureChildTagSentence, isBoundChild, registerPiRegistry, noteTodoWrite, noteToolCall, TODO_TOOL_NAME, rememberTodowriteToolCallTodos, parseTodos, setTodoSnapshot, registerTodoOverlay, registerTodoStateLifecycle, createTodowriteTool, syncCtxMemoryToolEnabled, registerMagicContextTools };

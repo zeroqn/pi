@@ -5,8 +5,8 @@ if (!port)
   throw new Error("marker candidate worker requires a parent port");
 port.postMessage({ kind: "accepted" });
 var [{ Database }, { scanMarkerCandidateSnapshot }] = await Promise.all([
-  import("./sqlite-3yye76ht.js"),
-  import("./compaction-marker-candidates-cd17s4ys.js")
+  import("./sqlite-f8kh2n10.js"),
+  import("./compaction-marker-candidates-tqcq5n00.js")
 ]);
 var input = workerData;
 var db;

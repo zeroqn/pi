@@ -1,6 +1,6 @@
 {
 	"name": "pi-magic-context-prebuilt",
-	"version": "0.49.4",
+	"version": "0.49.7",
 	"description": "Prebuilt @cortexkit/pi-magic-context from the pi-agents fork - generated, do not edit.",
 	"type": "module",
 	"license": "MIT",
@@ -35,8 +35,8 @@
 	},
 	"builtFrom": {
 		"submodule": "vendor/magic-context",
-		"commit": "9b4247e376430cdc01330d60d53901cb01592ff0",
-		"pluginVersion": "0.49.4",
+		"commit": "42e7404c83e9a1cd7f1b7eb272f73583b0ec0176",
+		"pluginVersion": "0.49.7",
 		"stageVersion": 2
 	},
 	"scripts": {

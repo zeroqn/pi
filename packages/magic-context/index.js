@@ -170,6 +170,7 @@ import {
   readPiSessionMessagePage,
   findRestartModelSeedFromBranch,
   iterateEntriesToRawMessageRange,
+  iterateAsyncEntriesToRawMessageRange,
   convertEntriesToRawMessages,
   convertPiAssistantEntryById,
   convertEntriesToRawMessagePage,
@@ -260,7 +261,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-6xq9q7as.js";
+} from "./index-s2v78gbh.js";
 import {
   canonicalModelIdentity,
   piModelRefToCanonical,
@@ -300,7 +301,7 @@ import {
   openCurrentDatabase,
   openDatabaseAsync,
   closeDatabase
-} from "./index-35sd5btx.js";
+} from "./index-a4r62vfn.js";
 import {
   setHomeProjectPermission,
   ProjectIdentityError,
@@ -311,7 +312,7 @@ import {
   resolveProjectIdentityForSession,
   beginBootQuietPeriod,
   scheduleAfterBootQuiet
-} from "./index-fgabebe5.js";
+} from "./index-mfysz78d.js";
 import {
   detectThinkingBindingMismatch,
   detectLatestTurnThinkingMismatch,
@@ -409,6 +410,7 @@ import {
   getPendingPiCompactionMarkerState,
   setPendingPiCompactionMarkerState,
   clearPendingPiCompactionMarkerStateIf,
+  logPiCompactionMarkerClear,
   getSessionsWithPendingPiMarker,
   setSessionWorkMetrics,
   getSessionWorkMetrics,
@@ -456,6 +458,7 @@ import {
   readRawSessionMessages2,
   getRawSessionMessageOrdinalCount2,
   visitRawSessionMessages2,
+  visitRawSessionMessagesAsync2,
   readRawSessionMessageRange2,
   prepareRawSessionOrdinals2,
   primeTailRawMessageCache2,
@@ -466,7 +469,7 @@ import {
   getRawSessionTagKeysThrough2,
   getLegacyProtectedTailStartOrdinal2,
   readSessionChunk2
-} from "./index-s1bev2xq.js";
+} from "./index-774944sz.js";
 import {
   UNKNOWN_FIT_RATIO,
   hasMeasuredDecisionCalibration,
@@ -549,7 +552,7 @@ import {
   getToolTagNumberByOwner2,
   getNullOwnerToolTag2,
   adoptNullOwnerToolTag2
-} from "./index-2s0s8mca.js";
+} from "./index-jg7jwy8c.js";
 import {
   textMentionsRecentCommit,
   hasMeaningfulUserText2,
@@ -573,7 +576,7 @@ import {
   isTransientSqliteError2,
   withAsyncPrivilegedWriter2,
   indexCoordinationInput2
-} from "./index-3cgbv47m.js";
+} from "./index-7ptxvfc5.js";
 import {
   stableStringify,
   closeQuietly,
@@ -598,7 +601,7 @@ import"./index-399p688g.js";
 import {
   runSessionWarmupWorker,
   RAW_SUMMARY_TEXT_MAX_CHARS2
-} from "./index-2apf1afe.js";
+} from "./index-7mm27xdc.js";
 import {
   piHarnessKindFromExecutable
 } from "./index-kgd6t63g.js";
@@ -624,13 +627,13 @@ import {
   indexSingleMessage2,
   indexMessagesAfterOrdinal2,
   sweepOrphanedOpenCodeMessageIndexes2
-} from "./index-sv5yv3gc.js";
+} from "./index-k3f0x2pv.js";
 import {
   formatSynapseLaneDescriptor
 } from "./index-xkf1qyj1.js";
 import {
   sameProjectDirectory
-} from "./index-knxngpvf.js";
+} from "./index-j36vpt39.js";
 import {
   buildCanonicalChunkTextFromFts,
   buildCompartmentSummaryFallbackText,
@@ -640,7 +643,7 @@ import {
   replaceCompartmentChunkEmbeddings,
   deleteChunkEmbedBackoffForSession,
   chunkWindowSourceKey
-} from "./index-jhw13tmp.js";
+} from "./index-c4y7qcdm.js";
 import {
   recordSessionProjectIdentity,
   GIT_SWEEP_LEASE_RENEWAL_MS,
@@ -666,7 +669,7 @@ import {
   embedSessionCompartmentChunks2,
   getEmbeddingCoverageStatus2,
   getAutoEmbeddingSessionCoverage2
-} from "./index-gt5en5ta.js";
+} from "./index-kmdweafv.js";
 import {
   V2_MEMORY_CATEGORIES
 } from "./index-135e8hvg.js";
@@ -678,7 +681,7 @@ import {
   expandWorkspaceIdentitySetWithAliases,
   sourceNameForMemory,
   computeWorkspaceEpochFingerprint
-} from "./index-krhpcm6f.js";
+} from "./index-pznwj7hn.js";
 import {
   configureContextDatabasePragmas2
 } from "./index-fapenpch.js";
@@ -728,7 +731,7 @@ import {
   normalizeVerificationFiles,
   indexCommitsForProject,
   embedUnembeddedCommits
-} from "./index-x0kmye0f.js";
+} from "./index-f6a73ytb.js";
 import {
   setEmbeddingSessionBusy2,
   isEmbeddingHostBusy2
@@ -752,7 +755,7 @@ import {
   setMemoryClassification2,
   archiveMemory2,
   getMemoryCountsByStatus2
-} from "./index-xjqheg7a.js";
+} from "./index-dj784nyr.js";
 import {
   invalidateMemory2
 } from "./index-yhzhdp3m.js";
@@ -762,11 +765,11 @@ import {
 import {
   resolveLocalEmbeddingWorkerRuntime,
   getLoadedLocalEmbeddingRuntimes
-} from "./index-xksvf3hj.js";
+} from "./index-pkn0y6j6.js";
 import {
   cosineSimilarity
-} from "./index-2pgk0q2g.js";
-import"./index-g3600tpw.js";
+} from "./index-cckp6kcc.js";
+import"./index-dj8hpkz7.js";
 import {
   buildHiddenAgentRegistrations,
   logTemperatureDecision,
@@ -2382,7 +2385,7 @@ function observeNoteNudgeServe(args) {
   sessions.set(args.sessionId, seen);
   return {
     isFirstServe: warm && args.isLiveTail && firstServe,
-    isCacheBustingPass: args.anchorMessageId !== null && args.isCacheBustingPass
+    prefixRewriteCoversAnchor: args.anchorMessageId !== null && args.prefixRewriteCoversAnchor
   };
 }
 var NOTE_NUDGE_COOLDOWN_MS = 15 * 60 * 1000;
@@ -2421,7 +2424,7 @@ function peekNoteNudgeText(db, sessionId, currentUserMessageId, projectIdentity,
   const state = getPersistedNoteNudge(db, sessionId);
   if (!state.triggerPending)
     return null;
-  if (eligibility && !eligibility.isFirstServe && !eligibility.isCacheBustingPass) {
+  if (eligibility && !eligibility.isFirstServe && !eligibility.prefixRewriteCoversAnchor) {
     sessionLog2(sessionId, "note-nudge: deferring — user already served or first serve unproven");
     return null;
   }
@@ -3436,7 +3439,7 @@ function startHostStallProfilerSwitch() {
 // package.json
 var package_default = {
   name: "@cortexkit/pi-magic-context",
-  version: "0.49.4",
+  version: "0.49.7",
   type: "module",
   description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
   main: "dist/index.js",
@@ -10335,6 +10338,25 @@ async function runHiddenSingleShotPrompt(args) {
     });
     promptSettled = true;
     return { validated: run.validated, completion: run.output, childSessionId: handle.id };
+  } catch (error) {
+    if (args.onFailureOutput) {
+      let timer;
+      try {
+        const completion = await Promise.race([
+          args.executor.collect(handle, 200),
+          new Promise((resolve) => {
+            timer = setTimeout(() => resolve(null), 5000);
+          })
+        ]);
+        if (completion)
+          args.onFailureOutput(completion);
+      } catch (readError) {
+        log2(`${args.callContext}: failed to collect interrupted output: ${String(readError)}`);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    throw error;
   } finally {
     await args.executor.close(handle, {
       promptSettled,
@@ -12501,7 +12523,7 @@ function getAsyncModule() {
     if (beforeModuleLoad)
       await beforeModuleLoad();
     const [{ default: singlefileAsyncifyVariant }, { newQuickJSAsyncWASMModuleFromVariant }] = await importPluginModule(() => Promise.all([
-      import("./index-jnhzwwgg.js").then((m)=>__toESM(m.default,1)),
+      import("./index-fr3x6spx.js").then((m)=>__toESM(m.default,1)),
       import("./index-69vas84q.js")
     ]));
     const module = await newQuickJSAsyncWASMModuleFromVariant(singlefileAsyncifyVariant);
@@ -13921,31 +13943,33 @@ function snapshotMaintainDocsFiles(docsDir) {
 import { createHash as createHash8 } from "node:crypto";
 
 // ../plugin/src/features/magic-context/dreamer/map-memories-prompt.ts
+import { execFile as execFile2 } from "node:child_process";
 import { existsSync as existsSync8, statSync as statSync2 } from "node:fs";
 import path10 from "node:path";
+import { promisify as promisify2 } from "node:util";
 var MAP_MEMORIES_SYSTEM_PROMPT = `You are a memory mapper for the magic-context system. You map project memories to the repository files that back them.
 
 A memory's BACKING FILES are the file(s) whose code the memory makes a claim about — the files you would open to check whether the memory is accurate. You do NOT judge accuracy, rewrite, or remove anything. You only LOCATE backing files.
 
-Tools (read-only): read, grep, glob. Request line ranges rather than full files; use offset/limit for longer files. Each memory may come with "Likely files" already named in it and confirmed to exist — confirm those FIRST (cheap) instead of searching. Use search/grep to FIND code only when no likely files are given. Do not guess — confirm a file exists and genuinely backs the memory before listing it. Keep reads minimal: you do not need to read a whole file to confirm it backs a one-line claim.
+Tools (read-only): read, grep, glob. Use at most 3 tool calls per memory, including searches and reads. Never read the same file twice in a batch; reuse what you already learned. Never repeat an identical search or use broad searches such as "fn " or ".*". Request one useful line range, not repeated slices. Each memory may come with "Likely files" from paths it names or a literal identifier search, confirmed to exist — confirm those FIRST (cheap) instead of searching. Use search/grep to FIND code only when no likely files are given. Do not guess — confirm a file exists and genuinely backs the memory before listing it. You are locating code, not exhaustively verifying the claim. If the call budget runs out before you can decide, leave that id unmapped and move on; uncertainty is not evidence of file-independence.
 
 For each memory decide ONE of:
-- Backing files found → the COMPLETE set of repo-relative paths whose code the memory is about.
+- Backing files found → the specific repo-relative paths whose code the memory is about; do not chase every caller or related implementation.
 - File-independent → the memory describes EXTERNAL behavior (a provider / API / platform / protocol limit, e.g. "Anthropic returns 400 on empty content"), or a pure process / workflow / philosophy rule, with NO specific local file that backs it. A BEHAVIORAL claim (when to act, how to work, who decides, or tool-usage discipline) is file-independent even when it cites file paths or commands as examples: a named file is not the file backing the rule.
 
-Output ONE XML manifest at the very end and NOTHING else — no narration, no per-memory commentary, no reasoning:
+Output ONE XML manifest and NOTHING else — no narration, no per-memory commentary, no reasoning. Open <mappings> before investigating. Emit each <memory> element as soon as you decide its mapping, before investigating the next memory, so an interruption cannot lose completed work. Close </mappings> when finished:
 <mappings>
 <memory id="N" files="path/a.ts,path/b.ts"/>
 <memory id="M" independent="true"/>
 </mappings>
 
 Rules:
-- Every input memory id MUST appear exactly once.
+- Every decided input memory id MUST appear exactly once. Omit uncertain ids rather than inventing backing files or declaring them independent.
 - files: repo-relative, comma-separated, no spaces inside a path. Only files that actually exist and genuinely back the memory.
 - A BACKING FILE is CODE that implements or handles the claim — not a file that merely mentions it. A path named inside a process directive is an action target or example, not evidence that the file backs the directive. A markdown doc (.md), a PARITY/notes file, or a test that only DESCRIBES an external fact is NOT a backing file. If the only place a memory's fact appears is prose/docs/a test (no code implements or handles it), mark it independent="true".
 - Many CONSTRAINTS are HYBRID: "external system does X, and OUR code handles it here." Map those to the HANDLING code (you can verify the handling, even though you can't verify the external behavior). Only mark independent when there is NO local code that implements or handles the fact.
 - Prefer the most specific file(s); do not pad with tangential files. Most memories map to one file; some to a few.
-- When you genuinely cannot find any local backing and it is not clearly external, still emit the memory with independent="true" (do not drop it).`;
+- Mark independent="true" only for the file-independent cases above; an investigation that runs out of calls stays unmapped.`;
 var MAX_SEED_PATHS_PER_MEMORY = 3;
 var PATH_PATTERN = "`?((?:[\\w.-]+\\/)+[\\w.-]+\\.(?:ts|tsx|js|jsx|mjs|cjs|rs|go|py|json|jsonc|sql|toml|sh))`?";
 function extractMemoryCandidatePaths(content, repoDir) {
@@ -13967,10 +13991,65 @@ function extractMemoryCandidatePaths(content, repoDir) {
   }
   return [...found];
 }
+var execFileAsync2 = promisify2(execFile2);
+async function seedIdentifierCandidates(memories, repoDir) {
+  const identifiers = new Map(memories.filter((memory) => memory.candidates.length === 0).map((memory) => [
+    memory.id,
+    [
+      ...new Set(memory.content.match(/\b(?:[A-Z][A-Za-z0-9_]{3,}|[a-z][a-z0-9]*[A-Z][A-Za-z0-9_]*|[a-z][a-z0-9]*_[A-Za-z0-9_]{2,})\b/g) ?? [])
+    ].slice(0, 3)
+  ]));
+  const terms = [...new Set([...identifiers.values()].flat())];
+  if (terms.length === 0)
+    return memories;
+  let stdout;
+  try {
+    const result = await execFileAsync2("git", [
+      "-c",
+      "core.quotePath=false",
+      "grep",
+      "--no-color",
+      "-n",
+      "-I",
+      "-F",
+      ...terms.flatMap((term) => ["-e", term]),
+      "--",
+      ...["ts", "tsx", "js", "jsx", "mjs", "cjs", "rs", "go", "py", "sql", "sh"].map((extension) => `*.${extension}`)
+    ], {
+      cwd: repoDir,
+      encoding: "utf8",
+      timeout: 2000,
+      maxBuffer: 256 * 1024,
+      windowsHide: true,
+      killSignal: "SIGKILL"
+    });
+    stdout = result.stdout;
+  } catch {
+    return memories;
+  }
+  const matches = stdout.split(`
+`).flatMap((line) => {
+    const match = line.match(/^([^:]+):\d+:(.*)$/);
+    return match ? [{ file: match[1], text: match[2] }] : [];
+  });
+  return memories.map((memory) => {
+    const names = identifiers.get(memory.id);
+    if (!names?.length)
+      return memory;
+    const files = new Map;
+    for (const match of matches) {
+      const score = names.filter((name) => match.text.includes(name)).length;
+      if (score)
+        files.set(match.file, Math.max(files.get(match.file) ?? 0, score));
+    }
+    const candidates = [...files].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, MAX_SEED_PATHS_PER_MEMORY).map(([file]) => file);
+    return candidates.length ? { ...memory, candidates } : memory;
+  });
+}
 function buildMapMemoriesPrompt(projectPath, memories) {
   const list = memories.map((m) => {
     const seed = m.candidates.length ? `
-Likely files (named in the memory, confirmed to exist): ${m.candidates.join(", ")}` : "";
+Likely files (candidate paths, confirmed to exist): ${m.candidates.join(", ")}` : "";
     return `[${m.id}] ${m.category}
 ${m.content}${seed}`;
   }).join(`
@@ -13980,13 +14059,13 @@ ${m.content}${seed}`;
 
 Project: ${projectPath}
 
-For each memory below, find the repo file(s) it makes a claim about, or mark it file-independent. Behavioral process/workflow directives stay file-independent even when they name files. When "Likely files" are listed, those paths are named in the memory and confirmed to exist — START there only for code claims: confirm each actually backs the claim (a quick read/outline), drop any that don't, add others only if genuinely needed. Search from scratch only when no likely files are given. Then output ONE <mappings> manifest covering every id.
+For each memory below, find the repo file(s) it makes a claim about, or mark it file-independent. Behavioral process/workflow directives stay file-independent even when they name files. When "Likely files" are listed, those paths either occur in the memory or match its identifiers in a bounded literal source search — START there only for code claims: confirm each actually backs the claim (a quick read/outline), drop any that don't, add others only if genuinely needed. Search from scratch only when no likely files are given. Use at most 3 tool calls per memory, reuse prior reads, and emit each decided mapping immediately in ONE <mappings> manifest. Leave uncertain ids unmapped and move on.
 
 <memories>
 ${list}
 </memories>`;
 }
-var MEMORY_ELEMENT_PATTERN = "<memory\\b([^>]*)(?:\\/>|>([\\s\\S]*?)<\\/memory>)";
+var MEMORY_ELEMENT_PATTERN = "<memory\\b([^<>]*)(?:\\/>|>([\\s\\S]*?)<\\/memory>)";
 var NESTED_FILE_PATTERN = "<file\\b([^>]*)\\/?>";
 function extractNestedFilePaths(inner) {
   const files = [];
@@ -14044,12 +14123,78 @@ function validateMapMemoriesManifest(text, expectedIds) {
   assertNoDuplicateManifestIds(parsed.filter((entry) => expectedIds.has(entry.id)).map((entry) => entry.id), "mappings");
   return parsed;
 }
+function parsePartialMapMemoriesManifest(text, expectedIds) {
+  const start = text.indexOf("<mappings>");
+  if (start < 0)
+    return [];
+  const entries = new Map;
+  const conflicts = new Set;
+  for (const match of text.slice(start).matchAll(new RegExp(MEMORY_ELEMENT_PATTERN, "gi"))) {
+    try {
+      const entry = parseMapMemoriesManifest(`<mappings>${match[0]}</mappings>`)[0];
+      if (!entry || !expectedIds.has(entry.id) || conflicts.has(entry.id))
+        continue;
+      const previous = entries.get(entry.id);
+      if (previous && JSON.stringify(previous) !== JSON.stringify(entry)) {
+        entries.delete(entry.id);
+        conflicts.add(entry.id);
+      } else {
+        entries.set(entry.id, entry);
+      }
+    } catch {}
+  }
+  return [...entries.values()];
+}
 
 // ../plugin/src/features/magic-context/dreamer/map-memories.ts
-var MAP_BATCH_SIZE = 20;
+var MAP_BATCH_SIZE = 5;
 var MAP_BATCH_FLOOR_MS = 240000;
 var CONSECUTIVE_TIMEOUT_LIMIT2 = 2;
 var MAX_INDEPENDENT_REQUEUE_PER_RUN = MAP_BATCH_SIZE;
+function retryKey(project) {
+  return `map-memories:retry:${project}`;
+}
+function readRetries(db, project) {
+  try {
+    const parsed = JSON.parse(getDreamState(db, retryKey(project)) ?? "{}");
+    if (!isRecord(parsed))
+      return {};
+    const retries = {};
+    for (const [id, value] of Object.entries(parsed)) {
+      if (isRecord(value) && typeof value.content === "string" && typeof value.failures === "number" && typeof value.deferUntil === "number") {
+        retries[id] = {
+          content: value.content,
+          failures: value.failures,
+          deferUntil: value.deferUntil
+        };
+      }
+    }
+    return retries;
+  } catch {
+    return {};
+  }
+}
+function contentKey(memory) {
+  return createHash8("sha256").update(`${memory.category}
+${memory.content}`).digest("hex");
+}
+function isDeferred(memory, retries) {
+  const retry = retries[memory.id];
+  return !!retry && retry.content === contentKey(memory) && retry.deferUntil > Date.now();
+}
+function assistantText(messages) {
+  return messages.filter((message) => isRecord(message) && (message.role === "assistant" || isRecord(message.info) && message.info.role === "assistant")).map((message) => extractLatestAssistantText([message]) ?? (isRecord(message) && Array.isArray(message.content) ? message.content.filter(isRecord).filter((part) => part.type === "text" && typeof part.text === "string").map((part) => part.text).join(`
+`) : "")).join(`
+`);
+}
+function currentManifest(text) {
+  const start = text.lastIndexOf("<mappings>");
+  return start < 0 ? text : text.slice(start);
+}
+function logBatchUsage(messages, committed, startedAt) {
+  const steps = messages.filter((message) => isRecord(message) && (message.role === "assistant" || isRecord(message.info) && message.info.role === "assistant")).length;
+  log2(`[dreamer] map-memories batch: steps=${steps} committed=${committed} steps_per_memory=${committed ? (steps / committed).toFixed(2) : "n/a"} elapsed_ms=${Date.now() - startedAt}`);
+}
 function computeMapBatchSliceMs(remainingMs, batchesRemaining) {
   return Math.min(remainingMs, Math.max(MAP_BATCH_FLOOR_MS, Math.floor(remainingMs / batchesRemaining)));
 }
@@ -14071,7 +14216,7 @@ function toMapInput(memory, repoDir) {
     candidates: extractMemoryCandidatePaths(memory.content, repoDir)
   };
 }
-function selectMapMemoryInputs(db, projectIdentity, repoDir) {
+function selectMapMemoryInputs(db, projectIdentity, repoDir, includeDeferred = false) {
   const active = getMemoriesByProject2(db, projectIdentity);
   const activeIds = active.map((m) => m.id);
   const unmapped = new Set(getUnmappedMemoryIds(db, activeIds));
@@ -14090,7 +14235,8 @@ function selectMapMemoryInputs(db, projectIdentity, repoDir) {
     if (requeue.length >= MAX_INDEPENDENT_REQUEUE_PER_RUN)
       break;
   }
-  return [...unmappedInputs, ...requeue];
+  const retries = readRetries(db, projectIdentity);
+  return [...unmappedInputs, ...requeue].filter((memory) => includeDeferred || !isDeferred(memory, retries));
 }
 async function mapMemories(args) {
   const result = {
@@ -14100,14 +14246,21 @@ async function mapMemories(args) {
     remaining: 0,
     complete: true
   };
-  const inputs = selectMapMemoryInputs(args.db, args.projectIdentity, args.sessionDirectory);
+  const allInputs = selectMapMemoryInputs(args.db, args.projectIdentity, args.sessionDirectory, true);
+  const retries = readRetries(args.db, args.projectIdentity);
+  const activeIds = new Set(allInputs.map((memory) => String(memory.id)));
+  for (const id of Object.keys(retries))
+    if (!activeIds.has(id))
+      delete retries[id];
+  const inputs = allInputs.filter((memory) => !isDeferred(memory, retries));
+  result.remaining = allInputs.length;
+  result.complete = result.remaining === 0;
   if (inputs.length === 0)
     return result;
   const batches = [];
   for (let i = 0;i < inputs.length; i += MAP_BATCH_SIZE) {
     batches.push({ inputs: inputs.slice(i, i + MAP_BATCH_SIZE), isOmissionRetry: false });
   }
-  result.remaining = inputs.length;
   const abortController = new AbortController;
   const heartbeat = startLeaseHeartbeat(args.db, args.holderId, args.leaseKey, (reason) => abortController.abort(new Error(reason)), args.leaseAcquisition);
   try {
@@ -14130,6 +14283,24 @@ async function mapMemories(args) {
         break;
       const outcome = await mapOneBatch(args, batch.inputs, sliceMs, abortController.signal);
       const committed = outcome.mapped + outcome.independent;
+      runLeaseGuardedWrite(args.db, args.holderId, args.leaseKey, () => {
+        const committedIds = new Set(outcome.committedIds);
+        for (const memory of batch.inputs) {
+          if (committedIds.has(memory.id)) {
+            delete retries[memory.id];
+            continue;
+          }
+          const content = contentKey(memory);
+          const prior = retries[memory.id];
+          const failures = (prior?.content === content ? prior.failures : 0) + 1;
+          retries[memory.id] = {
+            content,
+            failures,
+            deferUntil: failures < 2 ? 0 : Date.now() + Math.min(24, 2 ** (failures - 2)) * 3600000
+          };
+        }
+        setDreamState(args.db, retryKey(args.projectIdentity), JSON.stringify(retries));
+      });
       result.mapped += outcome.mapped;
       result.independent += outcome.independent;
       result.remaining -= committed;
@@ -14139,8 +14310,8 @@ async function mapMemories(args) {
       }
       if (outcome.requeue?.length) {
         if (!batch.isOmissionRetry) {
-          batches.splice(i + 1, 0, {
-            inputs: outcome.requeue,
+          batches.push({
+            inputs: outcome.requeue.filter((memory) => !isDeferred(memory, retries)),
             isOmissionRetry: true
           });
           log2(`[dreamer] map-memories: committed ${committed}/${batch.inputs.length} mapping(s); requeueing ${outcome.requeue.length} omitted id(s) in a targeted retry`);
@@ -14148,12 +14319,12 @@ async function mapMemories(args) {
           log2(`[dreamer] map-memories: targeted retry still omitted ${outcome.requeue.length} id(s); leaving them unmapped for the next run`);
         }
       }
-      if (outcome.failure?.class === "timeout") {
+      if (outcome.failure?.class === "timeout" && committed === 0) {
         consecutiveTimeouts += 1;
         timeoutStreakElapsedMs.push(outcome.failure.elapsedMs);
         if (consecutiveTimeouts >= CONSECUTIVE_TIMEOUT_LIMIT2) {
           result.stopReason = "timeout-circuit-breaker";
-          log2(`[dreamer] map-memories starvation: circuit breaker tripped after ${consecutiveTimeouts} consecutive batch timeouts (model too slow for its time slice); per-batch elapsed [${timeoutStreakElapsedMs.join("ms, ")}ms] vs ${sliceMs}ms slice; stopping with ${result.remaining} mapping(s) remaining`);
+          log2(`[dreamer] map-memories starvation: circuit breaker tripped after ${consecutiveTimeouts} consecutive batch timeouts with no committed mappings (investigation made no durable progress); per-batch elapsed [${timeoutStreakElapsedMs.join("ms, ")}ms] vs ${sliceMs}ms slice; stopping with ${result.remaining} mapping(s) remaining`);
           break;
         }
       } else {
@@ -14173,12 +14344,13 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
   let promptSettled = false;
   const startedAt = Date.now();
   let budgetFinalized = false;
+  let failedCompletion;
   const onBudgetUpdate = (state) => {
     budgetFinalized ||= state.finalizeFired;
     args.onBudgetUpdate?.(state);
   };
   try {
-    const prompt = buildMapMemoriesPrompt(args.projectIdentity, batch);
+    const prompt = buildMapMemoriesPrompt(args.projectIdentity, await seedIdentifierCandidates(batch, args.sessionDirectory));
     if (args.hiddenCompletionExecutor) {
       const run = await runHiddenSingleShotPrompt({
         executor: args.hiddenCompletionExecutor,
@@ -14194,14 +14366,18 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
         fallbackModels: args.fallbackModels,
         timeoutMs: sliceMs,
         signal,
-        parse: (text) => validateMapMemoriesManifest(text, new Set(batch.map((memory) => memory.id)))
+        onFailureOutput: (completion) => {
+          failedCompletion = completion;
+        },
+        parse: (text, completion) => validateMapMemoriesManifest(currentManifest(assistantText(completion.messages ?? []) || text), new Set(batch.map((memory) => memory.id)))
       });
       recordInvocation2(args, startedAt, {
         status: "completed",
         messages: run.completion.messages ?? []
       });
-      const outcome = await applyParsedBatchMappings(args, batch, run.validated, budgetFinalized);
-      const returnedIds = new Set(run.validated.map((entry) => entry.id));
+      const outcome = await applyParsedBatchMappings(args, batch, run.validated, budgetFinalized, true);
+      logBatchUsage(run.completion.messages ?? [], outcome.mapped + outcome.independent, startedAt);
+      const returnedIds = new Set(outcome.committedIds);
       return {
         ...outcome,
         requeue: budgetFinalized ? [] : batch.filter((memory) => !returnedIds.has(memory.id))
@@ -14244,7 +14420,7 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
       fetchOutput: async () => {
         const messagesResponse = await client.session.messages({
           path: { id: agentSessionId },
-          query: { directory: args.sessionDirectory, limit: 100 }
+          query: { directory: args.sessionDirectory, limit: 200 }
         });
         return normalizeSDKResponse(messagesResponse, [], {
           preferResponseOnMissingData: true
@@ -14254,7 +14430,7 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
         if (hasLengthCappedOutput(messages)) {
           throw new Error("map-memories returned length-capped output");
         }
-        const text = extractLatestAssistantText(messages);
+        const text = currentManifest(assistantText(messages));
         if (!text)
           throw new Error("map-memories returned no output");
         return validateMapMemoriesManifest(text, new Set(batch.map((memory) => memory.id)));
@@ -14262,8 +14438,9 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
     });
     promptSettled = true;
     recordInvocation2(args, startedAt, { status: "completed", messages: run.output });
-    const outcome = await applyParsedBatchMappings(args, batch, run.validated, budgetFinalized);
-    const returnedIds = new Set(run.validated.filter((entry) => batch.some((memory) => memory.id === entry.id)).map((entry) => entry.id));
+    const outcome = await applyParsedBatchMappings(args, batch, run.validated, budgetFinalized, true);
+    logBatchUsage(run.output, outcome.mapped + outcome.independent, startedAt);
+    const returnedIds = new Set(outcome.committedIds);
     return {
       ...outcome,
       requeue: budgetFinalized ? [] : batch.filter((memory) => !returnedIds.has(memory.id))
@@ -14271,18 +14448,23 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
   } catch (error) {
     const desc = describeError(error);
     log2(`[dreamer] map-memories batch failed: ${desc.brief}`, desc.stackHead ? { stackHead: desc.stackHead } : undefined);
+    const messages = failedCompletion?.messages ?? await readFailedChildMessages(args.client, agentSessionId, args.sessionDirectory) ?? [];
     recordInvocation2(args, startedAt, {
       status: failedInvocationStatus(error),
       error,
-      messages: await readFailedChildMessages(args.client, agentSessionId, args.sessionDirectory)
+      messages
     });
-    if (error instanceof DreamerModuleFailureError || error instanceof DreamTokenBudgetExceeded)
+    if (error instanceof DreamerModuleFailureError)
       throw error;
     if (signal.aborted)
       throw error;
+    const recovered = parsePartialMapMemoriesManifest(assistantText(messages) || failedCompletion?.text || "", new Set(batch.map((memory) => memory.id)));
+    const outcome = await applyParsedBatchMappings(args, batch, recovered, budgetFinalized, true);
+    logBatchUsage(messages, outcome.mapped + outcome.independent, startedAt);
+    if (error instanceof DreamTokenBudgetExceeded)
+      throw error;
     return {
-      mapped: 0,
-      independent: 0,
+      ...outcome,
       failure: {
         class: isTimeoutClassError2(error) ? "timeout" : "other",
         elapsedMs: Date.now() - startedAt
@@ -14301,7 +14483,7 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
       });
   }
 }
-async function applyParsedBatchMappings(args, batch, parsed, budgetFinalized = false) {
+async function applyParsedBatchMappings(args, batch, parsed, budgetFinalized = false, allowPartial = false) {
   const batchIds = new Set(batch.map((memory) => memory.id));
   const valid = parsed.filter((entry) => batchIds.has(entry.id));
   const unknown = parsed.filter((entry) => !batchIds.has(entry.id));
@@ -14309,14 +14491,14 @@ async function applyParsedBatchMappings(args, batch, parsed, budgetFinalized = f
     log2(`[dreamer] map-memories warning: dropping ${unknown.length} unknown mapping entr${unknown.length === 1 ? "y" : "ies"} outside the current batch (${unknown.map((entry) => entry.id).join(", ")})`);
   }
   assertNoDuplicateManifestIds(valid.map((entry) => entry.id), "mappings");
-  if (!budgetFinalized && valid.length * 2 < batch.length) {
+  if (!allowPartial && !budgetFinalized && valid.length * 2 < batch.length) {
     throw new Error(`mappings manifest covers ${valid.length}/${batch.length} batch ids after filtering unknown entries; rejecting mostly-wrong manifest`);
   }
   if (budgetFinalized && valid.length < batch.length) {
     log2(`[dreamer] map-memories: accepted partial manifest after token budget: ${valid.length}/${batch.length}`);
   }
   if (valid.length === 0)
-    return { mapped: 0, independent: 0 };
+    return { mapped: 0, independent: 0, committedIds: [] };
   const planned = [];
   const batchById = new Map(batch.map((memory) => [memory.id, memory]));
   for (const p of valid) {
@@ -14365,9 +14547,10 @@ async function applyParsedBatchMappings(args, batch, parsed, budgetFinalized = f
     });
   }
   if (planned.length === 0)
-    return { mapped: 0, independent: 0 };
+    return { mapped: 0, independent: 0, committedIds: [] };
   let mapped = 0;
   let independent = 0;
+  const committedIds = [];
   if (args.moduleRoute) {
     const identities = getModuleMemoryIdentities(args.db, args.projectIdentity, planned.map((item) => item.id));
     const rows = planned.map((item) => {
@@ -14405,19 +14588,22 @@ async function applyParsedBatchMappings(args, batch, parsed, budgetFinalized = f
     const accepted = new Set(result.accepted.filter((id) => typeof id === "number"));
     for (const item of planned) {
       const identity = identities.get(item.id);
-      if (identity && accepted.has(identity.moduleId))
+      if (identity && accepted.has(identity.moduleId)) {
         item.independent ? independent += 1 : mapped += 1;
+        committedIds.push(item.id);
+      }
     }
-    return { mapped, independent };
+    return { mapped, independent, committedIds };
   }
   const now = Date.now();
   runLeaseGuardedWrite(args.db, args.holderId, args.leaseKey, () => {
     for (const item of planned) {
       recordMemoryMapping(args.db, item.id, item.files, now, item.mappingOrigin);
       item.independent ? independent += 1 : mapped += 1;
+      committedIds.push(item.id);
     }
   });
-  return { mapped, independent };
+  return { mapped, independent, committedIds };
 }
 function recordInvocation2(args, startedAt, params) {
   if (!args.parentSessionId)
@@ -14685,32 +14871,41 @@ async function promotePrimers(args) {
 // ../plugin/src/features/magic-context/dreamer/primer-seed.ts
 var PRIMER_SEED_CAP_TOKENS = 4000;
 function renderUserAndToolOrientation(sessionId, startOrdinal, endOrdinal, capTokens) {
+  const renderer = orientationRenderer(capTokens);
+  visitRawSessionMessages2(sessionId, startOrdinal, endOrdinal, renderer.visit, {
+    summary: true
+  });
+  return renderer.result();
+}
+function orientationRenderer(capTokens) {
   const lines = [];
   let tokens = 0;
   let sawMessage = false;
-  visitRawSessionMessages2(sessionId, startOrdinal, endOrdinal, (msg) => {
-    sawMessage = true;
-    const out = [];
-    if (msg.role === "user" && hasMeaningfulUserText2(msg.parts)) {
-      const text = extractTexts2(msg.parts).map((t) => cleanUserText2(t)).map(normalizeText).filter((t) => t.length > 0).join(" / ");
-      if (text)
-        out.push(`U: ${text}`);
-    }
-    for (const tc of extractToolCallSummaries(msg.parts))
-      out.push(tc);
-    for (const line of out) {
-      const lineTokens = estimateTokens(line);
-      if (tokens + lineTokens > capTokens && lines.length > 0) {
-        lines.push("… (orientation truncated; investigate the current source directly)");
-        return false;
+  return {
+    visit: (msg) => {
+      sawMessage = true;
+      const out = [];
+      if (msg.role === "user" && hasMeaningfulUserText2(msg.parts)) {
+        const text = extractTexts2(msg.parts).map((t) => cleanUserText2(t)).map(normalizeText).filter((t) => t.length > 0).join(" / ");
+        if (text)
+          out.push(`U: ${text}`);
       }
-      lines.push(line);
-      tokens += lineTokens;
-    }
-    return true;
-  }, { summary: true });
-  return sawMessage ? lines.join(`
-`) : null;
+      for (const tc of extractToolCallSummaries(msg.parts))
+        out.push(tc);
+      for (const line of out) {
+        const lineTokens = estimateTokens(line);
+        if (tokens + lineTokens > capTokens && lines.length > 0) {
+          lines.push("… (orientation truncated; investigate the current source directly)");
+          return false;
+        }
+        lines.push(line);
+        tokens += lineTokens;
+      }
+      return true;
+    },
+    result: () => sawMessage ? lines.join(`
+`) : null
+  };
 }
 function selectPrimerOriginCandidate(db, primer) {
   return getPrimerCandidatesByIds(db, primer.sourceCandidateIds).filter((candidate) => candidate.projectPath === primer.projectPath).sort((a, b) => b.sourceMessageTime - a.sourceMessageTime || b.id - a.id)[0];
@@ -14744,16 +14939,37 @@ function closedBookOriginP1(db, sessionId, originStartMessage) {
   return { orientation, sessionId };
 }
 function buildPrimerSeed(db, primer) {
+  return buildPrimerSeedUsing(db, selectPrimerOriginCandidate(db, primer), renderUserAndToolOrientation);
+}
+async function buildPrimerSeedAsync(db, primer) {
   const mostRecent = selectPrimerOriginCandidate(db, primer);
+  let orientation = null;
+  if (mostRecent && typeof mostRecent.sourceCompartmentStart === "number" && typeof mostRecent.sourceCompartmentEnd === "number") {
+    try {
+      const renderer = orientationRenderer(PRIMER_SEED_CAP_TOKENS);
+      await visitRawSessionMessagesAsync2(mostRecent.sessionId, mostRecent.sourceCompartmentStart, mostRecent.sourceCompartmentEnd, renderer.visit, { summary: true });
+      orientation = renderer.result();
+    } catch {
+      orientation = null;
+    }
+  }
+  return buildPrimerSeedUsing(db, mostRecent, () => orientation);
+}
+function buildPrimerSeedUsing(db, mostRecent, render) {
   if (!mostRecent || typeof mostRecent.sourceCompartmentStart !== "number" || typeof mostRecent.sourceCompartmentEnd !== "number") {
-    return { kind: "closed-book", orientation: "", prePost: "", sessionId: null };
+    return {
+      kind: "closed-book",
+      orientation: "",
+      prePost: "",
+      sessionId: null
+    };
   }
   const sessionId = mostRecent.sessionId;
   const start = mostRecent.sourceCompartmentStart;
   const end = mostRecent.sourceCompartmentEnd;
   let orientation = null;
   try {
-    orientation = renderUserAndToolOrientation(sessionId, start, end, PRIMER_SEED_CAP_TOKENS);
+    orientation = render(sessionId, start, end, PRIMER_SEED_CAP_TOKENS);
   } catch {
     orientation = null;
   }
@@ -14884,14 +15100,14 @@ async function refreshOnePrimer(args, primer, sliceMs, signal) {
       provider = null;
     }
   }
-  const seed = withRawSessionMessageCache2(() => {
+  const seed = await (async () => {
     const unregister = provider && originSessionId ? setRawMessageProvider2(originSessionId, provider) : null;
     try {
-      return buildPrimerSeed(args.db, primer);
+      return provider?.iterateMessageRangeAsync ? await buildPrimerSeedAsync(args.db, primer) : withRawSessionMessageCache2(() => buildPrimerSeed(args.db, primer));
     } finally {
       unregister?.();
     }
-  });
+  })();
   let agentSessionId = null;
   let promptSettled = false;
   const startedAt = Date.now();
@@ -14907,7 +15123,10 @@ async function refreshOnePrimer(args, primer, sliceMs, signal) {
         prompt,
         title: "magic-context-dream-refresh-primers",
         callContext: "dreamer:refresh-primers",
-        metadata: { tokenBudget: args.tokenBudget, onBudgetUpdate: args.onBudgetUpdate },
+        metadata: {
+          tokenBudget: args.tokenBudget,
+          onBudgetUpdate: args.onBudgetUpdate
+        },
         model: args.model,
         fallbackModels: args.fallbackModels,
         language: args.language,
@@ -14973,7 +15192,10 @@ async function refreshOnePrimer(args, primer, sliceMs, signal) {
       validateOutput: (messages) => parseAnswer(messages, primer.answer)
     });
     promptSettled = true;
-    recordInvocation3(args, startedAt, { status: "completed", messages: run.output });
+    recordInvocation3(args, startedAt, {
+      status: "completed",
+      messages: run.output
+    });
     const answer = run.validated.trim();
     if (!answer)
       return false;
@@ -14988,7 +15210,10 @@ async function refreshOnePrimer(args, primer, sliceMs, signal) {
   } catch (error) {
     const desc = describeError(error);
     log2(`[dreamer] refresh-primers failed (primer #${primer.id}): ${desc.brief}`, desc.stackHead ? { stackHead: desc.stackHead } : undefined);
-    recordInvocation3(args, startedAt, { status: failedInvocationStatus(error), error });
+    recordInvocation3(args, startedAt, {
+      status: failedInvocationStatus(error),
+      error
+    });
     throw error;
   } finally {
     if (agentSessionId && args.client)
@@ -15602,9 +15827,9 @@ function insertDreamRun(db, run) {
 import { createHash as createHash9 } from "node:crypto";
 
 // ../plugin/src/features/magic-context/dreamer/verify-diff.ts
-import { execFile as execFile2 } from "node:child_process";
-import { promisify as promisify2 } from "node:util";
-var exec = promisify2(execFile2);
+import { execFile as execFile3 } from "node:child_process";
+import { promisify as promisify3 } from "node:util";
+var exec = promisify3(execFile3);
 var VERIFY_DIFF_BUDGET_TOKENS = 12000;
 var MAX_DIFF_BYTES = 4 * 1024 * 1024;
 async function git2(root, args) {
@@ -19921,11 +20146,19 @@ class PiSubagentRunner {
     });
     return new Promise((resolve) => {
       let accountingMessages = [];
+      let mappingMessages = [];
+      const isMemoryMapper = options.agent.replace(/^magic-context-/, "") === "dreamer-memory-mapper";
       let settled = false;
       const settle = (result) => {
         if (settled)
           return;
         settled = true;
+        if (isMemoryMapper) {
+          result = {
+            ...result,
+            meta: { ...result.meta, mappingMessages: [...mappingMessages] }
+          };
+        }
         if (accountingMessages.length > 0 && /historian|dreamer|classify/i.test(options.agent)) {
           const last = [...accountingMessages].reverse().find((message) => message !== null && typeof message === "object" && message.role === "assistant");
           const responseChars = result.ok ? result.assistantText.length : last?.content?.filter((part) => typeof part === "object" && part !== null && part.type === "text" && typeof part.text === "string").reduce((sum, part) => sum + part.text.length, 0) ?? 0;
@@ -20118,6 +20351,12 @@ class PiSubagentRunner {
         if (typeof event !== "object" || event === null)
           return;
         const e = event;
+        if (isMemoryMapper) {
+          if (e.type === "message_end" && e.message)
+            mappingMessages.push(e.message);
+          if (e.type === "agent_end" && Array.isArray(e.messages))
+            mappingMessages = e.messages;
+        }
         if (rpcBudget && e.type === "response" && event.success === false) {
           const reply = event;
           if (reply.command === "prompt" || reply.command === "steer" && !sawAgentEnd) {
@@ -20737,7 +20976,9 @@ import { join as join13 } from "node:path";
 
 // src/dreamer/bounded-session-reader.ts
 import { closeSync, opendirSync, openSync, readSync } from "node:fs";
+import { open as open4, opendir } from "node:fs/promises";
 import { join as join11 } from "node:path";
+import { setImmediate as yieldToHost } from "node:timers/promises";
 var MAX_ENTRY_BYTES = 1024 * 1024;
 var OVERSIZED_HEAD_BYTES = 64 * 1024;
 var OVERSIZED_TAIL_BYTES = 4 * 1024;
@@ -20808,98 +21049,112 @@ function lastMatch(text, pattern) {
     last = match[1];
   return last;
 }
+
+class LineDecoder {
+  pending = Buffer.alloc(0);
+  oversized = null;
+  *append(buffer) {
+    const bytes = buffer.length;
+    let start = 0;
+    for (let i = 0;i < bytes; i++) {
+      if (buffer[i] !== 10)
+        continue;
+      const piece = buffer.subarray(start, i);
+      if (this.oversized) {
+        yield this.oversized.append(piece).stub();
+        this.oversized = null;
+      } else if (this.pending.length + piece.length > MAX_ENTRY_BYTES) {
+        yield new OversizedLine().append(this.pending).append(piece).stub();
+      } else {
+        yield Buffer.concat([this.pending, piece]).toString("utf8");
+      }
+      this.pending = Buffer.alloc(0);
+      start = i + 1;
+    }
+    const rest = buffer.subarray(start, bytes);
+    if (this.oversized) {
+      this.oversized.append(rest);
+    } else if (this.pending.length + rest.length > MAX_ENTRY_BYTES) {
+      this.oversized = new OversizedLine().append(this.pending).append(rest);
+      this.pending = Buffer.alloc(0);
+    } else {
+      this.pending = Buffer.concat([this.pending, rest]);
+    }
+  }
+  *finish() {
+    if (this.oversized)
+      yield this.oversized.stub();
+    else if (this.pending.length)
+      yield this.pending.toString("utf8");
+  }
+}
 function* lines(path) {
   const fd = openSync(path, "r");
   const buffer = Buffer.alloc(64 * 1024);
-  let pending = Buffer.alloc(0);
-  let oversized = null;
+  const decoder = new LineDecoder;
   try {
     while (true) {
       const bytes = readSync(fd, buffer, 0, buffer.length, null);
       if (bytes === 0)
         break;
-      let start = 0;
-      for (let i = 0;i < bytes; i++) {
-        if (buffer[i] !== 10)
-          continue;
-        const piece = buffer.subarray(start, i);
-        if (oversized) {
-          yield oversized.append(piece).stub();
-          oversized = null;
-        } else if (pending.length + piece.length > MAX_ENTRY_BYTES) {
-          yield new OversizedLine().append(pending).append(piece).stub();
-        } else {
-          yield Buffer.concat([pending, piece]).toString("utf8");
-        }
-        pending = Buffer.alloc(0);
-        start = i + 1;
-      }
-      const rest = buffer.subarray(start, bytes);
-      if (oversized) {
-        oversized.append(rest);
-      } else if (pending.length + rest.length > MAX_ENTRY_BYTES) {
-        oversized = new OversizedLine().append(pending).append(rest);
-        pending = Buffer.alloc(0);
-      } else {
-        pending = Buffer.concat([pending, rest]);
-      }
+      yield* decoder.append(buffer.subarray(0, bytes));
     }
-    if (oversized)
-      yield oversized.stub();
-    else if (pending.length)
-      yield pending.toString("utf8");
+    yield* decoder.finish();
   } finally {
     closeSync(fd);
+  }
+}
+async function* asyncLines(path) {
+  const file = await open4(path, "r");
+  const buffer = Buffer.alloc(64 * 1024);
+  const decoder = new LineDecoder;
+  try {
+    while (true) {
+      const { bytesRead } = await file.read(buffer, 0, buffer.length, null);
+      if (bytesRead === 0)
+        break;
+      yield* decoder.append(buffer.subarray(0, bytesRead));
+      await yieldToHost();
+    }
+    yield* decoder.finish();
+  } finally {
+    await file.close();
   }
 }
 function record(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
-function* sessionFiles(directory, nested) {
+async function* asyncSessionEntries(path) {
+  for await (const line of asyncLines(path)) {
+    try {
+      yield JSON.parse(line);
+    } catch {}
+  }
+}
+async function* asyncSessionFiles(directory, nested) {
   let dir;
   try {
-    dir = opendirSync(directory);
+    dir = await opendir(directory);
   } catch {
     return;
   }
-  try {
-    while (true) {
-      const entry = dir.readSync();
-      if (!entry)
-        break;
-      const path = join11(directory, entry.name);
-      if (entry.isFile() && entry.name.endsWith(".jsonl"))
-        yield path;
-      else if (nested && entry.isDirectory())
-        yield* sessionFiles(path, false);
-    }
-  } finally {
-    dir.closeSync();
+  for await (const entry of dir) {
+    const path = join11(directory, entry.name);
+    if (entry.isFile() && entry.name.endsWith(".jsonl"))
+      yield path;
+    else if (nested && entry.isDirectory())
+      yield* asyncSessionFiles(path, false);
   }
 }
-function findSession(directory, nested, sessionId) {
-  for (const header of sessionHeaders(directory, nested)) {
-    if (header.id === sessionId)
-      return header.path;
-  }
-  return null;
-}
-function* sessionHeaders(directory, nested) {
-  for (const path of sessionFiles(directory, nested)) {
+async function* asyncSessionHeaders(directory, nested) {
+  for await (const path of asyncSessionFiles(directory, nested)) {
     try {
-      for (const line of lines(path)) {
+      for await (const line of asyncLines(path)) {
         const header = record(JSON.parse(line));
         if (header.type === "session")
           yield { ...header, path };
         break;
       }
-    } catch {}
-  }
-}
-function* sessionEntries(path) {
-  for (const line of lines(path)) {
-    try {
-      yield JSON.parse(line);
     } catch {}
   }
 }
@@ -21169,15 +21424,9 @@ function projectEntry(value) {
     }
   };
 }
-function* summaryEntries(path) {
+function summaryProjector() {
   let pendingResults = 0;
-  for (const line of lines(path)) {
-    let parsed;
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      continue;
-    }
+  return (parsed) => {
     const entry = projectEntry(parsed);
     const e = record2(entry);
     if (e.type === "message") {
@@ -21188,7 +21437,30 @@ function* summaryEntries(path) {
       } else if (m.role === "user" || m.role === "assistant")
         pendingResults = 0;
     }
-    yield entry;
+    return entry;
+  };
+}
+function* summaryEntries(path) {
+  const project = summaryProjector();
+  for (const line of lines(path)) {
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {}
+    if (entry !== undefined)
+      yield project(entry);
+  }
+}
+async function* asyncSummaryEntries(path) {
+  const project = summaryProjector();
+  for await (const line of asyncLines(path)) {
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    yield project(entry);
   }
 }
 function createPiPrimerRawProviderFactory(deps = {}) {
@@ -21201,12 +21473,22 @@ function createPiPrimerRawProviderFactory(deps = {}) {
           return null;
         directory = join13(mod.getAgentDir(), "sessions");
       }
-      const path = findSession(directory, !deps.sessionDir, sessionId);
+      let path = null;
+      for await (const header of asyncSessionHeaders(directory, !deps.sessionDir)) {
+        if (header.id === sessionId) {
+          path = header.path;
+          break;
+        }
+      }
       if (!path)
         return null;
+      const sessionPath = path;
       return {
         readMessages() {
           throw new Error("Pi primer history requires bounded pages");
+        },
+        iterateMessageRangeAsync(from, to) {
+          return iterateAsyncEntriesToRawMessageRange(asyncSummaryEntries(sessionPath), from - 1, Number.MAX_SAFE_INTEGER, to);
         },
         iterateMessageRange(from, to) {
           return iterateEntriesToRawMessageRange(summaryEntries(path), from - 1, Number.MAX_SAFE_INTEGER, to);
@@ -21222,6 +21504,7 @@ function createPiPrimerRawProviderFactory(deps = {}) {
 }
 
 // src/dreamer/retrospective-raw-provider-pi.ts
+import { stat as stat2 } from "node:fs/promises";
 import { join as join14 } from "node:path";
 class PiRetrospectiveRawProvider {
   deps;
@@ -21237,11 +21520,11 @@ class PiRetrospectiveRawProvider {
         return [];
       directory = join14(mod.getAgentDir(), "sessions");
     }
-    const sessions = this.deps.listSessions ? await this.deps.listSessions(directory) : directory ? sessionHeaders(directory, !this.deps.sessionDir) : [];
+    const sessions = this.deps.listSessions ? await this.deps.listSessions(directory) : directory ? asyncSessionHeaders(directory, !this.deps.sessionDir) : [];
     const projectCwd = this.deps.projectCwd;
     const result = [];
     this.sessionPathById.clear();
-    for (const raw of sessions) {
+    for await (const raw of sessions) {
       const info = raw;
       if (!info || typeof info !== "object")
         continue;
@@ -21263,7 +21546,7 @@ class PiRetrospectiveRawProvider {
   }
   async readUserMessagesSince(sessionId, sinceMs, capPerSession) {
     const limit = Math.max(1, Math.floor(capPerSession));
-    const messages = await this.selectUserEntries(sessionId, (ts) => ts > sinceMs, limit + 1, false);
+    const messages = await this.selectUserEntries(sessionId, (ts) => ts > sinceMs, limit + 1, false, sinceMs);
     return {
       messages: messages.slice(0, limit),
       truncated: messages.length > limit
@@ -21272,7 +21555,7 @@ class PiRetrospectiveRawProvider {
   async readOldestMessageTimesSince(sessionIds, sinceMs) {
     const out = new Map;
     for (const sessionId of sessionIds) {
-      const [oldest] = await this.selectUserEntries(sessionId, (ts) => ts > sinceMs, 1, false);
+      const [oldest] = await this.selectUserEntries(sessionId, (ts) => ts > sinceMs, 1, false, sinceMs);
       if (oldest)
         out.set(sessionId, oldest.ts);
     }
@@ -21281,15 +21564,19 @@ class PiRetrospectiveRawProvider {
   async readUserMessagesBefore(sessionId, beforeMs, count) {
     return this.selectUserEntries(sessionId, (ts) => ts <= beforeMs, Math.max(1, Math.floor(count)), true);
   }
-  async selectUserEntries(sessionId, eligible, limit, newest) {
+  async selectUserEntries(sessionId, eligible, limit, newest, sinceMs) {
     const filePath = this.sessionPathById.get(sessionId);
     if (!filePath)
       return [];
     const kept = [];
     try {
-      const entries = this.deps.loadEntriesFromFile ? await this.deps.loadEntriesFromFile(filePath) : sessionEntries(filePath);
+      if (sinceMs !== undefined && !this.deps.loadEntriesFromFile) {
+        if ((await stat2(filePath)).mtimeMs < sinceMs)
+          return [];
+      }
+      const entries = this.deps.loadEntriesFromFile ? await this.deps.loadEntriesFromFile(filePath) : asyncSessionEntries(filePath);
       let ordinal = 0;
-      for (const entry of entries) {
+      for await (const entry of entries) {
         const row = normalizePiUserEntry(entry, sessionId, ++ordinal);
         if (!row || !eligible(row.ts))
           continue;
@@ -21637,6 +21924,10 @@ function createPiDreamerClient(opts, onAdjunctsRefreshNeeded = opts.onAdjunctsRe
           });
         }
         assertRegistrationOwnerActive();
+        const mappingMessages = result.meta?.mappingMessages;
+        if (budgetTask === "map-memories" && Array.isArray(mappingMessages)) {
+          dreamSession.messages = mappingMessages.filter(isRecord).filter((message) => message.role === "assistant").map((message) => makeMessage("assistant", Array.isArray(message.content) ? message.content.filter(isRecord).flatMap((part) => part.type === "text" && typeof part.text === "string" ? [{ type: "text", text: part.text }] : part.type === "toolCall" ? syntheticToolParts(1) : []) : []));
+        }
         if (!result.ok) {
           if (result.reason === "token_budget") {
             throw new DreamTokenBudgetExceeded(dreamSession.id, Number(result.meta?.tokenBudget?.spent ?? 0));
@@ -21650,13 +21941,14 @@ function createPiDreamerClient(opts, onAdjunctsRefreshNeeded = opts.onAdjunctsRe
           }
           throw error;
         }
-        dreamSession.messages = [
-          makeMessage("user", [{ type: "text", text: userMessage }]),
-          makeMessage("assistant", [
-            ...syntheticToolParts(result.toolCallCount ?? 0, result.completedToolCalls),
-            ...result.assistantText ? [{ type: "text", text: result.assistantText }] : []
-          ])
-        ];
+        if (!(budgetTask === "map-memories" && Array.isArray(mappingMessages)))
+          dreamSession.messages = [
+            makeMessage("user", [{ type: "text", text: userMessage }]),
+            makeMessage("assistant", [
+              ...syntheticToolParts(result.toolCallCount ?? 0, result.completedToolCalls),
+              ...result.assistantText ? [{ type: "text", text: result.assistantText }] : []
+            ])
+          ];
         onAdjunctsRefreshNeeded?.(opts.projectIdentity);
       } finally {
         inFlightDreams.delete(runPromise);
@@ -22404,7 +22696,7 @@ function reconcilePiCompactionMode(args) {
     return NO_TRANSITION;
   let clearedSomething = false;
   if (getPendingPiCompactionMarkerState(args.db, args.sessionId) !== null) {
-    setPendingPiCompactionMarkerState(args.db, args.sessionId, null);
+    setPendingPiCompactionMarkerState(args.db, args.sessionId, null, "compaction-disabled");
     clearedSomething = true;
   }
   if (getOverflowState(args.db, args.sessionId).needsEmergencyRecovery) {
@@ -23301,20 +23593,39 @@ function buildReplacementContent(tagId) {
   return `[dropped §${tagId}§]`;
 }
 function applyNewToolDrop(target, options) {
-  if (!target)
+  if (options.persist && (target?.prepareDrop?.() ?? target?.canDrop?.()) === false) {
+    return { result: "incomplete", mode: "full" };
+  }
+  if (!target) {
+    options.persist?.("full");
     return { result: "absent", mode: "full" };
-  if (options.inWindow && hasSmallToolInput(target) || options.keepSkeleton === true || target.cannotRemove?.() === true) {
+  }
+  if (options.inWindow && hasSmallToolInput(target) || options.keepSkeleton === true || target.cannotRemove?.() === true || target.wouldStrandConversationEnd?.() === true) {
     const strip = target.hasAttachments?.() === true;
+    options.persist?.(strip ? "skeleton_stripped" : "skeleton_real");
     return {
       result: (strip ? target.skeletonStripped?.() : target.skeletonReal?.()) ?? "absent",
       mode: strip ? "skeleton_stripped" : "skeleton_real"
     };
   }
+  options.persist?.("full");
   const result = target.drop?.() ?? "absent";
   if (result === "truncated" && target.hasAttachments?.() === true) {
     return { result: target.skeletonStripped?.() ?? "absent", mode: "skeleton_stripped" };
   }
   return { result, mode: result === "truncated" ? "skeleton_real" : "full" };
+}
+function applyPersistedToolDrop(db, sessionId, tagNumber, target, options, afterWrite) {
+  return applyNewToolDrop(target, {
+    ...options,
+    persist: (mode) => {
+      db.transaction(() => {
+        updateTagDropMode2(db, sessionId, tagNumber, mode);
+        updateTagStatus2(db, sessionId, tagNumber, "dropped");
+        afterWrite?.();
+      }).immediate();
+    }
+  });
 }
 function hasSmallToolInput(target) {
   const bytes = target?.inputStringBytes?.() ?? null;
@@ -23390,11 +23701,11 @@ function applyPendingOperations(sessionId, db, targets, protectedTagIds, preload
     diagnostics.reasons[reason] = (diagnostics.reasons[reason] ?? 0) + 1;
   };
   let admitted = false;
-  let startedAt = 0;
   try {
     db.transaction(() => {
       admitted = true;
-      startedAt = performance.now();
+    }).immediate();
+    {
       const pendingOps = preloadedPendingOps ?? getPendingOps(db, sessionId);
       const tags = preloadedTags ?? getTagsByNumbers2(db, sessionId, [
         ...new Set([
@@ -23446,10 +23757,31 @@ function applyPendingOperations(sessionId, db, targets, protectedTagIds, preload
             continue;
           }
         }
+        const persistDrop = (mode) => {
+          let startedAt = 0;
+          try {
+            db.transaction(() => {
+              startedAt = performance.now();
+              if (mode)
+                updateTagDropMode2(db, sessionId, pendingOp.tagId, mode);
+              updateTagStatus2(db, sessionId, pendingOp.tagId, "dropped");
+              if (!synthetic)
+                removePendingOp(db, sessionId, pendingOp.tagId);
+            }).immediate();
+          } finally {
+            if (startedAt)
+              logSlowWriteTransaction("apply_pending_operation", startedAt);
+          }
+        };
         let shouldPersistDrop = false;
         if (isToolTag) {
           if (editMarkerTagIds.has(pendingOp.tagId)) {
             const strip = target?.hasAttachments?.() === true;
+            if (target?.canDrop?.() === false || target?.prepareDrop?.() === false || !target) {
+              reject("edit_marker_incomplete");
+              continue;
+            }
+            persistDrop(strip ? "edit_marker_stripped" : "edit_marker");
             const markResult = (strip ? target?.editMarkerStripped?.() : target?.editMarker?.()) ?? "absent";
             if (markResult === "incomplete" || markResult === "absent") {
               reject(`edit_marker_${markResult}`);
@@ -23458,11 +23790,11 @@ function applyPendingOperations(sessionId, db, targets, protectedTagIds, preload
             didMutateMessage = true;
             operationMutated = true;
             onTagReduced?.({ tagNumber: pendingOp.tagId, mode: "edit_marker" });
-            updateTagDropMode2(db, sessionId, pendingOp.tagId, strip ? "edit_marker_stripped" : "edit_marker");
             shouldPersistDrop = true;
           } else {
             const { result: dropResult, mode: appliedMode } = applyNewToolDrop(target, {
-              inWindow: skeletonWindow.has(pendingOp.tagId)
+              inWindow: skeletonWindow.has(pendingOp.tagId),
+              persist: persistDrop
             });
             if (dropResult === "incomplete" || synthetic && dropResult !== "removed" && dropResult !== "truncated") {
               reject(`drop_${dropResult}`);
@@ -23478,12 +23810,12 @@ function applyPendingOperations(sessionId, db, targets, protectedTagIds, preload
             } else {
               reject(`drop_${dropResult}`);
             }
-            updateTagDropMode2(db, sessionId, pendingOp.tagId, appliedMode);
             shouldPersistDrop = true;
           }
         } else if (target) {
           const replacement = buildReplacementContent(pendingOp.tagId);
           const priorContent = target.getContent?.();
+          persistDrop();
           const changed = target.setContent(replacement);
           if (changed) {
             didMutateMessage = true;
@@ -23500,30 +23832,25 @@ function applyPendingOperations(sessionId, db, targets, protectedTagIds, preload
           shouldPersistDrop = true;
         } else if (!synthetic) {
           reject("target_absent");
+          persistDrop();
           shouldPersistDrop = true;
         }
         if (!shouldPersistDrop) {
           reject("not_persisted");
           continue;
         }
-        updateTagStatus2(db, sessionId, pendingOp.tagId, "dropped");
-        if (!synthetic)
-          removePendingOp(db, sessionId, pendingOp.tagId);
         if (operationMutated)
           diagnostics.mutated += 1;
         else
           diagnostics.persistedWithoutMutation += 1;
       }
-    }).immediate();
+    }
   } catch (error) {
     if (!admitted && /database (?:table )?is locked|sqlite_(busy|locked)/i.test(String(error))) {
       sessionLog2(sessionId, "pending operations write admission busy; retaining prior bytes for retry");
       return false;
     }
     throw error;
-  } finally {
-    if (admitted)
-      logSlowWriteTransaction("apply_pending_operations", startedAt);
   }
   if (diagnostics) {
     onBatchComplete?.(diagnostics);
@@ -24895,6 +25222,24 @@ function checkCompartmentTrigger(db, sessionId, sessionMeta, usage, _previousPer
   };
 }
 
+// ../plugin/src/hooks/magic-context/degraded-pass-refusal.ts
+class DegradedPassRefusalError extends Error {
+  site;
+  code = "DEGRADED_PASS_REFUSAL";
+  recoverable = true;
+  estimatedTokens;
+  contextLimitTokens;
+  constructor(site, options) {
+    super(renderUserFacingFailure("transform_pass_degraded", "plain"), {
+      cause: options?.cause
+    });
+    this.site = site;
+    this.name = "DegradedPassRefusalError";
+    this.estimatedTokens = options?.estimatedTokens;
+    this.contextLimitTokens = options?.contextLimitTokens;
+  }
+}
+
 // ../plugin/src/hooks/magic-context/dropped-token-estimate.ts
 var TAG_QUERY_CHUNK_SIZE = 900;
 var ESTIMATED_CHARACTERS_PER_TOKEN = 3.5;
@@ -25515,8 +25860,110 @@ function advanceToolReclaimWatermarkToCurrentMax(db, sessionId) {
   return maxTagNumber;
 }
 
+// ../plugin/src/shared/recovery-reasoning-prefix.ts
+function recoveryReasoningPrefixes(messages, partsKey) {
+  const prefixes = [];
+  for (let index = 0;index < messages.length; index++) {
+    const message = messages[index];
+    const parts = message?.[partsKey];
+    if (!Array.isArray(parts))
+      continue;
+    for (let p = 0;p < parts.length; p++) {
+      const type = parts[p]?.type;
+      if (type !== "thinking" && type !== "reasoning" && type !== "redactedThinking" && type !== "redacted_thinking")
+        continue;
+      prefixes.push(JSON.stringify([
+        ...messages.slice(0, index),
+        { ...message, [partsKey]: parts.slice(0, p + 1) }
+      ]));
+    }
+  }
+  return prefixes;
+}
+
 // ../plugin/src/shared/tag-transcript.ts
 import { createHash as createHash11 } from "node:crypto";
+function buildPersistedDropTargets(transcript, tags, options = {}) {
+  const targets = new Map;
+  const tools = new Map(tags.filter((tag) => tag.type === "tool").map((tag) => [makeToolCompositeKey(tag.toolOwnerMessageId ?? "", tag.messageId), tag]));
+  const textTags = new Map(tags.filter((tag) => tag.type !== "tool").map((tag) => [tag.messageId, tag]));
+  const byNumber = new Map(tags.map((tag) => [tag.tagNumber, tag]));
+  const aggregates = new Map;
+  const pending = new Map;
+  const resolved = new Map;
+  const ambiguousCalls = new Set;
+  const end = new ConversationEndGuard(transcript.messages);
+  for (const message of transcript.messages) {
+    let ordinal = 0;
+    let resultRun;
+    const parts = message.parts;
+    const reasoning = message.requiresToolArcSkeleton ?? (message.info.role === "assistant" && parts.some((part) => part.kind === "thinking"));
+    for (const part of parts) {
+      if (part.kind !== "tool_result")
+        resultRun = undefined;
+      if (part.kind === "text") {
+        const prefix = /^§(\d+)§\s/.exec(part.getText() ?? "");
+        const tag = (prefix ? byNumber.get(Number(prefix[1])) : undefined) ?? textTags.get(`${message.info.id}:p${ordinal}`);
+        ordinal++;
+        if (tag && tag.type !== "tool")
+          targets.set(tag.tagNumber, buildTextTarget(part, message, ""));
+      } else if ((part.kind === "tool_use" || part.kind === "tool_result") && part.id) {
+        const open = pending.get(part.id) ?? [];
+        if (open.length > 1)
+          ambiguousCalls.add(part.id);
+        const key = (part.kind === "tool_result" ? resultRun?.callId === part.id ? resultRun.key : open.at(-1) ?? resolved.get(part.id) : undefined) ?? makeToolCompositeKey(message.info.id ?? "", part.id);
+        if (part.kind === "tool_use")
+          open.push(key);
+        else {
+          const position = open.lastIndexOf(key);
+          if (position >= 0)
+            open.splice(position, 1);
+          resultRun = { callId: part.id, key };
+          resolved.set(part.id, key);
+        }
+        pending.set(part.id, open);
+        let aggregate = aggregates.get(key);
+        if (!aggregate) {
+          aggregate = {
+            tag: tools.get(key),
+            occurrences: [],
+            reasoning: false
+          };
+          aggregates.set(key, aggregate);
+        }
+        aggregate.occurrences.push({ message, part, kind: part.kind });
+        aggregate.reasoning ||= reasoning;
+      }
+    }
+  }
+  const arcsByCall = new Map;
+  for (const { occurrences } of aggregates.values()) {
+    const callId = occurrences[0]?.part.id ?? "";
+    arcsByCall.set(callId, (arcsByCall.get(callId) ?? 0) + 1);
+  }
+  for (const aggregate of aggregates.values()) {
+    const { occurrences, reasoning } = aggregate;
+    const callId = occurrences[0]?.part.id ?? "";
+    if (ambiguousCalls.has(callId))
+      continue;
+    const tag = aggregate.tag ?? (arcsByCall.get(callId) === 1 ? tools.get(makeToolCompositeKey("", callId)) : undefined);
+    if (tag)
+      targets.set(tag.tagNumber, buildAggregateTarget(tag.tagNumber, occurrences, reasoning, end));
+  }
+  if (!options.allowReasoningPrefixRewrite) {
+    let lastThinking = -1;
+    transcript.messages.forEach((message, index) => {
+      if (message.parts.some((part) => part.kind === "thinking"))
+        lastThinking = index;
+    });
+    const protectedIds = new Set(transcript.messages.slice(0, lastThinking + 1).map((message) => message.info.id));
+    for (const [number, target] of targets) {
+      if (target.mutationParts?.some(({ message }) => protectedIds.has(message.info.id)))
+        targets.delete(number);
+    }
+  }
+  return targets;
+}
 function textIdentityDigest(value) {
   return createHash11("sha256").update(value).digest("hex");
 }
@@ -26222,6 +26669,7 @@ function buildAggregateTarget(tagId, occurrences, requiresToolArcSkeleton, conve
       }
       return any ? "truncated" : "absent";
     },
+    prepareDrop: () => !occurrences.some((occ) => occ.part.canRemove?.() === "defer"),
     canDrop: () => complete() && !occurrences.some((occ) => occ.part.hasUserAnswer?.()),
     requiresToolArcSkeleton,
     readInput() {
@@ -28251,18 +28699,27 @@ function buildPiCompactionSummary(compartments) {
   return `Magic Context compacted ${titles.length} segments: ${shown}; …and ${titles.length - MAX_SUMMARY_TITLES} more`;
 }
 function findFirstKeptEntryId(entries, lastCompactedOrdinal, ordinalOffset = 0) {
+  const boundary = resolvePiFirstKeptEntry(entries, lastCompactedOrdinal, ordinalOffset);
+  return boundary.kind === "resolved" ? boundary.entryId : null;
+}
+function resolvePiFirstKeptEntry(entries, lastCompactedOrdinal, ordinalOffset = 0) {
   const target = lastCompactedOrdinal + 1;
   const afterOrdinal = Number.isNaN(lastCompactedOrdinal) ? 0 : Math.max(0, lastCompactedOrdinal);
+  let syntheticKeptId;
   for (const message of iterateEntriesToRawMessageRange(entries, afterOrdinal, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, ordinalOffset)) {
     if (message.ordinal < target || isPiSystemEntry(message))
       continue;
-    if (message.id.startsWith(SYNTH_USER_ID_PREFIX))
-      return null;
+    if (syntheticKeptId)
+      return { kind: "unplaceable", rawId: syntheticKeptId };
+    if (message.id.startsWith(SYNTH_USER_ID_PREFIX)) {
+      syntheticKeptId = message.id;
+      continue;
+    }
     if (message.id.length === 0)
       continue;
-    return message.id;
+    return { kind: "resolved", entryId: message.id };
   }
-  return null;
+  return { kind: "waiting" };
 }
 
 // src/compaction-marker-manager-pi.ts
@@ -28283,6 +28740,7 @@ function logPiCompactionMarkerDrainGateOnce(sessionId, pending, gate, fields = {
     `endMessageId=${pending.endMessageId}`,
     `ordinal=${pending.ordinal}`,
     `firstKeptEntryId=${firstKeptEntryId ?? "<none>"}`,
+    `boundaryKind=${pending.endMessageId.startsWith(SYNTH_USER_ID_PREFIX) ? "folded-tool-result" : "session-entry"}`,
     `renderedCoverageOrdinal=${fields.renderedCoverageOrdinal ?? "<none>"}`
   ];
   if (fields.renderedCoverageEndMessageId !== undefined)
@@ -28295,6 +28753,17 @@ function logPiCompactionMarkerDrainGateOnce(sessionId, pending, gate, fields = {
     parts.push(`matchCount=${fields.matchCount}`);
   if (fields.alignment !== undefined)
     parts.push(`alignment=${fields.alignment}`);
+  if (fields.alignmentReason !== undefined)
+    parts.push(`alignmentReason=${fields.alignmentReason}`);
+  for (const key of [
+    "historyConsumed",
+    "materializationSatisfied",
+    "drainSuppressed",
+    "casLost"
+  ]) {
+    if (fields[key] !== undefined)
+      parts.push(`${key}=${fields[key]}`);
+  }
   if (fields.foldingOnlyTools !== undefined)
     parts.push(`foldingOnlyTools=${JSON.stringify(fields.foldingOnlyTools)}`);
   if (fields.persistedOnlyTools !== undefined)
@@ -28344,10 +28813,20 @@ function applyDeferredPiCompactionMarker(deps, sessionId, pending) {
     if (!firstKeptEntryId) {
       const alignment = resolvePiOrdinalAlignment(deps.db, sessionId, branchEntries);
       if (isPiOrdinalAlignmentUnanchored(alignment)) {
-        logPiCompactionMarkerDrainGateOnce(sessionId, pending, "ordinal-alignment-unavailable", { alignment: alignment.kind });
+        if (alignment.kind === "unanchored" && alignment.reason === "anchor-missing" && hasMergedSyntheticBoundary(branchEntries, pending.endMessageId)) {
+          return { kind: "stale-skip", reason: "synthetic-boundary-merged" };
+        }
+        logPiCompactionMarkerDrainGateOnce(sessionId, pending, "ordinal-alignment-unavailable", {
+          alignment: alignment.kind,
+          ...alignment.kind === "unanchored" ? { alignmentReason: alignment.reason } : {}
+        });
         return { kind: "waiting-for-entry" };
       }
-      firstKeptEntryId = findFirstKeptEntryId(branchEntries, pending.ordinal, alignment.offset);
+      const boundary = resolvePiFirstKeptEntry(branchEntries, pending.ordinal, alignment.offset);
+      if (boundary.kind === "unplaceable") {
+        return { kind: "stale-skip", reason: "synthetic-kept-entry" };
+      }
+      firstKeptEntryId = boundary.kind === "resolved" ? boundary.entryId : null;
     }
     if (!firstKeptEntryId) {
       logPiCompactionMarkerDrainGateOnce(sessionId, pending, "no-replay-safe-kept-entry", { firstKeptEntryId: null });
@@ -28401,6 +28880,27 @@ function applyDeferredPiCompactionMarker(deps, sessionId, pending) {
     });
     return { kind: "retryable-failure", error };
   }
+}
+function hasMergedSyntheticBoundary(entries, endMessageId) {
+  if (!endMessageId.startsWith(SYNTH_USER_ID_PREFIX))
+    return false;
+  const resultId = endMessageId.slice(SYNTH_USER_ID_PREFIX.length);
+  let foundResult = false;
+  for (const entry of entries) {
+    const row = entry;
+    if (row?.type !== "message")
+      continue;
+    const message = row.message;
+    if (!foundResult) {
+      foundResult = row.id === resultId && message?.role === "toolResult" && typeof message.toolCallId === "string" && message.toolCallId.length > 0;
+      continue;
+    }
+    if (message?.role === "user")
+      return true;
+    if (message?.role === "assistant")
+      return false;
+  }
+  return false;
 }
 function findLatestCompaction(branchEntries) {
   for (let i = branchEntries.length - 1;i >= 0; i--) {
@@ -29772,30 +30272,26 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
       const tPersist = performance.now();
       const toDrop = new Set(plan.tagNumbers);
       const newestEmergencyTags = recentTags;
-      db.transaction(() => {
-        for (const tag of tags) {
-          if (!toDrop.has(tag.tagNumber))
-            continue;
-          if (tag.status !== "active" || tag.type !== "tool")
-            continue;
-          const target = targets.get(tag.tagNumber);
-          const recent = (emergency.usagePercentage ?? 0) < 95 && newestEmergencyTags.has(tag.tagNumber);
-          const { result, mode } = applyNewToolDrop(target, {
-            inWindow: recent,
-            keepSkeleton: target?.requiresToolArcSkeleton === true
+      for (const tag of tags) {
+        if (!toDrop.has(tag.tagNumber))
+          continue;
+        if (tag.status !== "active" || tag.type !== "tool")
+          continue;
+        const target = targets.get(tag.tagNumber);
+        const recent = (emergency.usagePercentage ?? 0) < 95 && newestEmergencyTags.has(tag.tagNumber);
+        const { result, mode } = applyPersistedToolDrop(db, sessionId, tag.tagNumber, target, {
+          inWindow: recent,
+          keepSkeleton: target?.requiresToolArcSkeleton === true
+        });
+        if (result === "removed" || result === "truncated") {
+          droppedTools++;
+          emergencyDroppedTools++;
+          droppedTokenReductions.push({
+            tagNumber: tag.tagNumber,
+            mode: mode === "full" ? "full" : "truncated"
           });
-          if (result === "removed" || result === "truncated") {
-            updateTagStatus2(db, sessionId, tag.tagNumber, "dropped");
-            updateTagDropMode2(db, sessionId, tag.tagNumber, mode);
-            droppedTools++;
-            emergencyDroppedTools++;
-            droppedTokenReductions.push({
-              tagNumber: tag.tagNumber,
-              mode: mode === "full" ? "full" : "truncated"
-            });
-          }
         }
-      }).immediate();
+      }
       logStep("applyEmergencyDrops", tPersist, `dropped=${emergencyDroppedTools}`);
       sessionLog2(sessionId, `emergency tiered drop: ${plan.reason}`);
     } else {
@@ -29804,33 +30300,29 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
   }
   const staleReduce = routine && config.staleReduceStripEnabled ? collectStaleReduceCallIds(piMessages, buildMessageIdToMaxTagFromTargets(targets), buildCtxReduceTagNumbers(tags), toolAgeCutoff, resolveStableId) : { composite: new Set, bareCallIds: new Set };
   if (routine && config.staleReduceStripEnabled && (staleReduce.composite.size > 0 || staleReduce.bareCallIds.size > 0)) {
-    db.transaction(() => {
-      for (const tag of tags) {
-        if (tag.status !== "active")
-          continue;
-        if (tag.type !== "tool")
-          continue;
-        if (protectedTools.has(tag.tagNumber))
-          continue;
-        if (!tag.messageId)
-          continue;
-        const matched = tag.toolOwnerMessageId ? staleReduce.composite.has(`${tag.toolOwnerMessageId}\x00${tag.messageId}`) : staleReduce.bareCallIds.has(tag.messageId);
-        if (!matched)
-          continue;
-        const target = targets.get(tag.tagNumber);
-        if (target?.canDrop?.() === false)
-          continue;
-        const { result, mode } = applyNewToolDrop(target, { inWindow: false });
-        if (result === "incomplete")
-          continue;
-        updateTagDropMode2(db, sessionId, tag.tagNumber, mode);
-        updateTagStatus2(db, sessionId, tag.tagNumber, "dropped");
-        if (result === "removed" || result === "truncated") {
-          droppedStaleReduceCalls++;
-          config.onStaleReduceEdit?.(tag);
-        }
+    for (const tag of tags) {
+      if (tag.status !== "active")
+        continue;
+      if (tag.type !== "tool")
+        continue;
+      if (protectedTools.has(tag.tagNumber))
+        continue;
+      if (!tag.messageId)
+        continue;
+      const matched = tag.toolOwnerMessageId ? staleReduce.composite.has(`${tag.toolOwnerMessageId}\x00${tag.messageId}`) : staleReduce.bareCallIds.has(tag.messageId);
+      if (!matched)
+        continue;
+      const target = targets.get(tag.tagNumber);
+      if (target?.canDrop?.() === false)
+        continue;
+      const { result } = applyPersistedToolDrop(db, sessionId, tag.tagNumber, target, { inWindow: false });
+      if (result === "incomplete")
+        continue;
+      if (result === "removed" || result === "truncated") {
+        droppedStaleReduceCalls++;
+        config.onStaleReduceEdit?.(tag);
       }
-    }).immediate();
+    }
   }
   if (routine) {
     db.transaction(() => {
@@ -29899,37 +30391,33 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
       group.push(tag);
       fingerprintGroups.set(fingerprint, group);
     }
-    db.transaction(() => {
-      for (const [, group] of fingerprintGroups) {
-        if (group.length <= 1)
+    for (const [, group] of fingerprintGroups) {
+      if (group.length <= 1)
+        continue;
+      group.sort((a, b) => a.tagNumber - b.tagNumber);
+      for (let i = 0;i < group.length - 1; i++) {
+        const tag = group[i];
+        if (tag.tagNumber > protectedCutoff)
           continue;
-        group.sort((a, b) => a.tagNumber - b.tagNumber);
-        for (let i = 0;i < group.length - 1; i++) {
-          const tag = group[i];
-          if (tag.tagNumber > protectedCutoff)
-            continue;
-          const target = targets.get(tag.tagNumber);
-          if (protectedTools.has(tag.tagNumber))
-            continue;
-          if (target?.canDrop?.() === false)
-            continue;
-          const { result, mode } = applyNewToolDrop(target, {
-            inWindow: false
+        const target = targets.get(tag.tagNumber);
+        if (protectedTools.has(tag.tagNumber))
+          continue;
+        if (target?.canDrop?.() === false)
+          continue;
+        const { result, mode } = applyPersistedToolDrop(db, sessionId, tag.tagNumber, target, {
+          inWindow: false
+        });
+        if (result === "incomplete")
+          continue;
+        if (result === "removed" || result === "truncated") {
+          deduplicatedTools++;
+          droppedTokenReductions.push({
+            tagNumber: tag.tagNumber,
+            mode: mode === "full" ? "full" : "truncated"
           });
-          if (result === "incomplete")
-            continue;
-          updateTagDropMode2(db, sessionId, tag.tagNumber, mode);
-          updateTagStatus2(db, sessionId, tag.tagNumber, "dropped");
-          if (result === "removed" || result === "truncated") {
-            deduplicatedTools++;
-            droppedTokenReductions.push({
-              tagNumber: tag.tagNumber,
-              mode: mode === "full" ? "full" : "truncated"
-            });
-          }
         }
       }
-    }).immediate();
+    }
   }
   if (droppedTools > 0 || deduplicatedTools > 0 || droppedInjections > 0 || droppedStaleReduceCalls > 0) {
     sessionLog2(sessionId, `heuristic cleanup: dropped ${droppedTools} tool tags, stale ctx_reduce=${droppedStaleReduceCalls}, deduplicated ${deduplicatedTools} tool calls, dropped ${droppedInjections} system injections`);
@@ -30976,6 +31464,7 @@ function forgetCachedPrefix(sessionId) {
 function dropCompartmentsAfter(db, sessionId, anchor, holderId, activeBranch = false, onRetire) {
   db.exec("BEGIN IMMEDIATE");
   let finished = false;
+  let clearedMarker = null;
   try {
     if (!isCompartmentLeaseHeld(db, sessionId, holderId)) {
       db.exec("ROLLBACK");
@@ -30992,14 +31481,16 @@ function dropCompartmentsAfter(db, sessionId, anchor, holderId, activeBranch = f
     if (activeBranch) {
       db.prepare("UPDATE session_meta SET prior_boundary_ordinal = ? WHERE session_id = ?").run((anchor?.endMessage ?? 0) + 1, sessionId);
       const marker = getPendingPiCompactionMarkerState(db, sessionId);
-      if (marker)
-        clearPendingPiCompactionMarkerStateIf(db, sessionId, marker);
+      if (marker && clearPendingPiCompactionMarkerStateIf(db, sessionId, marker, null))
+        clearedMarker = marker;
     }
     deleteChunkEmbedBackoffForSession(db, sessionId);
     queueM0Mutation(db, { sessionId, mutationType: "recomp_boundary_change" });
     clearCachedM0M1(db, sessionId);
     db.exec("COMMIT");
     finished = true;
+    if (clearedMarker)
+      logPiCompactionMarkerClear(sessionId, clearedMarker, "active-branch-retired");
     return dropped.map((row) => row.sequence);
   } finally {
     if (!finished) {
@@ -32618,6 +33109,54 @@ function rewriteNativeToolInput(message, toolCallId, input) {
   items[match.index] = { ...match.item, [field]: nextValue };
   envelope.message.providerPayload = { ...envelope.payload, items };
 }
+function textIdentity(part) {
+  if (!isRecord(part) || part.type !== "text" || typeof part.textSignature !== "string")
+    return;
+  try {
+    const signature = JSON.parse(part.textSignature);
+    if (isRecord(signature) && signature.v === 1 && typeof signature.id === "string" && signature.id.length > 0 && (signature.phase === undefined || signature.phase === "commentary" || signature.phase === "final_answer")) {
+      return { id: signature.id, phase: signature.phase };
+    }
+  } catch {}
+  return;
+}
+function rewriteNativeAssistantTexts(message, previous, sessionId) {
+  const envelope = getNativeEnvelope(message);
+  if (envelope?.message.role !== "assistant" || !isRecord(previous) || !Array.isArray(previous.content) || !Array.isArray(envelope.message.content))
+    return;
+  const content = envelope.message.content;
+  for (let index = 0;index < content.length; index++) {
+    const part = content[index];
+    const before = previous.content[index];
+    if (!isRecord(part) || part.type !== "text" || typeof part.text !== "string" || !isRecord(before) || before.type !== "text" || typeof before.text !== "string")
+      continue;
+    if (part.text.replace(/^§\d+§ /u, "") === before.text.replace(/^§\d+§ /u, ""))
+      continue;
+    const identity = textIdentity(part);
+    const sameIdentity = (value) => {
+      const other = textIdentity(value);
+      return identity !== undefined && other?.id === identity.id && other.phase === identity.phase;
+    };
+    const matches = envelope.items.flatMap((item, itemIndex) => isRecord(item) && item.type === "message" && item.role === "assistant" && identity !== undefined && item.id === identity.id && item.phase === identity.phase ? [{ item, itemIndex }] : []);
+    const match = matches[0];
+    const outputs = match && Array.isArray(match.item.content) ? match.item.content.flatMap((output, outputIndex) => isRecord(output) && output.type === "output_text" && typeof output.text === "string" ? [{ output, outputIndex }] : []) : [];
+    if (!identity || content.filter(sameIdentity).length !== 1 || previous.content.filter(sameIdentity).length !== 1 || matches.length !== 1 || outputs.length !== 1) {
+      if (sessionId)
+        sessionLog2(sessionId, `native assistant text replay skipped: missing or ambiguous id/phase match at part ${index} (items=${matches.length}, outputs=${outputs.length}); retaining native history for dispatch validation`);
+      continue;
+    }
+    const { output, outputIndex } = outputs[0];
+    if (output.text === part.text)
+      continue;
+    const nextContent = match.item.content.slice();
+    nextContent[outputIndex] = { ...output, text: part.text };
+    const items = envelope.items.slice();
+    items[match.itemIndex] = { ...match.item, content: nextContent };
+    envelope.items = items;
+    envelope.payload = { ...envelope.payload, items };
+    envelope.message.providerPayload = envelope.payload;
+  }
+}
 function hasRedactedThinkingContent(message) {
   if (!Array.isArray(message.content))
     return false;
@@ -32897,6 +33436,14 @@ var PI_CONTEXT_BUDGET = {
 };
 
 class PiContextDeadlineError extends Error {
+}
+
+class PiContextSupersededError extends Error {
+  origin;
+  constructor(message, origin = "context ownership") {
+    super(message);
+    this.origin = origin;
+  }
 }
 
 class PiContextBudget {
@@ -33561,15 +34108,157 @@ function piMatchesChatImages(content, urls) {
   return true;
 }
 
+// src/pi-dispatch-image-budget.ts
+function object3(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function piImageBudgetPlan(model) {
+  if (!model?.input?.includes("image") || object3(model.compat)?.stripImageInput === true)
+    return;
+  return {
+    count: 0,
+    api: model.api,
+    rows: new Map,
+    hoistToolImages: model.api?.startsWith("google-") === true && object3(model.compat)?.multimodalFunctionResponse !== true || model.api === "bedrock-converse-stream" && model.requiresToolResultImageHoisting === true,
+    hoistErrorImages: model.api === "anthropic-messages" || model.api === "bedrock-converse-stream"
+  };
+}
+function inputImage(block, api) {
+  const file = object3(block.providerFile);
+  if (api === "ollama-chat")
+    return { kind: "bytes", value: String(block.data ?? "") };
+  if ((api?.endsWith("responses") && file?.provider === "openai" || api === "anthropic-messages" && file?.provider === "anthropic") && typeof file?.id === "string")
+    return { kind: "file", value: file.id };
+  if (api?.startsWith("google-") && file?.provider === "google" && typeof file.uri === "string")
+    return { kind: "url", value: file.uri };
+  if (api !== "bedrock-converse-stream" && typeof block.url === "string")
+    return { kind: "url", value: block.url };
+  return {
+    kind: "data",
+    value: typeof block.data === "string" ? block.data : "",
+    mime: typeof block.mimeType === "string" ? block.mimeType : ""
+  };
+}
+function piRecordImages(plan, row, source) {
+  if (!plan || !source || !["user", "developer", "toolResult"].includes(String(source.role)) || !Array.isArray(source.content))
+    return;
+  const images = [];
+  for (const value of source.content) {
+    const block = object3(value);
+    if (block?.type === "image")
+      images.push(inputImage(block, plan.api));
+  }
+  if (!images.length)
+    return;
+  plan.rows.set(row, {
+    first: plan.count,
+    images,
+    hoisted: source.role === "toolResult" && (plan.hoistToolImages || source.isError === true && plan.hoistErrorImages)
+  });
+  plan.count += images.length;
+}
+function piRemainingImages(run, drops) {
+  return run.images.slice(Math.max(0, Math.min(run.images.length, drops - run.first)));
+}
+function piWireImages(content, ollamaImages) {
+  if (Array.isArray(ollamaImages))
+    return ollamaImages.map((value) => ({
+      kind: "bytes",
+      value: String(value)
+    }));
+  if (!Array.isArray(content))
+    return [];
+  const images = [];
+  for (const value of content) {
+    const block = object3(value);
+    if (!block)
+      continue;
+    const source = object3(block.source);
+    const inline = object3(block.inlineData);
+    const file = object3(block.fileData);
+    const bedrock = object3(block.image);
+    if (block.type === "image_url" || block.type === "input_image") {
+      if (typeof block.file_id === "string")
+        images.push({ kind: "file", value: block.file_id });
+      else
+        images.push({
+          kind: "url",
+          value: String(typeof block.image_url === "string" ? block.image_url : object3(block.image_url)?.url)
+        });
+    } else if (block.type === "image") {
+      if (source?.type === "file")
+        images.push({ kind: "file", value: String(source.file_id) });
+      else if (source?.type === "url")
+        images.push({ kind: "url", value: String(source.url) });
+      else
+        images.push({
+          kind: "data",
+          value: String(source?.data),
+          mime: String(source?.media_type)
+        });
+    } else if (inline)
+      images.push({
+        kind: "data",
+        value: String(inline.data),
+        mime: String(inline.mimeType)
+      });
+    else if (file)
+      images.push({ kind: "url", value: String(file.fileUri) });
+    else if (bedrock)
+      images.push({
+        kind: "data",
+        value: String(object3(bedrock.source)?.bytes),
+        mime: `image/${bedrock.format}`
+      });
+  }
+  return images;
+}
+function piMatchesImages(actual, expected) {
+  if (actual.length !== expected.length)
+    return false;
+  for (let index = 0;index < expected.length; index++) {
+    const a = actual[index];
+    const e = expected[index];
+    if (e.kind === "data" && a.kind === "url") {
+      const prefix = `data:${e.mime};base64,`;
+      if (a.value.length !== prefix.length + e.value.length || !a.value.startsWith(prefix) || !a.value.endsWith(e.value))
+        return false;
+    } else if (a.kind !== e.kind || a.value !== e.value || a.mime?.replace("image/jpg", "image/jpeg") !== e.mime?.replace("image/jpg", "image/jpeg"))
+      return false;
+  }
+  return true;
+}
+function piWireImageCount(payload) {
+  const body = object3(payload);
+  const visit = (value) => {
+    if (Array.isArray(value))
+      return value.reduce((n, item) => n + visit(item), 0);
+    const block = object3(value);
+    if (!block)
+      return 0;
+    if (["image", "image_url", "input_image"].includes(String(block.type)) || block.inlineData || block.fileData || block.image)
+      return 1;
+    return [
+      block.content,
+      block.output,
+      block.parts,
+      block.toolResult,
+      block.functionResponse,
+      block.response
+    ].reduce((n, item) => n + visit(item), Array.isArray(block.images) ? block.images.length : 0);
+  };
+  return visit(body?.messages ?? body?.input ?? body?.contents ?? object3(body?.request)?.contents);
+}
+
 // src/pi-dispatch-responses-history.ts
 var MAX_TEXT_UNITS = 32 * 1024 * 1024;
-function object3(value) {
+function object4(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 }
 function wellFormed(text) {
   return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�");
 }
-function textIdentity(text, phase) {
+function textIdentity2(text, phase) {
   return JSON.stringify([
     text,
     phase === "commentary" || phase === "final_answer" ? phase : null
@@ -33578,7 +34267,7 @@ function textIdentity(text, phase) {
 function signaturePhase(block) {
   try {
     if (typeof block.textSignature === "string") {
-      const signature = object3(JSON.parse(block.textSignature));
+      const signature = object4(JSON.parse(block.textSignature));
       if (signature?.v === 1 && typeof signature.id === "string")
         return signature.phase;
     }
@@ -33598,17 +34287,17 @@ ${wellFormed(text)}
   return;
 }
 function piResponsesAssistantTexts(value, model) {
-  const message = object3(value);
+  const message = object4(value);
   if (!message || !Array.isArray(message.content))
     return;
-  if (["length", "error", "aborted"].includes(String(message.stopReason)) && !message.content.some((value) => ["text", "toolCall"].includes(String(object3(value)?.type))))
+  if (["length", "error", "aborted"].includes(String(message.stopReason)) && !message.content.some((value) => ["text", "toolCall"].includes(String(object4(value)?.type))))
     return [];
   const texts = [];
   const blocks = [];
   const sameModel = model !== undefined && typeof model.api === "string" && typeof model.id === "string" && typeof model.provider === "string" && message.api === model.api && message.model === model.id && message.provider === model.provider;
   let units = 0;
   for (const value of message.content) {
-    const block = object3(value);
+    const block = object4(value);
     if (block?.type === "toolCall")
       continue;
     if (block?.type === "thinking") {
@@ -33618,7 +34307,7 @@ function piResponsesAssistantTexts(value, model) {
         return;
       if (!block.thinking.trim())
         continue;
-      const compat = object3(model.compat);
+      const compat = object4(model.compat);
       if (block.summary === false && (compat?.requiresReasoningContentForToolCalls === true || compat?.requiresReasoningContentForAllAssistantTurns === true))
         return;
       const text = demotedThinking(block.thinking, model);
@@ -33627,7 +34316,7 @@ function piResponsesAssistantTexts(value, model) {
       units += text.length;
       if (units > MAX_TEXT_UNITS)
         return;
-      texts.push(textIdentity(text, undefined));
+      texts.push(textIdentity2(text, undefined));
       continue;
     }
     if (block?.type !== "text" || typeof block.text !== "string")
@@ -33635,32 +34324,32 @@ function piResponsesAssistantTexts(value, model) {
     units += block.text.length;
     if (units > MAX_TEXT_UNITS)
       return;
-    texts.push(textIdentity(wellFormed(block.text), sameModel ? signaturePhase(block) : undefined));
+    texts.push(textIdentity2(wellFormed(block.text), sameModel ? signaturePhase(block) : undefined));
     blocks.push(block);
   }
-  const payload = object3(message.providerPayload);
+  const payload = object4(message.providerPayload);
   if (message.api !== model?.api || typeof model?.id !== "string" || typeof model?.provider !== "string" || message.model !== model?.id || (payload?.provider ?? message.provider) !== model?.provider || payload?.type !== "openaiResponsesHistory" || payload.dt !== true || !Array.isArray(payload.items) || message.content.length !== blocks.length)
     return texts;
   const replay = [];
   for (const value of payload.items) {
-    const item = object3(value);
+    const item = object4(value);
     if (item?.type !== "message" || item.role !== "assistant" || !Array.isArray(item.content))
       return texts;
     for (const value of item.content) {
-      const part = object3(value);
+      const part = object4(value);
       const block = blocks[replay.length];
       if (!block || part?.type !== "output_text" || typeof part.text !== "string")
         return texts;
       let signature;
       try {
         if (typeof block.textSignature === "string")
-          signature = object3(JSON.parse(block.textSignature));
+          signature = object4(JSON.parse(block.textSignature));
       } catch {
         return texts;
       }
       if (signature?.v !== 1 || typeof signature.id !== "string" || item.id !== signature.id || item.phase !== signature.phase || part.text !== block.text.replace(/^§\d+§ /u, ""))
         return texts;
-      replay.push(textIdentity(wellFormed(part.text), item.phase));
+      replay.push(textIdentity2(wellFormed(part.text), item.phase));
     }
   }
   return replay.length === texts.length ? replay : texts;
@@ -33669,19 +34358,19 @@ function piResponsesWireTexts(value, phase) {
   if (phase !== undefined && phase !== null && phase !== "commentary" && phase !== "final_answer")
     return;
   if (typeof value === "string")
-    return [textIdentity(value, phase)];
+    return [textIdentity2(value, phase)];
   if (!Array.isArray(value))
     return;
   const texts = [];
   let units = 0;
   for (const partValue of value) {
-    const part = object3(partValue);
+    const part = object4(partValue);
     if (part?.type !== "output_text" || typeof part.text !== "string")
       return;
     units += part.text.length;
     if (units > MAX_TEXT_UNITS)
       return;
-    texts.push(textIdentity(part.text, phase));
+    texts.push(textIdentity2(part.text, phase));
   }
   return texts;
 }
@@ -33758,11 +34447,28 @@ function piToolCallWireId(id, model, source) {
 
 // src/pi-dispatch-structure.ts
 var MAX_MESSAGES = 1e5;
-function object4(value) {
+var ORPHAN_NOTE = Symbol("prepared orphan tool result");
+var TRANSFORM_MESSAGES_APIS = new Set([
+  "openai-completions",
+  "openai-responses",
+  "openrouter",
+  "openai-codex-responses",
+  "azure-openai-responses",
+  "anthropic-messages",
+  "bedrock-converse-stream",
+  "google-generative-ai",
+  "google-gemini-cli",
+  "google-vertex",
+  "ollama-chat",
+  "factory-droid-agent",
+  "devin-agent",
+  "apple-foundation-models"
+]);
+function object5(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 }
 function messageStructure(value) {
-  const message = object4(value);
+  const message = object5(value);
   if (!message)
     return;
   const role = [
@@ -33777,6 +34483,11 @@ function messageStructure(value) {
   if (role !== "user" && role !== "assistant" && role !== "toolResult")
     return;
   const row = { role, calls: [], results: [] };
+  if (ORPHAN_NOTE in message && typeof message.content === "string") {
+    if (message.content.length > 32 * 1024 * 1024)
+      return;
+    row.exactText = message.content;
+  }
   if (typeof message.timestamp === "number")
     row.timestamp = message.timestamp;
   if (role === "toolResult") {
@@ -33786,7 +34497,7 @@ function messageStructure(value) {
   }
   if (role === "assistant" && Array.isArray(message.content)) {
     for (const value of message.content) {
-      const block = object4(value);
+      const block = object5(value);
       if (block?.type !== "toolCall" && block?.type !== "tool_use")
         continue;
       if (typeof block.id !== "string")
@@ -33798,35 +34509,41 @@ function messageStructure(value) {
   }
   return row;
 }
-function projectMissingToolResults(messages) {
+function projectMissingToolResults(messages, api) {
+  const projectOrphans = TRANSFORM_MESSAGES_APIS.has(api ?? "");
   const responsesComponents = new Set;
   const opaqueIds = new Set;
+  const validToolUseIds = projectOrphans ? new Set : undefined;
   const component = (id) => {
     const pipe = id.indexOf("|");
     return pipe > 0 ? id.slice(0, pipe) : id;
   };
   for (const value of messages) {
-    const message = object4(value);
+    const message = object5(value);
     if (message?.role !== "assistant" || !Array.isArray(message.content))
       continue;
     for (const value of message.content) {
-      const block = object4(value);
+      const block = object5(value);
       if (block?.type !== "toolCall" || typeof block.id !== "string")
         continue;
       if ([
         "openai-responses",
         "azure-openai-responses",
         "openai-codex-responses"
-      ].includes(String(message.api)))
+      ].includes(String(message.api))) {
         responsesComponents.add(component(block.id));
-      else if (block.id.includes("|"))
-        opaqueIds.add(block.id);
+        validToolUseIds?.add(component(block.id));
+      } else {
+        if (block.id.includes("|"))
+          opaqueIds.add(block.id);
+        validToolUseIds?.add(block.id);
+      }
     }
   }
   const pairingId = (id) => !opaqueIds.has(id) && responsesComponents.has(component(id)) ? component(id) : id;
   const lastResult = new Map;
   messages.forEach((value, index) => {
-    const message = object4(value);
+    const message = object5(value);
     if (message?.role === "toolResult" && typeof message.toolCallId === "string")
       lastResult.set(pairingId(message.toolCallId), index);
   });
@@ -33857,13 +34574,35 @@ function projectMissingToolResults(messages) {
   };
   for (let index = 0;index < messages.length; index++) {
     const value = messages[index];
-    const message = object4(value);
+    const message = object5(value);
     if ((message?.role === "bashExecution" || message?.role === "pythonExecution") && message.excludeFromContext === true)
       continue;
     if (message?.role !== "toolResult")
       flush(message?.timestamp);
     else if (typeof message.toolCallId === "string" && pending.some((call) => pairingId(call.id) === pairingId(String(message.toolCallId))))
       resolved.add(pairingId(message.toolCallId));
+    else if (validToolUseIds && message?.role === "toolResult" && typeof message.toolCallId === "string" && typeof message.toolName === "string" && !validToolUseIds.has(pairingId(message.toolCallId)) && Array.isArray(message.content)) {
+      if (pending.some((call) => !resolved.has(pairingId(call.id))))
+        continue;
+      const parts = message.content.flatMap((value) => {
+        const part = object5(value);
+        return part?.type === "text" && typeof part.text === "string" && part.text.trim() ? [part.text] : [];
+      });
+      if (parts.length) {
+        const error = message.isError ? ' is-error="true"' : "";
+        const note = `<stale-tool-result tool="${message.toolName}" id="${message.toolCallId}"${error}>
+${parts.join(`
+`)}
+</stale-tool-result>`;
+        projected.push({
+          role: "user",
+          content: api === "ollama-chat" ? note : new TextDecoder().decode(new TextEncoder().encode(note)),
+          timestamp: message.timestamp,
+          [ORPHAN_NOTE]: true
+        });
+      }
+      continue;
+    }
     projected.push(value);
     if (message?.role !== "assistant" || !Array.isArray(message.content))
       continue;
@@ -33873,7 +34612,7 @@ function projectMissingToolResults(messages) {
     if (aborted && typeof timestamp !== "number")
       continue;
     for (const value of message.content) {
-      const block = object4(value);
+      const block = object5(value);
       if (block?.type === "toolCall" && typeof block.id === "string")
         pending.push({
           id: block.id,
@@ -33887,7 +34626,7 @@ function projectMissingToolResults(messages) {
 function preparePiDispatch(messages, model, omp) {
   let output = messages;
   const structure = buildPiPreparedStructure(messages, model, omp ? (index, source) => {
-    if (object4(source.providerPayload)?.type !== "openaiResponsesHistory")
+    if (object5(source.providerPayload)?.type !== "openaiResponsesHistory")
       return;
     if (output === messages)
       output = messages.slice();
@@ -33900,11 +34639,11 @@ function buildPiPreparedStructure(messages, model, prepareUser) {
   if (!messages.length || messages.length > MAX_MESSAGES)
     return;
   for (let index = 0;index < messages.length; index++) {
-    const source = object4(messages[index]);
+    const source = object5(messages[index]);
     if (source?.role === "user" || source?.role === "compactionSummary")
       prepareUser?.(index, source);
   }
-  const projectedMessages = projectMissingToolResults(model?.api ? piAgentHistory(messages, model.api) : messages);
+  const projectedMessages = projectMissingToolResults(model?.api ? piAgentHistory(messages, model.api) : messages, model?.api);
   if (projectedMessages.length > MAX_MESSAGES)
     return;
   const rows = [];
@@ -33912,10 +34651,11 @@ function buildPiPreparedStructure(messages, model, prepareUser) {
   const toolIds = new Map;
   const responsesToolIds = new Map;
   const byIndex = new Map;
+  const imageBudget = piImageBudgetPlan(model);
   let valid = true;
   for (let index = 0;index < projectedMessages.length; index++) {
     const message = projectedMessages[index];
-    const source = object4(message);
+    const source = object5(message);
     if (rows.length === 0 && (source?.role === "system" || source?.role === "developer"))
       continue;
     if ((source?.role === "bashExecution" || source?.role === "pythonExecution") && source.excludeFromContext === true)
@@ -33939,7 +34679,7 @@ function buildPiPreparedStructure(messages, model, prepareUser) {
       "azure-openai-responses",
       "openai-codex-responses"
     ].includes(model?.api ?? "") && (source?.role === "user" || source?.role === "developer") && (typeof source.content === "string" ? !source.content.trim() : Array.isArray(source.content) && !source.content.some((value) => {
-      const block = object4(value);
+      const block = object5(value);
       return block?.type === "image" || block?.type === "text" && typeof block.text === "string" && block.text.trim();
     })))
       continue;
@@ -33965,6 +34705,7 @@ function buildPiPreparedStructure(messages, model, prepareUser) {
     }
     rows.push(row);
     byIndex.set(index, row);
+    piRecordImages(imageBudget, row, source);
   }
   if (!valid)
     return;
@@ -33998,28 +34739,40 @@ function buildPiPreparedStructure(messages, model, prepareUser) {
     }
   }
   const plan = piChatHistoryPlan(projectedMessages, model);
+  let pendingToolImages = [];
   const chatMessages = plan?.flatMap((step) => {
     if (step.kind === "source") {
       const row = byIndex.get(step.index);
+      const images = row && imageBudget?.rows.get(row);
+      if (row?.role === "toolResult" && images)
+        pendingToolImages.push(images);
       return row ? [row] : [];
     }
-    return [
-      {
-        role: "user",
-        calls: [],
-        results: [],
-        ...step.kind === "note" ? { exactText: step.text } : { exactImages: step.urls }
-      }
-    ];
+    const row = {
+      role: "user",
+      calls: [],
+      results: [],
+      ...step.kind === "note" ? { exactText: step.text } : { exactImages: step.urls }
+    };
+    if (step.kind === "images" && imageBudget && pendingToolImages.length) {
+      imageBudget.rows.set(row, {
+        first: pendingToolImages[0].first,
+        images: pendingToolImages.flatMap((run) => run.images),
+        synthesized: true
+      });
+      pendingToolImages = [];
+    }
+    return [row];
   });
   return {
     messages: rows,
+    ...imageBudget?.count ? { imageBudget } : {},
     ...responsesApi && !responsesMessages ? { structuralSkipReason: "Responses history transform is not modeled" } : model?.api === "openai-completions" && !chatMessages ? { structuralSkipReason: "Chat history transform is not modeled" } : {},
     ...chatMessages ? { chatMessages } : {},
     ...responsesMessages ? { responsesMessages } : {},
     ...model?.api ? { api: model.api } : {},
     ...model?.api?.startsWith("google-") ? {
-      googleFunctionIds: object4(model.compat)?.supportsFunctionPartId === true
+      googleFunctionIds: object5(model.compat)?.supportsFunctionPartId === true
     } : {}
   };
 }
@@ -34030,13 +34783,13 @@ function responsesLane(api) {
     "openai-codex-responses"
   ].includes(api ?? "");
 }
-function payloadStructure(payload, ollama = false, responsesItems = false) {
-  const body = object4(payload);
+function payloadStructure(payload, ollama = false, responsesItems = false, imageProjection = false) {
+  const body = object5(payload);
   if (!body)
     return;
   const google = piGoogleConversation(payload);
   if (google)
-    return googleStructure(google.contents);
+    return googleStructure(google.contents, imageProjection);
   const bedrock = body.inferenceConfig !== undefined;
   if (body.messages === undefined && typeof body.input === "string")
     return [{ role: "user", calls: [], results: [] }];
@@ -34046,7 +34799,7 @@ function payloadStructure(payload, ollama = false, responsesItems = false) {
     return;
   const rows = [];
   for (const value of messages) {
-    const message = object4(value);
+    const message = object5(value);
     if (!message)
       return;
     if (rows.length === 0 && (message.role === "system" || message.role === "developer"))
@@ -34077,6 +34830,8 @@ function payloadStructure(payload, ollama = false, responsesItems = false) {
       if (typeof message.call_id !== "string")
         return;
       rows.push({ role: "toolResult", calls: [], results: [message.call_id] });
+      if (imageProjection)
+        rows[rows.length - 1].images = piWireImages(message.output);
       continue;
     }
     if (message.role === "tool") {
@@ -34086,7 +34841,8 @@ function payloadStructure(payload, ollama = false, responsesItems = false) {
           calls: [],
           results: [""],
           resultNames: [message.tool_name],
-          idlessResults: [true]
+          idlessResults: [true],
+          ...imageProjection ? { images: piWireImages(message.content, message.images) } : {}
         });
         continue;
       }
@@ -34095,12 +34851,15 @@ function payloadStructure(payload, ollama = false, responsesItems = false) {
       rows.push({
         role: "toolResult",
         calls: [],
-        results: [message.tool_call_id]
+        results: [message.tool_call_id],
+        ...imageProjection ? {
+          images: piWireImages(message.content, ollama ? message.images : undefined)
+        } : {}
       });
       continue;
     }
     if (message.role === "user" && Array.isArray(message.content)) {
-      const results = message.content.filter((block) => object4(block)?.type === "tool_result" || bedrock && object4(block)?.toolResult);
+      const results = message.content.filter((block) => object5(block)?.type === "tool_result" || bedrock && object5(block)?.toolResult);
       if (results.length) {
         for (const block of results) {
           const id = bedrock ? block.toolResult?.toolUseId : block.tool_use_id;
@@ -34109,8 +34868,16 @@ function payloadStructure(payload, ollama = false, responsesItems = false) {
           rows.push({
             role: "toolResult",
             calls: [],
-            results: [id]
+            results: [id],
+            ...imageProjection ? {
+              images: piWireImages(bedrock ? block.toolResult?.content : block.content)
+            } : {}
           });
+        }
+        if (imageProjection) {
+          const images = piWireImages(message.content.filter((block) => !results.includes(block)));
+          if (images.length)
+            rows.push({ role: "user", calls: [], results: [], images });
         }
         continue;
       }
@@ -34119,6 +34886,8 @@ function payloadStructure(payload, ollama = false, responsesItems = false) {
     if (!row)
       return;
     row.wireContent = message.content;
+    if (imageProjection)
+      row.images = piWireImages(message.content, ollama ? message.images : undefined);
     if (responses && responsesItems && row.role === "assistant") {
       const texts = piResponsesWireTexts(message.content, message.phase);
       if (!texts)
@@ -34137,11 +34906,11 @@ function payloadStructure(payload, ollama = false, responsesItems = false) {
     }
     if (Array.isArray(message.tool_calls)) {
       for (const call of message.tool_calls) {
-        const source = object4(call);
+        const source = object5(call);
         if (!source)
           return;
         if (source.id === undefined && ollama) {
-          const fn = object4(source.function);
+          const fn = object5(source.function);
           if (typeof fn?.name !== "string")
             return;
           row.calls.push("");
@@ -34172,12 +34941,12 @@ function payloadStructure(payload, ollama = false, responsesItems = false) {
   }
   return rows;
 }
-function googleStructure(contents) {
+function googleStructure(contents, imageProjection = false) {
   if (contents.length > MAX_MESSAGES)
     return;
   const rows = [];
   for (const value of contents) {
-    const message = object4(value);
+    const message = object5(value);
     if (!message || !Array.isArray(message.parts))
       return;
     if (message.role !== "user" && message.role !== "model")
@@ -34185,15 +34954,18 @@ function googleStructure(contents) {
     const row = {
       role: message.role === "model" ? "assistant" : "user",
       calls: [],
-      results: []
+      results: [],
+      ...imageProjection ? { images: piWireImages(message.parts) } : {},
+      wireRole: message.role,
+      wireContent: message.parts
     };
     const results = [];
     for (const value of message.parts) {
-      const part = object4(value);
+      const part = object5(value);
       if (!part)
         return;
       if (part.functionCall) {
-        const call = object4(part.functionCall);
+        const call = object5(part.functionCall);
         if (row.role !== "assistant" || typeof call?.name !== "string" || call.id !== undefined && typeof call.id !== "string")
           return;
         row.calls.push(call.id ?? "");
@@ -34201,20 +34973,23 @@ function googleStructure(contents) {
         row.callNames.push(call.name);
       }
       if (part.functionResponse) {
-        const result = object4(part.functionResponse);
+        const result = object5(part.functionResponse);
         if (row.role !== "user" || typeof result?.name !== "string" || result.id !== undefined && typeof result.id !== "string")
           return;
         results.push({
           role: "toolResult",
           calls: [],
           results: [result.id ?? ""],
-          resultNames: [result.name]
+          resultNames: [result.name],
+          ...imageProjection ? { images: piWireImages(result.parts) } : {}
         });
       }
     }
-    if (results.length)
+    if (results.length) {
       rows.push(...results);
-    else
+      if (imageProjection && row.images?.length)
+        rows.push({ role: "user", calls: [], results: [], images: row.images });
+    } else
       rows.push(row);
   }
   return rows;
@@ -34227,6 +35002,19 @@ function wireId(id, anthropic, responses) {
     return /^[a-zA-Z0-9_-]{1,64}$/.test(callId) ? callId : undefined;
   }
   return id;
+}
+function matchesUserText(content, text, api, responses, googleOrBedrock) {
+  if (responses || googleOrBedrock) {
+    if (!Array.isArray(content) || content.length !== 1)
+      return false;
+    const block = object5(content[0]);
+    return !!block && block.text === text && (responses ? block.type === "input_text" : Object.keys(block).length === 1);
+  }
+  if ((api === "anthropic-messages" || api === "factory-droid-agent") && Array.isArray(content)) {
+    const block = content.length === 1 ? object5(content[0]) : undefined;
+    return block?.type === "text" && block.text === text;
+  }
+  return content === text;
 }
 function safeRole(row, readable) {
   if (!readable)
@@ -34243,16 +35031,57 @@ function structureDetail(index, expected, actual, comparison) {
   const actualRow = actual?.[index];
   return `row=${index} expectedRows=${safeCount(expected?.length)} actualRows=${safeCount(actual?.length)} expectedRole=${safeRole(expectedRow, !!expected)} actualRole=${safeRole(actualRow, !!actual)} expectedCalls=${safeCount(expected ? expectedRow?.calls.length ?? 0 : undefined)} actualCalls=${safeCount(actual ? actualRow?.calls.length ?? 0 : undefined)} expectedResults=${safeCount(expected ? expectedRow?.results.length ?? 0 : undefined)} actualResults=${safeCount(actual ? actualRow?.results.length ?? 0 : undefined)} comparison=${comparison}`;
 }
-function piPreparedStructureMismatch(payload, prepared) {
+function trimPreparedImageRows(rows, budget, drops) {
+  const projected = [];
+  let hoisted = [];
+  const flush = () => {
+    if (hoisted.length)
+      projected.push({ role: "user", calls: [], results: [], images: hoisted });
+    hoisted = [];
+  };
+  for (const row of rows) {
+    if (row.role !== "toolResult")
+      flush();
+    const run = budget.rows.get(row);
+    if (!run || budget.api === "openai-completions" && row.role === "toolResult") {
+      projected.push(row);
+      continue;
+    }
+    const images = piRemainingImages(run, drops);
+    if (run.synthesized) {
+      if (images.length)
+        projected.push({
+          ...row,
+          images,
+          exactImages: row.exactImages?.slice(run.images.length - images.length)
+        });
+    } else if (run.hoisted) {
+      projected.push(row);
+      hoisted.push(...images);
+    } else
+      projected.push({ ...row, images });
+  }
+  flush();
+  return projected;
+}
+function piPreparedStructureMismatch(payload, prepared, onImageTrim) {
   try {
     if (prepared?.structuralSkipReason)
       return;
-    const body = object4(payload);
+    const imageBudget = prepared?.imageBudget;
+    const actualImages = imageBudget ? piWireImageCount(payload) : 0;
+    const trimmed = imageBudget ? imageBudget.count - actualImages : 0;
+    if (trimmed < 0)
+      return "comparison=image count";
+    const imageProjection = trimmed > 0;
+    const body = object5(payload);
     const ollama = prepared?.api === "ollama-chat" && !!body && Array.isArray(body.messages) && body.input === undefined && body.system === undefined && body.inferenceConfig === undefined;
     const responses = body?.messages === undefined && Array.isArray(body?.input);
-    const rows = payloadStructure(payload, ollama, responses && !!prepared?.responsesMessages);
+    const rows = payloadStructure(payload, ollama, responses && !!prepared?.responsesMessages, imageProjection);
     const chat = !!body && Array.isArray(body.messages) && (prepared?.api === "openai-completions" || body.system === undefined) && body.input === undefined && body.inferenceConfig === undefined;
-    const expectedRows = responses && prepared?.responsesMessages ? prepared.responsesMessages : chat && prepared?.chatMessages ? prepared.chatMessages : prepared?.messages;
+    let expectedRows = responses && prepared?.responsesMessages ? prepared.responsesMessages : chat && prepared?.chatMessages ? prepared.chatMessages : prepared?.messages;
+    if (expectedRows && imageProjection && imageBudget)
+      expectedRows = trimPreparedImageRows(expectedRows, imageBudget, trimmed);
     if (!rows || !expectedRows)
       return structureDetail(0, expectedRows, rows, "count");
     if (!body)
@@ -34264,12 +35093,14 @@ function piPreparedStructureMismatch(payload, prepared) {
       const actual = rows[i];
       if (actual.role !== expected.role)
         return structureDetail(i, expectedRows, rows, "role");
+      if (imageProjection && !piMatchesImages(actual.images ?? [], expected.images ?? []))
+        return structureDetail(i, expectedRows, rows, "content");
       if (expected.responseTexts !== undefined && (expected.responseTexts.length !== actual.responseTexts?.length || expected.responseTexts.some((text, index) => text !== actual.responseTexts?.[index])))
         return structureDetail(i, expectedRows, rows, "content");
       if (expected.exactText !== undefined || expected.exactImages !== undefined) {
         if (actual.wireRole !== "user")
           return structureDetail(i, expectedRows, rows, "role");
-        if (expected.exactText !== undefined && actual.wireContent !== expected.exactText || expected.exactImages !== undefined && !piMatchesChatImages(actual.wireContent, expected.exactImages))
+        if (expected.exactText !== undefined && !matchesUserText(actual.wireContent, expected.exactText, prepared?.api, responses, google || body.inferenceConfig !== undefined) || expected.exactImages !== undefined && !piMatchesChatImages(actual.wireContent, expected.exactImages))
           return structureDetail(i, expectedRows, rows, "content");
       }
       if (actual.calls.length !== expected.calls.length || actual.results.length !== expected.results.length)
@@ -34285,6 +35116,12 @@ function piPreparedStructureMismatch(payload, prepared) {
     }
     if (rows.length !== expectedRows.length)
       return structureDetail(Math.min(rows.length, expectedRows.length), expectedRows, rows, "count");
+    if (imageProjection && imageBudget)
+      onImageTrim?.({
+        planned: imageBudget.count,
+        actual: actualImages,
+        trimmed
+      });
     return;
   } catch {
     return structureDetail(0, undefined, undefined, "count");
@@ -34295,14 +35132,6 @@ function piPreparedStructureMismatch(payload, prepared) {
 var ENTRY_TYPE = "magic-context-turn-refused";
 var RETRY_MESSAGE = "Magic Context could not safely prepare this turn; send your message again.";
 var MAX_UNSENDABLE_NONCES_PER_SESSION = 32;
-
-class PiContextSupersededError extends Error {
-  origin;
-  constructor(message, origin = "context ownership") {
-    super(message);
-    this.origin = origin;
-  }
-}
 var receiptMaps = new Set;
 function clearPiContextReceipt(sessionId) {
   for (const receipts of receiptMaps)
@@ -34461,6 +35290,8 @@ function registerPiGuardedContext(pi, handler, options = {}) {
   receiptMaps.add(unsendableNonces);
   const structureWarnings = new Map;
   receiptMaps.add(structureWarnings);
+  const imageTrimNotices = new Map;
+  receiptMaps.add(imageTrimNotices);
   const refuse = (ctx, budget, reason, isCurrent) => {
     if (!isCurrent()) {
       log2(`[magic-context][pi] DISCARDED CONTEXT RESULT ${budget.diagnostic()}`, reason);
@@ -34586,7 +35417,12 @@ function registerPiGuardedContext(pi, handler, options = {}) {
           structureWarnings.set(key, true);
           log2(`[magic-context][pi] OMP structural comparison skipped: ${skipReason}; stale prepared requests are not detected on this pass; session=${String(key)}`);
         }
-        const structureMismatch = skipReason ? undefined : piPreparedStructureMismatch(payload, active.preparedStructure);
+        const structureMismatch = skipReason ? undefined : piPreparedStructureMismatch(payload, active.preparedStructure, (counts) => {
+          if (imageTrimNotices.has(key))
+            return;
+          imageTrimNotices.set(key, true);
+          log2(`[magic-context][pi] OMP provider images trimmed: planned=${counts.planned} actual=${counts.actual} trimmed=${counts.trimmed}`);
+        });
         if (structureMismatch)
           throw new Error(`provider request does not match this pass's managed dispatch (prepared turn structure); ${structureMismatch}`);
         if (active.dispatched) {
@@ -35527,17 +36363,26 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
       return { rebuildReason: "lkg_recovery_input_rebuild" };
     return { prefix };
   };
-  const noteRecovery = (snapshot, messages) => {
-    const state = stateFor(snapshot.sessionId);
+  const recoveryEntryIds = (snapshot) => {
     const anchor = snapshot.replayAnchorInputIndex;
     const slot = getSlot(snapshot.sessionId);
     if (snapshot.preparationFailure || anchor === null || !slot?.piOutputEntryIds)
       throw new PiLkgUncapturable("lkg_output_mapping_unavailable", "Cannot retain recovered output ownership");
     const surviving = new Set(snapshot.inputs.map((input) => input.id));
-    const outputEntryIds = [
+    return [
       ...slot.piOutputEntryIds.filter((id) => id === null || surviving.has(id)),
       ...snapshot.inputs.slice(anchor + 1).map((input) => input.id)
     ];
+  };
+  const noteRecovery = (snapshot, messages, entryIds) => {
+    const state = stateFor(snapshot.sessionId);
+    const slot = getSlot(snapshot.sessionId);
+    if (!slot)
+      throw new PiLkgUncapturable("lkg_miss", "Cannot retain recovery without a saved request");
+    const anchor = snapshot.replayAnchorInputIndex;
+    if (anchor === null)
+      throw new PiLkgUncapturable("lkg_miss", "Cannot retain recovery without an input anchor");
+    const outputEntryIds = entryIds ?? recoveryEntryIds(snapshot);
     if (outputEntryIds.length !== messages.length)
       throw new PiLkgUncapturable("lkg_output_mapping_unavailable", "Recovered output ownership does not match the served array");
     state.recoveryPrefix = {
@@ -35954,6 +36799,7 @@ function createPiLkgCoordinator(db, scheduleCapture = (capture) => setImmediate(
   };
   return {
     noteRecovery,
+    recoveryEntryIds,
     recoveryFor,
     beginPass(args) {
       return {
@@ -36342,6 +37188,8 @@ function flushPiServedArrayLedger() {
         item.assertCurrentPass?.();
         return true;
       } catch (error) {
+        if (error instanceof PiContextSupersededError)
+          return false;
         log2("[magic-context][pi] DISCARDED CONTEXT RESULT: queued served capture", error);
         return false;
       }
@@ -38307,31 +39155,61 @@ function isLargeImagePart(value) {
   const part = value;
   return part.type === "image" && typeof part.mimeType === "string" && part.mimeType.startsWith("image/") && typeof part.data === "string" && part.data.length > 200;
 }
-function stripPiProcessedImages(args) {
-  const frozenIds = getProcessedImageStrippedIds(args.db, args.sessionId);
-  const newlyStrippedIds = [];
-  let hasAssistantResponse = false;
-  if (args.detect && args.watermark > 0) {
-    for (let i = args.messages.length - 1;i >= 0; i--) {
-      const raw = args.messages[i];
-      if (!raw || typeof raw !== "object")
-        continue;
-      const message = raw;
-      if (message.role === "assistant") {
-        hasAssistantResponse = true;
-        continue;
+function planPiProcessedImageIds(args, frozenIds) {
+  if (!args.detect || args.watermark <= 0)
+    return [];
+  const ids = args.messages.map(args.stableId);
+  const ownTags = ids.map((id) => id ? args.messageIdToMaxTag.get(id) ?? 0 : 0);
+  const completeToolResults = new Set;
+  const openCalls = new Map;
+  for (let i = 0;i < args.messages.length; i++) {
+    const message = args.messages[i];
+    if (!message || typeof message !== "object")
+      continue;
+    if (message.role === "assistant" && Array.isArray(message.content)) {
+      for (const part of message.content) {
+        if (part?.type === "toolCall" && typeof part.id === "string") {
+          openCalls.set(part.id, `${ids[i] ?? ""}\x00${part.id}`);
+        }
       }
-      if (message.role !== "user" && message.role !== "toolResult" || !hasAssistantResponse || !Array.isArray(message.content) || !message.content.some(isLargeImagePart)) {
-        continue;
+    } else if (message.role === "toolResult" && message.toolCallId) {
+      const key = openCalls.get(message.toolCallId);
+      if (key !== undefined && !args.protectedToolKeys?.has(key) && !args.protectedToolKeys?.has(message.toolCallId)) {
+        completeToolResults.add(i);
       }
-      const id = args.stableId(raw, i);
-      if (!id || frozenIds.has(id))
-        continue;
-      const maxTag = args.messageIdToMaxTag.get(id) ?? 0;
-      if (maxTag <= args.watermark)
-        newlyStrippedIds.push(id);
+      openCalls.delete(message.toolCallId);
     }
   }
+  const selected = [];
+  let hasAssistantResponse = false;
+  let nextTag;
+  for (let i = args.messages.length - 1;i >= 0; i--) {
+    const ownTag = ownTags[i];
+    const positionTag = ownTag > 0 ? ownTag : nextTag;
+    if (ownTag > 0)
+      nextTag = ownTag;
+    const raw = args.messages[i];
+    if (!raw || typeof raw !== "object")
+      continue;
+    const message = raw;
+    if (message.role === "assistant") {
+      hasAssistantResponse = true;
+      continue;
+    }
+    if (message.role !== "user" && message.role !== "toolResult" || message.role === "toolResult" && !completeToolResults.has(i) || !hasAssistantResponse || !Array.isArray(message.content) || !message.content.some(isLargeImagePart))
+      continue;
+    const id = ids[i];
+    if (!id || frozenIds.has(id) || positionTag === undefined || positionTag > args.watermark)
+      continue;
+    if ((args.usagePercentage ?? 0) < 95 && positionTag >= (args.protectedCutoff ?? Infinity))
+      continue;
+    selected.push(id);
+  }
+  return selected;
+}
+function stripPiProcessedImages(args) {
+  const frozenIds = getProcessedImageStrippedIds(args.db, args.sessionId);
+  const newlyStrippedIds = planPiProcessedImageIds(args, frozenIds);
   if (newlyStrippedIds.length > 0) {
     const persisted = (args.addIds ?? addProcessedImageStrippedIds)(args.db, args.sessionId, newlyStrippedIds);
     if (persisted) {
@@ -38583,6 +39461,9 @@ function createPiTranscript(source, sessionId, entryIds, options = {}) {
       if (committed)
         return;
       committed = true;
+      for (const index of dirtyMessages) {
+        rewriteNativeAssistantTexts(working[index], source[index], sessionId);
+      }
       for (const [index, parts] of removals) {
         const message = working[index];
         if (message.role !== "assistant" && message.role !== "toolResult" || !Array.isArray(message.content))
@@ -38975,6 +39856,8 @@ function createPiAssistantPart(working, messageIndex, partIndex, markDirty) {
           ...existing,
           arguments: { dropped: sentinelText }
         };
+      } else if (existing?.type === "text") {
+        newContent[partIndex] = { ...existing, text: sentinelText };
       } else {
         newContent[partIndex] = { type: "text", text: sentinelText };
       }
@@ -40805,6 +41688,7 @@ function registerPiContextHandler(pi, baseOptions) {
     let sessionIdForError;
     let lkgPassSnapshot;
     let lkgCompactionOff = baseOptions.compactionOff === true;
+    let lkgOptions = baseOptions;
     let lkgEmergencyRecoveryArmed = false;
     const captureServedEvidence = (...args) => {
       try {
@@ -40835,6 +41719,7 @@ function registerPiContextHandler(pi, baseOptions) {
       rawMessageCount = event.messages.length;
       const fullWireMessageCount = rawMessageCount;
       const options = baseOptions.resolveForProject?.(projectDirectory) ?? baseOptions;
+      lkgOptions = options;
       const deliveryModelKey = resolvePiContextModelKey(ctx);
       if (!budget.sideTurn && deliveryModelKey) {
         const parentId = ctx.sessionManager.getLeafId?.();
@@ -42054,14 +42939,38 @@ function registerPiContextHandler(pi, baseOptions) {
             reason: lkgPassSnapshot.replayFailure ?? "lkg_recovery_unproven"
           } : lkgCoordinator.replay(lkgPassSnapshot, (id) => ctx.sessionManager.getEntry?.(id)?.parentId);
           if (replay.ok) {
+            const reasoningPrefixes = recoveryReasoningPrefixes(replay.messages, "content");
+            const entryIds = lkgCoordinator.recoveryEntryIds(lkgPassSnapshot);
+            const recoverySessionId = sessionIdForError;
+            const recoveryTranscript = createPiTranscript(replay.messages, sessionIdForError, entryIds.map((id) => id ?? undefined), {
+              preserveReasoningToolArcs: ctx.model?.api !== "openai-codex-responses" && ctx.model?.api !== "openai-responses",
+              authorizeToolRemoval: (callId) => authorizePiToolRemoval({
+                db: lkgOptions.db,
+                sessionId: recoverySessionId,
+                callId,
+                saved: getNativeReplayState(lkgOptions.db, recoverySessionId).toolInputs,
+                canApply: false
+              })
+            });
+            const drops = getTagsBySession2(lkgOptions.db, sessionIdForError).filter((tag) => tag.status === "dropped");
+            const changed = applyFlushedStatuses(sessionIdForError, lkgOptions.db, buildPersistedDropTargets(recoveryTranscript, drops, {
+              allowReasoningPrefixRewrite: true
+            }), drops);
+            const working = recoveryTranscript.getWorkingMessages();
+            recoveryTranscript.commit();
+            const idsByOutput = new Map(working.map((message, index) => [message, entryIds[index]]));
+            recoveryTranscript.finalizeToolRemovals();
+            if (JSON.stringify(recoveryReasoningPrefixes(replay.messages, "content")) !== JSON.stringify(reasoningPrefixes))
+              throw new DegradedPassRefusalError("lkg-reasoning-prefix-changed", { cause: err });
+            const recoveryIds = replay.messages.map((message) => idsByOutput.get(message) ?? null);
             assertPiRawFallbackFits(replay.messages, rawFallbackLimit, (line) => {
               if (sessionIdForError)
                 logPiLkgRecovery(sessionIdForError, line);
-            }, err, readPiLkgFitEnvelope(ctx, pi, resolvePiContextModelKey(ctx), sessionDecisionCalibration(baseOptions.db, sessionIdForError), toolWireSchema), replay.measuredPrefix);
+            }, err, readPiLkgFitEnvelope(ctx, pi, resolvePiContextModelKey(ctx), sessionDecisionCalibration(baseOptions.db, sessionIdForError), toolWireSchema), changed ? undefined : replay.measuredPrefix);
             const reason = piStorageErrorReason(err);
             logPiLkgRecovery(sessionIdForError, `${failureLabel} ${reason}: LKG replay served ${replay.messages.length} messages instead of raw ${rawMessageCount}`);
             budget.assertOutcome();
-            lkgCoordinator.noteRecovery(lkgPassSnapshot, replay.messages);
+            lkgCoordinator.noteRecovery(lkgPassSnapshot, replay.messages, recoveryIds);
             if (!budget.sideTurn)
               captureServedEvidence(sessionIdForError, replay.messages, {
                 recoveryWithoutTagState: true,
@@ -42074,6 +42983,8 @@ function registerPiContextHandler(pi, baseOptions) {
           logPiLkgRecovery(sessionIdForError, `${failureLabel} ${piStorageErrorReason(err)}: LKG unavailable (${replay.reason}); refusing unreduced ${rawMessageCount}-message input`);
         } catch (replayError) {
           budget.assertOutcome();
+          if (replayError instanceof DegradedPassRefusalError)
+            throw replayError;
           if (replayError instanceof PiStorageBusyError)
             throw replayError;
           logPiLkgRecovery(sessionIdForError, `${failureLabel} ${piStorageErrorReason(err)}: LKG replay unavailable (${replayError instanceof Error ? replayError.message : String(replayError)}); refusing unreduced ${rawMessageCount}-message input`);
@@ -43397,7 +44308,7 @@ async function runPipeline(args) {
         protectedToolTags,
         protectedCutoff: usesTokenProtection ? protectionWindowForPass.cutoff : undefined,
         routine: routineCleanupApplied,
-        staleReduceStripEnabled: args.canUseEmptySentinels,
+        staleReduceStripEnabled: true,
         onStaleReduceEdit: recordStaleReduceEdit,
         emergency: args.forceMaterialization === true && args.emergencyCeilingTokens !== undefined && args.emergencyCeilingTokens > 0 ? {
           currentTotalInputTokens: args.contextUsage.inputTokens,
@@ -43413,7 +44324,7 @@ async function runPipeline(args) {
           protectedToolTags,
           protectedCutoff: usesTokenProtection ? protectionWindowForPass.cutoff : undefined,
           routine: true,
-          staleReduceStripEnabled: args.canUseEmptySentinels,
+          staleReduceStripEnabled: true,
           onStaleReduceEdit: recordStaleReduceEdit,
           caveman: args.isSubagent ? undefined : args.heuristics.caveman
         }, getActiveTagsBySession2(args.db, args.sessionId), stableIdResolver);
@@ -43599,16 +44510,50 @@ async function runPipeline(args) {
       }
     }
   }
-  if (args.canUseEmptySentinels) {
+  {
     const tProcessedImages = performance.now();
     try {
+      const imagePositionTags = new Map;
+      const noteImagePosition = (id, tag) => {
+        if (id && tag > (imagePositionTags.get(id) ?? 0))
+          imagePositionTags.set(id, tag);
+      };
+      for (const [tagNumber, target] of targets) {
+        for (const { message, part } of target.mutationParts ?? []) {
+          if (typeof part === "object" && part !== null && "kind" in part && part.kind === "text")
+            noteImagePosition(message.info.id, tagNumber);
+        }
+      }
+      const imageToolTags = new Map(allTagsForPass.filter((tag) => tag.type === "tool").map((tag) => [
+        `${tag.toolOwnerMessageId ?? ""}\x00${tag.messageId}`,
+        tag.tagNumber
+      ]));
+      const imageToolOwners = new Map;
+      for (let index = 0;index < workingMessages.length; index++) {
+        const message = workingMessages[index];
+        const id = stableIdResolver(message, index);
+        if (message.role === "assistant" && Array.isArray(message.content)) {
+          for (const part of message.content) {
+            if (part.type !== "toolCall")
+              continue;
+            imageToolOwners.set(part.id, id ?? "");
+            noteImagePosition(id, imageToolTags.get(`${id ?? ""}\x00${part.id}`) ?? 0);
+          }
+        } else if (message.role === "toolResult") {
+          noteImagePosition(id, imageToolTags.get(`${imageToolOwners.get(message.toolCallId) ?? ""}\x00${message.toolCallId}`) ?? 0);
+        }
+      }
+      const protectedImageToolKeys = new Set(activeTags.filter((tag) => tag.type === "tool" && protectedToolTags.has(tag.tagNumber)).map((tag) => tag.toolOwnerMessageId ? `${tag.toolOwnerMessageId}\x00${tag.messageId}` : tag.messageId));
       const imageResult = stripPiProcessedImages({
         db: args.db,
         sessionId: args.sessionId,
         messages: workingMessages,
         detect: isCacheBustingPass && !protectedSignedPrefix,
         watermark: getMaxDroppedTagNumber2(args.db, args.sessionId),
-        messageIdToMaxTag,
+        messageIdToMaxTag: imagePositionTags,
+        protectedCutoff: usesTokenProtection ? protectionWindowForPass.cutoff : protectedTagNumbersForPass.size > 0 ? Math.min(...protectedTagNumbersForPass) : null,
+        usagePercentage: args.contextUsage.percentage,
+        protectedToolKeys: protectedImageToolKeys,
         stableId: stableIdResolver,
         onFirstApplication: recordFirstApplicationAt
       });
@@ -43758,6 +44703,18 @@ async function runPipeline(args) {
   const deferredHistoryDrainEligible = historyWasConsumedThisPass && materializationSatisfiedThisPass && (deferredHistoryWasPendingAtPassStart || hasPendingMaterializeSignal) && !suppressDeferredHistoryDrain && !casLost;
   let preserveDeferredMaterializationForMarkerDrain = false;
   let pendingForDrain = null;
+  if (!deferredHistoryDrainEligible && (deferredHistoryWasPendingAtPassStart || hasPendingMaterializeSignal)) {
+    try {
+      const pending = getPendingPiCompactionMarkerState(args.db, args.sessionId);
+      if (pending)
+        logPiCompactionMarkerDrainGateOnce(args.sessionId, pending, "drain-not-eligible", {
+          historyConsumed: historyWasConsumedThisPass,
+          materializationSatisfied: materializationSatisfiedThisPass,
+          drainSuppressed: suppressDeferredHistoryDrain,
+          casLost
+        });
+    } catch {}
+  }
   if (deferredHistoryDrainEligible) {
     try {
       args.assertCurrentPass?.();
@@ -43832,7 +44789,7 @@ async function runPipeline(args) {
         if (outcome.kind === "waiting-for-entry") {
           suppressDeferredHistoryDrain = true;
           preserveDeferredMaterializationForMarkerDrain = true;
-        } else if (outcome.kind === "retryable-failure") {} else if (markerEquivalent && clearPendingPiCompactionMarkerStateIf(args.db, args.sessionId, pending)) {
+        } else if (outcome.kind === "retryable-failure") {} else if (markerEquivalent && clearPendingPiCompactionMarkerStateIf(args.db, args.sessionId, pending, outcome.kind === "stale-skip" ? outcome.reason : outcome.kind)) {
           consumeDeferredHistoryRefresh(args.sessionId);
         } else if (markerEquivalent) {
           casLost = true;
@@ -44050,12 +45007,6 @@ function applyNoteNudges(args) {
   for (const anchor of noteAnchors) {
     appendReminderToUserMessageByIdPi(messages, replayMessageIdByIndex, anchor.messageId, anchor.text);
   }
-  const autoSearchDecisions = args.postTransformSnapshot?.autoSearchDecisions ?? getAutoSearchHintDecisions(db, sessionId);
-  for (const decision of autoSearchDecisions) {
-    if (decision.decision === "hint" && getUnpublishedAutoSearchNoHint(sessionId, decision.messageId) === undefined) {
-      appendReminderToUserMessageByIdPi(messages, replayMessageIdByIndex, decision.messageId, decision.text);
-    }
-  }
   logTransformTiming(sessionId, "stickyReplayDecisions", tStickyReplay);
   const latestUser = findLatestUserMessageIdPi(messages, messageIdByIndex);
   const latestUserId = latestUser?.messageId ?? null;
@@ -44065,7 +45016,7 @@ function applyNoteNudges(args) {
     userMessageIds: [...messageIdByIndex].filter(([index]) => messages[index]?.role === "user").map(([, id]) => id),
     anchorMessageId: latestUserId,
     isLiveTail: latestUser?.index === messages.length - 1,
-    isCacheBustingPass: args.isCacheBusting
+    prefixRewriteCoversAnchor: false
   });
   const noteReadStillVisible = hasVisibleNoteReadCallPi(messages);
   const deferredNoteText = args.postTransformSnapshot?.noteTriggerPending === false ? null : peekNoteNudgeText(db, sessionId, latestUserId, projectIdentity, noteReadStillVisible, eligibility);
@@ -44087,6 +45038,12 @@ function applyNoteNudges(args) {
       appendReminderToPiUserMessage(messages[latestUser.index], noteInstruction);
     } else if (!outcome.ok) {
       sessionLog2(sessionId, `Pi note-nudge delivery skipped wire append: ${outcome.kind}`);
+    }
+  }
+  const autoSearchDecisions = args.postTransformSnapshot?.autoSearchDecisions ?? getAutoSearchHintDecisions(db, sessionId);
+  for (const decision of autoSearchDecisions) {
+    if (decision.decision === "hint" && getUnpublishedAutoSearchNoHint(sessionId, decision.messageId) === undefined) {
+      appendReminderToUserMessageByIdPi(messages, replayMessageIdByIndex, decision.messageId, decision.text);
     }
   }
   if (args.isCacheBusting) {
@@ -47174,9 +48131,9 @@ function readPiWrapupBranchEntries(ctx) {
 function observePiMessageActivity(db, sessionId, timestamp) {
   observeSessionActivity(db, sessionId, timestamp);
 }
-function latestPiMessageTime(path) {
+async function latestPiMessageTime(path) {
   let latest = 0;
-  for (const entry of sessionEntries(path)) {
+  for await (const entry of asyncSessionEntries(path)) {
     const row = entry;
     if (row.type === "message" && typeof row.message?.timestamp === "number")
       latest = Math.max(latest, row.message.timestamp);
@@ -47184,12 +48141,12 @@ function latestPiMessageTime(path) {
   return latest || undefined;
 }
 async function backfillPiSessionActivity(db, harness, paths) {
-  await backfillSessionActivity(db, harness, (sessionId) => {
+  await backfillSessionActivity(db, harness, async (sessionId) => {
     const path = paths.get(sessionId);
     if (!path)
       return;
     try {
-      return latestPiMessageTime(path);
+      return await latestPiMessageTime(path);
     } catch {
       return;
     }

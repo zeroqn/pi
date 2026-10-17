@@ -14,19 +14,22 @@ var [
   { installProjectEmbeddingSearchBridge },
   { searchMessageHistory, unifiedSearch },
   { setEmbeddingSessionBusy },
-  { setHarness },
-  { Database }
+  { getHarness, setHarness },
+  { Database, registerSqliteDiagnosticSink },
+  { log }
 ] = await Promise.all([
-  import("./embedding-backfill-0gcymy3f.js"),
+  import("./embedding-backfill-1ca91s0n.js"),
   import("./embedding-cache-7rp4gqzr.js"),
-  import("./storage-memory-1z20y55x.js"),
-  import("./project-embedding-registry-ds15c3tw.js"),
-  import("./search-h218x4ss.js"),
+  import("./storage-memory-yf7r98vz.js"),
+  import("./project-embedding-registry-6kwjapme.js"),
+  import("./search-5kjag95p.js"),
   import("./embedding-activity-ew6dshfd.js"),
   import("./harness-9872e0ym.js"),
-  import("./sqlite-3yye76ht.js")
+  import("./sqlite-f8kh2n10.js"),
+  import("./logger-j6tecd1h.js")
 ]);
 setHarness(input.harness);
+registerSqliteDiagnosticSink(log, getHarness);
 setEmbeddingSessionBusy(input.sessionId, input.embeddingHostBusy === true);
 var nextId = 0;
 var pending = new Map;

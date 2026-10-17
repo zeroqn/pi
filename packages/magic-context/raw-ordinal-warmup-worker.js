@@ -5,10 +5,19 @@ if (!port)
   throw new Error("raw ordinal warm-up worker requires a parent port");
 var input = workerData;
 port.postMessage({ kind: "accepted" });
-var [{ Database }, { scanRawSessionSummaryRows }] = await Promise.all([
-  import("./sqlite-3yye76ht.js"),
-  import("./read-session-raw-527m0yxx.js")
+var [
+  { Database, registerSqliteDiagnosticSink },
+  { scanRawSessionSummaryRows },
+  { getHarness, setHarness },
+  { log }
+] = await Promise.all([
+  import("./sqlite-f8kh2n10.js"),
+  import("./read-session-raw-s14c7nf3.js"),
+  import("./harness-9872e0ym.js"),
+  import("./logger-j6tecd1h.js")
 ]);
+setHarness(input.harness ?? "opencode");
+registerSqliteDiagnosticSink(log, getHarness);
 var db;
 var reply;
 try {
@@ -21,7 +30,7 @@ try {
       { configureContextDatabasePragmas }
     ] = await Promise.all([
       import("./harness-9872e0ym.js"),
-      import("./message-index-rp0nsk6n.js"),
+      import("./message-index-ywrg46tk.js"),
       import("./sqlite-context-pragmas-gcgch6qz.js")
     ]);
     setHarness(input.harness ?? "opencode");
@@ -34,17 +43,10 @@ try {
   } else if (input.indexMessage) {
     const { setHarness } = await import("./harness-9872e0ym.js");
     setHarness(input.harness ?? "opencode");
-    const [
-      { indexMessageInShortChunks },
-      { configureContextDatabasePragmas },
-      { registerSqliteDiagnosticSink }
-    ] = await Promise.all([
-      import("./message-index-bounded-ht45p3n7.js"),
-      import("./sqlite-context-pragmas-gcgch6qz.js"),
-      import("./sqlite-3yye76ht.js")
+    const [{ indexMessageInShortChunks }, { configureContextDatabasePragmas }] = await Promise.all([
+      import("./message-index-bounded-5j2rg9j6.js"),
+      import("./sqlite-context-pragmas-gcgch6qz.js")
     ]);
-    const { log } = await import("./logger-j6tecd1h.js");
-    registerSqliteDiagnosticSink(log);
     configureContextDatabasePragmas(db);
     const writer = db;
     const message = input.indexMessage;
@@ -52,7 +54,7 @@ try {
     const result = await indexMessageInShortChunks(writer, input.sessionId, message, input, () => !cancellation || Atomics.load(cancellation, 0) === 0);
     reply = { kind: "indexed", inserted: result.inserted, measurements: result.measurements };
   } else if (input.tagRatio !== undefined) {
-    const { scanTagOwnerSummary, scanTagOwnerDelta } = await import("./storage-tags-apgmj0m3.js");
+    const { scanTagOwnerSummary, scanTagOwnerDelta } = await import("./storage-tags-rk4qncz6.js");
     const delta = input.tagState ? scanTagOwnerDelta(db, input.sessionId, input.tagState) : null;
     if (delta)
       reply = { kind: "tag-delta", delta };

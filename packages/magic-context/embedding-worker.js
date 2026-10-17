@@ -11,7 +11,7 @@ import {
   resolveLocalEmbeddingWorkerRuntime,
   getLocalEmbeddingNativeMemoryStats,
   LocalEmbeddingProvider
-} from "./index-xksvf3hj.js";
+} from "./index-pkn0y6j6.js";
 import {
   setStoragePrivatePermissionEnforcement
 } from "./index-81nthk8j.js";
