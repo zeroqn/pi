@@ -10,6 +10,16 @@
  * session) so a resumed session can still see what ran — read-only, and never
  * re-executed: replay turns a journaled background start into a **terminal handle
  * with its recorded output**.
+ *
+ * **Since 2026-10-17 a background shell with no declared `timeout=` is a lease.** The case is
+ * measured (`.scratch/bg-lease/REPORT.md`): a session backgrounded a benchmark whose own script
+ * blocked in a bare `wait` behind spinner processes it had started, and with nothing to bound it
+ * the shell held ~20 cores for eighteen hours. An abort does not touch a background handle — that
+ * is the point of it being session-owned — and `shutdownAll` runs only at `session_shutdown`, so
+ * while the process stayed open nothing could end it and no notice was ever due, because a notice
+ * is raised when a handle **finishes**. The lease closes exactly that hole: the handle still runs
+ * past its soft bound (the model is the actor, `long-work` tickets 03/01), it is *announced*, and
+ * only a handle nobody grants more time is killed. A declared `timeout=` is untouched by it.
  */
 import { spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -47,19 +57,47 @@ export interface BgHandleInfo {
 	 * trimmed to its last 64 KB once it grows. A restored handle counts from zero, and says so.
 	 */
 	bytes_out: number;
+	/**
+	 * Seconds until an **unattended** handle is killed — the clock to judge by, computed at read
+	 * time like `age_ms`. Non-`null` only in the window that opens when the soft bound is announced
+	 * and closes when the model grants more time or the handle ends, so `null` means *there is no
+	 * such deadline*, never *no deadline at all*.
+	 */
+	lease_s: number | null;
 }
 
-interface BgRecord extends Omit<BgHandleInfo, "age_ms" | "timeout_s" | "bytes_out"> {
+interface BgRecord extends Omit<BgHandleInfo, "age_ms" | "timeout_s" | "lease_s" | "bytes_out"> {
 	child?: ReturnType<typeof spawn>;
 	output: string;
 	timeoutSeconds: number | null;
+	/** Armed for a **declared** bound; the lease's two timers are below and never coexist with it. */
 	timer?: ReturnType<typeof setTimeout>;
+	/** The soft bound's announcement, then the countdown it starts. Unset once either is disarmed. */
+	softTimer?: ReturnType<typeof setTimeout>;
+	leaseTimer?: ReturnType<typeof setTimeout>;
+	/**
+	 * When the unattended kill falls, against the kernel's monotonic reference, or `null` outside the
+	 * announced window. `lease_s` is this read against the clock rather than a second countdown.
+	 */
+	leaseKillAtMonotonic: number | null;
 	/** `null` for a restored record: the process it describes did not run here. */
 	startedMonotonic: number | null;
 	bytesOut: number;
 }
 
 const MAX_MEMORY_OUTPUT = 64 * 1024;
+
+/**
+ * The soft bound an **undeclared** background shell gets, and the grace it has to be judged in.
+ *
+ * The soft bound is not a kill: at it the handle is announced (`deps.onLease`) and the countdown
+ * that *will* kill it starts, so a job nobody attends to stops instead of burning a machine, while
+ * a job the model is watching is kept by one call (`extend`). Both are module constants rather than
+ * knobs — a value a caller could pass is one more thing to get wrong — and a test drives them
+ * through `deps`, the seam `limits?` already is elsewhere.
+ */
+export const SOFT_BOUND_SECONDS = 3600;
+export const LEASE_GRACE_SECONDS = 600;
 
 export interface BackgroundManagerDeps {
 	cwd: () => string;
@@ -68,10 +106,21 @@ export interface BackgroundManagerDeps {
 	onFinish: (record: BgHandleInfo) => void;
 	onRecord?: (record: BgHandleInfo) => void;
 	cap: number;
+	/**
+	 * The soft bound has passed on an undeclared handle, and `graceSeconds` is all the time left to
+	 * judge it in. A notice, not a kill: the caller composes the sentence, because it is the one that
+	 * knows how this session speaks to the model (`kernel.ts`'s `raiseNotice`).
+	 */
+	onLease?: (record: BgHandleInfo, graceSeconds: number) => void;
+	/** Test seams for the two constants; production takes the module values. */
+	softBoundSeconds?: number;
+	leaseGraceSeconds?: number;
 }
 
 export function createBackgroundManager(deps: BackgroundManagerDeps) {
 	const records = new Map<string, BgRecord>();
+	const softBoundSeconds = deps.softBoundSeconds ?? SOFT_BOUND_SECONDS;
+	const leaseGraceSeconds = deps.leaseGraceSeconds ?? LEASE_GRACE_SECONDS;
 	let counter = 0;
 
 	function info(record: BgRecord): BgHandleInfo {
@@ -80,6 +129,12 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 			output: _output,
 			timeoutSeconds,
 			timer: _timer,
+			// Every internal field is destructured away here, not merely typed out of the record: the
+			// spread below is what the model sees through `bg_list`, and a `setTimeout` handle in it is a
+			// value monty cannot convert (`abort.test.ts` caught exactly that on the first run of the lease).
+			softTimer: _softTimer,
+			leaseTimer: _leaseTimer,
+			leaseKillAtMonotonic: _leaseAt,
 			startedMonotonic,
 			bytesOut,
 			// A restored record was spread from a previous session's info, so the computed fields may
@@ -87,16 +142,24 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 			// process saw is not what this one can vouch for.
 			age_ms: _staleAge,
 			timeout_s: _staleTimeout,
+			lease_s: _staleLease,
 			bytes_out: _staleBytes,
 			...rest
 		} = record as BgRecord & Partial<BgHandleInfo>;
+		const now = performance.now();
 		return {
-			...(rest as Omit<BgHandleInfo, "age_ms" | "timeout_s" | "bytes_out">),
+			...(rest as Omit<BgHandleInfo, "age_ms" | "timeout_s" | "lease_s" | "bytes_out">),
 			age_ms:
 				record.status === "running" && startedMonotonic !== null
-					? Math.max(0, Math.round(performance.now() - startedMonotonic))
+					? Math.max(0, Math.round(now - startedMonotonic))
 					: null,
 			timeout_s: timeoutSeconds,
+			// Only a running handle inside the announced window has a countdown; everywhere else the
+			// answer is an absence (see the field).
+			lease_s:
+				record.status === "running" && record.leaseKillAtMonotonic != null
+					? Math.max(0, Math.round((record.leaseKillAtMonotonic - now) / 1000))
+					: null,
 			bytes_out: bytesOut,
 		};
 	}
@@ -116,7 +179,7 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 		record.reason = reason;
 		record.exit_code = exitCode ?? record.exit_code;
 		record.ended_at = new Date().toISOString();
-		if (record.timer) clearTimeout(record.timer);
+		clearTimers(record);
 		try {
 			if (record.log_path) {
 				mkdirSync(deps.logDir(), { recursive: true });
@@ -127,6 +190,48 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 		}
 		deps.onRecord?.(info(record));
 		deps.onFinish(info(record));
+	}
+
+	function clearTimers(record: BgRecord): void {
+		for (const timer of [record.timer, record.softTimer, record.leaseTimer]) {
+			if (timer) clearTimeout(timer);
+		}
+		record.timer = record.softTimer = record.leaseTimer = undefined;
+	}
+
+	/** A declared bound, and the grant `extend` turns a lease into: one kill, one status, one reason. */
+	function armHardBound(record: BgRecord, seconds: number): void {
+		record.timer = setTimeout(() => {
+			if (record.status !== "running") return;
+			record.reason = `timed out after ${seconds}s`;
+			killProcess(record);
+			finish(record, "timeout", record.reason, null);
+		}, seconds * 1000);
+		record.timer.unref?.();
+	}
+
+	/**
+	 * The lease for a handle whose caller declared no bound: announce at `seconds`, and start the
+	 * countdown that kills it if nobody grants more time.
+	 *
+	 * The kill is armed by the **announcement**, not by its delivery: a session with no turn coming
+	 * still gets the deadline it was told about, which is the whole reason this exists (a notice that
+	 * waits for a turn would leave the case that started this file's header exactly as it was).
+	 */
+	function armLease(record: BgRecord, seconds: number): void {
+		record.softTimer = setTimeout(() => {
+			if (record.status !== "running") return;
+			record.leaseKillAtMonotonic = performance.now() + leaseGraceSeconds * 1000;
+			deps.onLease?.(info(record), leaseGraceSeconds);
+			record.leaseTimer = setTimeout(() => {
+				if (record.status !== "running") return;
+				record.reason = `unattended: no bound was declared and none was granted within ${leaseGraceSeconds}s of the ${seconds}s soft bound`;
+				killProcess(record);
+				finish(record, "killed", record.reason, null);
+			}, leaseGraceSeconds * 1000);
+			record.leaseTimer.unref?.();
+		}, seconds * 1000);
+		record.softTimer.unref?.();
 	}
 
 	function start(command: string, timeoutSeconds: number | null): BgHandleInfo {
@@ -153,6 +258,7 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 			output: "",
 			timeoutSeconds,
 			startedMonotonic: performance.now(),
+			leaseKillAtMonotonic: null,
 			bytesOut: 0,
 		};
 		const append = (chunk: Buffer) => {
@@ -178,15 +284,10 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 			else finish(record, code === 0 ? "done" : "failed", code === 0 ? undefined : `exit ${code}`, code);
 		});
 
-		if (timeoutSeconds !== null && timeoutSeconds > 0) {
-			record.timer = setTimeout(() => {
-				if (record.status !== "running") return;
-				record.reason = `timed out after ${timeoutSeconds}s`;
-				killProcess(record);
-				finish(record, "timeout", record.reason, null);
-			}, timeoutSeconds * 1000);
-			record.timer.unref?.();
-		}
+		// A declared bound is a promise and keeps today's hard kill; a shell that declared none gets the
+		// lease, which announces and only then kills (the header).
+		if (timeoutSeconds !== null && timeoutSeconds > 0) armHardBound(record, timeoutSeconds);
+		else armLease(record, softBoundSeconds);
 
 		records.set(id, record);
 		deps.onRecord?.(info(record));
@@ -245,6 +346,29 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 			return info(record);
 		},
 
+		/**
+		 * Grant a handle more seconds, and answer with it.
+		 *
+		 * **One rule: the grant becomes the bound.** The lease is over, `timeout_s` reports the granted
+		 * value, and from here the handle is hard-bounded exactly as a declared `timeout=` is — so
+		 * `extend` is the same act whether it answers a lease notice or re-decides a bound the caller
+		 * set too low. A terminal handle is simply answered as it stands, the way `kill` does it.
+		 */
+		extend(id: string, seconds: number): BgHandleInfo {
+			const record = find(id);
+			if (record.status !== "running") return info(record);
+			const granted = Math.floor(seconds);
+			if (!Number.isFinite(granted) || granted <= 0) {
+				throw new Error(`bg_extend needs a positive number of seconds, got ${String(seconds)}`);
+			}
+			clearTimers(record);
+			record.leaseKillAtMonotonic = null;
+			record.timeoutSeconds = granted;
+			armHardBound(record, granted);
+			deps.onRecord?.(info(record));
+			return info(record);
+		},
+
 		list(): BgHandleInfo[] {
 			return [...records.values()].map(info);
 		},
@@ -259,8 +383,10 @@ export function createBackgroundManager(deps: BackgroundManagerDeps) {
 					reason: record.status === "running" ? "the process did not survive the session that started it" : record.reason,
 					output: "",
 					timeoutSeconds: null,
-					// Nothing here ran in this process: no duration to report, and no bytes watched.
+					// Nothing here ran in this process: no duration to report, no bytes watched, and no
+					// lease to serve — whatever is still on the host is not this process's to kill.
 					startedMonotonic: null,
+					leaseKillAtMonotonic: null,
 					bytesOut: 0,
 				});
 			}

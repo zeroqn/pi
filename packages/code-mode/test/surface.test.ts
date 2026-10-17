@@ -68,6 +68,15 @@
  * does not have is a lie the model acts on, and this file has that failure in its history
  * (`<coroutine external_future(N)>`, the background-handle amendment of 2026-09-29). Only the
  * whole-array hash and the length move; the first six, the description and the snippet keep theirs.
+ * Then the background-lease amendment of 2026-10-17: a background shell with no declared `timeout=`
+ * used to be bounded by nothing but the session's end, and a session stays open — a job backgrounded
+ * behind a script that blocked in a bare `wait` held a machine for eighteen hours with no notice ever
+ * due, because a notice is raised when a handle *finishes* (`.scratch/bg-lease/REPORT.md`, diagnosed
+ * from `diag-wait-issue-20261017.tar.gz`). The soft bound announced at an hour and the ten-minute
+ * grace that follows it are the kernel's behaviour, so guideline 10 — the one clause on this surface
+ * that describes the kernel rather than what a cell should write — carries the rule, and the
+ * description's handle list gains `await h.extend(seconds)`. Both hashes move; the first six and the
+ * snippet keep theirs.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -77,7 +86,7 @@ const sha = (text: string) => createHash("sha256").update(text, "utf8").digest("
 
 describe("the base surface (acceptance check 2)", () => {
 	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.0", () => {
-		expect(sha(BASE_DESCRIPTION)).toBe("acb8ff8d77b85137766be3264f3eb42ed74a4485f6a84ec2f80803c2441ea161");
+		expect(sha(BASE_DESCRIPTION)).toBe("85fff196baf70eacade3387cc1c9bf23258dafe78adefbf371fb03d9a9f8f3f9");
 		expect(BASE_DESCRIPTION).toContain("put throwaway files there rather than under /tmp");
 		expect(BASE_DESCRIPTION).not.toContain("rlm.spawn");
 		expect(BASE_DESCRIPTION).not.toContain("agent_message");
@@ -99,7 +108,7 @@ describe("the base surface (acceptance check 2)", () => {
 	// that had no business being in the foreground.
 	it("carries the four added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(10);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("3b5019c574894bfc40e56239ca2ee40b290efa3eb6d3ed9cc50267d2f683545b");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("8e1d67676af0771b696a74396d6c9eb0fa49e533701a4cc21ab10ac78bbf192a");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, path tests come from `pathlib`");

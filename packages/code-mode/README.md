@@ -25,8 +25,11 @@ way to run it; `packages/web-access` adds web host functions the same way.
   and `bash`. The delegation half is contributed — see below.
 - **Host functions**: `bash_host`, `find`, `grep`, `read_image` — async, all awaited — and the
   background handles behind `await bash(cmd, background=True)`: `bg_poll`, `bg_read`, `bg_kill`,
-  `bg_list`, cap 8 live, one notice per finished handle, killed at shutdown with the record kept
-  and restored read-only after a resume (never re-executed).
+  `bg_list`, `bg_extend`, cap 8 live, one notice per finished handle, killed at shutdown with the
+  record kept and restored read-only after a resume (never re-executed). A shell started with no
+  `timeout=` gets a **lease** instead of nothing: noticed at an hour and killed ten minutes later
+  unless `bg_extend(id, seconds)` (or `h.extend(seconds)`) grants more, which then *is* its bound
+  (`.scratch/bg-lease/REPORT.md`).
 - **Progress updates** for long host calls, so a slow cell is not opaque.
 - **Journal-and-replay durability** (`.scratch/rlm-extension/` ticket 04): successful cells are
   journaled to `<sessionFile>.rlm-journal.jsonl` (code plus every host-call result) with a

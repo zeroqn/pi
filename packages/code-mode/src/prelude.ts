@@ -93,6 +93,9 @@ class BgHandle:
     def kill(self):
         return bg_kill(self.id)
 
+    def extend(self, seconds):
+        return bg_extend(self.id, seconds)
+
 async def bash(command, timeout=None, background=False):
     result = await bash_host(command, timeout, background)
     if isinstance(result, dict) and result.get("id"):

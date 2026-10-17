@@ -446,7 +446,7 @@ test("the shell lane is checkReadOnlyCommand's, verbatim — and only while the 
 test("code mode's own reads are not the policy's business", async () => {
 	const { h, guard } = await cellLane();
 	await toggleOn(h);
-	for (const name of ["find", "grep", "read_image", "bg_poll", "bg_read", "bg_kill", "bg_list"]) {
+	for (const name of ["find", "grep", "read_image", "bg_poll", "bg_read", "bg_kill", "bg_list", "bg_extend"]) {
 		assert.ok(allowed(guard.before({ name, args: [] })), `expected ${name} to be untouched`);
 	}
 });

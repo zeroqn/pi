@@ -42,9 +42,18 @@ aborting the run kills its process group, and nothing of it outlives the cell. T
 _Avoid_: foreground work (that names the syntax, not the ownership)
 
 **Session-owned work**:
-Work that outlives the turn that started it — a background handle, a child — and ends only when someone
-ends it (`bg_kill`, `rlm.stop`) or its own bound fires.
+Work that outlives the turn that started it — a background handle, a child — and ends when someone ends
+it (`bg_kill`, `rlm.stop`), when its own bound fires, or when a shell that declared no bound runs out
+its **lease** (2026-10-17).
 _Avoid_: detached work, async work
+
+**Lease**:
+The stand-in bound a background shell gets when its caller declared no `timeout=`: an hour of running, a
+notice while it is still going, then ten minutes in which the model may grant more
+(`await h.extend(seconds)`) before the handle is killed as *unattended*. The grant **becomes** the
+declared bound, so one call leaves the handle bounded exactly as if the caller had declared it; a shell
+that declared a `timeout=` is never leased.
+_Avoid_: deadline, idle timeout (a lease is not the caller's bound, and it is not about silence)
 
 ## The seam between packages
 

@@ -408,6 +408,7 @@ export const BASE_HOST_FNS = [
 	"bg_read",
 	"bg_kill",
 	"bg_list",
+	"bg_extend",
 ];
 
 /** The exact surface of a contribution: an unknown field is a typo, and a typo is loud. */

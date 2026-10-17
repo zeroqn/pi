@@ -95,7 +95,21 @@ function isWriterTool(name: string): boolean {
 /** Code mode's own host calls. Never a policy question here: `bash_host` has its own rule below,
  *  and the rest are reads. A guard that also had to allow-list code mode's own surface would be
  *  claiming authority it does not have. */
-const BASE_HOST_CALLS = new Set(["bash_host", "find", "grep", "read_image", "bg_poll", "bg_read", "bg_kill", "bg_list"]);
+const BASE_HOST_CALLS = new Set([
+	"bash_host",
+	"find",
+	"grep",
+	"read_image",
+	"bg_poll",
+	"bg_read",
+	"bg_kill",
+	"bg_list",
+	// `bg_extend` grants a background shell more time (`.scratch/bg-lease/REPORT.md`). Code mode's own call
+	// like the other four, and not a policy question: the mode kills every running handle when it turns on
+	// (readonly-guard ticket 10) and refuses `bash_host background=True` while it is on, so there is nothing
+	// here to extend — and an unlisted code-mode name would be refused as an unknown extension capability.
+	"bg_extend",
+]);
 
 /**
  * Route host calls: a call whose *capability* is the name it carries rather than its own name.

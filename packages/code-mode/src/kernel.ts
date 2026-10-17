@@ -55,6 +55,21 @@ export const ROTATE_AT = rotateAtFor(MAX_SUSPENSIONS);
 export const ROTATE_BACKOFF = Math.max(1, Math.floor((MAX_SUSPENSIONS - ROTATE_AT) / 8));
 /** Consecutive failed rotations after which rotation stops until the next turn. */
 export const ROTATE_FAILURE_CAP = 3;
+
+/**
+ * A span of seconds as this kernel's notices print it: `45s`, `12m`, `1h`.
+ *
+ * One definition, so a notice and the guideline that describes it cannot drift apart. rlm's footer
+ * has its own for the same reason, and cannot import this one: the packages share no code
+ * (`contract.ts`'s rule).
+ */
+function spanText(seconds: number): string {
+	const value = Math.max(0, Math.round(seconds));
+	if (value < 60) return `${value}s`;
+	if (value < 3600) return `${Math.round(value / 60)}m`;
+	return `${Math.round(value / 3600)}h`;
+}
+
 /**
  * How long one **feed** — one cell — may execute before monty stops it. An hour.
  *
@@ -369,7 +384,14 @@ export function createKernel(options: {
 	 * small `maxSuspensions` lets a test cross the reserve in seconds, which is the difference
 	 * between asserting the rotation's *outcomes* and waiting twenty minutes for them; a small
 	 * `maxFeedDurationSecs` is the same trick for the feed budget, which is otherwise an hour long. */
-	limits?: { maxMemory?: number; maxSuspensions?: number; maxFeedDurationSecs?: number };
+	limits?: {
+		maxMemory?: number;
+		maxSuspensions?: number;
+		maxFeedDurationSecs?: number;
+		/** The background lease's two clocks, at seconds instead of an hour (`.scratch/bg-lease/REPORT.md`). */
+		softBoundSeconds?: number;
+		leaseGraceSeconds?: number;
+	};
 }): Kernel {
 	const { pi, ledger } = options;
 	const maxSuspensions = options.limits?.maxSuspensions ?? MAX_SUSPENSIONS;
@@ -429,6 +451,8 @@ export function createKernel(options: {
 		cwd: () => root || process.cwd(),
 		logDir: () => (journalPath ? `${journalPath}.bg` : join(tmpdir(), `rlm-bg-${process.pid}`)),
 		cap: MAX_LIVE_BACKGROUND,
+		softBoundSeconds: options.limits?.softBoundSeconds,
+		leaseGraceSeconds: options.limits?.leaseGraceSeconds,
 		onRecord: (record) => {
 			try {
 				// The name stays: it is a contract with sessions already on disk (ticket 03, C5).
@@ -442,6 +466,30 @@ export function createKernel(options: {
 				key: `bg:${record.id}`,
 				content: `[${record.id}] ${record.status}${record.reason ? ` (${record.reason})` : record.exit_code !== null ? ` (exit ${record.exit_code})` : ""} — ${record.command.split("\n")[0]?.slice(0, 120) ?? ""}${record.log_path ? `\noutput: ${record.log_path}` : ""}`,
 				cancelled: () => bgReads.has(record.id),
+			}),
+		/**
+		 * The lease's announcement (`.scratch/bg-lease/REPORT.md`): the handle is **still running**, and
+		 * the countdown this sentence names has already been armed by the manager — the notice reports a
+		 * deadline, it does not create one, so a session with no turn coming is still bound by it.
+		 *
+		 * A key of its own rather than the finish notice's, because the two are not each other's
+		 * replacements; and deliberately **not** withdrawn by a read the way the finish notice is: reading
+		 * a handle is looking at it, and looking is not judging.
+		 */
+		onLease: (record, graceSeconds) =>
+			raiseNotice({
+				key: `bg-lease:${record.id}`,
+				// The id form of the grant, not `h.extend`: by the time this arrives the handle may not be in the
+				// namespace at all (a rotation, a resume, another cell's name for it), and the id is what survives.
+				content: `[${record.id}] still running ${spanText((record.age_ms ?? 0) / 1000)} with no declared bound — keep it with bg_extend("${record.id}", seconds), which becomes its bound, or stop it with bg_kill("${record.id}"). It is killed in ${spanText(graceSeconds)} if you do neither.\ncommand: ${record.command.split("\n")[0]?.slice(0, 120) ?? ""}${record.log_path ? `\noutput: ${record.log_path}` : ""}`,
+				cancelled: () => {
+					try {
+						const settled = background.poll(record.id);
+						return settled.status !== "running" || settled.lease_s === null;
+					} catch {
+						return true;
+					}
+				},
 			}),
 	});
 
@@ -1047,6 +1095,11 @@ export function createKernel(options: {
 				const all = background.list();
 				for (const record of all) if (record.status !== "running") bgReads.add(record.id);
 				return all;
+			},
+			/** The judgement the lease asks for: the grant becomes the handle's bound (`background.ts`). */
+			async bg_extend(...args: unknown[]) {
+				const { id, seconds } = bind(args, ["id", "seconds"], "bg_extend");
+				return background.extend(String(id ?? ""), typeof seconds === "number" ? seconds : Number.NaN);
 			},
 		};
 	}
