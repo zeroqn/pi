@@ -127,6 +127,16 @@ describe("malformed input never throws", () => {
 		expect(errors[0]).toContain(join(agentDir, "mcp.json"));
 	});
 
+	it("reads a file that starts with a UTF-8 BOM, as pi 1.4.0 now does", () => {
+		// pi 1.4.0 strips the BOM before parsing its own reader (`utils/text.ts` `stripBom`), so a
+		// file written by PowerShell or a Windows editor loads there; this reader reimplements that
+		// read, and must not be the one place that reports the same file malformed.
+		globalConfig("\uFEFF" + JSON.stringify({ mcpServers: { docs: { command: "npx" } } }));
+		const { servers, errors } = read();
+		expect(errors).toEqual([]);
+		expect(servers.map((server) => server.name)).toEqual(["docs"]);
+	});
+
 	it("reports a non-object `mcpServers`", () => {
 		globalConfig({ mcpServers: ["docs"] });
 		const { errors } = read();

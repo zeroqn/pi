@@ -56,7 +56,10 @@ function readFile(path: string, scope: "global" | "project", state: State): void
 	if (!existsSync(path)) return;
 	let parsed: unknown;
 	try {
-		parsed = JSON.parse(readFileSync(path, "utf8"));
+		// pi 1.4.0 strips a BOM before parsing its own `mcp.json` (`utils/text.ts` `stripBom`), so a file
+		// written by PowerShell or a Windows editor loads there; this reader must not be the one place
+		// where the same file is reported malformed.
+		parsed = JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
 	} catch (error) {
 		state.errors.push(`${path}: ${error instanceof Error ? error.message : String(error)}`);
 		return;
