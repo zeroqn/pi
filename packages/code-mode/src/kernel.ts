@@ -405,6 +405,15 @@ export function createKernel(options: {
 		maxSuspensions,
 		maxFeedDurationSecs,
 	};
+	/**
+	 * Every mount's memory budget, stated rather than inherited: `@pydantic/monty` 1.4.0 halved
+	 * `monty-fs`'s `DEFAULT_MEMORY_USAGE_LIMIT` from 100 MB to 50 MB, and the budget covers a mount's
+	 * retained overlay data *and* its filesystem results, so a 60 MB read or a large overlay write that
+	 * fitted before the upgrade would now raise `MemoryError: mount memory usage limit of 50 MB
+	 * exceeded`. Pinning the old number here keeps the kernel's behaviour a property of this file
+	 * rather than of the worker's release.
+	 */
+	const MOUNT_MEMORY_BYTES = 100_000_000;
 	const checkoutOptions = { limits: checkoutLimits, osPolicy: CHECKOUT_OS_POLICY };
 	const rotateAt = rotateAtFor(maxSuspensions);
 	const rotateBackoff = Math.max(1, Math.floor((maxSuspensions - rotateAt) / 8));
@@ -640,7 +649,12 @@ export function createKernel(options: {
 		const existing = cwdMounts.get(mode);
 		if (existing) return { mount: existing };
 		try {
-			const made = new monty.MountDir({ hostPath: root, virtualPath: root, mode });
+			const made = new monty.MountDir({
+				hostPath: root,
+				virtualPath: root,
+				mode,
+				memoryUsageLimit: MOUNT_MEMORY_BYTES,
+			});
 			cwdMounts.set(mode, made);
 			return { mount: made };
 		} catch (error) {
@@ -694,7 +708,12 @@ export function createKernel(options: {
 		pool = started;
 		session = await started.checkout(checkoutOptions);
 		root = cwd;
-		scratchMount = new monty.MountDir({ hostPath: scratch, virtualPath: scratch, mode: "read-write" });
+		scratchMount = new monty.MountDir({
+			hostPath: scratch,
+			virtualPath: scratch,
+			mode: "read-write",
+			memoryUsageLimit: MOUNT_MEMORY_BYTES,
+		});
 		// The workspace's mode is the guard's answer, and a mount that cannot be made is a **start**
 		// failure rather than a cell refusal — the kernel is not running, and the next cell rebuilds
 		// it (the pinned "does not cache a failed start" contract).
@@ -1025,8 +1044,18 @@ export function createKernel(options: {
 		try {
 			await session?.feedRun(records.map((record) => record.code).join("\n"), {
 				mount: [
-					new monty.MountDir({ hostPath: cwd, virtualPath: cwd, mode: "overlay" }),
-					new monty.MountDir({ hostPath: scratch, virtualPath: scratch, mode: "overlay" }),
+					new monty.MountDir({
+						hostPath: cwd,
+						virtualPath: cwd,
+						mode: "overlay",
+						memoryUsageLimit: MOUNT_MEMORY_BYTES,
+					}),
+					new monty.MountDir({
+						hostPath: scratch,
+						virtualPath: scratch,
+						mode: "overlay",
+						memoryUsageLimit: MOUNT_MEMORY_BYTES,
+					}),
 				],
 				printCallback: silent,
 				externalLookup: replay.host,

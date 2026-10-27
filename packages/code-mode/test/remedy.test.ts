@@ -23,22 +23,39 @@ if (!montyReady) {
 const maybe = montyReady ? it : it.skip;
 
 describe("the name map", () => {
-	it("answers the os subset with the like-for-like replacement, in either message shape", () => {
-		for (const name of ["path", "walk", "getsize", "isdir", "isfile", "islink", "scandir", "symlink"]) {
+	// The lists moved when the pin did: monty 1.4.0 has `os.path`, `os.walk`, `os.scandir` and
+	// `os.pathsep`, and `Path.glob`/`Path.rglob` (`docs/limitations/os.md`, `pathlib.md`). A name that
+	// arrived must get no remedy at all — a cell that reached for it now succeeds, and the remedy would
+	// be advice about a sandbox that no longer exists.
+	it("answers the os names that are still absent, in either message shape", () => {
+		for (const name of ["getsize", "isdir", "isfile", "islink", "symlink", "lstat", "chmod", "utime"]) {
 			// The traceback shape (what the kernel actually matches on) and the `getattr` shape.
 			for (const message of [`module 'os' has no attribute '${name}'`, `'module' object has no attribute '${name}'`]) {
 				const remedy = remedyFor("AttributeError", message);
-				expect(remedy).toContain("walk(path)");
-				expect(remedy).toContain("Path(p).is_dir()");
+				expect(remedy).toContain("os.path.getsize(p)");
+				expect(remedy).toContain("os.walk(root)");
 			}
 		}
 	});
 
-	it("answers pathlib's own holes with the slice, class methods included", () => {
-		for (const name of ["rglob", "glob", "parents", "relative_to", "home"]) {
-			expect(remedyFor("AttributeError", `'PosixPath' object has no attribute '${name}'`)).toContain("p[len(root):]");
+	it("stays quiet for the os names monty 1.4.0 gained", () => {
+		for (const name of ["path", "walk", "scandir", "pathsep", "listdir", "mkdir"]) {
+			expect(remedyFor("AttributeError", `module 'os' has no attribute '${name}'`)).toBeNull();
+			expect(remedyFor("AttributeError", `'module' object has no attribute '${name}'`)).toBeNull();
 		}
-		expect(remedyFor("AttributeError", "type object 'PosixPath' has no attribute 'home'")).toContain("walk(path)");
+	});
+
+	it("answers pathlib's own holes with os.path.relpath, class methods included", () => {
+		for (const name of ["parents", "relative_to", "is_relative_to", "home", "match", "samefile"]) {
+			expect(remedyFor("AttributeError", `'PosixPath' object has no attribute '${name}'`)).toContain("os.path.relpath(p, root)");
+		}
+		expect(remedyFor("AttributeError", "type object 'PosixPath' has no attribute 'home'")).toContain("os.walk(root)");
+	});
+
+	it("stays quiet for the pathlib names monty 1.4.0 gained", () => {
+		for (const name of ["rglob", "glob", "iterdir", "read_text", "walk"]) {
+			expect(remedyFor("AttributeError", `'PosixPath' object has no attribute '${name}'`)).toBeNull();
+		}
 	});
 
 	it("answers a replacement written without its import", () => {
@@ -61,6 +78,7 @@ describe("the name map", () => {
 		expect(remedyFor("AttributeError", "no attribute in this shape")).toBeNull();
 	});
 });
+
 
 type Handler = (event: unknown, ctx: unknown) => unknown;
 
@@ -128,12 +146,14 @@ describe("a cell that names one of them", () => {
 
 	maybe("carries the remedy under the traceback, and the kernel survives it", async () => {
 		const { handle, ctx } = session();
+		// `os.walk` was the live cell until monty 1.4.0 implemented it (measured: the cell now walks
+		// ROOT successfully); `os.lstat` is the same event on a name that is still absent.
 		const failed = textOf(
-			await (handle.kernel as Kernel).execute({ code: "import os\nfor dp, dn, fn in os.walk(ROOT):\n    pass\n" }, undefined, ctx),
+			await (handle.kernel as Kernel).execute({ code: "import os\nos.lstat(ROOT)\n" }, undefined, ctx),
 		);
 		expect(failed).toContain("AttributeError");
 		expect(failed).toContain("# monty's `os` is a curated subset");
-		expect(failed).toContain("walk(path)");
+		expect(failed).toContain("os.walk(root)");
 
 		// The session is not poisoned: the next cell runs, and it is the fix the remedy named.
 		const fixed = textOf(await (handle.kernel as Kernel).execute({ code: "print(len(walk(ROOT)) > 0)" }, undefined, ctx));
@@ -160,7 +180,7 @@ describe("a cell that names one of them", () => {
 			),
 		);
 		expect(relative).toContain("AttributeError");
-		expect(relative).toContain("p[len(root):]");
+		expect(relative).toContain("os.path.relpath(p, root)");
 
 		const ordinary = textOf(await (handle.kernel as Kernel).execute({ code: "1 + 'a'\n" }, undefined, ctx));
 		expect(ordinary).toContain("TypeError");

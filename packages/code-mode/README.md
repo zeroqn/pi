@@ -190,6 +190,20 @@ contract violations that must fail a test rather than reach a session.
   `FutureSnapshot` cannot be restored from a dump (its pending promises lived in the old worker), so
   the loop answers it and rotates on the next suspension. The reserve is never crossed without a
   rotation; it is only ever a few suspensions later.
+- **A dump written under monty 1.4.0 does not load on a 1.1.0 worker.** Upstream's dump format moved
+  13 -> 14 with `MIN_SUPPORTED_DUMP_VERSION = 13`, so an old dump still loads on the new worker and the
+  upgrade direction is fine; the reverse is refused (`dump format version 14 is newer than 13`) and a
+  refused restore poisons that session, which is why the fallback matters. Our kernel treats any
+  `loadSession` throw as "replay instead", and the replay source is the journal's own `.json` record, so
+  a downgrade loses the fast path and nothing else.
+- **A mount's memory budget is stated here, not inherited.** `MOUNT_MEMORY_BYTES` is 100 MB at every
+  `MountDir` because `@pydantic/monty` 1.4.0 halved `monty-fs`'s default to 50 MB, and the budget covers
+  a mount's retained overlay data *and* its filesystem results: a read or overlay write over 50 MB would
+  otherwise have started raising `MemoryError: mount memory usage limit of 50 MB exceeded`.
+- **A tree scan is capped by the worker, not by us.** `os.walk`/`os.scandir`/`Path.glob`/`Path.rglob`
+  answer one `Path.scan` host call for the whole subtree, materialised, so a tree over 100,000 entries or
+  100 MB of path data fails with `RuntimeError` and a big one is charged to the mount's budget. `find`
+  (fd, one host call, `.gitignore`-aware) and `walk()` (one mount read per entry) stay the escapes.
 - **The compiled pi binary cannot resolve the napi addon on its own.** `src/monty.ts` points
   `NAPI_RS_NATIVE_LIBRARY_PATH` at the platform `.node`, searching both a hoisted
   `node_modules/@pydantic/monty-*` and bun's store — without the store case, every *spawned* pi

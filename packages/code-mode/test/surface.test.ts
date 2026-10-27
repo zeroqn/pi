@@ -86,6 +86,14 @@
  * and the kernel's own clock ends the cell at the cell's budget and kills what it was waiting on — both
  * of which the model has to know, so guideline 10 carries them. Only the whole-array hash moves; the
  * first six, the description and the snippet keep theirs.
+ * Then the monty-1.4 amendment of 2026-10-27, which is the first one to *invert* earlier claims rather
+ * than add to them: `match`/`case`, `hashlib`, `os.path`, `os.walk`, `os.scandir`, `Path.glob` and
+ * `Path.rglob` all exist at 1.4.0, and every tree primitive answered in the sandbox is one host call for
+ * the whole subtree where our `walk()` is one mount read per entry — so guideline 9 had been teaching the
+ * expensive primitive as the cheap one. Guideline 6 gained the data-module clause (hashlib/csv/tomllib/
+ * decimal rather than `sha256sum`/`awk`/`jq`), so both the first-six and the whole-array hashes move; the
+ * description moves with the six new modules, the loss of "no match statements", and the scan's entry cap.
+ * The measurement and its probe are `.scratch/toolchain-1.4.0/` (monty-delta.md §2, `probe/`).
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -94,8 +102,8 @@ import { BASE_DESCRIPTION, BASE_GUIDELINES, BASE_SNIPPET } from "../src/surface"
 const sha = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
 
 describe("the base surface (acceptance check 2)", () => {
-	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.0", () => {
-		expect(sha(BASE_DESCRIPTION)).toBe("85fff196baf70eacade3387cc1c9bf23258dafe78adefbf371fb03d9a9f8f3f9");
+	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.4", () => {
+		expect(sha(BASE_DESCRIPTION)).toBe("a409441465d552a77acbb2be49b9210a7321653f4f8553a400e96691e32efe09");
 		expect(BASE_DESCRIPTION).toContain("put throwaway files there rather than under /tmp");
 		expect(BASE_DESCRIPTION).not.toContain("rlm.spawn");
 		expect(BASE_DESCRIPTION).not.toContain("agent_message");
@@ -106,7 +114,7 @@ describe("the base surface (acceptance check 2)", () => {
 	});
 
 	it("keeps the first six guidelines, in order (as of the await-in-a-plain-def amendment)", () => {
-		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("c20d63bc26b42749e2cc588ffccfcd9a0e54a3dd64766541a670a13eefe02228");
+		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("dea5f71d696211d26ba15cb51f291531e7603741af5392d7a7ae1feaaccd580c");
 		expect(BASE_GUIDELINES[0]).toStartWith("Use python for work that is stateful");
 	});
 
@@ -117,10 +125,10 @@ describe("the base surface (acceptance check 2)", () => {
 	// that had no business being in the foreground.
 	it("carries the four added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(10);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("4f587c4ab955406dc884f0cb4765204f3aefc92d3f4bfee2bc2720260413aa7a");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("08d3612cab53d67824e563edfb48f89bc64c2cb9176bcae1273ae1cec7e6641b");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
-		expect(BASE_GUIDELINES[8]).toStartWith("In python, path tests come from `pathlib`");
+		expect(BASE_GUIDELINES[8]).toStartWith("In python, path tests are `os.path.isdir(p)`");
 		expect(BASE_GUIDELINES[9]).toStartWith("In python, bound what you cannot predict");
 	});
 });

@@ -10,31 +10,30 @@
  * `AttributeError` whose message carries the attribute *and* the kind of object it was missing from — so
  * the remedy can arrive once, in the result the model is already reading.
  *
- * The names, and the message shapes, are measured against monty 1.0.0, not assumed. `os` has `mkdir`,
- * `makedirs`, `rmdir`, `remove`, `unlink`, `stat`, `getcwd`, `chdir`, `listdir`, `getenv`, `environ`,
- * `rename`, `replace`, `fspath`, `urandom` and the POSIX constants, and lacks `path`, `walk`, `getsize`,
- * `isdir`, `isfile`, `islink`, `scandir`, `symlink`, `readlink`, `lstat`, `chmod`, `utime`, `access`,
- * `removedirs`, `renames` and `pathsep`. `pathlib.Path` has `is_dir`, `is_file`, `exists`, `stat`,
- * `iterdir`, `joinpath`, `parent`, `name`, `as_posix`, `resolve`, `with_suffix`, `is_symlink`,
- * `read_text` and lacks `PurePath`, `home`, `rglob`, `glob`, `parents`, `relative_to`, `is_relative_to`,
- * `lstat`, `match` and `samefile`.
- *
- * The `NameError` case is the same event one step earlier — a cell that writes the replacement without
- * importing it. Measured over the 48 runs of the two A/B pairs behind this file: 27 module/pathlib
- * `AttributeError`s, every one on a name in the two sets below, and five `NameError: name 'Path' is not
- * defined`, which those sets cannot see, because a name that was never bound has no object to be missing
- * from.
+ * The names, and the message shapes, are measured against monty 1.4.0, not assumed
+ * (`.scratch/toolchain-1.4.0/monty-delta.md` §2.2-2.3 for the upstream docs, `.scratch/toolchain-1.4.0/probe/`
+ * for the calls). At 1.4.0 `os` has `mkdir`, `makedirs`, `rmdir`, `remove`, `unlink`, `stat`, `getcwd`,
+ * `chdir`, `listdir`, `scandir`, `walk`, `rename`, `replace`, `fspath`, `urandom`, `path` and the POSIX
+ * constants including `pathsep`, and lacks `lstat`, `chmod`, `utime`, `access`, `symlink`, `readlink`,
+ * `removedirs`, `renames` and `link`. `os.environ` and `os.getenv` exist but
+ * raise `RuntimeError: 'os.environ' is not supported in this environment`, which is a different event and
+ * gets no remedy. `pathlib.Path` has `is_dir`, `is_file`, `exists`, `stat`, `iterdir`, `joinpath`, `parent`,
+ * `name`, `suffix`, `parts`, `as_posix`, `resolve`, `absolute`, `with_suffix`, `is_symlink`, `read_text`,
+ * `glob` and `rglob`, and lacks `parents`, `relative_to`, `is_relative_to`, `home`, `lstat`, `match` and
+ * `samefile`. Two names left these tables when the pin moved from 1.1.0: `os.walk`/`os.path`/`os.scandir`
+ * and `Path.rglob`/`Path.glob` arrived, and the remedy for `os.path`'s own members now points at
+ * `os.path`, not only at `Path` (`docs/limitations/os.md`, `docs/limitations/pathlib.md`).
  */
 
 /** Names monty's curated `os` does not have. */
 const OS_MISSING = new Set([
-	"path",
-	"walk",
+	// Present at monty 1.4.0 and therefore not here any more: `path`, `walk`, `scandir` and `pathsep`
+	// (`docs/limitations/os.md`; measured). What remains is absent at 1.4.0, and `getsize`/`isdir`/
+	// `isfile`/`islink` are `os.path` members a cell reaches for on `os` itself.
 	"getsize",
 	"isdir",
 	"isfile",
 	"islink",
-	"scandir",
 	"symlink",
 	"readlink",
 	"lstat",
@@ -43,13 +42,12 @@ const OS_MISSING = new Set([
 	"access",
 	"removedirs",
 	"renames",
-	"pathsep",
 ]);
 
 /** Names monty's `pathlib.Path` does not have. */
 const PATH_MISSING = new Set([
-	"rglob",
-	"glob",
+	// `rglob` and `glob` arrived at monty 1.2.0 and are gone from this set; `parents`, `relative_to`,
+	// `home`, `match` and `samefile` are still absent at 1.4.0 (`docs/limitations/pathlib.md`).
 	"parents",
 	"relative_to",
 	"is_relative_to",
@@ -63,14 +61,15 @@ const PATH_MISSING = new Set([
 const NEEDS_IMPORT = new Set(["Path", "pathlib"]);
 
 const OS_REMEDY =
-	"# monty's `os` is a curated subset — no `os.path`, no `os.walk`. A tree is `walk(path)` or\n" +
-	"# `await find(...)`; a path test is `Path(p).is_dir()` / `.is_file()` / `.stat().st_size` after\n" +
-	"# `import pathlib`, while `os.listdir(dir)` and `os.stat(path)` do exist.";
+	"# monty's `os` is a curated subset: `os.path`, `os.walk`, `os.scandir` and `os.listdir` exist,\n" +
+	"# but `os.lstat`, `os.chmod`, `os.utime`, `os.symlink`, `os.readlink` and `os.access` do not.\n" +
+	"# Sizes and path tests are `os.path.getsize(p)` / `os.path.isdir(p)` / `os.path.exists(p)`;\n" +
+	"# a tree is `os.walk(root)` or `Path(root).rglob('*')` (one host call per subtree).";
 
 const PATH_REMEDY =
-	"# monty's `pathlib` is partial: `rglob`, `glob`, `parents` and `relative_to` do not exist.\n" +
-	"# A tree is `walk(path)` or `await find(...)`, and a path relative to a root is a slice:\n" +
-	"# `p[len(root):].lstrip('/')`.";
+	"# monty's `pathlib` is partial: `glob`, `rglob`, `iterdir`, `walk` and `read_text` exist, but\n" +
+	"# `parents`, `relative_to`, `home` and `match` do not. A path relative to a root is\n" +
+	"# `os.path.relpath(p, root)`; a tree is `os.walk(root)` or `Path(root).rglob('*')`.";
 
 const IMPORT_REMEDY =
 	"# `Path` is `pathlib.Path`, and only `os` and `json` are pre-imported: `import pathlib` first\n" +
