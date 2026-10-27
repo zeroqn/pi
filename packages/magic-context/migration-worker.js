@@ -2,28 +2,31 @@ import"./index-0h2mkab2.js";
 import {
   setLogLineForwarder2,
   log2
-} from "./index-x3dcnxh0.js";
+} from "./index-fgs78jyd.js";
 import {
   Database2
-} from "./index-7ptxvfc5.js";
+} from "./index-2qtx0q6h.js";
 import"./index-135e8hvg.js";
 import {
   runMigrationsWithRetry
-} from "./index-pznwj7hn.js";
+} from "./index-0dr64gsy.js";
 import {
   closeQuietly
-} from "./index-nmsb3x01.js";
-import"./index-8976mezv.js";
-import"./index-mfysz78d.js";
-import"./index-kgd6t63g.js";
+} from "./index-w1avzkdt.js";
+import"./index-23t8ryqw.js";
+import"./index-hxp6q5f8.js";
+import"./index-n4wyxcgr.js";
 import"./index-fapenpch.js";
 import {
   setSqlitePragmaConfig,
   initializeDatabase
-} from "./index-a4r62vfn.js";
-import"./index-j36vpt39.js";
-import"./index-vaah9fbg.js";
-import"./index-0vrkp1jq.js";
+} from "./index-j0t5pwjg.js";
+import"./index-399p688g.js";
+import"./index-54wmg4rj.js";
+import"./index-8hmqdav2.js";
+import"./index-8a2wvrda.js";
+import"./index-my0dn413.js";
+import"./index-hqw0rt9k.js";
 
 // ../plugin/src/features/magic-context/migration-worker.ts
 import { parentPort, workerData } from "node:worker_threads";

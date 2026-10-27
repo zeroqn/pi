@@ -1,49 +1,55 @@
 import {
   TOKEN_BUDGET_TOOL_REFUSAL
-} from "./index-774944sz.js";
+} from "./index-cm9e52mb.js";
 import {
   setHarness2
 } from "./index-0h2mkab2.js";
 import {
   log2
-} from "./index-x3dcnxh0.js";
+} from "./index-fgs78jyd.js";
 import {
   resolveProjectIdentityForSession
-} from "./index-mfysz78d.js";
-import"./index-kgd6t63g.js";
-import"./index-7ptxvfc5.js";
+} from "./index-hxp6q5f8.js";
+import"./index-2qtx0q6h.js";
+import"./index-n4wyxcgr.js";
 import"./index-fapenpch.js";
 import {
   openDatabase
-} from "./index-a4r62vfn.js";
-import"./index-j36vpt39.js";
-import"./index-pznwj7hn.js";
-import"./index-nmsb3x01.js";
+} from "./index-j0t5pwjg.js";
+import"./index-399p688g.js";
+import"./index-54wmg4rj.js";
+import"./index-8hmqdav2.js";
+import"./index-8a2wvrda.js";
+import"./index-0dr64gsy.js";
+import"./index-w1avzkdt.js";
 import"./index-135e8hvg.js";
-import"./index-8976mezv.js";
-import"./index-vaah9fbg.js";
+import"./index-23t8ryqw.js";
+import"./index-my0dn413.js";
+import"./index-4knyh1kt.js";
 import {
   loadPiConfig,
   ensureProjectRegisteredFromPiDirectory,
   resolvePiHarnessKind,
   registerMagicContextTools
-} from "./index-s2v78gbh.js";
-import"./index-cyrnv16r.js";
-import"./index-xkf1qyj1.js";
-import"./index-c4y7qcdm.js";
-import"./index-pkn0y6j6.js";
-import"./index-kmdweafv.js";
+} from "./index-sxyhgtzp.js";
+import"./index-ccanzg8p.js";
+import"./index-gwxaz0z5.js";
+import"./index-wb2t932e.js";
+import"./index-0pt8z7am.js";
+import"./index-vc6fjs1m.js";
 import"./index-9p40dgkm.js";
+import"./index-j3pz3a1b.js";
 import"./index-yhzhdp3m.js";
-import"./index-cckp6kcc.js";
-import"./index-k3f0x2pv.js";
-import"./index-jg7jwy8c.js";
-import"./index-399p688g.js";
-import"./index-7mm27xdc.js";
-import"./index-f6a73ytb.js";
-import"./index-dj784nyr.js";
-import"./index-dj8hpkz7.js";
-import"./index-0vrkp1jq.js";
+import"./index-zrc2y4em.js";
+import"./index-zmg1td73.js";
+import"./index-n8e5e9fp.js";
+import"./index-6x556c2q.js";
+import"./index-adk1kpy9.js";
+import"./index-1cvyaw9a.js";
+import"./index-cms6wfmd.js";
+import"./index-29nw7n1r.js";
+import"./index-6wdwv3a6.js";
+import"./index-hqw0rt9k.js";
 import {
   setStoragePrivatePermissionEnforcement
 } from "./index-81nthk8j.js";
@@ -88,6 +94,7 @@ function magicContextSubagentExtension(pi) {
       const dreamerActionsEnabled = pi.getFlag(SUBAGENT_DREAMER_ACTIONS_FLAG) === true;
       registerMagicContextTools(pi, {
         rerankConnectionFile: cfg.subc?.connection_file,
+        rerankConfig: cfg.rerank,
         db,
         ensureProjectRegistered: ensureProjectRegisteredFromPiDirectory,
         resolveProjectIdentity: (ctx) => resolveProjectIdentityForSession(ctx.cwd, cfg.allow_home_project),

@@ -1,14 +1,18 @@
 import"./index-0h2mkab2.js";
 import {
   log2
-} from "./index-x3dcnxh0.js";
+} from "./index-fgs78jyd.js";
+import {
+  inRootAsyncContext2
+} from "./index-2qtx0q6h.js";
 
 // ../plugin/src/features/magic-context/memory/embedding-worker-process.ts
 import { Worker } from "node:worker_threads";
 var worker;
 process.on("message", (message) => {
   if (message.entry && !worker) {
-    worker = new Worker(new URL(message.entry), { workerData: message.data });
+    const entry = new URL(message.entry);
+    worker = inRootAsyncContext2(() => new Worker(entry, { workerData: message.data }));
     worker.on("message", (reply) => {
       const wire = {
         ...reply,
