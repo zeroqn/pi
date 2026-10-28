@@ -347,6 +347,23 @@ describe("indexWorkspace", () => {
 	});
 });
 
+describe("spawnExec", () => {
+	test("a root that does not exist is named as the directory, not as a missing zg", async () => {
+		const result = await spawnExec("zg", ["--hybrid", "x"], { cwd: "/definitely/not/here", timeout: 5000 });
+		expect(result.code).toBe(1);
+		expect(result.stderr).toContain("working directory does not exist: /definitely/not/here");
+		// The kernel's own message ("spawn zg ENOENT") would send a reader after the binary.
+		expect(result.stderr).not.toContain("spawn zg ENOENT");
+	});
+
+	test("a missing binary still reports the binary", async () => {
+		const result = await spawnExec("/definitely/not/a/binary", [], { cwd: "/", timeout: 5000 });
+		expect(result.code).toBe(1);
+		expect(result.stderr).toContain("ENOENT");
+		expect(result.stderr).not.toContain("working directory");
+	});
+});
+
 describe("explainFailure", () => {
 	test("the engine's filter refusal becomes the negated-glob route, with its own line bounded", () => {
 		const explained = explainFailure(NOT_LIKE_REFUSAL);

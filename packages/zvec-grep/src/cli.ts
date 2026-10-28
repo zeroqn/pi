@@ -9,6 +9,7 @@
  * (`code-mode/src/output.ts:39-84`) — the extension stops needing pi's `exec` to exist at all.
  */
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 
 export const VERSION_TIMEOUT_MS = 15_000;
 export const SEARCH_TIMEOUT_MS = 10 * 60 * 1000;
@@ -86,8 +87,13 @@ export const spawnExec: Exec = (command, args, options) =>
 			if (options.signal.aborted) kill();
 			else options.signal.addEventListener("abort", kill, { once: true });
 		}
-		child.on("error", (error: Error) => {
-			stderr = `${stderr}\n${error.message}`.trim();
+		child.on("error", (error: Error & { code?: string }) => {
+			// `spawn` answers ENOENT both for a binary it cannot find *and* for a working directory
+			// that does not exist, and its message names only the binary ("spawn zg ENOENT"). A caller
+			// that handed us a root that is not there would read that as "zg is not installed" and go
+			// hunting for the wrong problem, so the directory is named instead.
+			const missingCwd = error.code === "ENOENT" && !existsSync(options.cwd);
+			stderr = `${stderr}\n${missingCwd ? `working directory does not exist: ${options.cwd}` : error.message}`.trim();
 			finish(1, null);
 		});
 		child.on("close", (code: number | null, signal: NodeJS.Signals | null) => finish(code, signal));
