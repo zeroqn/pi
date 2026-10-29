@@ -257,6 +257,22 @@ async function defaultLookup(hostname: string): Promise<string[]> {
 	return records.map((record) => record.address);
 }
 
+/**
+ * What a failed request actually said, for the model that has to act on it.
+ *
+ * A platform `fetch` reports a transport failure either with the reason in `message` (Bun says
+ * `ECONNREFUSED: …`, and carries the TLS reason) or with a bare `fetch failed` and the reason on
+ * `cause` (Node). Both spellings reach the model, because the alternative — `fetch failed for URL:
+ * fetch failed` — is a failure with no information in it at all.
+ */
+function describeTransportError(error: unknown): string {
+	if (!(error instanceof Error)) return String(error);
+	const cause = (error as { cause?: { message?: unknown; code?: unknown } }).cause;
+	const reason = typeof cause?.message === "string" && cause.message !== "" ? cause.message : undefined;
+	if (reason === undefined) return error.message;
+	return error.message.includes(reason) ? error.message : `${error.message} (${reason})`;
+}
+
 export type GuardedFetchOptions = GuardOptions & {
 	maxRedirects?: number;
 	timeoutMs: number;
@@ -288,12 +304,14 @@ export async function fetchGuarded(url: string, options: GuardedFetchOptions): P
 			if (deadline.aborted) throw webError("TimeoutError", `fetch timed out after ${options.timeoutMs} ms: ${current.href}`);
 			if (error instanceof Error && error.name === "TimeoutError") throw webError("TimeoutError", `fetch timed out after ${options.timeoutMs} ms: ${current.href}`);
 			if (error instanceof Error && error.name === "ValueError") throw error;
-			throw webError("OSError", `fetch failed for ${current.href}: ${error instanceof Error ? error.message : String(error)}`);
+			throw webError("OSError", `fetch failed for ${current.href}: ${describeTransportError(error)}`);
 		}
 		const location = response.headers.get("location");
 		const redirecting = response.status >= 300 && response.status < 400 && location;
 		if (!redirecting) {
-			if (!response.ok) throw webError("OSError", `HTTP ${response.status} for ${current.href}`);
+			// A 4xx/5xx is the case the hatch fixes most often (403 to our request shape, an
+			// authenticated API), so the remedy rides on this failure like it does on the guard's.
+			if (!response.ok) throw webError("OSError", `HTTP ${response.status} for ${current.href}${HATCH_HINT}`);
 			return { response, finalUrl: current.href, hops: hop };
 		}
 		if (hop === maxRedirects) throw webError("RuntimeError", `too many redirects fetching ${url} (cap ${maxRedirects})`);

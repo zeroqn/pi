@@ -58,13 +58,15 @@ f = await fetch_content("https://example.com/paper.pdf", "raw")   # the bytes, o
   ordered list. An unknown name raises `ValueError`.
 - `domain_filter` takes hostnames; a `-` prefix denies. Applied here, identically for both
   providers: over-fetch, then keep the first `num_results` survivors.
-- Content types: HTML is extracted to markdown, `text/*`/JSON/XML pass through, and PDFs go
-  through `unpdf`. A **declared** type that is none of those raises `ValueError` in both modes —
-  but `application/octet-stream`, which is also what a missing `Content-Type` header becomes
-  here, is not refused: the bytes decide, so HTML and text are delivered as if the type had been
-  declared (with a `note` naming the declaration they were guessed against) and a body that is
-  not text spills raw with a `note`. A page with nothing extractable spills its raw body and
-  says so in `note`.
+- Content types, in `mode="markdown"`: HTML is extracted to markdown, `text/*`/JSON/XML pass
+  through, and PDFs go through `unpdf`. A **declared** type that is none of those raises
+  `ValueError`, and the refusal names `mode="raw"` — which accepts **any** declared type, because a
+  file on disk is not a promise of text. `application/octet-stream`, which is also what a missing
+  `Content-Type` header becomes here, is not refused in either mode: the bytes decide, so HTML and
+  text are delivered as if the type had been declared (with a `note` naming the declaration they
+  were guessed against) and a body that is not text spills raw with a `note`. A page with nothing
+  extractable — an empty body, a JS shell, a body the extractor cannot parse — spills its raw body
+  and says so in `note`, so a fetch of an empty page is an envelope and never a library error.
 
 ### Errors, in sandbox terms
 
@@ -72,9 +74,9 @@ Only monty's built-in exception types cross the boundary, so the mapping is deli
 
 | raises | when |
 | --- | --- |
-| `TypeError` / `ValueError` | wrong argument types; unknown provider; the SSRF guard refusing a URL; a declared content type that is not text, HTML or PDF (an `image/png`, say — `application/octet-stream` is sniffed instead) |
-| `TimeoutError` | a provider or fetch ran out of its budget (30 s per search, 60 s per fetch) |
-| `OSError` | transport, DNS, TLS, a non-2xx response |
+| `TypeError` / `ValueError` | wrong argument types; unknown provider; the SSRF guard refusing a URL; a declared content type that `mode="markdown"` cannot deliver as text (an `image/png` say — `mode="raw"` keeps it, and `application/octet-stream` is sniffed instead) |
+| `TimeoutError` | a provider or fetch ran out of its budget (30 s per search, 60 s per fetch), including a `curl` killed at that budget on the `via="shell"` route |
+| `OSError` | transport, DNS, TLS, a non-2xx response, `curl`'s own non-zero exit on the `via="shell"` route |
 | `RuntimeError` | every provider failed; too many redirects |
 
 ## The untrusted-content guard
@@ -243,8 +245,10 @@ await fetch_content(url, via="shell", args=["-H", "Authorization: Bearer …", "
 ```
 
 The hatch is for the pages the guarded route is *designed* to refuse or cannot get: a server on
-localhost, an authenticated or POST API, a page that answers 403 to our request shape, a content type
-nothing can extract. It runs `curl` **on this host**, argv-only — no shell string is built, so `args`
+localhost, an authenticated or POST API, a page that answers 403 to our request shape, a hostname it
+cannot resolve. It is **not** the route for a content type it will not deliver as text: both routes run
+the same type policy, so the hatch would refuse identically and `mode="raw"` is the route that keeps
+those bytes. It runs `curl` **on this host**, argv-only — no shell string is built, so `args`
 cannot smuggle shell syntax and the hatch stays a fetch rather than a second way to run commands — and
 feeds the body back through the **same** pipeline: same content-type policy, same extraction, same
 spill, same `fenceText`. The envelope gains `via: "shell"` and a note saying so, and a non-2xx status is
@@ -258,9 +262,12 @@ What it skips and what it keeps is deliberate, and both are in `fetch.ts`'s head
   a safety default, and an escape hatch is not the place to overrule it. It is checked against the URL
   asked for, not against a redirect curl followed on its own.
 
-Every refusal a shell fetch would get past — the internal-address and scheme ones, and the
-unsupported-content-type one — carries the hatch in its own message (`HATCH_HINT`), so the remedy
-arrives with the failure rather than living only in a guideline the model may not have read.
+Every refusal a shell fetch would get past — the internal-address and scheme ones, and a non-2xx
+response — carries the hatch in its own message (`HATCH_HINT`), so the remedy arrives with the
+failure rather than living only in a guideline the model may not have read. The
+unsupported-content-type refusal deliberately does **not**: the hatch feeds the same
+content-type policy and would refuse with the same words, so naming it sent a session round a
+loop. That refusal names `mode="raw"` instead, which is the route that actually keeps the bytes.
 
 ## Development
 

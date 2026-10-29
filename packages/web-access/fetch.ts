@@ -5,10 +5,11 @@
  *
  *   markdown -> { url, title, path, chars, head }            head = first 2000 chars
  *               plus `note` when nothing was extractable (the raw body is spilled instead)
- *   raw      -> { url, path, bytes, content_type }           the bytes, on disk
+ *   raw      -> { url, path, bytes, content_type }           the bytes, on disk, whatever the type
  *
- * A declared type that is not text, HTML or PDF raises `ValueError` in **both** modes: scope
- * decides what is acceptable, mode decides how it is delivered. `application/octet-stream` is not
+ * A declared type that is not text, HTML or PDF raises `ValueError` in **markdown** mode only: that
+ * mode promises text, so extraction has to be honest about what it delivers. `mode="raw"` promises
+ * bytes and keeps any type. `application/octet-stream` is not
  * one of those — it is the server declining to say, and it is also what a missing header becomes
  * — so there the bytes decide: HTML and text are delivered as if the type had been declared, and
  * a body that is not text spills raw with a `note`.
@@ -43,6 +44,11 @@
  *   - **Refused, in `args`:** the flags that would stop it being a fetch — anything naming a file for
  *     curl to write or upload, and `--config` (`NON_FETCH_FLAGS`). The hatch fetches into the
  *     envelope; `mode="raw"` is the route that keeps a copy of the bytes.
+ *
+ * The **content-type policy** is not on that list, because it is not about where the body came from:
+ * markdown mode promises text, and both routes keep that promise or refuse. The route for a
+ * declared binary is `mode="raw"`, which keeps any type's bytes — so no refusal names the hatch when
+ * the hatch would answer with the same refusal.
  */
 
 import { execFile } from "node:child_process";
@@ -54,7 +60,7 @@ import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
 import { extractText, getDocumentProxy } from "unpdf";
 import { webError } from "./errors";
-import { assertDomainPolicy, fetchGuarded, HATCH_HINT, type GuardOptions } from "./ssrf";
+import { assertDomainPolicy, fetchGuarded, type GuardOptions } from "./ssrf";
 import { fenceText } from "./guard";
 
 export const HEAD_CHARS = 2000;
@@ -101,8 +107,24 @@ export type FetchOptions = {
 	shellExec?: ShellExec;
 };
 
+/** Declared types whose byte spill is worth naming for the tools that read it back: `read_image`
+ *  picks its mime type from the extension, and an archive is opened by its own name. */
+const BINARY_EXTENSIONS: Record<string, string> = {
+	"application/zip": "zip",
+	"application/gzip": "gz",
+	"application/x-gzip": "gz",
+	"application/x-tar": "tar",
+	"application/x-7z-compressed": "7z",
+	"image/png": "png",
+	"image/jpeg": "jpg",
+	"image/gif": "gif",
+	"image/webp": "webp",
+};
+
 function extensionFor(contentType: string): string {
 	const type = contentType.toLowerCase();
+	const named = BINARY_EXTENSIONS[type];
+	if (named !== undefined) return named;
 	if (type.includes("html")) return "html";
 	if (type.includes("json")) return "json";
 	if (type.includes("xml")) return "xml";
@@ -209,16 +231,23 @@ async function deliver(
 	const via = options.via === "shell" ? ({ via: "shell" } as const) : {};
 	const contentType = rawContentType.split(";")[0]!.trim() || "application/octet-stream";
 
-	const supported = isTextish(contentType) || isHtml(contentType) || contentType.toLowerCase().includes("pdf");
-	if (!supported && !isUnknownType(contentType)) {
-		throw webError("ValueError", `unsupported content type ${contentType} at ${finalUrl} (text, HTML, PDF and undeclared bodies only)${HATCH_HINT}`);
-	}
-
+	// Raw mode hands back the bytes, whatever the server declared: the type policy below exists
+	// because markdown mode promises *text*, and a file on disk promises nothing of the kind.
 	if (options.mode === "raw") {
 		const path = spillPath(options.scratchDir, finalUrl, extensionFor(contentType));
 		writeFileSync(path, buffer);
 		options.progress?.(`fetch_content: wrote ${buffer.length} bytes to ${path}`);
 		return { url: finalUrl, path, bytes: buffer.length, content_type: contentType, ...via };
+	}
+
+	// The remedy for a type markdown mode cannot deliver is `mode="raw"`, never the shell hatch:
+	// `via="shell"` feeds this same function, so it would refuse with these very words.
+	const supported = isTextish(contentType) || isHtml(contentType) || contentType.toLowerCase().includes("pdf");
+	if (!supported && !isUnknownType(contentType)) {
+		throw webError(
+			"ValueError",
+			`unsupported content type ${contentType} at ${finalUrl} (text, HTML, PDF and undeclared bodies only); use mode="raw" to keep the bytes of anything else`,
+		);
 	}
 
 	// markdown mode. A declared type we cannot deliver refused above; an undeclared one is decided
@@ -252,15 +281,24 @@ async function deliver(
 	}
 
 	const body = decodeBody(buffer, rawContentType);
+	// An empty body is nothing to extract whatever the declared type is. This guard used to live in
+	// the non-HTML branch only, so an empty `text/html` response (a 204, a challenge page with no
+	// body) reached Readability, which threw a bare library `Error` naming no URL and no status.
+	if (!body.trim()) return spillRawBody(buffer, finalUrl, contentType, "the response was empty", options, extraNote);
 	if (!isHtml(type)) {
-		if (!body.trim()) return spillRawBody(buffer, finalUrl, contentType, "the response was empty", options, extraNote);
 		const path = spillPath(options.scratchDir, finalUrl, extensionFor(type));
 		writeFileSync(path, fenceText(body));
 		options.progress?.(`fetch_content: ${body.length} chars (${contentType}) to ${path}`);
 		return { url: finalUrl, title: "", path, chars: body.length, head: body.slice(0, HEAD_CHARS), ...(note ? { note } : {}), ...via };
 	}
 
-	const extracted = extractMarkdown(body, finalUrl);
+	let extracted: { title: string; markdown: string } | null = null;
+	try {
+		extracted = extractMarkdown(body, finalUrl);
+	} catch {
+		// The extraction stack is third-party. A body it cannot parse is "nothing extractable",
+		// which already has a contract — spill the raw body and say so — not an unlabelled `Error`.
+	}
 	if (!extracted) {
 		return spillRawBody(buffer, finalUrl, type, "no readable content", options, extraNote);
 	}
@@ -378,11 +416,26 @@ async function fetchViaShell(url: string, options: FetchOptions): Promise<FetchE
 			timeoutMs: options.timeoutMs,
 		});
 	} catch (error) {
+		// `execFile` kills the child at `timeout` and answers an error whose `code` is not a number.
+		// That is curl's own budget running out, not a binary that would not start — and saying
+		// "could not run curl" for it sends a session looking for a missing curl.
+		const killed = error as { killed?: boolean; signal?: string } | null;
+		if (killed?.killed === true || killed?.signal !== undefined) {
+			throw webError("TimeoutError", `fetch_content via="shell": curl timed out after ${options.timeoutMs} ms for ${url}`);
+		}
 		throw webError("OSError", `fetch_content via="shell": could not run curl: ${error instanceof Error ? error.message : String(error)}`);
 	}
 
-	const headerLine = result.stdout.toString("utf-8").trim().split("\n").slice(-1)[0] ?? "";
-	const [contentType = "", finalUrl = "", httpStatus = "0"] = headerLine.split("\t");
+	// The `-w` line is `content_type \t url \t status`, and a server that sends no Content-Type makes
+	// the first field empty: the line then *starts* with a tab. Trimming the line before splitting it
+	// dropped that field, so the URL was reported as the content type and the status as the URL.
+	const lastLine = result.stdout
+		.toString("utf-8")
+		.split("\n")
+		.map((line) => line.replace(/\r$/, ""))
+		.filter((line) => line !== "")
+		.slice(-1)[0] ?? "";
+	const [contentType = "", finalUrl = "", httpStatus = "0"] = lastLine.split("\t");
 
 	if (result.code !== 0) {
 		safeUnlink(bodyPath);

@@ -117,12 +117,40 @@ describe("fetch_content, markdown mode (tickets 04 and 05)", () => {
 		expect(readFileSync(result.path, "utf8")).toContain("window.boot()");
 	});
 
-	it("refuses content types it cannot honestly deliver, in both modes", async () => {
+	it("refuses a declared binary, and names the route that keeps its bytes", async () => {
 		const dir = scratch();
-		for (const mode of ["markdown", "raw"] as const) {
-			const error = (await fetchContent("http://example.com/pic.png", { mode, scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: respond("binary", "image/png").impl }).catch((caught: unknown) => caught)) as Error;
-			expect(`${mode}: ${error.name}`).toBe(`${mode}: ValueError`);
-			expect(error.message).toMatch(/unsupported content type image\/png/);
+		const error = (await fetchContent("http://example.com/pic.png", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: respond("binary", "image/png").impl }).catch((caught: unknown) => caught)) as Error;
+		expect(error.name).toBe("ValueError");
+		expect(error.message).toMatch(/unsupported content type image\/png/);
+		// The remedy is `mode="raw"`, not the shell hatch: `via="shell"` feeds the same pipeline and
+		// would refuse with these very words, so naming it sent a session round a loop.
+		expect(error.message).toContain('use mode="raw"');
+		expect(error.message).not.toContain('via="shell"');
+	});
+
+	it("raw mode keeps the bytes of a declared binary, with a usable extension", async () => {
+		const dir = scratch();
+		const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
+		const result = await fetchContent("http://example.com/pic.png", { mode: "raw", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: respond(bytes, "image/png").impl });
+		if (!("bytes" in result)) throw new Error("expected a raw envelope");
+		expect(result.content_type).toBe("image/png");
+		expect(result.path.endsWith(".png")).toBe(true);
+		expect([...readFileSync(result.path)]).toEqual([...bytes]);
+	});
+
+	it("reports an empty HTML body as empty rather than as a library failure", async () => {
+		const dir = scratch();
+		// A 204, or a challenge page with no body: Readability used to throw on the empty document,
+		// and the throw escaped as a bare `Error` naming no URL, no status and no type.
+		const empty = respond("", "text/html").impl;
+		// A 204 cannot be built with a body, so its response is spelled out.
+		const noContent = (async () => new Response(null, { status: 204, headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
+		for (const impl of [empty, noContent]) {
+			const result = await fetchContent("http://example.com/gone", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: impl });
+			if (!("chars" in result)) throw new Error("expected a markdown envelope");
+			expect(result.chars).toBe(0);
+			expect(result.note ?? "").toContain("the response was empty");
+			expect(readFileSync(result.path, "utf8")).toBe("");
 		}
 	});
 
@@ -353,6 +381,34 @@ describe('fetch_content via="shell" — the escape hatch', () => {
 		expect([...readFileSync(result.path)]).toEqual([...bytes]);
 	});
 
+	it("reads the -w line field by field, so a response with no Content-Type keeps its type empty", async () => {
+		const dir = scratch();
+		// curl prints `\t<url>\t<status>` when the server sends no Content-Type. Trimming the line
+		// before splitting it dropped that empty field: the URL became the "content type" and the
+		// status became the URL, so the model was told its own URL was an unsupported media type.
+		const { shellExec } = curlStub("plain body", "");
+		const result = await fetchContent("http://localhost:3000/a.txt", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, via: "shell", shellExec });
+		if (!("chars" in result)) throw new Error("expected a markdown envelope");
+		// An undeclared body is sniffed, exactly as the guarded route does: text, delivered as text.
+		expect(plain(readFileSync(result.path, "utf8"))).toBe("plain body");
+		expect(result.url).toBe("http://localhost:3000/a.txt");
+		expect(result.note ?? "").toContain("the server declared application/octet-stream");
+	});
+
+	it("reports a curl timeout as a timeout, not as a curl that would not start", async () => {
+		const dir = scratch();
+		// `execFile` kills the child at `timeout` and answers an error with `killed: true`: curl ran
+		// fine and was killed, so "could not run curl" is the wrong story and sends a session hunting
+		// for a missing binary.
+		const shellExec = async () => {
+			throw Object.assign(new Error("Command failed: curl -sS -L -o /x/.curl-1.body -w …"), { killed: true, signal: "SIGTERM", code: null });
+		};
+		const error = (await fetchContent("https://example.com/slow", { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, via: "shell", shellExec }).catch((caught: unknown) => caught)) as Error;
+		expect(error.name).toBe("TimeoutError");
+		expect(error.message).toContain("timed out after 5000 ms");
+		expect(error.message).not.toContain("could not run curl");
+	});
+
 	it("raises OSError naming curl's own exit and stderr, and one when curl cannot run at all", async () => {
 		const dir = scratch();
 		const failing = curlStub("", "", { code: 6, stderr: "Could not resolve host: nope.invalid" });
@@ -424,17 +480,20 @@ describe('fetch_content via="shell" — the escape hatch', () => {
 		expect(readdirSync(join(dir, "web")).filter((name) => name.startsWith(".curl-"))).toEqual([]);
 	});
 
-	it("the guarded route's own refusals name the hatch, so the remedy arrives with the failure", async () => {
+	it("each refusal names the route that actually gets past it", async () => {
 		const dir = scratch();
-		const impl = (async () => new Response("x", { status: 200, headers: { "content-type": "application/zip" } })) as unknown as typeof fetch;
-		const error = (await fetchContent("https://example.com/a.zip", {
-			mode: "markdown",
-			scratchDir: dir,
-			timeoutMs: 5_000,
-			guard,
-			fetchImpl: impl,
-		}).catch((caught: unknown) => caught)) as Error;
-		expect(error.message).toContain("unsupported content type");
-		expect(error.message).toContain('via="shell"');
+		const fetchWith = async (url: string, impl: typeof fetch) =>
+			(await fetchContent(url, { mode: "markdown", scratchDir: dir, timeoutMs: 5_000, guard, fetchImpl: impl }).catch((caught: unknown) => caught)) as Error;
+
+		// A non-2xx is what the hatch is for: a 403 to our request shape, an authenticated API.
+		const forbidden = await fetchWith("https://example.com/private", (async () => new Response("no", { status: 403 })) as unknown as typeof fetch);
+		expect(forbidden.message).toContain("HTTP 403");
+		expect(forbidden.message).toContain('via="shell"');
+
+		// A content type is not: the hatch runs this same pipeline, so the refusal names mode="raw".
+		const zip = await fetchWith("https://example.com/a.zip", (async () => new Response("x", { status: 200, headers: { "content-type": "application/zip" } })) as unknown as typeof fetch);
+		expect(zip.message).toContain("unsupported content type");
+		expect(zip.message).toContain('use mode="raw"');
+		expect(zip.message).not.toContain('via="shell"');
 	});
 });
