@@ -1,11 +1,19 @@
 /**
  * advisor-ui — bordered select-panel builders for the `/advisor` command.
  *
- * Carried verbatim from upstream (`advisor-ui.ts`), including its panel prose: two public functions
+ * Carried from upstream (`advisor-ui.ts`), including its panel prose: two public functions
  * (`showAdvisorPicker`, `showEffortPicker`) over a private `showFilterablePicker` that owns the bordered
  * container, the `SelectList` theme wiring, and a type-to-filter fuzzy search. Nothing about it is
  * lane-specific — a command is still typed by a human, and a host function cannot be typed — which is why
- * the picker survives the port unchanged.
+ * the picker survives the port.
+ *
+ * **One amendment, for pi 1.5.0.** `ctx.ui.custom()` took a `blocked` option and the picker now declares
+ * itself through it, so a terminal that speaks OSC 7501 is told the program waits on a **question** while
+ * this panel is the visible component, instead of reporting nothing and looking stalled. Pi's reporter
+ * accepts only the session name, a dialog title or an error's first line as the message
+ * (`program-status-reporter.ts`), so the message is the panel's own title and never a row or the filter.
+ * The option applies to inline components only, which is what this picker is; a host older than 1.5.0
+ * ignores the key, so there is no version check and no second code path.
  */
 
 import type { ThinkingLevel } from "@earendil-works/pi-ai";
@@ -81,6 +89,12 @@ interface FilterablePickerOptions {
 }
 
 function showFilterablePicker(ctx: ExtensionContext, opts: FilterablePickerOptions): Promise<string | null> {
+	// What pi 1.5.0 reports to the terminal (OSC 7501) while this panel is the visible component: a program
+	// waiting on a question, named by the panel's own title. Inline components only — which this is — and a
+	// host older than 1.5.0 ignores the key, so there is no version check and no second code path.
+	const dialog: { blocked: { kind: "question"; message: string } } = {
+		blocked: { kind: "question", message: opts.title },
+	};
 	return ctx.ui.custom<string | null>((tui, theme, _kb, done) => {
 		let query = "";
 		let selectList: SelectList;
@@ -119,7 +133,7 @@ function showFilterablePicker(ctx: ExtensionContext, opts: FilterablePickerOptio
 				tui.requestRender();
 			},
 		};
-	});
+	}, dialog);
 }
 
 export async function showAdvisorPicker(ctx: ExtensionContext, items: SelectItem[]): Promise<string | null> {
