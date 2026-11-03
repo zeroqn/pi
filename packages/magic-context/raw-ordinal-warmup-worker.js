@@ -23,6 +23,11 @@ main().catch((error) => {
   });
 });
 async function main() {
+  if (input.v2ArchiveReader) {
+    const { serveV2ArchiveReads } = await import("./v2-archive-reader-mpj9hcnv.js");
+    await serveV2ArchiveReads(port, openConnections);
+    return;
+  }
   const [
     { Database, registerSqliteDiagnosticSink },
     { readRawSessionMessageIdsAtOrdinalsFromDb, scanRawSessionSummaryRows },
@@ -30,9 +35,9 @@ async function main() {
     { log }
   ] = await Promise.all([
     import("./sqlite-v89bj0yy.js"),
-    import("./read-session-raw-napqv76k.js"),
+    import("./read-session-raw-zb8kpa2y.js"),
     import("./harness-9872e0ym.js"),
-    import("./logger-shetp43v.js")
+    import("./logger-2j70hhz4.js")
   ]);
   setHarness(input.harness ?? "opencode");
   registerSqliteDiagnosticSink(log, getHarness);
@@ -42,17 +47,17 @@ async function main() {
     if (input.openCancellation && Atomics.load(new Int32Array(input.openCancellation), 0) !== 0) {
       throw new Error("warm-up owner closed before database open");
     }
-    db = input.indexMessage || input.orphanSweep || input.ftsRowidBackfill ? new Database(input.path) : new Database(input.path, { readonly: true });
+    db = input.indexMessage || input.ftsRowidBackfill ? new Database(input.path) : new Database(input.path, { readonly: true });
     openConnections.add(db);
     db.exec("PRAGMA busy_timeout = 250");
     if (input.ftsRowidBackfill) {
-      const { runMessageFtsRowidMapBackfill } = await import("./message-fts-rowid-map-1tb3qjtc.js");
+      const { runMessageFtsRowidMapBackfill } = await import("./message-fts-rowid-map-aw4xa05a.js");
       db.exec("PRAGMA busy_timeout = 0");
       await runMessageFtsRowidMapBackfill(db);
       reply = { kind: "fts-rowid-backfill" };
     } else if (input.searchArchive) {
-      const { renderSearchArchive } = await import("./search-archive-qa1sf8hc.js");
-      const { readRawSessionMessageIdOrdinalsForRangeFromDb } = await import("./read-session-raw-napqv76k.js");
+      const { renderSearchArchive } = await import("./search-archive-wf69rern.js");
+      const { readRawSessionMessageIdOrdinalsForRangeFromDb } = await import("./read-session-raw-zb8kpa2y.js");
       const archive = input.searchArchive;
       let raw;
       try {
@@ -77,34 +82,11 @@ async function main() {
         kind: "exact-ordinal-ids",
         ids: readRawSessionMessageIdsAtOrdinalsFromDb(db, input.sessionId, input.exactOrdinalIds)
       };
-    } else if (input.orphanSweep) {
-      const [
-        { setHarness },
-        { sweepOrphanedOpenCodeMessageIndexesCooperatively },
-        { configureContextDatabasePragmas }
-      ] = await Promise.all([
-        import("./harness-9872e0ym.js"),
-        import("./message-index-fedjhja5.js"),
-        import("./sqlite-context-pragmas-gcgch6qz.js")
-      ]);
-      setHarness(input.harness ?? "opencode");
-      configureContextDatabasePragmas(db);
-      const sourcePath = input.orphanSweep.sourcePath;
-      reply = {
-        kind: "orphan-sweep",
-        result: await sweepOrphanedOpenCodeMessageIndexesCooperatively(db, () => {
-          if (!sourcePath)
-            return null;
-          const source = new Database(sourcePath, { readonly: true });
-          openConnections.add(source);
-          return source;
-        }, input.orphanSweep.options)
-      };
     } else if (input.indexMessage) {
       const { setHarness } = await import("./harness-9872e0ym.js");
       setHarness(input.harness ?? "opencode");
       const [{ indexMessageInShortChunks }, { configureContextDatabasePragmas }] = await Promise.all([
-        import("./message-index-bounded-yj7s7cwz.js"),
+        import("./message-index-bounded-7bvtawjf.js"),
         import("./sqlite-context-pragmas-gcgch6qz.js")
       ]);
       configureContextDatabasePragmas(db);
@@ -118,7 +100,7 @@ async function main() {
         measurements: result.measurements
       };
     } else if (input.tagRatio !== undefined) {
-      const { scanTagOwnerSummary, scanTagOwnerDelta } = await import("./storage-tags-r48vxthe.js");
+      const { scanTagOwnerSummary, scanTagOwnerDelta } = await import("./storage-tags-4hcs1nv4.js");
       const delta = input.tagState ? scanTagOwnerDelta(db, input.sessionId, input.tagState) : null;
       if (delta)
         reply = { kind: "tag-delta", delta };

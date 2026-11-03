@@ -6,7 +6,7 @@ if (!port)
 port.postMessage({ kind: "accepted" });
 var [{ Database }, { scanMarkerCandidateSnapshot }] = await Promise.all([
   import("./sqlite-v89bj0yy.js"),
-  import("./compaction-marker-candidates-p1kqkqhq.js")
+  import("./compaction-marker-candidates-hk2frhac.js")
 ]);
 var input = workerData;
 var db;

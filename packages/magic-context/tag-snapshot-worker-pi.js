@@ -1,38 +1,41 @@
 import {
   Database2
 } from "./index-2qtx0q6h.js";
-import"./index-hxp6q5f8.js";
+import"./index-6pk49fc3.js";
 import"./index-0h2mkab2.js";
-import"./index-fgs78jyd.js";
-import"./index-n4wyxcgr.js";
-import"./index-fapenpch.js";
+import"./index-gymgz20n.js";
+import"./index-dnp1jjar.js";
 import {
   LATEST_SUPPORTED_VERSION,
   getPersistedSchemaVersion
-} from "./index-j0t5pwjg.js";
+} from "./index-cx7ctxbc.js";
+import"./index-fapenpch.js";
+import"./index-3bb24eb6.js";
 import"./index-399p688g.js";
 import {
   exitOnWorkerClose
 } from "./index-54wmg4rj.js";
-import"./index-8hmqdav2.js";
-import"./index-8a2wvrda.js";
-import"./index-0dr64gsy.js";
+import"./index-mkh1cm5k.js";
+import"./index-rgvqh5x7.js";
+import"./index-vd4cwnaz.js";
 import {
   tagRevisionKey
-} from "./index-w1avzkdt.js";
+} from "./index-3pk2mhaq.js";
 import"./index-135e8hvg.js";
-import"./index-23t8ryqw.js";
-import"./index-my0dn413.js";
+import"./index-n0zjvs3h.js";
+import"./index-3rq8rbt9.js";
+import"./index-c6wbq66z.js";
 import {
   normalizeTagSnapshotRow2,
   TAG_SELECT_COLUMNS2
-} from "./index-n8e5e9fp.js";
+} from "./index-asxy48qe.js";
 import {
   encodePiHydrationOperation,
+  projectPiPassTag,
   PI_FALLBACK_ROW_COLUMNS,
   PI_FALLBACK_ROW_PREDICATE
-} from "./index-qqhp68dc.js";
-import"./index-hqw0rt9k.js";
+} from "./index-am0e75f3.js";
+import"./index-0wtm7g7f.js";
 
 // src/tag-snapshot-worker-pi.ts
 import { setTimeout as delay } from "node:timers/promises";
@@ -124,7 +127,8 @@ async function stream(kind) {
   const fallback = kind === "fallback" ? `AND ${PI_FALLBACK_ROW_PREDICATE}` : "";
   const query = `SELECT ${columns} FROM tags WHERE session_id = ? ${fallback}`;
   const firstPage = connection.prepare(`${query} ORDER BY tag_number ASC, id ASC LIMIT 256`);
-  const nextPage = connection.prepare(`${query} AND ((? IS NULL AND tag_number IS NOT NULL) OR tag_number > ? OR (tag_number IS ? AND id > ?)) ORDER BY tag_number ASC, id ASC LIMIT 256`);
+  const nextPage = connection.prepare(`${query} AND (tag_number, id) > (?, ?) ORDER BY tag_number ASC, id ASC LIMIT 256`);
+  const nextNullPage = connection.prepare(`${query} AND ((tag_number IS NULL AND id > ?) OR tag_number IS NOT NULL) ORDER BY tag_number ASC, id ASC LIMIT 256`);
   let buffer = new Uint8Array(65536);
   for (;; ) {
     if (request.test?.pageDelayMs)
@@ -139,7 +143,7 @@ async function stream(kind) {
         generation = stamp;
       } else if (stamp.revision !== generation.revision || stamp.durable !== generation.durable)
         throw new StaleGeneration("session tags changed between pages");
-      rows = cursor ? nextPage.all(request.sessionId, cursor.tag_number, cursor.tag_number, cursor.tag_number, cursor.id) : firstPage.all(request.sessionId);
+      rows = cursor ? cursor.tag_number === null ? nextNullPage.all(request.sessionId, cursor.id) : nextPage.all(request.sessionId, cursor.tag_number, cursor.id) : firstPage.all(request.sessionId);
       connection.exec("COMMIT");
     } catch (error) {
       connection.exec("ROLLBACK");
@@ -169,7 +173,8 @@ async function stream(kind) {
     };
     for (const raw of rows) {
       cursor = { tag_number: raw.tag_number, id: raw.id };
-      const row = kind === "tags" ? normalizeTagSnapshotRow2(raw) : raw;
+      const normalized = kind === "tags" ? normalizeTagSnapshotRow2(raw) : raw;
+      const row = kind === "tags" && normalized && request.projection === "pass" ? projectPiPassTag(normalized) : normalized;
       if (!row)
         continue;
       for (const operation of operations(row)) {

@@ -4,25 +4,28 @@ import {
   harnessOwnsOpenCodeStore2
 } from "./index-0h2mkab2.js";
 import {
-  getDataDir,
   ensureCortexKitArtifactGitignore,
   getProjectMagicContextHistorianDir,
   getMagicContextStorageDir,
   isMagicContextStorageOutsideEngram,
   claimStorageBackupWarningCheck,
-  sanitizeDiagnosticText,
-  hasShareabilitySensitiveText,
   registerStalePluginBuildHost,
   classifyStalePluginBuild,
   importPluginModule,
   log2,
   sessionLog2,
   flushLogger2
-} from "./index-fgs78jyd.js";
+} from "./index-gymgz20n.js";
+import {
+  sanitizeDiagnosticText,
+  hasShareabilitySensitiveText
+} from "./index-dnp1jjar.js";
 import {
   COMPACTION_ENABLED_PATH,
   isDreamerRunnable,
   isCompactionEnabled,
+  isCommitRetentionPaused,
+  copyCommitRetentionRecovery,
   formatConfigParseStatusLine,
   formatConfigParseNotice,
   claimConfigParseFailuresOnce,
@@ -46,110 +49,6 @@ import {
   cortexKitProjectConfigBasePath,
   migrateMagicContextConfigLocations,
   getProtectedTokensTierOverrides,
-  rememberUnpublishedAutoSearchNoHint,
-  getUnpublishedAutoSearchNoHint,
-  forgetUnpublishedAutoSearchNoHint,
-  registerAutoSearchWork,
-  cancelAutoSearchWork,
-  readSessionMeta,
-  getOrCreateSessionMeta,
-  updateSessionMeta,
-  advanceToolReclaimWatermark,
-  retryPendingSessionCleanups,
-  retryPendingRustSessionCleanupsForProject,
-  COMPARTMENT_LEASE_RENEWAL_MS,
-  acquireCompartmentLease,
-  renewCompartmentLease,
-  releaseCompartmentLease,
-  releaseCompartmentLeaseBestEffort,
-  isCompartmentLeaseHeld,
-  isNoContentCompartment,
-  HAS_COMPARTMENT_CONTENT_SQL,
-  queueM0Mutation,
-  getMaxM0MutationId,
-  getCompartments,
-  getLastCompartmentEndMessage,
-  getLastCompartmentEndMessageId,
-  getCompartmentsByEndMessageId,
-  appendCompartments,
-  saveRecompStagingPass,
-  getRecompStaging,
-  clearRecompStaging,
-  getRecompPartialRange,
-  setRecompPartialRange,
-  escapeXmlAttr,
-  escapeXmlContent,
-  getUncoveredCompartmentEndThrough,
-  isPartialCompartmentEnd,
-  readProjectDocsCanonical,
-  providerResponseFailed,
-  isSuccessfulProviderCompletion,
-  requestPendingMaterialization,
-  pendingMaterializationOrigin,
-  hasPendingMaterializationOrigin,
-  clearPendingMaterialization,
-  recordSystemRefreshOwnership,
-  recordSystemPromptForRequest,
-  recordHeldHeadForRequest,
-  bindSystemPromptResponse,
-  acknowledgeSystemPromptDelivery,
-  deferDeliveredSystemRefresh,
-  clearSystemPromptDelivery,
-  saveLkgSlotToDb,
-  loadPersistedLkgSlot,
-  drainStaleLkgSlots,
-  createDbLkgPersistence,
-  replayLkg,
-  registerLkgPersistence,
-  LKG_SNAPSHOT_ARRAY,
-  LKG_SNAPSHOT_OBJECT,
-  LKG_SNAPSHOT_KEY,
-  LKG_SNAPSHOT_STRING,
-  LKG_SNAPSHOT_NUMBER,
-  LKG_SNAPSHOT_BOOLEAN,
-  LKG_SNAPSHOT_NULL,
-  LKG_SNAPSHOT_UNDEFINED,
-  contentSnapshotValue,
-  signatureForFields,
-  lkgContentFields,
-  lkgContentDigestFromFields,
-  isLegacyLkgDigest,
-  legacyLkgDigestFromFields,
-  lkgFieldsMatchDigest,
-  exactReusablePrefix,
-  incrementalLkgContentDigests,
-  lkgSlotRejection,
-  captureSlot,
-  getInMemorySlot,
-  getSlot,
-  dropSlot,
-  TOOL_SWEEP_SCOPED_MARKER,
-  encodePiContentDecision,
-  decodePiContentDecision,
-  getPiContentDecisions,
-  freezePiContentDecision,
-  getNativeReplayState,
-  saveNativeToolInputs,
-  addNativeReasoningIds,
-  copySessionStateForClone,
-  externalHistorianFailureReason,
-  subprocessExitHistorianFailureReason,
-  countHistorianRuns,
-  recordHistorianRun,
-  summarizeImportance,
-  tallyFactsByCategory,
-  queueMemoryMutation,
-  getMemoryMutationsForRender,
-  getMemoryMutationsForRenderByProjects,
-  getMaxMemoryMutationId,
-  getMaxMemoryMutationIdForProjects,
-  GLOBAL_USER_PROFILE_PROJECT_PATH,
-  getProjectState,
-  bumpProjectUserProfileVersion,
-  saveSourceContent,
-  getSourceContents,
-  recordSubagentInvocation,
-  getLatestHistorianInvocationId,
   noteTouchedAt,
   noteNudgePickIndex,
   formatNoteNudge,
@@ -262,7 +161,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-sxyhgtzp.js";
+} from "./index-x5y4ar97.js";
 import"./index-4knyh1kt.js";
 import {
   canonicalModelIdentity,
@@ -287,23 +186,8 @@ import {
   createFailClosedBlockingError,
   isFailClosedBlockingError,
   shouldBypassFailClosedBlock,
-  createFailClosedController,
-  getErrorMessage,
-  describeError,
-  startBootDeadline,
-  getSchemaFenceRejection,
-  getMigrationOnOpenRefusal,
-  LATEST_SUPPORTED_VERSION,
-  getDatabasePath,
-  getPersistedSchemaVersion,
-  setSqlitePragmaConfig,
-  applySqliteTuningPragmas,
-  runSqliteOptimize,
-  openDatabase,
-  openCurrentDatabase,
-  openDatabaseAsync,
-  closeDatabase
-} from "./index-j0t5pwjg.js";
+  createFailClosedController
+} from "./index-3bb24eb6.js";
 import {
   pruneMissingProjectIdentities,
   setHomeProjectPermission,
@@ -315,7 +199,7 @@ import {
   resolveProjectIdentityForSession,
   beginBootQuietPeriod,
   scheduleAfterBootQuiet
-} from "./index-hxp6q5f8.js";
+} from "./index-6pk49fc3.js";
 import {
   detectThinkingBindingMismatch,
   detectLatestTurnThinkingMismatch,
@@ -327,6 +211,7 @@ import {
   HYGIENE_PROVIDER_UNITS_VERSION,
   sessionDecisionCalibration,
   transitionSessionHygieneUnits,
+  rowWindowMass,
   computeProtectionWindow,
   readEpochFloorSnapshot,
   getProtectionWindowForSession,
@@ -420,7 +305,7 @@ import {
   getSessionWorkMetrics,
   resolveEpochFloorForPass,
   askAnswerLines,
-  retreatPastHostUnservedRows,
+  removeUnsupportedCommitHashes,
   completedToolArcCrossesBoundary,
   estimateTrueRawMessageTokens,
   buildToolArcs,
@@ -448,6 +333,7 @@ import {
   isInActiveAnthropicTurn,
   activeAnthropicTurnStart,
   hasAnthropicReasoning,
+  isMarkerOnlyText,
   findLatestAssistantReasoningMutationExemptMessage,
   DEFAULT_KEEP_REASONING_TOKENS,
   resolveKeepReasoningTokens,
@@ -473,11 +359,12 @@ import {
   getCachedAbsoluteMessageCount2,
   primeInMemoryTailRawMessageCache2,
   readRawSessionMessageIdOrdinalsForRange2,
+  compareRawSessionMessageOrder2,
   getRawSessionMessageCount2,
   getRawSessionTagKeysThrough2,
   getLegacyProtectedTailStartOrdinal2,
   readSessionChunk2
-} from "./index-cm9e52mb.js";
+} from "./index-6vfy5y6a.js";
 import {
   UNKNOWN_FIT_RATIO,
   hasMeasuredDecisionCalibration,
@@ -564,7 +451,7 @@ import {
   getToolTagNumberByOwner2,
   getNullOwnerToolTag2,
   adoptNullOwnerToolTag2
-} from "./index-n8e5e9fp.js";
+} from "./index-asxy48qe.js";
 import {
   textMentionsRecentCommit,
   hasMeaningfulUserText2,
@@ -576,7 +463,7 @@ import {
   estimateTokens,
   estimateFixedPromptTokens,
   normalizeText
-} from "./index-my0dn413.js";
+} from "./index-3rq8rbt9.js";
 import {
   inRootAsyncContext2,
   Database2,
@@ -588,67 +475,170 @@ import {
   guardSqliteTransformPass2,
   assertTransformWrite2,
   isTransientSqliteError2,
-  withAsyncPrivilegedWriter2,
-  indexCoordinationInput2
+  withAsyncPrivilegedWriter2
 } from "./index-2qtx0q6h.js";
 import {
   stableStringify,
-  closeQuietly,
-  isKnownAutocommit,
+  getTableColumnNames,
   observeTemporalDecisions,
   freezeTemporalDecisions,
   tagIdentityRevisionKey
-} from "./index-w1avzkdt.js";
+} from "./index-3pk2mhaq.js";
 import {
-  piHarnessKindFromExecutable
-} from "./index-n4wyxcgr.js";
+  piHarnessKindFromExecutable,
+  getErrorMessage,
+  describeError,
+  startBootDeadline,
+  getSchemaFenceRejection,
+  getMigrationOnOpenRefusal,
+  LATEST_SUPPORTED_VERSION,
+  getDatabasePath,
+  getPersistedSchemaVersion,
+  setSqlitePragmaConfig,
+  applySqliteTuningPragmas,
+  runSqliteOptimize,
+  openDatabase,
+  openCurrentDatabase,
+  openDatabaseAsync,
+  closeDatabase
+} from "./index-cx7ctxbc.js";
 import {
   LkgRecoveryFenceError,
   clearLkgFenceProcessState,
-  takeLkgRecoveryLockSweepPage,
   lkgFenceRequiresRebuild,
   lkgRecoveryFenceUnclean,
   ownsLkgDirtyFence,
   invalidateCleanLkgRecoveryFence,
   markLkgRecoveryDirty,
-  gaDatabasePath,
+  rememberUnpublishedAutoSearchNoHint,
+  getUnpublishedAutoSearchNoHint,
+  forgetUnpublishedAutoSearchNoHint,
+  registerAutoSearchWork,
+  cancelAutoSearchWork,
   readSessionActivity,
   observeSessionActivity,
   backfillSessionActivity,
-  clearCompressionDepth,
-  clearCompressionDepthRange,
-  cleanSearchText,
-  matchedSearchSnippet,
-  getMessageIndexSourceIdentity2,
-  isMessageIndexSourceCurrent2,
-  getLastIndexedOrdinal2,
-  getMessageIndexReconciliationStartOrdinal2,
-  isMessageIndexReconciledThrough2,
-  indexSingleMessage2,
-  indexMessagesAfterOrdinal2,
-  sweepOrphanedOpenCodeMessageIndexesCooperatively2
-} from "./index-zmg1td73.js";
+  readSessionMeta,
+  getOrCreateSessionMeta,
+  updateSessionMeta,
+  advanceToolReclaimWatermark,
+  retryPendingSessionCleanups,
+  retryPendingRustSessionCleanupsForProject,
+  COMPARTMENT_LEASE_RENEWAL_MS,
+  acquireCompartmentLease,
+  renewCompartmentLease,
+  releaseCompartmentLease,
+  releaseCompartmentLeaseBestEffort,
+  isCompartmentLeaseHeld,
+  isNoContentCompartment,
+  HAS_COMPARTMENT_CONTENT_SQL,
+  queueM0Mutation,
+  getMaxM0MutationId,
+  getCompartments,
+  getLastCompartmentEndMessage,
+  getLastCompartmentEndMessageId,
+  getCompartmentsByEndMessageId,
+  appendCompartments,
+  saveRecompStagingPass,
+  getRecompStaging,
+  clearRecompStaging,
+  getRecompPartialRange,
+  setRecompPartialRange,
+  escapeXmlAttr,
+  escapeXmlContent,
+  getUncoveredCompartmentEndThrough,
+  isPartialCompartmentEnd,
+  readProjectDocsCanonical,
+  providerResponseFailed,
+  isSuccessfulProviderCompletion,
+  requestPendingMaterialization,
+  pendingMaterializationOrigin,
+  hasPendingMaterializationOrigin,
+  clearPendingMaterialization,
+  recordSystemRefreshOwnership,
+  recordSystemPromptForRequest,
+  recordHeldHeadForRequest,
+  bindSystemPromptResponse,
+  acknowledgeSystemPromptDelivery,
+  deferDeliveredSystemRefresh,
+  clearSystemPromptDelivery,
+  saveLkgSlotToDb,
+  loadPersistedLkgSlot,
+  drainStaleLkgSlots,
+  createDbLkgPersistence,
+  replayLkg,
+  registerLkgPersistence,
+  LKG_SNAPSHOT_ARRAY,
+  LKG_SNAPSHOT_OBJECT,
+  LKG_SNAPSHOT_KEY,
+  LKG_SNAPSHOT_STRING,
+  LKG_SNAPSHOT_NUMBER,
+  LKG_SNAPSHOT_BOOLEAN,
+  LKG_SNAPSHOT_NULL,
+  LKG_SNAPSHOT_UNDEFINED,
+  contentSnapshotValue,
+  signatureForFields,
+  lkgContentFields,
+  lkgContentDigestFromFields,
+  isLegacyLkgDigest,
+  legacyLkgDigestFromFields,
+  lkgFieldsMatchDigest,
+  exactReusablePrefix,
+  incrementalLkgContentDigests,
+  lkgSlotRejection,
+  captureSlot,
+  getInMemorySlot,
+  getSlot,
+  dropSlot,
+  TOOL_SWEEP_SCOPED_MARKER,
+  encodePiContentDecision,
+  decodePiContentDecision,
+  getPiContentDecisions,
+  freezePiContentDecision,
+  withNativeReplayWriteBarrier,
+  getNativeReplayState,
+  saveNativeToolInputs,
+  addNativeReasoningIds,
+  copySessionStateForClone,
+  externalHistorianFailureReason,
+  subprocessExitHistorianFailureReason,
+  countHistorianRuns,
+  recordHistorianRun,
+  summarizeImportance,
+  tallyFactsByCategory,
+  queueMemoryMutation,
+  getMemoryMutationsForRender,
+  getMemoryMutationsForRenderByProjects,
+  getMaxMemoryMutationId,
+  getMaxMemoryMutationIdForProjects,
+  GLOBAL_USER_PROFILE_PROJECT_PATH,
+  getProjectState,
+  bumpProjectUserProfileVersion,
+  saveSourceContent,
+  getSourceContents,
+  recordSubagentInvocation,
+  getLatestHistorianInvocationId
+} from "./index-0hsvna5t.js";
 import {
-  BoundedSessionMap,
   resolveOpenCodeDbPath,
   assertOpenCodeStoreGeneration,
   openCodeDbPathExists,
   recordOpenCodeDbReadFailure,
   clearOpenCodeDbReadFailure,
   claimOpenCodeDbDiagnosticOnce
-} from "./index-23t8ryqw.js";
+} from "./index-n0zjvs3h.js";
 import"./index-399p688g.js";
 import {
   createWorkerShutdown
 } from "./index-54wmg4rj.js";
 import {
-  runSessionWarmupWorker,
   RAW_SUMMARY_TEXT_MAX_CHARS2
-} from "./index-8hmqdav2.js";
+} from "./index-mkh1cm5k.js";
+import"./index-ea37qn4x.js";
 import {
   formatSynapseLaneDescriptor
-} from "./index-gwxaz0z5.js";
-import"./index-8a2wvrda.js";
+} from "./index-ar863dwd.js";
+import"./index-rgvqh5x7.js";
 import {
   buildCanonicalChunkTextFromFts2,
   buildCompartmentSummaryFallbackText2,
@@ -658,7 +648,7 @@ import {
   replaceCompartmentChunkEmbeddings2,
   deleteChunkEmbedBackoffForSession2,
   chunkWindowSourceKey2
-} from "./index-wb2t932e.js";
+} from "./index-6gtz99am.js";
 import {
   recordSessionProjectIdentity,
   GIT_SWEEP_LEASE_RENEWAL_MS,
@@ -667,7 +657,7 @@ import {
   markGitSweepSuccessAndRelease,
   parkGitSweepNonIndexable,
   releaseGitSweepLease
-} from "./index-j3pz3a1b.js";
+} from "./index-mp0gh04g.js";
 import {
   embedPauseBySession,
   embedRunStateBySession,
@@ -676,28 +666,20 @@ import {
   autoEmbedIdentityBySession,
   autoEmbedRetryAfterBySession,
   invalidateAutoEmbedSession,
-  getEmbedDrainUiStatus,
-  describeShadowBackfillWriteRefusal2,
-  contentSha2562,
-  drainProjectEmbeddingIdentityMaintenance2,
-  drainStaleEmbeddingIdentitiesForProject2,
-  enqueueShadowEmbeddingItems2,
-  getProjectEmbeddingSnapshot2,
-  getProjectLocalEmbeddingRuntime2,
-  getProjectChunkEmbeddingModelId2,
-  getProjectEmbeddingMaxInputTokens2,
-  embedTextForProject2,
-  embedBatchForProject2,
-  embedItemsForProject2,
-  embedUnembeddedMemoriesForProject2,
-  drainCommitBacklogForProject2,
-  embedSessionCompartmentChunks2,
-  getEmbeddingCoverageStatus2,
-  getAutoEmbeddingSessionCoverage2
-} from "./index-vc6fjs1m.js";
+  getEmbedDrainUiStatus
+} from "./index-hgd00nas.js";
+import {
+  clearCompressionDepth,
+  clearCompressionDepthRange,
+  cleanSearchText,
+  matchedSearchSnippet
+} from "./index-2bfj5gcg.js";
 import {
   rememberV1HiddenRun
 } from "./index-6x556c2q.js";
+import {
+  BoundedSessionMap
+} from "./index-c6wbq66z.js";
 import {
   V2_MEMORY_CATEGORIES
 } from "./index-135e8hvg.js";
@@ -709,7 +691,7 @@ import {
   expandWorkspaceIdentitySetWithAliases,
   sourceNameForMemory,
   computeWorkspaceEpochFingerprint
-} from "./index-0dr64gsy.js";
+} from "./index-vd4cwnaz.js";
 import {
   configureContextDatabasePragmas2
 } from "./index-fapenpch.js";
@@ -733,33 +715,8 @@ import {
   getActivePrimers,
   createPrimer,
   updatePrimerSupport,
-  updatePrimerAnswer,
-  USER_FACING_FAILURES,
-  renderUserFacingFailure,
-  userFacingFailureCode,
-  renderCapabilityRefusal,
-  renderDreamFailure,
-  dreamFailureCode,
-  renderEmbeddingFailure,
-  renderSingleStoreMigrationRequiredRefusal,
-  SingleStoreMigrationRequiredError,
-  projectNeedsSingleStoreMigration,
-  promoteSessionFactsDurable,
-  embedPromotedFacts,
-  recordMemoryMapping,
-  recordMemoryVerifications,
-  getUnmappedMemoryIds,
-  clearMemoryVerifications,
-  getMemoryVerifications,
-  resolveGitTopLevel,
-  readGitHead,
-  readGitChangedFilesSince,
-  readGitFileChangeTimesSince,
-  verificationFileExists,
-  normalizeVerificationFiles,
-  indexCommitsForProject,
-  embedUnembeddedCommits
-} from "./index-adk1kpy9.js";
+  updatePrimerAnswer
+} from "./index-r74njrfh.js";
 import {
   setEmbeddingSessionBusy2,
   isEmbeddingHostBusy2
@@ -794,11 +751,64 @@ import {
   getCachedLocalEmbeddingPooling,
   resolveLocalEmbeddingWorkerRuntime,
   getLoadedLocalEmbeddingRuntimes
-} from "./index-0pt8z7am.js";
+} from "./index-kd79p7yt.js";
+import {
+  describeShadowBackfillWriteRefusal2,
+  contentSha2562,
+  drainProjectEmbeddingIdentityMaintenance2,
+  drainStaleEmbeddingIdentitiesForProject2,
+  enqueueShadowEmbeddingItems2,
+  getProjectEmbeddingSnapshot2,
+  getProjectLocalEmbeddingRuntime2,
+  getProjectChunkEmbeddingModelId2,
+  getProjectEmbeddingMaxInputTokens2,
+  embedTextForProject2,
+  embedBatchForProject2,
+  embedItemsForProject2,
+  embedUnembeddedMemoriesForProject2,
+  drainCommitBacklogForProject2,
+  embedSessionCompartmentChunks2,
+  getEmbeddingCoverageStatus2,
+  getAutoEmbeddingSessionCoverage2
+} from "./index-4113vdfg.js";
 import {
   cosineSimilarity
-} from "./index-zrc2y4em.js";
-import"./index-6wdwv3a6.js";
+} from "./index-9m0jvsz2.js";
+import {
+  USER_FACING_FAILURES,
+  renderUserFacingFailure,
+  userFacingFailureCode,
+  renderCapabilityRefusal,
+  renderDreamFailure,
+  dreamFailureCode,
+  renderEmbeddingFailure,
+  renderSingleStoreMigrationRequiredRefusal,
+  SingleStoreMigrationRequiredError,
+  projectNeedsSingleStoreMigration,
+  promoteSessionFactsDurable,
+  embedPromotedFacts,
+  recordMemoryMapping,
+  recordMemoryVerifications,
+  getUnmappedMemoryIds,
+  clearMemoryVerifications,
+  getMemoryVerifications,
+  resolveGitTopLevel,
+  readGitHead,
+  readGitChangedFilesSince,
+  readGitFileChangeTimesSince,
+  verificationFileExists,
+  normalizeVerificationFiles,
+  indexCommitsForProject,
+  embedUnembeddedCommits,
+  getMessageIndexEpoch,
+  isMessageIndexSearchable,
+  scheduleReconciliation,
+  scheduleIncrementalIndex,
+  scheduleClearAndReindex,
+  clearSessionTracking,
+  createAutoSearchDiagnostics
+} from "./index-6td53h94.js";
+import"./index-d0w84hy5.js";
 import {
   DREAMER_PRIMER_INVESTIGATOR_ALLOWED_TOOLS,
   buildHiddenAgentRegistrations,
@@ -810,14 +820,14 @@ import {
   HISTORIAN_CACHE_TAIL_ENV2,
   HISTORIAN_MAX_OUTPUT_TOKENS_ENV2,
   SUBAGENT_OUTPUT_CEILING_ENV2
-} from "./index-0b5kqg7n.js";
+} from "./index-2tmjp88s.js";
 import {
   PI_CONTEXT_BUDGET,
   PiContextDeadlineError,
   PiContextSupersededError,
   PiContextBudget,
   PiTagHydrationError,
-  getPiTagSnapshotView,
+  getPiPassTagSnapshotView,
   getPiActiveTagSnapshotView,
   readPiFallbackTagRows,
   prewarmPiTagSnapshot,
@@ -825,13 +835,17 @@ import {
   drainPiTagSnapshotSession,
   assertPiTagSnapshotReady,
   ensurePiTagSnapshotReady
-} from "./index-qqhp68dc.js";
-import"./index-jn44h81p.js";
+} from "./index-am0e75f3.js";
+import"./index-cq71g4dk.js";
 import"./index-1cvyaw9a.js";
-import"./index-cms6wfmd.js";
+import"./index-kfs7073b.js";
+import"./index-e9n1n9ah.js";
 import {
   __toESM
 } from "./index-22jkk6wg.js";
+import {
+  retreatPastHostUnservedRows
+} from "./index-by1bzjcd.js";
 import {
   computeNormalizedHash
 } from "./index-9x1f96r8.js";
@@ -842,9 +856,13 @@ import {
   sameProjectDirectory
 } from "./index-wrr9rp9a.js";
 import {
+  closeQuietly,
+  isKnownAutocommit
+} from "./index-nrzkqte4.js";
+import {
   logSlowWriteTransaction,
   WriteTransactionSteps
-} from "./index-hqw0rt9k.js";
+} from "./index-0wtm7g7f.js";
 import {
   setStoragePrivatePermissionEnforcement,
   ensureStorageDirectorySync,
@@ -1190,7 +1208,13 @@ function sampleLiveConfig(boot, fresh) {
     if (leaf !== undefined)
       target[leaf] = value;
   }
-  return result;
+  const sampled = result;
+  const freshCommitIndexing = fresh.memory?.git_commit_indexing;
+  const sampledCommitIndexing = sampled.memory?.git_commit_indexing;
+  if (freshCommitIndexing && sampledCommitIndexing) {
+    copyCommitRetentionRecovery(freshCommitIndexing, sampledCommitIndexing);
+  }
+  return sampled;
 }
 function removeLeaf(root, parts) {
   const parents = parts.slice(0, -1);
@@ -3570,7 +3594,7 @@ function startHostStallProfilerSwitch() {
 // package.json
 var package_default = {
   name: "@cortexkit/pi-magic-context",
-  version: "0.49.25",
+  version: "0.49.35",
   type: "module",
   description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
   main: "dist/index.js",
@@ -3636,12 +3660,14 @@ var package_default = {
     "@types/node": "^22.20.0",
     "omp-coding-agent-1812": "npm:@oh-my-pi/pi-coding-agent@18.12.3",
     "omp-coding-agent-18126": "npm:@oh-my-pi/pi-coding-agent@18.12.6",
+    "omp-coding-agent-18132": "npm:@oh-my-pi/pi-coding-agent@18.13.2",
     "omp-pi-ai-171": "npm:@oh-my-pi/pi-ai@17.1.7",
     "omp-pi-ai-1889": "npm:@oh-my-pi/pi-ai@18.8.9",
     "omp-pi-ai-1811": "npm:@oh-my-pi/pi-ai@18.11.3",
     "omp-pi-ai-1812": "npm:@oh-my-pi/pi-ai@18.12.3",
     "omp-pi-ai-18126": "npm:@oh-my-pi/pi-ai@18.12.6",
     "omp-pi-ai-1813": "npm:@oh-my-pi/pi-ai@18.13.0",
+    "omp-pi-ai-18132": "npm:@oh-my-pi/pi-ai@18.13.2",
     "pi-agent-core-087": "npm:@earendil-works/pi-agent-core@0.87.1",
     "pi-ai-086": "npm:@earendil-works/pi-ai@0.86.0",
     "pi-ai-087": "npm:@earendil-works/pi-ai@0.87.1",
@@ -4377,15 +4403,46 @@ function getDreamTaskBacklog(db, projectPath, task, options = {}) {
   }
 }
 var backlogCaches = new WeakMap;
+var displayBacklogCaches = new WeakMap;
+var DISPLAY_BACKLOG_MAX_AGE_MS = 60000;
 function getDreamTaskBacklogs(db, projectPath, tasks = CANONICAL_DREAM_TASKS, options = {}) {
   if (tasks.length === 0)
     return {};
   if (!isKnownAutocommit(db)) {
     backlogCaches.delete(db);
+    displayBacklogCaches.delete(db);
     const result = {};
     for (const task of tasks)
       result[task] = getDreamTaskBacklog(db, projectPath, task, options);
     return result;
+  }
+  if (options.display) {
+    let entries = displayBacklogCaches.get(db);
+    if (!entries) {
+      entries = new Map;
+      displayBacklogCaches.set(db, entries);
+    }
+    const optionKey = (value) => value === undefined ? "omitted" : value === null ? "null" : `number:${value}`;
+    const key = JSON.stringify([
+      projectPath,
+      tasks,
+      optionKey(options.lastRunAt),
+      optionKey(options.retrospectiveWatermarkMs)
+    ]);
+    const now = Date.now();
+    const cached = entries.get(key);
+    if (cached && now < cached.expiresAt && now >= cached.expiresAt - DISPLAY_BACKLOG_MAX_AGE_MS)
+      return structuredClone(cached.value);
+    const value = {};
+    for (const task of tasks)
+      value[task] = getDreamTaskBacklog(db, projectPath, task, options);
+    if (entries.size >= 256)
+      entries.delete(entries.keys().next().value);
+    entries.set(key, {
+      expiresAt: now + DISPLAY_BACKLOG_MAX_AGE_MS,
+      value: structuredClone(value)
+    });
+    return value;
   }
   let cache = backlogCaches.get(db);
   if (!cache) {
@@ -7211,6 +7268,15 @@ function validateHistorianOutput(text, sessionId, chunk, _priorCompartments, seq
       ok: false,
       error: "Historian terminal boundary splits a completed tool invocation/result arc"
     });
+  }
+  for (const compartment of mapped.compartments) {
+    const supported = new Set(chunk.lines.filter((line) => line.ordinal >= compartment.startMessage && line.ordinal <= compartment.endMessage).flatMap((line) => line.commitHashes ?? []));
+    for (const field of ["title", "content", "p1", "p2", "p3", "p4"]) {
+      const value = compartment[field];
+      if (typeof value === "string") {
+        compartment[field] = removeUnsupportedCommitHashes(value, supported);
+      }
+    }
   }
   return finish({
     ok: true,
@@ -10958,7 +11024,7 @@ async function runHiddenSingleShotPrompt(args) {
       let timer;
       try {
         const completion = await Promise.race([
-          args.executor.collect(handle, 200),
+          args.executor.collectPartial?.(handle, 200) ?? args.executor.collect(handle, 200),
           new Promise((resolve) => {
             timer = setTimeout(() => resolve(null), 5000);
           })
@@ -13601,6 +13667,7 @@ Remember: output only the JSON object described by the system prompt.`;
   let childSessionId = null;
   let promptSettled = false;
   let invocationRecorded = false;
+  let completionUsage;
   const recordInvocation = (params) => {
     if (!args.db || !args.parentSessionId || invocationRecorded)
       return;
@@ -13614,6 +13681,7 @@ Remember: output only the JSON object described by the system prompt.`;
       startedAt,
       status: params.status,
       messages: params.messages,
+      tokens: args.hiddenCompletionExecutor?.capabilities.harness === "opencode2" ? completionUsage : undefined,
       attemptedModel: args.model,
       configuredModels: args.fallbackModels,
       error: params.error
@@ -13638,11 +13706,15 @@ Remember: output only the JSON object described by the system prompt.`;
         timeoutMs: remainingMs,
         signal: args.signal,
         metadata: { task: "evaluate-smart-notes" },
+        onFailureOutput: (completion) => {
+          completionUsage = completion.usage;
+        },
         parse: parseCompilerOutput
       });
       promptSettled = true;
       response = carried.validated;
       outputMessages = carried.completion.messages;
+      completionUsage = carried.completion.usage;
     } else {
       const client = args.client;
       if (!client) {
@@ -14363,6 +14435,7 @@ async function confirmReadOnly(args, noteId, content, surfaceCondition, leaseSig
       startedAt,
       status: params.status,
       messages: params.messages,
+      tokens: args.hiddenCompletionExecutor?.capabilities.harness === "opencode2" ? params.tokens : undefined,
       attemptedModel: args.model,
       configuredModels: args.fallbackModels,
       error: params.error
@@ -14390,7 +14463,11 @@ async function confirmReadOnly(args, noteId, content, surfaceCondition, leaseSig
           parse: parseConfirmationVerdict
         });
         promptSettled = true;
-        recordInvocation({ status: "completed", messages: run.completion.messages });
+        recordInvocation({
+          status: "completed",
+          messages: run.completion.messages,
+          tokens: run.completion.usage
+        });
         return run.validated;
       } finally {
         promptSignal.cleanup();
@@ -14762,7 +14839,6 @@ function parseMapMemoriesManifest(text) {
 }
 function validateMapMemoriesManifest(text, expectedIds) {
   const parsed = parseMapMemoriesManifest(text);
-  assertParsedManifestNonEmpty(parsed.length, expectedIds.size, text, "mappings", "memory");
   assertNoDuplicateManifestIds(parsed.filter((entry) => expectedIds.has(entry.id)).map((entry) => entry.id), "mappings");
   return parsed;
 }
@@ -14948,8 +15024,8 @@ async function mapMemories(args) {
         result.failureStage = outcome.failure.stage;
       }
       const committed = outcome.mapped + outcome.independent;
+      const committedIds = new Set(outcome.committedIds);
       runLeaseGuardedWrite(args.db, args.holderId, args.leaseKey, () => {
-        const committedIds = new Set(outcome.committedIds);
         for (const memory of batch.inputs) {
           if (committedIds.has(memory.id)) {
             delete retries[memory.id];
@@ -14984,7 +15060,22 @@ async function mapMemories(args) {
           log2(`[dreamer] map-memories: targeted retry still omitted ${outcome.requeue.length} id(s); leaving them unmapped for the next run`);
         }
       }
-      if (outcome.failure?.class === "timeout" && committed === 0) {
+      if (outcome.failure?.class === "timeout" && batch.inputs.length > 1) {
+        const unmapped = batch.inputs.filter((memory) => !committedIds.has(memory.id));
+        const splitSize = Math.floor(batch.inputs.length / 2);
+        const splits = [];
+        for (let offset = 0;offset < unmapped.length; offset += splitSize) {
+          splits.push({
+            inputs: unmapped.slice(offset, offset + splitSize),
+            isOmissionRetry: batch.isOmissionRetry
+          });
+        }
+        if (splits.length > 0) {
+          batches.splice(i + 1, 0, ...splits);
+          log2(`[dreamer] map-memories: splitting batch [${batch.inputs.map((memory) => memory.id).join(",")}] into ${splits.map((split) => split.inputs.length).join("+")} after timeout; retrying ${unmapped.length} uncommitted mapping(s)`);
+        }
+      }
+      if (outcome.failure?.class === "timeout" && batch.inputs.length === 1 && committed === 0) {
         consecutiveTimeouts += 1;
         timeoutStreakElapsedMs.push(outcome.failure.elapsedMs);
         if (consecutiveTimeouts >= CONSECUTIVE_TIMEOUT_LIMIT2) {
@@ -14992,7 +15083,7 @@ async function mapMemories(args) {
           log2(`[dreamer] map-memories starvation: circuit breaker tripped after ${consecutiveTimeouts} consecutive batch timeouts with no committed mappings (investigation made no durable progress); per-batch elapsed [${timeoutStreakElapsedMs.join("ms, ")}ms] vs ${sliceMs}ms slice; stopping with ${result.remaining} mapping(s) remaining`);
           break;
         }
-      } else {
+      } else if (committed > 0 || outcome.failure?.class !== "timeout") {
         consecutiveTimeouts = 0;
         timeoutStreakElapsedMs = [];
       }
@@ -15043,7 +15134,8 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
       });
       recordInvocation2(args, startedAt, {
         status: "completed",
-        messages: run.completion.messages ?? []
+        messages: run.completion.messages ?? [],
+        tokens: run.completion.usage
       });
       stage = "apply";
       const outcome = await applyParsedBatchMappings(args, batch, run.validated, budgetFinalized, true);
@@ -15118,7 +15210,8 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
     recordInvocation2(args, startedAt, {
       status: failedInvocationStatus(error),
       error,
-      messages
+      messages,
+      tokens: failedCompletion?.usage
     });
     if (error instanceof DreamerModuleFailureError)
       throw error;
@@ -15285,6 +15378,7 @@ function recordInvocation2(args, startedAt, params) {
     startedAt,
     status: params.status,
     messages: params.messages,
+    tokens: args.hiddenCompletionExecutor?.capabilities.harness === "opencode2" ? params.tokens : undefined,
     attemptedModel: args.model,
     configuredModels: args.fallbackModels,
     error: params.error
@@ -16536,7 +16630,8 @@ async function git2(root, args) {
     cwd: root,
     timeout: 1e4,
     maxBuffer: MAX_DIFF_BYTES,
-    encoding: "utf8"
+    encoding: "utf8",
+    windowsHide: true
   });
   return stdout;
 }
@@ -16930,8 +17025,7 @@ function parsePartialVerifyManifest(text, expectedIds) {
 var VERIFY_BATCH_SIZE = 5;
 var VERIFY_TOKENS_PER_MEMORY = 1e5;
 var VERIFY_RUN_TOKEN_BUDGET = 2500000;
-var VERIFY_RUN_SLICE_MS = 240000;
-var VERIFY_IN_FLIGHT_GRACE_MS = 120000;
+var VERIFY_BATCH_DEFAULT_MS = 240000;
 function verifyBatchTokenBudget(size, configured) {
   return Math.min(configured ?? Number.MAX_SAFE_INTEGER, size * VERIFY_TOKENS_PER_MEMORY);
 }
@@ -16944,10 +17038,25 @@ function verifyAssistantText(messages) {
   const start = text.lastIndexOf("<verify>");
   return start >= 0 ? text.slice(start) : text;
 }
+function validateVerifyCompletion(messages, text, expectedIds, responseText = text) {
+  let parsed;
+  try {
+    parsed = validateVerifyManifest(text, expectedIds);
+  } catch (error) {
+    throw providerOutputFailureFromInvalidManifest(messages, responseText) ?? error;
+  }
+  const ids = [...parsed.verified, ...parsed.updated, ...parsed.archived, ...parsed.skipped].map((entry) => entry.id);
+  if (ids.length !== expectedIds.size || ids.some((id) => !expectedIds.has(id))) {
+    const providerFailure = providerOutputFailureFromInvalidManifest(messages, responseText);
+    if (providerFailure)
+      throw providerFailure;
+  }
+  return parsed;
+}
 var IDENTICAL_PROVIDER_FAILURE_BATCH_LIMIT = 2;
 var VERIFY_BATCH_FLOOR_MS = 30000;
-function computeVerifyBatchSliceMs(remainingMs, _batchesRemaining) {
-  return Math.min(remainingMs, VERIFY_RUN_SLICE_MS);
+function computeVerifyBatchSliceMs(remainingMs, batchesRemaining) {
+  return Math.min(remainingMs, Math.max(VERIFY_BATCH_DEFAULT_MS, remainingMs / Math.max(1, batchesRemaining)));
 }
 function closeBroadCycle(args, cycleStartAt) {
   if (!args.forceBroad || cycleStartAt === undefined)
@@ -16971,7 +17080,6 @@ async function runVerify(args) {
 }
 async function runVerifyWithCooldown(args) {
   const runStartedAt = Date.now();
-  const sliceDeadline = runStartedAt + VERIFY_RUN_SLICE_MS;
   const result = {
     verified: 0,
     updated: 0,
@@ -17019,12 +17127,10 @@ async function runVerifyWithCooldown(args) {
   try {
     for (let i = 0;i < batches.length; i += 1) {
       const now = Date.now();
-      const startCutoff = Math.min(args.deadline, sliceDeadline);
-      const hardStop = Math.min(args.deadline, sliceDeadline + VERIFY_IN_FLIGHT_GRACE_MS);
-      const remainingMs = Math.max(0, hardStop - now);
-      if (now >= startCutoff) {
+      const remainingMs = Math.max(0, args.deadline - now);
+      if (now >= args.deadline) {
         result.stopReason = "deadline";
-        log2(`[dreamer] ${args.forceBroad ? "verify-broad" : "verify"}: stopping before batch ${i + 1}/${batches.length} — the run deadline passed ${now - startCutoff}ms ago`);
+        log2(`[dreamer] ${args.forceBroad ? "verify-broad" : "verify"}: stopping before batch ${i + 1}/${batches.length} — the run deadline passed ${now - args.deadline}ms ago`);
         break;
       }
       if (remainingMs < VERIFY_BATCH_FLOOR_MS) {
@@ -17102,6 +17208,7 @@ async function verifyOneBatch(args, batch, sliceMs, signal) {
   const timer = setTimeout(() => batchController.abort(new Error(`verify slice timed out after ${sliceMs}ms`)), sliceMs);
   const batchSignal = batchController.signal;
   const tokenBudget = verifyBatchTokenBudget(batch.length, args.tokenBudget);
+  const expectedIds = new Set(batch.map((memory) => memory.id));
   let agentSessionId = null;
   let hiddenSessionId = null;
   let promptSettled = false;
@@ -17154,18 +17261,16 @@ async function verifyOneBatch(args, batch, sliceMs, signal) {
           onBudgetUpdate({ spent: 0, finalizeFired: false, sessionId });
         },
         parse: (text, completion) => {
-          const providerFailure = providerOutputFailureFromInvalidManifest(completion.messages ?? [], text);
-          if (providerFailure)
-            throw providerFailure;
           const manifest = verifyAssistantText(completion.messages ?? []) ?? (text.trim() ? text : null);
           if (!manifest)
             throw new Error("verify returned no output");
-          return validateVerifyManifest(manifest, new Set(batch.map((memory) => memory.id)));
+          return validateVerifyCompletion(completion.messages ?? [], manifest, expectedIds, text);
         }
       });
       recordInvocation4(args, startedAt, {
         status: "completed",
-        messages: run.completion.messages ?? []
+        messages: run.completion.messages ?? [],
+        tokens: run.completion.usage
       });
       reportUsage(run.completion.messages ?? [], run.childSessionId, run.completion.usage.input + (run.completion.usage.cacheRead ?? 0) + (run.completion.usage.cacheWrite ?? 0));
       return await applyParsedVerifyManifest(args, batch, run.validated, evidence?.head ?? headAtPrompt, budgetFinalized);
@@ -17222,10 +17327,7 @@ async function verifyOneBatch(args, batch, sliceMs, signal) {
         const text = verifyAssistantText(messages);
         if (!text)
           throw new Error("verify returned no output");
-        const providerFailure = providerOutputFailureFromInvalidManifest(messages, text);
-        if (providerFailure)
-          throw providerFailure;
-        return validateVerifyManifest(text, new Set(batch.map((memory) => memory.id)));
+        return validateVerifyCompletion(messages, text, expectedIds);
       }
     });
     promptSettled = true;
@@ -17242,7 +17344,8 @@ async function verifyOneBatch(args, batch, sliceMs, signal) {
     recordInvocation4(args, startedAt, {
       status: failedInvocationStatus(error),
       error,
-      messages
+      messages,
+      tokens: failedCompletion?.usage
     });
     if (error instanceof DreamerModuleFailureError || signal.aborted)
       throw error;
@@ -17501,6 +17604,7 @@ function recordInvocation4(args, startedAt, params) {
     startedAt,
     status: params.status,
     messages: params.messages,
+    tokens: args.hiddenCompletionExecutor?.capabilities.harness === "opencode2" ? params.tokens : undefined,
     attemptedModel: args.model,
     configuredModels: args.fallbackModels,
     error: params.error
@@ -17569,6 +17673,15 @@ function classifyFailure(error) {
   const combined = `${name} ${brief}`.toLowerCase();
   const transient = explicitTransient || name === "AbortError" || /abort|lease|timeout|timed out|econn|socket|network|rate.?limit|429|503|overloaded|sqlite_busy|database is locked/.test(combined);
   return { transient, brief };
+}
+function sumCompletionUsages(usages) {
+  return usages.reduce((total, usage) => ({
+    input: total.input + usage.input,
+    output: total.output + usage.output,
+    cacheRead: total.cacheRead + usage.cacheRead,
+    cacheWrite: total.cacheWrite + usage.cacheWrite,
+    ...total.reasoning !== undefined || usage.reasoning !== undefined ? { reasoning: (total.reasoning ?? 0) + (usage.reasoning ?? 0) } : {}
+  }), emptyTokenTotals());
 }
 function newIds(beforeIds, afterIds) {
   const before = new Set(beforeIds);
@@ -17956,7 +18069,7 @@ function createDreamTaskExecutor(deps) {
             return { status: "failed", transient: true, error };
           }
           const processed = result.mapped + result.independent;
-          if (processed > 0) {
+          if (processed > 0 || result.failure === undefined) {
             const progress = `map-memories: committed ${processed} mapping(s) (mapped ${result.mapped}, independent ${result.independent}); ${result.remaining} remain`;
             recordRun("completed", null, { progress });
             return { status: "completed" };
@@ -18377,6 +18490,7 @@ async function runRetrospectiveTask(config, ctx, helpers) {
   }, ctx.leaseAcquisition);
   let childSessionId = null;
   let hiddenHandle = null;
+  const hiddenUsages = [];
   let promptSettled = false;
   let invocationRecorded = false;
   const recordInvocation = (status, messages, error) => {
@@ -18392,6 +18506,7 @@ async function runRetrospectiveTask(config, ctx, helpers) {
       startedAt: helpers.invocationStartedAt,
       status,
       messages,
+      tokens: deps.hiddenCompletionExecutor?.capabilities.harness === "opencode2" && hiddenUsages.length ? sumCompletionUsages(hiddenUsages) : undefined,
       attemptedModel: config.model,
       configuredModels: config.fallbackModels,
       error
@@ -18477,6 +18592,8 @@ async function runRetrospectiveTask(config, ctx, helpers) {
         }
       });
       promptSettled = true;
+      if (hiddenHandle)
+        hiddenUsages.push(run.output.usage);
       const output = hiddenHandle ? run.output.messages ?? [] : run.output;
       return { ...run, output };
     };
@@ -18647,6 +18764,7 @@ async function runAgenticTask(config, ctx, helpers) {
   let childSessionId = null;
   let promptSettled = false;
   let expiredArchived = 0;
+  const hiddenUsages = [];
   let invocationRecorded = false;
   const recordInvocation = (status, messages, error) => {
     if (!parent || !childSessionId || invocationRecorded)
@@ -18661,6 +18779,7 @@ async function runAgenticTask(config, ctx, helpers) {
       startedAt: invocationStartedAt,
       status,
       messages,
+      tokens: deps.hiddenCompletionExecutor?.capabilities.harness === "opencode2" && hiddenUsages.length ? sumCompletionUsages(hiddenUsages) : undefined,
       attemptedModel: config.model,
       configuredModels: config.fallbackModels,
       error
@@ -18778,6 +18897,7 @@ async function runAgenticTask(config, ctx, helpers) {
           }
         });
         childSessionId = hidden.childSessionId;
+        hiddenUsages.push(hidden.completion.usage);
         run = { output: hidden.completion.messages ?? [], validated: hidden.validated };
         promptSettled = true;
       } else {
@@ -19495,326 +19615,6 @@ function clearDreamerTickFailure(db) {
   db.prepare("DELETE FROM schema_migrations_meta WHERE key = ?").run(DREAMER_TICK_FAILURE_KEY);
 }
 
-// ../plugin/src/features/magic-context/message-index-async.ts
-var indexCancellations = new Map;
-var sessionEpochs = new Map;
-var workerMeasurements = new WeakMap;
-function isDatabaseLockedError(error) {
-  if (!error || typeof error !== "object")
-    return false;
-  const e = error;
-  if (typeof e.code === "string") {
-    if (e.code === "SQLITE_BUSY" || e.code === "SQLITE_LOCKED")
-      return true;
-  }
-  if (typeof e.message === "string") {
-    if (/database is locked/i.test(e.message))
-      return true;
-    if (/sqlite_(busy|locked)/i.test(e.message))
-      return true;
-  }
-  return false;
-}
-var INCREMENTAL_DEBOUNCE_MS = 100;
-var RECONCILIATION_BATCH_SIZE = 100;
-
-class MagicContextMessageIndexHeapHolder {
-  reconciledSessions = new Set;
-  reconciledSnapshots = new Map;
-  stalledSessions = new Set;
-  reconciliationScheduledSessions = new Set;
-  clearAndReindexScheduledSessions = new Map;
-  sessionLocks = new Map;
-  incrementalTimers = new Map;
-  pendingIncrementalKeys = new Set;
-  completedIncrementalKeys = new Set;
-  activeReconcilerBuffers = new Map;
-}
-var heapHolder = new MagicContextMessageIndexHeapHolder;
-var PREPARE_RETRY_MS = 60000;
-async function sourceReady(source, sessionId) {
-  const prepare = source?.prepare;
-  return typeof prepare === "function" ? prepare(sessionId) : true;
-}
-function defer(fn) {
-  const immediate = globalThis.setImmediate;
-  if (typeof immediate === "function") {
-    inRootAsyncContext2(() => immediate(fn));
-    return;
-  }
-  inRootAsyncContext2(() => setTimeout(fn, 0));
-}
-function yieldToEventLoop() {
-  return new Promise((resolve) => defer(resolve));
-}
-function runWithSessionLock(sessionId, operation) {
-  const previous = heapHolder.sessionLocks.get(sessionId) ?? Promise.resolve();
-  const run = previous.catch(() => {
-    return;
-  }).then(async () => {
-    await operation();
-  });
-  heapHolder.sessionLocks.set(sessionId, run);
-  run.finally(() => {
-    if (heapHolder.sessionLocks.get(sessionId) === run) {
-      heapHolder.sessionLocks.delete(sessionId);
-    }
-  }).catch(() => {
-    return;
-  });
-  return run;
-}
-function logIndexingError(sessionId, action, error) {
-  if (isDatabaseLockedError(error)) {
-    sessionLog2(sessionId, `message FTS async ${action} skipped (database busy; will retry on next reconciliation)`);
-    return;
-  }
-  sessionLog2(sessionId, `message FTS async ${action} failed: ${error instanceof Error ? error.message : String(error)}`);
-  log2(`[message-index-async] ${action} failed for ${sessionId}:`, error);
-}
-function logReconciliationStall(sessionId, reason) {
-  if (heapHolder.stalledSessions.has(sessionId))
-    return;
-  heapHolder.stalledSessions.add(sessionId);
-  sessionLog2(sessionId, `message FTS reconciliation stalled: ${reason}; will retry`);
-}
-async function reconcileSessionIndex(db, sessionId, readMessages) {
-  if (!await sourceReady(readMessages, sessionId)) {
-    logReconciliationStall(sessionId, "raw message reader is not ready");
-    return false;
-  }
-  await runWithSessionLock(sessionId, async () => {
-    if (!readMessages.getRevision && heapHolder.reconciledSessions.has(sessionId))
-      return;
-    let fallbackSnapshot = null;
-    try {
-      const fullReader = typeof readMessages === "function" ? readMessages : null;
-      const revision = readMessages.getRevision?.(sessionId);
-      const previous = heapHolder.reconciledSnapshots.get(sessionId);
-      const finalWatermark = previous && revision === previous.revision ? previous.count : revision !== undefined && readMessages.getCountAfterRevision ? previous && revision > previous.revision ? previous.count + readMessages.getCountAfterRevision(sessionId, previous.revision, revision) : readMessages.getCountAfterRevision(sessionId, -1, revision) : readMessages.getCount ? readMessages.getCount(sessionId) : (fallbackSnapshot = fullReader?.(sessionId) ?? []).length;
-      let cursor = getMessageIndexReconciliationStartOrdinal2(db, sessionId);
-      let after = cursor === previous?.count ? previous.after : undefined;
-      while (cursor < finalWatermark) {
-        const pageEnd = Math.min(finalWatermark, cursor + RECONCILIATION_BATCH_SIZE);
-        const messages = readMessages.readPage ? readMessages.readPage(sessionId, cursor, RECONCILIATION_BATCH_SIZE, finalWatermark, after) : (fallbackSnapshot ?? []).filter((message) => message.ordinal > cursor && message.ordinal <= pageEnd);
-        const retainedMessages = fallbackSnapshot ?? messages;
-        heapHolder.activeReconcilerBuffers.set(sessionId, retainedMessages);
-        withSqliteBackgroundWriter2(() => indexMessagesAfterOrdinal2(db, sessionId, messages, cursor, pageEnd));
-        const nextCursor = getMessageIndexReconciliationStartOrdinal2(db, sessionId);
-        if (nextCursor <= cursor)
-          break;
-        cursor = nextCursor;
-        const last = messages.at(-1);
-        after = last?.ordinal === cursor && typeof last.createdAt === "number" ? { timeCreated: last.createdAt, id: last.id } : undefined;
-        if (cursor < finalWatermark) {
-          await yieldToEventLoop();
-        }
-      }
-      if (isMessageIndexReconciledThrough2(db, sessionId, finalWatermark)) {
-        heapHolder.reconciledSessions.add(sessionId);
-        if (revision !== undefined) {
-          if (!after && finalWatermark > 0 && readMessages.readPage) {
-            const last = readMessages.readPage(sessionId, finalWatermark - 1, 1, finalWatermark).at(-1);
-            if (last?.ordinal === finalWatermark && typeof last.createdAt === "number")
-              after = { timeCreated: last.createdAt, id: last.id };
-          }
-          heapHolder.reconciledSnapshots.set(sessionId, {
-            revision,
-            count: finalWatermark,
-            after
-          });
-        }
-      } else {
-        logReconciliationStall(sessionId, `gap after ordinal ${cursor} (store count ${finalWatermark})`);
-      }
-    } finally {
-      heapHolder.activeReconcilerBuffers.delete(sessionId);
-    }
-  });
-  return true;
-}
-function scheduleReconciliation(db, sessionId, readMessages) {
-  if (!readMessages.getRevision && heapHolder.reconciledSessions.has(sessionId) || heapHolder.reconciliationScheduledSessions.has(sessionId)) {
-    return;
-  }
-  heapHolder.reconciliationScheduledSessions.add(sessionId);
-  scheduleAfterBootQuiet(() => {
-    defer(() => {
-      let appendedDuringReconciliation = false;
-      const previousSnapshot = heapHolder.reconciledSnapshots.get(sessionId);
-      reconcileSessionIndex(db, sessionId, readMessages).then((ran) => {
-        if (ran) {
-          const snapshot = heapHolder.reconciledSnapshots.get(sessionId);
-          appendedDuringReconciliation = snapshot !== undefined && snapshot !== previousSnapshot && readMessages.getRevision !== undefined && readMessages.getRevision(sessionId) !== snapshot.revision;
-          return;
-        }
-        inRootAsyncContext2(() => setTimeout(() => {
-          heapHolder.reconciliationScheduledSessions.delete(sessionId);
-          scheduleReconciliation(db, sessionId, readMessages);
-        }, PREPARE_RETRY_MS)).unref?.();
-      }).catch((error) => {
-        logReconciliationStall(sessionId, error instanceof Error ? error.message : String(error));
-        if (isDatabaseLockedError(error))
-          inRootAsyncContext2(() => setTimeout(() => scheduleReconciliation(db, sessionId, readMessages), 1000)).unref();
-      }).finally(() => {
-        heapHolder.reconciliationScheduledSessions.delete(sessionId);
-        if (appendedDuringReconciliation)
-          scheduleReconciliation(db, sessionId, readMessages);
-      });
-    });
-  });
-}
-function scheduleIncrementalIndex(db, sessionId, messageId, messageSource) {
-  const schedulingKey = `${sessionId}\x00${messageId}`;
-  const epoch = sessionEpochs.get(sessionId) ?? 0;
-  if (heapHolder.pendingIncrementalKeys.has(schedulingKey))
-    return;
-  const activeTimer = heapHolder.incrementalTimers.get(schedulingKey);
-  if (activeTimer)
-    clearTimeout(activeTimer);
-  const timer = inRootAsyncContext2(() => setTimeout(() => {
-    heapHolder.incrementalTimers.delete(schedulingKey);
-    heapHolder.pendingIncrementalKeys.add(schedulingKey);
-    const indexMessage = async () => {
-      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch || !heapHolder.pendingIncrementalKeys.has(schedulingKey))
-        return;
-      const message = typeof messageSource === "function" ? messageSource(sessionId, messageId) : messageSource;
-      if (!message)
-        return;
-      const revisionKey = `${schedulingKey}\x00${getMessageIndexSourceIdentity2(message)}`;
-      if (heapHolder.completedIncrementalKeys.has(revisionKey))
-        return;
-      const currentWatermark = getLastIndexedOrdinal2(db, sessionId);
-      if (message.ordinal <= currentWatermark && isMessageIndexSourceCurrent2(db, sessionId, message)) {
-        heapHolder.completedIncrementalKeys.add(revisionKey);
-        return;
-      }
-      const wasReconciled = heapHolder.reconciledSessions.delete(sessionId);
-      await indexSingleMessageOffThread(db, sessionId, message);
-      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch || !heapHolder.pendingIncrementalKeys.has(schedulingKey))
-        return;
-      const finalWatermark = getLastIndexedOrdinal2(db, sessionId);
-      if (wasReconciled && isMessageIndexReconciledThrough2(db, sessionId, finalWatermark)) {
-        heapHolder.reconciledSessions.add(sessionId);
-      }
-      heapHolder.completedIncrementalKeys.add(revisionKey);
-    };
-    sourceReady(messageSource, sessionId).then((ready) => {
-      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch)
-        return;
-      if (ready)
-        return runWithSessionLock(sessionId, indexMessage);
-      setTimeout(() => scheduleIncrementalIndex(db, sessionId, messageId, messageSource), PREPARE_RETRY_MS).unref?.();
-    }).catch((error) => {
-      if ((sessionEpochs.get(sessionId) ?? 0) !== epoch)
-        return;
-      heapHolder.reconciledSessions.delete(sessionId);
-      logIndexingError(sessionId, `incremental index for ${messageId}`, error);
-      if (isDatabaseLockedError(error))
-        setTimeout(() => scheduleIncrementalIndex(db, sessionId, messageId, messageSource), 1000).unref();
-    }).finally(() => {
-      if ((sessionEpochs.get(sessionId) ?? 0) === epoch)
-        heapHolder.pendingIncrementalKeys.delete(schedulingKey);
-    });
-  }, INCREMENTAL_DEBOUNCE_MS));
-  heapHolder.incrementalTimers.set(schedulingKey, timer);
-}
-async function indexSingleMessageOffThread(db, sessionId, message) {
-  const path = getSqliteDatabasePath2(db);
-  if (!path)
-    return withSqliteBackgroundWriter2(() => indexSingleMessage2(db, sessionId, message));
-  const cancellation = new Int32Array(new SharedArrayBuffer(4));
-  const active = indexCancellations.get(sessionId) ?? new Set;
-  active.add(cancellation);
-  indexCancellations.set(sessionId, active);
-  const result = await runSessionWarmupWorker({
-    path,
-    sessionId,
-    indexMessage: message,
-    harness: getHarness2(),
-    indexCancellation: cancellation.buffer,
-    ...indexCoordinationInput2()
-  }, {}).finally(() => {
-    active.delete(cancellation);
-    if (active.size === 0)
-      indexCancellations.delete(sessionId);
-  });
-  if (!("inserted" in result))
-    throw new Error("failure" in result ? result.detail : "unexpected indexing worker reply");
-  if (result.measurements) {
-    const sessions = workerMeasurements.get(db) ?? new Map;
-    sessions.set(sessionId, result.measurements);
-    workerMeasurements.set(db, sessions);
-    if (result.measurements.skipped)
-      log2(`[magic-context] incremental FTS skipped oversized source ${message.id} (${result.measurements.sourceBytes} bytes); identity and progress persisted`);
-  }
-  return result.inserted;
-}
-async function sweepOrphanedOpenCodeMessageIndexesOffThread(db, openSource, options = {}) {
-  if (getHarness2() === "opencode" || getHarness2() === "opencode2")
-    options = {
-      ...options,
-      fenceLockNames: options.fenceLockNames ?? takeLkgRecoveryLockSweepPage()
-    };
-  if (getHarness2() === "opencode2")
-    openSource = () => new Database2(gaDatabasePath(getDataDir(), process.env.OPENCODE_CHANNEL ?? "latest"), {
-      readonly: true,
-      fileMustExist: true
-    });
-  const path = getSqliteDatabasePath2(db);
-  if (!path || getHarness2() !== "opencode" && getHarness2() !== "opencode2")
-    return sweepOrphanedOpenCodeMessageIndexesCooperatively2(db, openSource, options);
-  let source = null;
-  let sourcePath = null;
-  try {
-    source = openSource();
-    if (source)
-      sourcePath = getSqliteDatabasePath2(source);
-  } catch {} finally {
-    if (sourcePath)
-      source?.close();
-  }
-  if (!sourcePath)
-    return sweepOrphanedOpenCodeMessageIndexesCooperatively2(db, () => source, options);
-  const reply = await runSessionWarmupWorker({
-    path,
-    sessionId: "",
-    harness: getHarness2(),
-    orphanSweep: { sourcePath, options }
-  }, {});
-  if (!("orphanSweep" in reply))
-    throw new Error("message history orphan sweep worker failed");
-  return reply.orphanSweep;
-}
-function clearSessionTracking(sessionId) {
-  sessionEpochs.set(sessionId, (sessionEpochs.get(sessionId) ?? 0) + 1);
-  for (const cancellation of indexCancellations.get(sessionId) ?? [])
-    Atomics.store(cancellation, 0, 1);
-  heapHolder.clearAndReindexScheduledSessions.delete(sessionId);
-  heapHolder.reconciledSessions.delete(sessionId);
-  heapHolder.reconciledSnapshots.delete(sessionId);
-  heapHolder.stalledSessions.delete(sessionId);
-  heapHolder.reconciliationScheduledSessions.delete(sessionId);
-  heapHolder.sessionLocks.delete(sessionId);
-  heapHolder.activeReconcilerBuffers.delete(sessionId);
-  const prefix = `${sessionId}\x00`;
-  for (const [key, timer] of heapHolder.incrementalTimers) {
-    if (key.startsWith(prefix)) {
-      clearTimeout(timer);
-      heapHolder.incrementalTimers.delete(key);
-    }
-  }
-  for (const key of heapHolder.pendingIncrementalKeys) {
-    if (key.startsWith(prefix)) {
-      heapHolder.pendingIncrementalKeys.delete(key);
-    }
-  }
-  for (const key of heapHolder.completedIncrementalKeys) {
-    if (key.startsWith(prefix))
-      heapHolder.completedIncrementalKeys.delete(key);
-  }
-}
-
 // ../plugin/src/plugin/dream-timer.ts
 var DREAM_TIMER_INTERVAL_MS = 15 * 60 * 1000;
 var GIT_COMMIT_BACKLOG_DRAIN_MAX_MS = 5 * 60 * 1000;
@@ -20009,12 +19809,6 @@ async function runMessageHistoryMaintenance(db) {
     if (rustCleanup.cleared > 0 || rustCleanup.failedSessionIds.length > 0) {
       log2(`[message-index] pending Rust session cleanup: cleared=${rustCleanup.cleared} failed=${rustCleanup.failedSessionIds.length}`);
     }
-  }
-  const sweep = await sweepOrphanedOpenCodeMessageIndexesOffThread(db, openOpenCodeDb);
-  if (sweep.reason)
-    log2(`[message-index] orphan sweep parked: ${sweep.reason}`);
-  if (sweep.deleted > 0) {
-    log2(`[message-index] orphan sweep: scanned=${sweep.scanned} deleted=${sweep.deleted} cursor=${sweep.cursor || "<complete>"}`);
   }
 }
 function startupJitterMs(directory) {
@@ -20239,7 +20033,8 @@ async function sweepGitCommits(args) {
   try {
     const result = await indexCommitsForProject(db, projectIdentity, directory, {
       sinceDays: gitCommitIndexing.since_days,
-      maxCommits: gitCommitIndexing.max_commits
+      maxCommits: gitCommitIndexing.max_commits,
+      skipRetention: isCommitRetentionPaused(gitCommitIndexing)
     });
     if (result.nonIndexable) {
       if (!parkGitSweepNonIndexable(db, projectIdentity, holderId)) {
@@ -22704,7 +22499,7 @@ function normalizePiUserEntry(entry, sessionId, ordinal, followsAssistantReply) 
     return null;
   if (message.role !== "user" || typeof message.timestamp !== "number")
     return null;
-  const text = extractPiTextContent(message.content).trim();
+  const text = cleanUserText2(extractPiTextContent(message.content));
   if (!text)
     return null;
   return {
@@ -22738,7 +22533,7 @@ function extractPiTextContent(content) {
     if (part === null || typeof part !== "object")
       return [];
     const record = part;
-    return record.type === "text" && typeof record.text === "string" ? [record.text] : [];
+    return record.synthetic !== true && record.type === "text" && typeof record.text === "string" ? [record.text] : [];
   }).join(`
 `);
 }
@@ -22967,6 +22762,8 @@ async function awaitInFlightDreamers(registrationOwner) {
     return;
   await Promise.allSettled(runs);
 }
+var RUNNER_TIMEOUT_HEADROOM_MINUTES = 5;
+var UNKNOWN_TASK_TIMEOUT_MINUTES = 30;
 function createPiDreamerClient(opts, onAdjunctsRefreshNeeded = opts.onAdjunctsRefreshNeeded, isRegistrationOwnerActive = () => true, getMaxOutputTokens = () => opts.config.maxTokens, getDreamerConfig = () => opts.config) {
   const runner = piSubagentRunnerFactory();
   const budgetStates = new Map;
@@ -23020,7 +22817,7 @@ function createPiDreamerClient(opts, onAdjunctsRefreshNeeded = opts.onAdjunctsRe
         userMessage,
         model: perTaskModel,
         fallbackModels: undefined,
-        timeoutMs: 30 * 60 * 1000,
+        timeoutMs: ((taskConfig?.timeoutMinutes ?? UNKNOWN_TASK_TIMEOUT_MINUTES) + RUNNER_TIMEOUT_HEADROOM_MINUTES) * 60 * 1000,
         cwd: dreamSession.directory,
         signal: args.signal ? AbortSignal.any([args.signal, controller.signal]) : controller.signal,
         thinkingLevel: extractBodyVariant(args),
@@ -23129,7 +22926,11 @@ function accountingTaskFromTitle(title) {
   const task = title.slice("magic-context-dream-".length);
   if (!title.startsWith("magic-context-dream-") || task.length === 0)
     return null;
-  return task === "classify" ? "classify-memories" : task;
+  if (task === "classify")
+    return "classify-memories";
+  if (task === "user-memories")
+    return "review-user-memories";
+  return task;
 }
 function readSessionTitle(args) {
   const body = args.body;
@@ -24906,6 +24707,7 @@ function hasSmallToolInput(target) {
 var CACHE_LOSING_FOLD_REASONS = new Set([
   "model_change",
   "system_hash",
+  "tool_definitions",
   "ttl_idle",
   "host_compaction"
 ]);
@@ -24944,6 +24746,7 @@ function prepareLegacyToolSkeletonConversions(db, sessionId, targets, options = 
     });
   };
   const rows = readRows(db);
+  options.prepareRemovals?.(rows);
   const converted = new Map;
   for (const row of rows) {
     const target = targets.get(row.tagNumber);
@@ -24971,6 +24774,50 @@ function prepareLegacyToolSkeletonConversions(db, sessionId, targets, options = 
     persist: (connection) => {
       for (const [tagNumber, mode] of converted)
         updateTagDropMode2(connection, sessionId, tagNumber, mode);
+    }
+  };
+}
+function prepareAgedToolSkeletonConversions(db, sessionId, targets, options = {}) {
+  const candidates = [...targets.keys()].sort((a, b) => a - b);
+  const readRows = (connection) => {
+    const window = getNewestToolTagNumbers2(connection, sessionId, RECENT_TOOL_SKELETON_WINDOW);
+    const recent = new Set(window);
+    const statement = connection.prepare(`SELECT tag_number AS tagNumber, drop_mode AS dropMode, message_id AS callId
+             FROM tags WHERE session_id = ? AND tag_number = ?
+               AND type = 'tool' AND status = 'dropped'
+               AND drop_mode IN ('truncated', 'skeleton_real', 'skeleton_stripped')`);
+    const rows = candidates.filter((id) => !recent.has(id)).flatMap((id) => {
+      const row = statement.get(sessionId, id);
+      return row ? [row] : [];
+    });
+    return { window, rows };
+  };
+  const snapshot = readRows(db);
+  options.prepareRemovals?.(snapshot.rows);
+  const converted = new Map;
+  const plannedRemovals = new Set;
+  for (const row of snapshot.rows) {
+    const target = targets.get(row.tagNumber);
+    if (target?.thinkingDropProtected || target?.thinkingRewriteProtected || target?.identityRepairProtected)
+      continue;
+    if (target?.canDrop?.() !== true || target.prepareDrop?.() === false)
+      continue;
+    if (target.requiresToolArcSkeleton) {
+      const owners = target.mutationParts ? target.mutationParts.map(({ message }) => message).filter((message) => message.info.role === "assistant") : target.message ? [target.message] : [];
+      if (owners.length === 0 || owners.some((message) => !options.thinkingStrippedIds?.has(message.info.id ?? "")))
+        continue;
+    }
+    if (target.cannotRemove?.() === true || target.wouldStrandConversationEnd?.(plannedRemovals) === true)
+      continue;
+    converted.set(row.tagNumber, "full");
+    target.notePlannedRemoval?.(plannedRemovals);
+  }
+  return {
+    converted,
+    isCurrent: (connection) => JSON.stringify(readRows(connection)) === JSON.stringify(snapshot),
+    persist: (connection) => {
+      for (const tagNumber of converted.keys())
+        updateTagDropMode2(connection, sessionId, tagNumber, "full");
     }
   };
 }
@@ -25174,6 +25021,15 @@ function applyPendingOperations(sessionId, db, targets, protectedTagIds, preload
     }
   }
   return didMutateMessage;
+}
+function prepareFlushedToolRemovals(targets, tags) {
+  for (const tag of tags) {
+    if (tag.status !== "dropped" || tag.type !== "tool")
+      continue;
+    if (tag.dropMode != null && tag.dropMode !== "full")
+      continue;
+    targets.get(tag.tagNumber)?.prepareReplayDrop?.();
+  }
 }
 function applyFlushedStatuses(sessionId, db, targets, preloadedTags) {
   let didMutateMessage = false;
@@ -26394,6 +26250,60 @@ function isHistorianDrainBudgetSpent(args) {
   return true;
 }
 
+// ../plugin/src/hooks/magic-context/historian-history-wait.ts
+var historyWaits = new Map;
+function newestMessageId(snapshot) {
+  try {
+    const count = getRawSessionMessageOrdinalCount2(snapshot.sessionId);
+    const ids = readRawSessionMessageIdOrdinalsForRange2(snapshot.sessionId, count, count);
+    const newest = ids.keys().next().value;
+    if (newest)
+      return newest;
+  } catch {}
+  return snapshot.rawLastMessageIdAtTrigger;
+}
+function recoveryWindow(snapshot, percentage) {
+  return percentage >= escalationBands(snapshot.executeThresholdPercentage).forceMaterializationPercentage || snapshot.emergencyTailScale !== undefined;
+}
+function clearHistorianHistoryWait(sessionId) {
+  historyWaits.delete(sessionId);
+}
+function recordHistorianNoProgress(snapshot, emergency = false) {
+  const newest = newestMessageId(snapshot);
+  if (!newest)
+    return;
+  const previous = historyWaits.get(snapshot.sessionId);
+  const sameHistory = previous?.newestMessageId === newest;
+  historyWaits.set(snapshot.sessionId, {
+    newestMessageId: newest,
+    recoveryAttempted: sameHistory && previous.recoveryAttempted || emergency || recoveryWindow(snapshot, snapshot.usagePercentage),
+    floorLiftAttempted: sameHistory && previous.floorLiftAttempted || snapshot.liftLivePromptFloor === true
+  });
+}
+function shouldWaitForNewHistorianHistory(snapshot, options = {}) {
+  const wait = historyWaits.get(snapshot.sessionId);
+  if (!wait)
+    return false;
+  const newest = newestMessageId(snapshot);
+  if (newest && newest !== wait.newestMessageId) {
+    try {
+      const order = compareRawSessionMessageOrder2(snapshot.sessionId, newest, wait.newestMessageId);
+      if (order === null || order > 0)
+        return false;
+    } catch {}
+  }
+  const recovery = options.emergency || recoveryWindow(snapshot, options.usagePercentage ?? snapshot.usagePercentage);
+  const floorLift = snapshot.liftLivePromptFloor === true;
+  if (recovery && !wait.recoveryAttempted || floorLift && !wait.floorLiftAttempted) {
+    if (options.claim) {
+      wait.recoveryAttempted ||= recovery;
+      wait.floorLiftAttempted ||= floorLift;
+    }
+    return false;
+  }
+  return true;
+}
+
 // ../plugin/src/hooks/magic-context/compartment-trigger.ts
 var PROACTIVE_TRIGGER_OFFSET_PERCENTAGE = 2;
 var POST_DROP_TARGET_RATIO = 0.75;
@@ -26650,6 +26560,13 @@ function checkCompartmentTrigger(db, sessionId, sessionMeta, usage, _previousPer
     } catch (error) {
       sessionLog2(sessionId, `compartment trigger: skipped — no new raw history (usage=${usage.percentage.toFixed(1)}% nextStartOrdinal=${tailInfo.nextStartOrdinal} diagnostic-collection-failed: ${error instanceof Error ? error.message : String(error)})`);
     }
+    return { shouldFire: false };
+  }
+  if (tailInfo.boundarySnapshot && shouldWaitForNewHistorianHistory(tailInfo.boundarySnapshot, {
+    usagePercentage: usage.percentage,
+    emergency: getOverflowState(db, sessionId).needsEmergencyRecovery
+  })) {
+    sessionLog2(sessionId, "compartment trigger: waiting for new history after no forward progress");
     return { shouldFire: false };
   }
   const canClearReasoning = reasoningProjection?.canClearReasoning ?? modelAcceptsEmptyContent(reasoningProjection?.providerID);
@@ -27820,7 +27737,7 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
           skipPrefixInjection,
           preserveTagOnlyAssistantText: options.preserveTagOnlyAssistantText,
           entryFingerprint: options.entryFingerprintByMessageId?.get(messageId) ?? null,
-          reuseIdentity: reuseIdentity || contentDerivedTextIds !== undefined,
+          reuseIdentity: reuseIdentity || options.reuseTextMessageIds?.has(messageId) === true || contentDerivedTextIds !== undefined,
           timing,
           textIdentitySourceCache: options.textIdentitySourceCache,
           textTokenCache: options.textTokenCache
@@ -27890,7 +27807,11 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
             if (timing)
               timing.identity += performance.now() - identityStart;
           } else {
-            const accounting = readAggregateToolAccounting(part, timing, options.toolTokenCache, tokenCacheKey);
+            const accounting = readAggregateToolAccounting(part, timing, options.toolTokenCache, tokenCacheKey, {
+              byteSize: existing.maxByteSize,
+              tokenCount: existing.maxTokenCount,
+              inputTokenCount: existing.inputTokenCount
+            });
             text = accounting.text;
             if (part.kind === "tool_result") {
               applyGrownToolResultAccounting({
@@ -27972,7 +27893,7 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
           if (timing)
             timing.identity += performance.now() - identityStart;
         } else {
-          const accounting = readAggregateToolAccounting(part, timing, options.toolTokenCache, tokenCacheKey);
+          const accounting = readAggregateToolAccounting(part, timing, options.toolTokenCache, tokenCacheKey, tagger.getToolTagAccounting(sessionId, callId, messageId));
           text = accounting.text;
           const outputByteSize = part.kind === "tool_result" ? accounting.byteSize : 0;
           const outputTokenCount = part.kind === "tool_result" ? accounting.tokenCount : 0;
@@ -28068,12 +27989,14 @@ function applyGrownToolResultAccounting(args) {
   updateTagTokenCount2(args.db, args.sessionId, args.aggregate.tagId, tokenCount);
   syncToolAggregateAccounting(args.tagger, args.sessionId, args.aggregate);
 }
-function readAggregateToolAccounting(part, timing, tokenCache, tokenCacheKey) {
+function readAggregateToolAccounting(part, timing, tokenCache, tokenCacheKey, persisted) {
   const text = part.getText() ?? "";
   const byteSize = getToolPartByteSize(part, text);
-  const metadata = part.getToolMetadata();
+  const metadata = part.getToolMetadata({
+    skipInputTokenCount: persisted?.inputTokenCount != null
+  });
   let tokenCount = 0;
-  if (part.kind === "tool_result") {
+  if (part.kind === "tool_result" && (!persisted || persisted.tokenCount === null || byteSize > persisted.byteSize)) {
     const tokenStart = timing ? performance.now() : 0;
     tokenCount = getCachedToolPartTokenCount(part, text, tokenCache, tokenCacheKey);
     if (timing)
@@ -28460,6 +28383,12 @@ function buildAggregateTarget(tagId, occurrences, requiresToolArcSkeleton, conve
       return any ? "truncated" : "absent";
     },
     prepareDrop: () => !occurrences.some((occ) => occ.part.canRemove?.() === "defer"),
+    prepareReplayDrop: () => {
+      if (complete() && !requiresToolArcSkeleton) {
+        for (const occ of occurrences)
+          occ.part.canRemove?.();
+      }
+    },
     canDrop: () => complete() && !occurrences.some((occ) => occ.part.hasUserAnswer?.()),
     requiresToolArcSkeleton,
     readInput() {
@@ -28705,6 +28634,32 @@ function selectAutoSearchResults(results, threshold) {
   return results.filter((result) => relevance(result) >= threshold).sort((left, right) => relevance(right) - relevance(left));
 }
 
+// ../plugin/src/hooks/magic-context/auto-search-observation.ts
+var disabledTurns = new WeakMap;
+function logDisabledAutoSearch(db, sessionId, messageId, threshold, startedAt) {
+  const sessions = disabledTurns.get(db) ?? new Map;
+  disabledTurns.set(db, sessions);
+  if (sessions.get(sessionId) === messageId)
+    return;
+  sessions.set(sessionId, messageId);
+  observeAutoSearch(sessionId, threshold, startedAt).finish("disabled");
+}
+function observeAutoSearch(sessionId, threshold, startedAt) {
+  const diagnostics = createAutoSearchDiagnostics(threshold);
+  let logged = false;
+  return {
+    diagnostics,
+    finish(outcome, reason) {
+      if (logged)
+        return;
+      logged = true;
+      const lanes = Object.entries(diagnostics.lanes).map(([lane, value]) => `${lane}:${value.top?.toFixed(3) ?? "none"}`).join(",");
+      const nearMisses = Object.values(diagnostics.lanes).reduce((sum, lane) => sum + lane.nearMisses, 0);
+      sessionLog2(sessionId, `auto-search: decision outcome=${outcome}${reason ? ` reason=${reason}` : ""} lanes=${lanes || "none"} nearMisses=${nearMisses} threshold=${threshold} pool=${diagnostics.pool} rows=${diagnostics.poolRows ?? "unknown"} workerStarted=${diagnostics.workerStarted ?? "unknown"} peek=${diagnostics.peek} elapsedMs=${Math.round(performance.now() - startedAt)}`);
+    }
+  };
+}
+
 // ../plugin/src/hooks/magic-context/auto-search-worker-client.ts
 import { Worker } from "node:worker_threads";
 var pendingRegistrations = new WeakMap;
@@ -28803,6 +28758,8 @@ class AutoSearchBusyError extends Error {
   }
 }
 async function searchAutoHint(db, sessionId, projectPath, query, options, entry = new URL(new URL(import.meta.url).pathname.endsWith(".ts") ? "./auto-search-worker.ts" : "./auto-search-worker.js", import.meta.url)) {
+  const messageIndexEpoch = getMessageIndexEpoch(sessionId);
+  const messageIndexWasSearchable = isMessageIndexSearchable(sessionId);
   const {
     rerankConfig: _rerankConfig,
     rerankClient: _rerankClient,
@@ -28811,7 +28768,8 @@ async function searchAutoHint(db, sessionId, projectPath, query, options, entry 
     captureRerankLanes: _captureRerankLanes,
     ...hintOptions
   } = options;
-  return executeAutoSearchWorker(db, sessionId, projectPath, query, { ...hintOptions, explicitSearch: false, rerank: false }, entry, "search");
+  const results = await executeAutoSearchWorker(db, sessionId, projectPath, query, { ...hintOptions, explicitSearch: false, rerank: false }, entry, "search");
+  return messageIndexWasSearchable && isMessageIndexSearchable(sessionId) && getMessageIndexEpoch(sessionId) === messageIndexEpoch ? results : results.filter((result) => result.source !== "message");
 }
 var pendingBackfills = new WeakMap;
 var searchWorkers = new WeakMap;
@@ -28939,6 +28897,7 @@ async function executeAutoSearchWorker(db, sessionId, projectPath, query, option
     readMessages: _readMessages,
     searchMessageHistory: _searchMessageHistory,
     stepTimings: _stepTimings,
+    onAutoSearchDiagnostics: _onAutoSearchDiagnostics,
     ...serializable
   } = options;
   const lifecycle = registerAutoSearchWork(sessionId);
@@ -28980,6 +28939,11 @@ async function executeAutoSearchWorker(db, sessionId, projectPath, query, option
     throw new AutoSearchBusyError;
   }
   const { slot, fresh } = lease;
+  if (options.autoSearchDiagnostics) {
+    options.autoSearchDiagnostics.workerStarted = fresh;
+    if (fresh)
+      options.autoSearchDiagnostics.pool = "cold";
+  }
   const worker = slot.worker;
   const detachable = job === "search" && entry.href === defaultAutoSearchWorkerEntry().href;
   const startedAt = performance.now();
@@ -29059,6 +29023,15 @@ async function executeAutoSearchWorker(db, sessionId, projectPath, query, option
     const onMessage = async (reply) => {
       if (released)
         return;
+      if (reply.kind === "diagnostics") {
+        if (!settled && options.autoSearchDiagnostics) {
+          const workerStarted = options.autoSearchDiagnostics.workerStarted;
+          Object.assign(options.autoSearchDiagnostics, reply.diagnostics, {
+            workerStarted
+          });
+        }
+        return;
+      }
       if (reply.kind === "result" || reply.kind === "error") {
         if (detachedAt !== undefined) {
           logLateSearch(sessionId, performance.now() - detachedAt, detachedAt - startedAt, ownerVectorMs, reply.kind === "result" ? reply.timings : undefined, reply.kind === "error");
@@ -29262,8 +29235,6 @@ async function runAutoSearchHintForPi(args) {
     const timestamp = message.timestamp;
     return `test-entry-${index}:${typeof timestamp === "number" ? timestamp : "no-ts"}`;
   }) : args.entryIds;
-  if (!options.enabled)
-    return messages;
   const strictResolutionFailed = entryIds === null;
   const effectiveEntryIds = strictResolutionFailed ? messages.map((message) => {
     const id = message.id;
@@ -29273,6 +29244,11 @@ async function runAutoSearchHintForPi(args) {
   if (found === null)
     return messages;
   const { message: userMsg, messageId: userMsgId } = found;
+  if (!options.enabled) {
+    if (found.index === messages.length - 1)
+      logDisabledAutoSearch(db, sessionId, userMsgId, options.scoreThreshold ?? DEFAULT_SCORE_THRESHOLD, startedAt);
+    return messages;
+  }
   await wait(coalesceAutoSearchTurn(db, sessionId, userMsgId, async (lifecycleSignal) => {
     args.passGuard?.assert();
     if (lifecycleSignal.aborted)
@@ -29299,10 +29275,12 @@ async function runAutoSearchHintForPi(args) {
       return messages;
     if (!isUsableProjectIdentity(options.projectPath))
       return messages;
+    const observation = observeAutoSearch(sessionId, options.scoreThreshold ?? DEFAULT_SCORE_THRESHOLD, startedAt);
     const snapshot = getProjectEmbeddingSnapshot2(options.projectPath);
     if (!snapshot) {
       queueAutoSearchRegistration(db, options.projectPath, args.ensureProjectRegistered);
       persistAutoSearchSkip(db, sessionId, userMsgId, "empty");
+      observation.finish("no-candidates", "unregistered");
       return messages;
     }
     const writeNoHintAndReconcile = async (reason) => {
@@ -29315,17 +29293,20 @@ async function runAutoSearchHintForPi(args) {
       args.passGuard?.assert();
       if (outcome === null) {
         persistAutoSearchSkip(db, sessionId, userMsgId);
+        observation.finish("timeout");
         return;
       }
-      if (!outcome.ok)
+      if (!outcome.ok) {
+        observation.finish("error", outcome.kind);
         return;
+      }
       if (outcome.kind === "already-present" && outcome.decision.decision === "hint") {
         appendHintToUserMessage(userMsg, outcome.decision.text);
       }
+      observation.finish(outcome.decision.decision === "hint" ? "attached" : reason === "below-threshold" ? "below-threshold" : reason === "error" ? "error" : "no-candidates", reason);
     };
     const rawPartsText = collectUserPromptParts(userMsg);
     if (hasStackedAugmentation(rawPartsText)) {
-      sessionLog2(sessionId, "auto-search: skipping — user message already carries augmentation/hint");
       await writeNoHintAndReconcile("stacked");
       return messages;
     }
@@ -29345,6 +29326,7 @@ async function runAutoSearchHintForPi(args) {
         const embeddingEnabled = snapshot ? snapshot.historyEnabled : true;
         const gitCommitsEnabled = snapshot?.gitCommitEnabled ?? false;
         const searchOptions = {
+          autoSearchDiagnostics: observation.diagnostics,
           limit: 10,
           maxMessageOrdinal: Math.max(0, getLastCompartmentEndMessage(db, sessionId)),
           excludeMessageId: userMsgId,
@@ -29373,11 +29355,10 @@ async function runAutoSearchHintForPi(args) {
       if (lifecycleSignal.aborted)
         return messages;
       if (error instanceof AutoSearchBusyError) {
-        sessionLog2(sessionId, "auto-search: an earlier search of this session is still running, skipping hint for this turn");
+        observation.finish("timeout", "worker-busy");
         persistAutoSearchSkip(db, sessionId, userMsgId);
         return messages;
       }
-      log2(`[auto-search] unified search failed for session ${sessionId} (no-hint frozen for this turn): ${error instanceof Error ? error.message : String(error)}`);
       await writeNoHintAndReconcile("error");
       return messages;
     }
@@ -29386,7 +29367,7 @@ async function runAutoSearchHintForPi(args) {
       return messages;
     try {
       if (results === null) {
-        sessionLog2(sessionId, `auto-search: timed out after ${AUTO_SEARCH_TIMEOUT_MS}ms, skipping hint for this turn`);
+        observation.finish("timeout");
         persistAutoSearchSkip(db, sessionId, userMsgId);
         return messages;
       }
@@ -29397,7 +29378,6 @@ async function runAutoSearchHintForPi(args) {
       const scoreThreshold = options.scoreThreshold ?? DEFAULT_SCORE_THRESHOLD;
       results = selectAutoSearchResults(results, scoreThreshold);
       if (results.length === 0) {
-        sessionLog2(sessionId, `auto-search: no fragment meets relevance threshold ${scoreThreshold}`);
         await writeNoHintAndReconcile("below-threshold");
         return messages;
       }
@@ -29421,14 +29401,17 @@ ${hintText}`;
       args.passGuard?.assert();
       if (outcome === null) {
         persistAutoSearchSkip(db, sessionId, userMsgId);
+        observation.finish("timeout");
         return messages;
       }
-      if (!outcome.ok)
+      if (!outcome.ok) {
+        observation.finish("error", outcome.kind);
         return messages;
+      }
       if (outcome.decision.decision === "hint") {
         appendHintToUserMessage(userMsg, outcome.decision.text);
       }
-      sessionLog2(sessionId, `auto-search: attached hint to ${userMsgId} (${results.length} fragments, top relevance ${(results[0].relevanceScore ?? results[0].score).toFixed(3)})`);
+      observation.finish(outcome.decision.decision === "hint" ? "attached" : "no-candidates");
       return messages;
     } finally {
       if (!lifecycleSignal.aborted && results !== null) {
@@ -30055,6 +30038,14 @@ async function runPiHistorian(deps) {
         return;
       }
       const protectedTailStart = boundarySnapshot.protectedTailStart;
+      if (!forceDrainQuota && shouldWaitForNewHistorianHistory(boundarySnapshot, {
+        emergency: getOverflowState(db, sessionId).needsEmergencyRecovery
+      })) {
+        telemetry.status = "noop";
+        telemetry.failureReason = "waiting for new history after no forward progress";
+        sessionLog2(sessionId, "historian no-op: waiting for new history after no forward progress");
+        return;
+      }
       const eligibleEndOrdinal = Math.min(boundarySnapshot.eligibleEndOrdinal, protectedTailStart);
       if (protectedTailStart <= offset || eligibleEndOrdinal <= offset) {
         telemetry.status = "noop";
@@ -30255,6 +30246,12 @@ ${chunkText}`,
       };
       retainDrainReservationForRetryThrottle = true;
       const historianEditorSystemPrompt = withContentLanguageDirective(HISTORIAN_EDITOR_SYSTEM_PROMPT, deps.language, { preserveUserQuotes: true });
+      if (!forceDrainQuota) {
+        shouldWaitForNewHistorianHistory(boundarySnapshot, {
+          emergency: getOverflowState(db, sessionId).needsEmergencyRecovery,
+          claim: true
+        });
+      }
       const firstResult = await runHistorianSubagentWithTransientRetries({
         runner,
         sessionId,
@@ -30418,6 +30415,7 @@ ${chunkText}`,
           const failCount = incrementHistorianFailure(db, sessionId, errorMsg);
           await notify(buildHistorianFailureNotice(failCount, errorMsg));
         }
+        recordHistorianNoProgress(boundarySnapshot, inEmergency);
         rollbackDrainReservation();
         return;
       }
@@ -30513,6 +30511,7 @@ ${chunkText}`,
         }
         db.exec("COMMIT");
         published = true;
+        clearHistorianHistoryWait(sessionId);
         logSlowWriteTransaction("pi_historian_publish", transactionStartedAt);
       } finally {
         if (!published) {
@@ -31280,7 +31279,8 @@ function tagAttribution(input) {
   if (!cached) {
     removed.length = 0;
     added.length = 0;
-    added.push(...input.tags);
+    for (const tag of input.tags)
+      added.push(tag);
     cached = {
       tags: input.tags,
       messageTags: new Map,
@@ -31369,7 +31369,10 @@ function attributeTags(input, arcs, messageIds) {
     exactToolTags,
     orphanTagsByCall,
     boundsByOwner
-  } = tagAttribution(input);
+  } = tagAttribution({
+    ...input,
+    tags: attributionProjection(input, arcs, messageIds)
+  });
   const messageIndexById = new Map;
   for (let index = 0;index < messageIds.length; index += 1) {
     const id = input.stableId?.(input.messages[index], index);
@@ -31431,6 +31434,61 @@ function attributeTags(input, arcs, messageIds) {
     }
   }
   return { messageTags, tagsByNumber };
+}
+var attributionProjections = new WeakMap;
+function attributionProjection(input, arcs, messageIds) {
+  const owners = new Set(messageIds);
+  const calls = new Set;
+  const numbers = new Set;
+  for (const arc of arcs) {
+    owners.add(arc.ownerId);
+    calls.add(arc.callId);
+  }
+  const notePrefix = (text) => {
+    for (const candidate of [text, stripChannel1ReminderSpans(text)]) {
+      const match = candidate.trimStart().match(TAG_PREFIX);
+      if (match)
+        numbers.add(Number(match[1]));
+    }
+  };
+  for (let index = 0;index < input.messages.length; index++) {
+    const id = input.stableId?.(input.messages[index], index);
+    if (id)
+      owners.add(id);
+    const message = input.messages[index];
+    if (!isRecord5(message))
+      continue;
+    if (typeof message.content === "string")
+      notePrefix(message.content);
+    else if (Array.isArray(message.content)) {
+      for (const part of message.content)
+        if (isRecord5(part) && typeof part.text === "string")
+          notePrefix(part.text);
+    }
+  }
+  const cacheable = input.tagCacheKey !== undefined;
+  const cached = cacheable ? attributionProjections.get(input.tags) : undefined;
+  const content = cacheable ? input.messages.map(safeStableStringify) : undefined;
+  if (cached && cached.messageIds.length === messageIds.length && messageIds.every((id, index) => id === cached.messageIds[index]) && content?.length === cached.content.length && content.every((value, index) => value === cached.content[index]) && owners.size === cached.owners.size && [...owners].every((owner) => cached.owners.has(owner)) && calls.size === cached.calls.size && [...calls].every((call) => cached.calls.has(call)) && numbers.size === cached.numbers.size && [...numbers].every((number) => cached.numbers.has(number)))
+    return cached.projection;
+  const projection = input.tags.filter((tag) => {
+    if (numbers.has(tag.tagNumber))
+      return true;
+    const owner = messageIdForTag(tag);
+    if (owner !== null && owners.has(owner))
+      return true;
+    return tag.type === "tool" && tag.toolOwnerMessageId === null && calls.has(tag.messageId);
+  });
+  if (cacheable && content)
+    attributionProjections.set(input.tags, {
+      messageIds,
+      content,
+      owners,
+      calls,
+      numbers,
+      projection
+    });
+  return projection;
 }
 var partJsonMemo = new TailHygieneJsonMemo;
 var excludedViews = new WeakMap;
@@ -33320,6 +33378,26 @@ async function executeContextRecompWithResult(deps, options = {}) {
 }
 
 // ../plugin/src/hooks/magic-context/history-boundary-repair.ts
+function readStoreBoundaries(db, sessionId) {
+  const columns = getTableColumnNames(db, "compartments");
+  const numbers = ["id", "sequence", "start_message", "end_message", "created_at"];
+  const strings = ["session_id", "start_message_id", "end_message_id", "title", "content"];
+  const predicates = [...numbers, ...strings].every((column) => columns.has(column)) ? [
+    ...numbers.map((column) => `typeof(${column}) IN ('integer', 'real')`),
+    ...strings.map((column) => `typeof(${column}) = 'text'`)
+  ] : ["0"];
+  for (const column of ["p1", "p2", "p3", "p4", "episode_type"]) {
+    if (columns.has(column))
+      predicates.push(`typeof(${column}) IN ('text', 'null')`);
+  }
+  for (const column of ["importance", "legacy"]) {
+    if (columns.has(column))
+      predicates.push(`typeof(${column}) IN ('integer', 'real', 'null')`);
+  }
+  return db.prepare(`SELECT sequence, ${columns.has("end_message_id") ? "end_message_id" : "NULL"} AS endMessageId
+             FROM compartments WHERE session_id = ? AND ${predicates.join(" AND ")}
+             ORDER BY sequence ASC`).all(sessionId);
+}
 function readBaseline(db, sessionId) {
   const row = db.prepare("SELECT cached_m0_bytes IS NOT NULL AS hasM0, cached_m0_last_baseline_end_message_id AS boundary FROM session_meta WHERE session_id = ?").get(sessionId);
   return {
@@ -33386,7 +33464,7 @@ function dropCompartmentsAfter(db, sessionId, anchor, holderId, activeBranch = f
 }
 function repairMissingHistoryBoundary(args) {
   const { db, sessionId, isInHostStore, scope = "store" } = args;
-  const compartments = scope === "active-branch" ? db.prepare("SELECT sequence, COALESCE(end_message_id, '') AS endMessageId FROM compartments WHERE session_id = ? ORDER BY sequence").all(sessionId) : getCompartments(db, sessionId);
+  const compartments = scope === "active-branch" ? db.prepare("SELECT sequence, COALESCE(end_message_id, '') AS endMessageId FROM compartments WHERE session_id = ? ORDER BY sequence").all(sessionId) : readStoreBoundaries(db, sessionId);
   let latestIndex = compartments.length - 1;
   while (latestIndex >= 0 && !compartments[latestIndex]?.endMessageId)
     latestIndex -= 1;
@@ -33430,7 +33508,7 @@ function repairMissingHistoryBoundary(args) {
     let dropped;
     let anchorForDrop = anchor;
     try {
-      if (scope === "active-branch" && anchor) {
+      if (anchor) {
         const row = db.prepare("SELECT end_message AS endMessage FROM compartments WHERE session_id = ? AND sequence = ?").get(sessionId, anchor.sequence);
         if (!row)
           return { kind: "unresolved", reason: "busy", missingEndMessageId: missing };
@@ -35139,6 +35217,76 @@ function canRemoveNativeToolCall(message, toolCallId) {
 var NATIVE_TOOL_REMOVAL_MARKER = '{"__magic_context_remove_tool_arc__":true}';
 
 // src/native-replay-state-pi.ts
+var removalBatches = new WeakMap;
+
+class PiToolRemovalBatchError extends Error {
+  constructor(cause) {
+    super("Native tool removal batch could not be persisted", { cause });
+  }
+}
+function withPiToolRemovalBatch(args, edit) {
+  let sessions = removalBatches.get(args.db);
+  const enclosing = sessions?.get(args.sessionId);
+  if (enclosing)
+    return edit(enclosing.flush);
+  if (!sessions) {
+    sessions = new Map;
+    removalBatches.set(args.db, sessions);
+  }
+  let publishing = false;
+  const batch = {
+    saved: args.saved,
+    planned: new Map(args.saved),
+    requested: new Map,
+    pending: new Map,
+    flushed: false,
+    flush() {
+      if (batch.flushed)
+        return;
+      batch.persistPending();
+      batch.flushed = true;
+    },
+    persistPending() {
+      if (publishing || batch.pending.size === 0)
+        return;
+      const connection = args.db;
+      if (connection.inTransaction !== true && connection.isTransaction !== true)
+        throw new Error("Native removal publication requires a caller-owned transaction");
+      try {
+        publishing = true;
+        saveNativeToolInputs(args.db, args.sessionId, batch.pending);
+        batch.pending.clear();
+      } catch (cause) {
+        throw new PiToolRemovalBatchError(cause);
+      } finally {
+        publishing = false;
+      }
+    }
+  };
+  sessions.set(args.sessionId, batch);
+  try {
+    const result = withNativeReplayWriteBarrier(args.db, args.sessionId, batch.persistPending, () => edit(batch.flush));
+    if (batch.requested.size > 0 && !batch.flushed)
+      throw new Error("Native removal markers were not flushed in the caller's transaction");
+    const saved = args.saved;
+    if (saved && batch.requested.size > 0) {
+      const prior = new Map([...batch.requested.keys()].map((id) => [id, saved.get(id)]));
+      args.rollbackObservations?.push(() => {
+        for (const [id, value] of prior) {
+          if (value === undefined)
+            saved.delete(id);
+          else
+            saved.set(id, value);
+        }
+      });
+      for (const [id, marker] of batch.requested)
+        saved.set(id, marker);
+    }
+    return result;
+  } finally {
+    sessions.delete(args.sessionId);
+  }
+}
 function applyNativeToolInputReplayPi(args, saved) {
   if (saved.size === 0 && (!args.canApply || args.changes.size === 0))
     return 0;
@@ -35250,6 +35398,12 @@ function applyNativeReasoningReplayPi(args, saved) {
 function preparePiToolRemovalMeasurements(args) {
   if (!args.saved || !args.canApply)
     return;
+  const batch = removalBatches.get(args.db)?.get(args.sessionId);
+  if (batch?.saved === args.saved) {
+    for (const callId of args.callIds)
+      authorizePiToolRemoval({ ...args, callId });
+    return;
+  }
   const requested = new Map;
   for (const callId of args.callIds) {
     if (args.saved.get(callId) !== NATIVE_TOOL_REMOVAL_MARKER)
@@ -35265,9 +35419,54 @@ function preparePiToolRemovalMeasurements(args) {
       args.saved.set(callId, marker);
   } catch {}
 }
+function preparePiToolRemovalChecks(args) {
+  if (!args.db?.inTransaction || args.rows.length === 0)
+    return;
+  const occurrences = new Map;
+  for (const raw of args.messages) {
+    if (!raw || typeof raw !== "object")
+      continue;
+    const message = raw;
+    if (message.role !== "assistant" || !Array.isArray(message.content))
+      continue;
+    for (const rawPart of message.content) {
+      if (!rawPart || typeof rawPart !== "object")
+        continue;
+      const part = rawPart;
+      if (part.type === "toolCall" && typeof part.id === "string")
+        occurrences.set(part.id, (occurrences.get(part.id) ?? 0) + 1);
+    }
+  }
+  const requested = [];
+  for (const row of args.rows) {
+    if (row.callId === null || occurrences.get(row.callId) !== 1)
+      continue;
+    const target = args.targets.get(row.tagNumber);
+    if (target?.requiresToolArcSkeleton || target?.canDrop?.() !== true)
+      continue;
+    if (!target.mutationParts?.some(({ part }) => part !== null && typeof part === "object" && ("kind" in part) && part.kind === "tool_use" && ("id" in part) && part.id === row.callId))
+      continue;
+    requested.push(row.callId);
+  }
+  if (requested.length)
+    args.prepare(requested);
+}
 function authorizePiToolRemoval(args) {
   if (!args.saved)
     return false;
+  const batch = removalBatches.get(args.db)?.get(args.sessionId);
+  if (batch?.saved === args.saved) {
+    if (batch.planned.get(args.callId) === NATIVE_TOOL_REMOVAL_MARKER)
+      return true;
+    if (!args.canApply)
+      return false;
+    if (batch.flushed)
+      throw new Error("Tool removal requested after lane publication");
+    batch.planned.set(args.callId, NATIVE_TOOL_REMOVAL_MARKER);
+    batch.requested.set(args.callId, NATIVE_TOOL_REMOVAL_MARKER);
+    batch.pending.set(args.callId, NATIVE_TOOL_REMOVAL_MARKER);
+    return true;
+  }
   if (args.saved.get(args.callId) === NATIVE_TOOL_REMOVAL_MARKER)
     return true;
   if (!args.canApply)
@@ -35281,6 +35480,118 @@ function authorizePiToolRemoval(args) {
     const priorDrop = args.db.prepare("SELECT 1 FROM tags WHERE session_id = ? AND type = 'tool' AND message_id = ? AND status = 'dropped' LIMIT 1").get(args.sessionId, args.callId);
     return priorDrop ? false : "defer";
   }
+}
+
+// src/native-replay-tag-provenance-pi.ts
+import { createHash as createHash12 } from "node:crypto";
+var PI_NATIVE_TAG_STRIP_PROVENANCE = "magicContextNativeTagStrips";
+function nativeResponseTagStripKey(id, phase, text) {
+  return createHash12("sha256").update(JSON.stringify([id, phase, text])).digest("hex");
+}
+function ownsNativeResponseTagStrip(decisions, id, phase, text) {
+  if (!isRecord(decisions) || phase !== undefined && phase !== "commentary" && phase !== "final_answer")
+    return false;
+  return Object.entries(decisions).some(([key, original]) => typeof original === "string" && /^§\d+§ /u.test(original) && original.replace(/^§\d+§ /u, "") === text && nativeResponseTagStripKey(id, phase, original) === key);
+}
+
+// src/native-replay-tags-pi.ts
+var FIELD = "piResponsesTagStrips";
+var TAG = /^§\d+§ /u;
+function readDecisions(value) {
+  if (value === undefined)
+    return new Set;
+  if (!Array.isArray(value) || !value.every((key) => typeof key === "string" && /^[a-f0-9]{64}$/u.test(key)))
+    throw new Error("Invalid persisted Responses tag strips");
+  return new Set(value);
+}
+function signature(part) {
+  if (!isRecord(part) || typeof part.textSignature !== "string")
+    return;
+  try {
+    const value = JSON.parse(part.textSignature);
+    if (isRecord(value) && value.v === 1 && typeof value.id === "string" && value.id.length > 0 && (value.phase === undefined || value.phase === "commentary" || value.phase === "final_answer"))
+      return { id: value.id, phase: value.phase };
+  } catch {}
+}
+function applyNativeResponseTagReplayPi(args) {
+  let saved;
+  const added = new Set;
+  const pending = new Map;
+  for (const [index, message] of args.messages.entries()) {
+    if (!isRecord(message) || message.role !== "assistant" || !Array.isArray(message.content) || ![
+      "openai-responses",
+      "azure-openai-responses",
+      "openai-codex-responses"
+    ].includes(String(message.api)))
+      continue;
+    const payload = message.providerPayload;
+    if (!isRecord(payload) || payload.type !== "openaiResponsesHistory" || payload.dt !== true || !Array.isArray(payload.items))
+      continue;
+    if (saved === undefined) {
+      try {
+        saved = readDecisions(readReplayEnvelope(args.db, args.sessionId)[FIELD]);
+      } catch (error) {
+        sessionLog2(args.sessionId, `native tag replay unavailable; retaining native history: ${String(error)}`);
+        return 0;
+      }
+    }
+    if (!args.canApply && saved.size === 0)
+      return 0;
+    const frozen = saved;
+    const content = message.content;
+    const nativeItems = payload.items;
+    const decisions = {};
+    let changed = false;
+    const items = nativeItems.map((item) => {
+      if (!isRecord(item) || item.type !== "message" || item.role !== "assistant" || item.phase !== undefined && item.phase !== "commentary" && item.phase !== "final_answer" || !Array.isArray(item.content) || item.content.length !== 1)
+        return item;
+      const output = item.content[0];
+      if (!isRecord(output) || output.type !== "output_text" || typeof output.text !== "string" || !TAG.test(output.text))
+        return item;
+      if (nativeItems.filter((other) => isRecord(other) && other.id === item.id && other.phase === item.phase).length !== 1)
+        return item;
+      const key = nativeResponseTagStripKey(item.id, item.phase, output.text);
+      if (!frozen.has(key)) {
+        if (!args.canApply)
+          return item;
+        const blocks = content.filter((block) => {
+          const identity = signature(block);
+          return identity && identity.id === item.id && identity.phase === item.phase;
+        });
+        const block = blocks[0];
+        if (blocks.length !== 1 || !isRecord(block) || block.type !== "text" || typeof block.text !== "string" || block.text.replace(TAG, "") !== output.text.replace(TAG, ""))
+          return item;
+        added.add(key);
+      }
+      decisions[key] = output.text;
+      changed = true;
+      return {
+        ...item,
+        content: [{ ...output, text: output.text.replace(TAG, "") }]
+      };
+    });
+    if (changed)
+      pending.set(index, {
+        ...message,
+        [PI_NATIVE_TAG_STRIP_PROVENANCE]: decisions,
+        providerPayload: { ...payload, items }
+      });
+  }
+  if (added.size > 0) {
+    const persisted = updateReplayDocument(args.db, args.sessionId, (doc) => {
+      const decisions = readDecisions(doc[FIELD]);
+      for (const key of added)
+        decisions.add(key);
+      doc.version = 2;
+      doc[FIELD] = [...decisions];
+      return true;
+    });
+    if (!persisted)
+      throw new Error("Could not persist Responses tag strips");
+  }
+  for (const [index, message] of pending)
+    args.messages[index] = message;
+  return added.size;
 }
 
 // src/note-visibility-pi.ts
@@ -35328,6 +35639,57 @@ function isSentinelPart(part) {
     return false;
   const p = part;
   return p.type === "text" && typeof p.text === "string" && (p.text === "" || p.text === WHOLE_MESSAGE_PLACEHOLDER_TEXT);
+}
+
+// src/pass-tag-projection-pi.ts
+function projectPiReplayDrops(transcript, metadata) {
+  const owners = new Set;
+  const addresses = new Set;
+  const calls = new Set;
+  const prefixes = new Set;
+  for (const message of transcript.messages) {
+    owners.add(message.info.id ?? "");
+    let ordinal = 0;
+    for (const part of message.parts) {
+      if (part.kind === "text") {
+        addresses.add(`${message.info.id}:p${ordinal++}`);
+        const prefix = /^§(\d+)§\s/.exec(part.getText() ?? "");
+        if (prefix)
+          prefixes.add(Number(prefix[1]));
+      } else if ((part.kind === "tool_use" || part.kind === "tool_result") && part.id)
+        calls.add(part.id);
+    }
+  }
+  const numbers = new Set;
+  for (const tag of metadata) {
+    if (tag.status !== "dropped")
+      continue;
+    if (prefixes.has(tag.tagNumber) || (tag.type === "tool" ? calls.has(tag.messageId) && (tag.toolOwnerMessageId === null || tag.toolOwnerMessageId === "" || owners.has(tag.toolOwnerMessageId)) : addresses.has(tag.messageId)))
+      numbers.add(tag.tagNumber);
+  }
+  return metadata.filter((tag) => tag.status === "dropped" && numbers.has(tag.tagNumber));
+}
+function protectedPiPassTagNumbers(rows, floor, toolsRatio = 1) {
+  if (!(toolsRatio >= 0) || rows.some((row) => !Number.isFinite(row.tagNumber)))
+    return computeProtectionWindow(rows, floor, toolsRatio).protectedTagNumbers;
+  const numbers = [];
+  let group;
+  let groups = 0;
+  let mass = 0;
+  for (let index = rows.length - 1;index >= 0; index--) {
+    const row = rows[index];
+    if (row?.type !== "tool")
+      continue;
+    if (row.tagNumber !== group) {
+      if (groups >= 3 && Math.ceil(mass * toolsRatio) >= floor)
+        break;
+      group = row.tagNumber;
+      groups++;
+      numbers.push(row.tagNumber);
+    }
+    mass += rowWindowMass(row);
+  }
+  return new Set(numbers.reverse());
 }
 
 // src/pi-append-compaction.ts
@@ -36486,23 +36848,113 @@ function piMatchesChatImages(content, urls) {
   return true;
 }
 
-// src/pi-dispatch-image-budget.ts
+// src/pi-dispatch-date-reminder.ts
 function object8(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 }
+function piDateReminderText(value, cwd) {
+  if (typeof value !== "string")
+    return false;
+  const match = /^<system-reminder>\nToday: (\d{4}-\d{2}-\d{2}); current working directory: '([^\r\n<>§]+)'\. Do not repeat this information in your reply\.\n<\/system-reminder>$/u.exec(value);
+  if (!match)
+    return false;
+  const [, date, path] = match;
+  if ([...path].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))
+    return false;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date)
+    return false;
+  if (!/^(?:\/|[A-Za-z]:\/)/u.test(path) || path.includes("\\"))
+    return false;
+  return cwd === undefined || path === cwd.replace(/\\/gu, "/");
+}
+function piDateReminderWireText(content, cwd) {
+  if (typeof content === "string")
+    return piDateReminderText(content, cwd) ? content : undefined;
+  if (!Array.isArray(content) || content.length !== 1)
+    return;
+  const block = object8(content[0]);
+  const cache = object8(block?.cache_control);
+  if (block?.type !== "text" || !cache || cache.type !== "ephemeral" || Object.keys(block).some((key) => !["type", "text", "cache_control"].includes(key)) || Object.keys(cache).some((key) => !["type", "ttl", "scope"].includes(key)) || cache.ttl !== undefined && cache.ttl !== "5m" && cache.ttl !== "1h" || cache.scope !== undefined && cache.scope !== "global")
+    return;
+  return piDateReminderText(block.text, cwd) ? block.text : undefined;
+}
+var PI_DATE_REMINDER_APIS = new Set([
+  "anthropic-messages",
+  "openai-completions",
+  "openai-responses",
+  "azure-openai-responses",
+  "openai-codex-responses",
+  "bedrock-converse-stream",
+  "google-generative-ai",
+  "google-vertex",
+  "google-gemini-cli",
+  "ollama-chat"
+]);
+function singleText(value, type) {
+  if (!Array.isArray(value) || value.length !== 1)
+    return;
+  const part = object8(value[0]);
+  return part && (type === undefined ? Object.keys(part).length === 1 : part.type === type && Object.keys(part).length === 2) ? part.text : undefined;
+}
+function piWithoutDateReminders(payload, api, cwd, developerRole, includesPreparedFirstUser) {
+  const body = object8(payload);
+  if (!body)
+    return;
+  const google = api.startsWith("google-");
+  const envelope = google ? object8(body.request) ?? body : body;
+  const field = google ? "contents" : api.endsWith("responses") ? "input" : "messages";
+  const messages = envelope[field];
+  if (!Array.isArray(messages))
+    return;
+  let firstUser = false;
+  let removed = false;
+  const kept = [];
+  for (const value of messages) {
+    const row = object8(value);
+    if (!row)
+      return;
+    const text = google ? singleText(row.parts) : api === "bedrock-converse-stream" ? singleText(row.content) : api.endsWith("responses") ? singleText(row.content, "input_text") ?? (api === "openai-codex-responses" ? row.content : undefined) : row.content;
+    if (piDateReminderText(text, cwd)) {
+      const keys = google ? ["role", "parts"] : api.endsWith("responses") ? ["role", "content", "type"] : ["role", "content"];
+      const role = api === "ollama-chat" ? "system" : api === "openai-completions" && developerRole ? "developer" : "user";
+      if (!firstUser || row.role !== role || Object.keys(row).some((key) => !keys.includes(key)) || row.type !== undefined && row.type !== "message")
+        return;
+      if (!removed) {
+        const prefix = { ...envelope, [field]: kept };
+        if (!includesPreparedFirstUser(google && body.request !== undefined ? { ...body, request: prefix } : prefix))
+          return;
+      }
+      removed = true;
+      continue;
+    }
+    if (row.role === "user" && (typeof row.content === "string" || Array.isArray(row.content) && row.content.some((part) => object8(part)?.type === "input_text" || object8(part)?.type === "text" || typeof object8(part)?.text === "string") || Array.isArray(row.parts) && row.parts.some((part) => typeof object8(part)?.text === "string")))
+      firstUser = true;
+    kept.push(value);
+  }
+  if (!removed)
+    return;
+  const filtered = { ...envelope, [field]: kept };
+  return google && body.request !== undefined ? { ...body, request: filtered } : filtered;
+}
+
+// src/pi-dispatch-image-budget.ts
+function object9(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
 function piImageBudgetPlan(model) {
-  if (!model?.input?.includes("image") || object8(model.compat)?.stripImageInput === true)
+  if (!model?.input?.includes("image") || object9(model.compat)?.stripImageInput === true)
     return;
   return {
     count: 0,
     api: model.api,
     rows: new Map,
-    hoistToolImages: model.api?.startsWith("google-") === true && object8(model.compat)?.multimodalFunctionResponse !== true || model.api === "bedrock-converse-stream" && model.requiresToolResultImageHoisting === true,
+    hoistToolImages: model.api?.startsWith("google-") === true && object9(model.compat)?.multimodalFunctionResponse !== true || model.api === "bedrock-converse-stream" && model.requiresToolResultImageHoisting === true,
     hoistErrorImages: model.api === "anthropic-messages" || model.api === "bedrock-converse-stream"
   };
 }
 function inputImage(block, api) {
-  const file = object8(block.providerFile);
+  const file = object9(block.providerFile);
   if (api === "ollama-chat")
     return { kind: "bytes", value: String(block.data ?? "") };
   if ((api?.endsWith("responses") && file?.provider === "openai" || api === "anthropic-messages" && file?.provider === "anthropic") && typeof file?.id === "string")
@@ -36522,7 +36974,7 @@ function piRecordImages(plan, row, source) {
     return;
   const images = [];
   for (const value of source.content) {
-    const block = object8(value);
+    const block = object9(value);
     if (block?.type === "image")
       images.push(inputImage(block, plan.api));
   }
@@ -36548,20 +37000,20 @@ function piWireImages(content, ollamaImages) {
     return [];
   const images = [];
   for (const value of content) {
-    const block = object8(value);
+    const block = object9(value);
     if (!block)
       continue;
-    const source = object8(block.source);
-    const inline = object8(block.inlineData);
-    const file = object8(block.fileData);
-    const bedrock = object8(block.image);
+    const source = object9(block.source);
+    const inline = object9(block.inlineData);
+    const file = object9(block.fileData);
+    const bedrock = object9(block.image);
     if (block.type === "image_url" || block.type === "input_image") {
       if (typeof block.file_id === "string")
         images.push({ kind: "file", value: block.file_id });
       else
         images.push({
           kind: "url",
-          value: String(typeof block.image_url === "string" ? block.image_url : object8(block.image_url)?.url)
+          value: String(typeof block.image_url === "string" ? block.image_url : object9(block.image_url)?.url)
         });
     } else if (block.type === "image") {
       if (source?.type === "file")
@@ -36585,7 +37037,7 @@ function piWireImages(content, ollamaImages) {
     else if (bedrock)
       images.push({
         kind: "data",
-        value: String(object8(bedrock.source)?.bytes),
+        value: String(object9(bedrock.source)?.bytes),
         mime: `image/${bedrock.format}`
       });
   }
@@ -36607,11 +37059,11 @@ function piMatchesImages(actual, expected) {
   return true;
 }
 function piWireImageCount(payload) {
-  const body = object8(payload);
+  const body = object9(payload);
   const visit = (value) => {
     if (Array.isArray(value))
       return value.reduce((n, item) => n + visit(item), 0);
-    const block = object8(value);
+    const block = object9(value);
     if (!block)
       return 0;
     if (["image", "image_url", "input_image"].includes(String(block.type)) || block.inlineData || block.fileData || block.image)
@@ -36625,12 +37077,12 @@ function piWireImageCount(payload) {
       block.response
     ].reduce((n, item) => n + visit(item), Array.isArray(block.images) ? block.images.length : 0);
   };
-  return visit(body?.messages ?? body?.input ?? body?.contents ?? object8(body?.request)?.contents);
+  return visit(body?.messages ?? body?.input ?? body?.contents ?? object9(body?.request)?.contents);
 }
 
 // src/pi-dispatch-responses-history.ts
 var MAX_TEXT_UNITS = 32 * 1024 * 1024;
-function object9(value) {
+function object10(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 }
 function wellFormed2(text) {
@@ -36645,7 +37097,7 @@ function textIdentity2(text, phase) {
 function signaturePhase(block) {
   try {
     if (typeof block.textSignature === "string") {
-      const signature = object9(JSON.parse(block.textSignature));
+      const signature = object10(JSON.parse(block.textSignature));
       if (signature?.v === 1 && typeof signature.id === "string")
         return signature.phase;
     }
@@ -36667,19 +37119,19 @@ ${wellFormed2(text)}
 function coldReplayable(items) {
   let reasoning = false;
   for (const value of items) {
-    const item = object9(value);
+    const item = object10(value);
     if (typeof item?.encrypted_content === "string")
       return false;
     if (item?.type !== "reasoning")
       continue;
-    if (!Array.isArray(item.content) || !item.content.some((part) => object9(part)?.type === "reasoning_text"))
+    if (!Array.isArray(item.content) || !item.content.some((part) => object10(part)?.type === "reasoning_text"))
       return false;
     reasoning = true;
   }
   return reasoning;
 }
-function piResponsesAssistantTexts(value, model, host, alternatives) {
-  const message = object9(value);
+function piResponsesAssistantTexts(value, model, host, alternatives, frozenTagStrips) {
+  const message = object10(value);
   if (!message || !Array.isArray(message.content))
     return;
   if (piOmitsTruncatedAssistant(message))
@@ -36689,7 +37141,7 @@ function piResponsesAssistantTexts(value, model, host, alternatives) {
   const sameModel = model !== undefined && typeof model.api === "string" && typeof model.id === "string" && typeof model.provider === "string" && message.api === model.api && message.model === model.id && message.provider === model.provider;
   let units = 0;
   for (const value of message.content) {
-    const block = object9(value);
+    const block = object10(value);
     if (block?.type === "toolCall")
       continue;
     if (block?.type === "thinking") {
@@ -36699,7 +37151,7 @@ function piResponsesAssistantTexts(value, model, host, alternatives) {
         return;
       if (!block.thinking.trim())
         continue;
-      const compat = object9(model.compat);
+      const compat = object10(model.compat);
       if (block.summary === false && (compat?.requiresReasoningContentForToolCalls === true || compat?.requiresReasoningContentForAllAssistantTurns === true))
         return;
       const text = demotedThinking(block.thinking, model);
@@ -36719,7 +37171,7 @@ function piResponsesAssistantTexts(value, model, host, alternatives) {
     texts.push(textIdentity2(wellFormed2(block.text), sameModel ? signaturePhase(block) : undefined));
     blocks.push(block);
   }
-  const payload = object9(message.providerPayload);
+  const payload = object10(message.providerPayload);
   if (message.api !== model?.api || typeof model?.id !== "string" || typeof model?.provider !== "string" || message.model !== model?.id || (payload?.provider ?? message.provider) !== model?.provider || payload?.type !== "openaiResponsesHistory" || payload.dt !== true || !Array.isArray(payload.items))
     return texts;
   const replay = [];
@@ -36732,8 +37184,9 @@ function piResponsesAssistantTexts(value, model, host, alternatives) {
   ].includes(model?.api ?? "");
   let unsigned = false;
   let rewrittenText = false;
+  let allUnsignedFrozen = true;
   for (const value of payload.items) {
-    const item = object9(value);
+    const item = object10(value);
     if (item?.type === "reasoning")
       continue;
     if (item?.type === "function_call" || item?.type === "custom_tool_call") {
@@ -36744,14 +37197,14 @@ function piResponsesAssistantTexts(value, model, host, alternatives) {
       return texts;
     const itemTexts = [];
     for (const value of item.content) {
-      const part = object9(value);
+      const part = object10(value);
       const block = blocks[bound];
       if (!block || part?.type !== "output_text" || typeof part.text !== "string")
         return texts;
       let signature;
       try {
         if (typeof block.textSignature === "string")
-          signature = object9(JSON.parse(block.textSignature));
+          signature = object10(JSON.parse(block.textSignature));
       } catch {
         return texts;
       }
@@ -36761,7 +37214,8 @@ function piResponsesAssistantTexts(value, model, host, alternatives) {
         if (!allowUnsigned || "textSignature" in block || stripped !== block.text.replace(/^§\d+§ /u, ""))
           return texts;
         unsigned = true;
-        rewrittenText ||= part.text !== stripped && part.text !== block.text;
+        allUnsignedFrozen &&= part.text === block.text && ownsNativeResponseTagStrip(frozenTagStrips, item.id, item.phase, part.text);
+        rewrittenText ||= part.text !== stripped;
       }
       bound++;
       itemTexts.push(part.text);
@@ -36772,7 +37226,7 @@ function piResponsesAssistantTexts(value, model, host, alternatives) {
     for (const text of itemTexts)
       replay.push(textIdentity2(wellFormed2(text), item.phase));
   }
-  if (!output || bound !== blocks.length || unsigned && !rewrittenText)
+  if (!output || bound !== blocks.length || unsigned && !rewrittenText && !allUnsignedFrozen)
     return texts;
   if (unsigned && alternatives) {
     alternatives.fallback = texts;
@@ -36790,7 +37244,7 @@ function piResponsesWireTexts(value, phase) {
   const texts = [];
   let units = 0;
   for (const partValue of value) {
-    const part = object9(partValue);
+    const part = object10(partValue);
     if (part?.type !== "output_text" || typeof part.text !== "string")
       return;
     units += part.text.length;
@@ -36802,6 +37256,7 @@ function piResponsesWireTexts(value, phase) {
 }
 
 // src/pi-dispatch-structure.ts
+var dateReminderPlans = new WeakMap;
 var MAX_MESSAGES = 1e5;
 var ORPHAN_NOTE = Symbol("prepared orphan tool result");
 var ANTHROPIC_CONTINUE_PAD_TEXT = "Continue.";
@@ -36828,11 +37283,11 @@ var TRANSFORM_MESSAGES_APIS = new Set([
   "devin-agent",
   "apple-foundation-models"
 ]);
-function object10(value) {
+function object11(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 }
 function messageStructure(value) {
-  const message = object10(value);
+  const message = object11(value);
   if (!message)
     return;
   const role = [
@@ -36861,7 +37316,7 @@ function messageStructure(value) {
   }
   if (role === "assistant" && Array.isArray(message.content)) {
     for (const value of message.content) {
-      const block = object10(value);
+      const block = object11(value);
       if (block?.type !== "toolCall" && block?.type !== "tool_use")
         continue;
       if (typeof block.id !== "string")
@@ -36877,7 +37332,7 @@ function windowCalls(message) {
   if (!Array.isArray(message.content))
     return [];
   return message.content.flatMap((value) => {
-    const block = object10(value);
+    const block = object11(value);
     return block?.type === "toolCall" && typeof block.id === "string" ? [
       {
         id: block.id,
@@ -36887,7 +37342,7 @@ function windowCalls(message) {
   });
 }
 function duplicateSuffix(model) {
-  const compat = object10(model?.compat);
+  const compat = object11(model?.compat);
   if (model?.api === "openai-completions") {
     if (compat?.requiresMistralToolIds === true)
       return { prefix: "dup", max: 9 };
@@ -36904,7 +37359,7 @@ function appendDuplicateSuffix(id, suffix, max) {
 }
 function projectMissingToolResults(messages, model, host = "omp") {
   const input = messages.filter((value) => {
-    const message = object10(value);
+    const message = object11(value);
     return !((message?.role === "bashExecution" || message?.role === "pythonExecution") && message.excludeFromContext === true);
   });
   if (host === "pi")
@@ -36919,7 +37374,7 @@ function projectMissingToolResults(messages, model, host = "omp") {
   const realResults = new Map;
   const validToolUseIds = new Set;
   const deduplicated = input.map((value, index) => {
-    const message = object10(value);
+    const message = object11(value);
     if (message?.role === "toolResult" && typeof message.toolCallId === "string") {
       let key = pairingId(message.toolCallId);
       let output = value;
@@ -36946,7 +37401,7 @@ function projectMissingToolResults(messages, model, host = "omp") {
     const touched = new Set;
     let changed = false;
     const content = message.content.map((part) => {
-      const block = object10(part);
+      const block = object11(part);
       if (block?.type !== "toolCall" || typeof block.id !== "string")
         return part;
       const key = pairingId(block.id);
@@ -37025,7 +37480,7 @@ function projectMissingToolResults(messages, model, host = "omp") {
   };
   for (let index = 0;index < deduplicated.length; index++) {
     const value = deduplicated[index];
-    const message = object10(value);
+    const message = object11(value);
     if (message?.role === "assistant") {
       flush(message.timestamp);
       if (piOmitsTruncatedAssistant(message))
@@ -37066,7 +37521,7 @@ function projectMissingToolResults(messages, model, host = "omp") {
     if (pending.some((call) => !answered.has(pairingId(call.id))) || aborted.size > 0)
       continue;
     const parts = message.content.flatMap((value) => {
-      const part = object10(value);
+      const part = object11(value);
       return part?.type === "text" && typeof part.text === "string" && part.text.trim() ? [part.text] : [];
     });
     if (!parts.length)
@@ -37094,11 +37549,11 @@ function projectUnmodeledToolResults(messages) {
     return pipe > 0 ? id.slice(0, pipe) : id;
   };
   for (const value of messages) {
-    const message = object10(value);
+    const message = object11(value);
     if (message?.role !== "assistant" || !Array.isArray(message.content))
       continue;
     for (const value of message.content) {
-      const block = object10(value);
+      const block = object11(value);
       if (block?.type !== "toolCall" || typeof block.id !== "string")
         continue;
       if ([
@@ -37114,7 +37569,7 @@ function projectUnmodeledToolResults(messages) {
   const pairingId = (id) => !opaqueIds.has(id) && responsesComponents.has(component(id)) ? component(id) : id;
   const lastResult = new Map;
   messages.forEach((value, index) => {
-    const message = object10(value);
+    const message = object11(value);
     if (message?.role === "toolResult" && typeof message.toolCallId === "string")
       lastResult.set(pairingId(message.toolCallId), index);
   });
@@ -37145,7 +37600,7 @@ function projectUnmodeledToolResults(messages) {
   };
   for (let index = 0;index < messages.length; index++) {
     const value = messages[index];
-    const message = object10(value);
+    const message = object11(value);
     if ((message?.role === "bashExecution" || message?.role === "pythonExecution") && message.excludeFromContext === true)
       continue;
     if (message?.role !== "toolResult")
@@ -37187,7 +37642,7 @@ function projectPiToolResults(messages) {
     held.length = 0;
   };
   for (const value of messages) {
-    const message = object10(value);
+    const message = object11(value);
     const role = message?.role;
     if (role === "assistant") {
       close(message?.timestamp);
@@ -37215,23 +37670,26 @@ function projectPiToolResults(messages) {
   close();
   return projected;
 }
-function preparePiDispatch(messages, model, omp) {
+function preparePiDispatch(messages, model, omp, cwd) {
   let output = messages;
   const structure = buildPiPreparedStructure(messages, model, omp ? (index, source) => {
-    if (object10(source.providerPayload)?.type !== "openaiResponsesHistory")
+    if (object11(source.providerPayload)?.type !== "openaiResponsesHistory")
       return;
     if (output === messages)
       output = messages.slice();
     const { providerPayload: _payload, ...copy } = source;
     output[index] = copy;
   } : undefined, omp ? "omp" : "pi");
+  const reminders = structure && dateReminderPlans.get(structure);
+  if (reminders)
+    reminders.cwd = cwd;
   return { messages: output, structure };
 }
 function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
   if (!messages.length || messages.length > MAX_MESSAGES)
     return;
   for (let index = 0;index < messages.length; index++) {
-    const source = object10(messages[index]);
+    const source = object11(messages[index]);
     if (source?.role === "user" || source?.role === "compactionSummary")
       prepareUser?.(index, source);
   }
@@ -37243,11 +37701,12 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
   const toolIds = new Map;
   const responsesToolIds = new Map;
   const byIndex = new Map;
+  let firstUserRow;
   const imageBudget = piImageBudgetPlan(model);
   let valid = true;
   for (let index = 0;index < projectedMessages.length; index++) {
     const message = projectedMessages[index];
-    const source = object10(message);
+    const source = object11(message);
     if (rows.length === 0 && (source?.role === "system" || source?.role === "developer"))
       continue;
     if ((source?.role === "bashExecution" || source?.role === "pythonExecution") && source.excludeFromContext === true)
@@ -37271,7 +37730,7 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
       "azure-openai-responses",
       "openai-codex-responses"
     ].includes(model?.api ?? "") && (source?.role === "user" || source?.role === "developer") && (typeof source.content === "string" ? !source.content.trim() : Array.isArray(source.content) && !source.content.some((value) => {
-      const block = object10(value);
+      const block = object11(value);
       return block?.type === "image" || block?.type === "text" && typeof block.text === "string" && block.text.trim();
     })))
       continue;
@@ -37303,6 +37762,8 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
         row.wireResults = row.results.map((id) => toolIds.has(id) ? toolIds.get(id) : responsesToolIds.get(id.split("|", 1)[0]));
     }
     rows.push(row);
+    if (source?.role === "user")
+      firstUserRow ??= row;
     byIndex.set(index, row);
     piRecordImages(imageBudget, row, source);
   }
@@ -37313,12 +37774,12 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
   const positionedRows = [...byIndex];
   for (let position = positionedRows.length - 1;position >= 0; position--) {
     const [index, row] = positionedRows[position];
-    const source = object10(projectedMessages[index]);
+    const source = object11(projectedMessages[index]);
     if (!source)
       return;
     const content = source.content;
     const parts = typeof content === "string" ? [{ type: "text", text: content }] : content;
-    const textOnly = Array.isArray(parts) && parts.every((part) => object10(part)?.type === "text" && typeof object10(part)?.text === "string");
+    const textOnly = Array.isArray(parts) && parts.every((part) => object11(part)?.type === "text" && typeof object11(part)?.text === "string");
     const systemTexts = () => {
       const texts = parts.map((part) => part.text);
       return model?.api === "anthropic-messages" ? texts.filter((text) => text.trim()).map((text) => new TextDecoder().decode(new TextEncoder().encode(text))) : texts;
@@ -37326,7 +37787,7 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
     if (piIsDeveloperHistory(source) && source.attribution !== "user") {
       const previous = rows[position - 1];
       const next = rows[position + 1];
-      const anthropicPromotable = model?.api === "anthropic-messages" && object10(model.compat)?.supportsMidConversationSystem === true && textOnly;
+      const anthropicPromotable = model?.api === "anthropic-messages" && object11(model.compat)?.supportsMidConversationSystem === true && textOnly;
       if (anthropicPromotable)
         promotable.set(row, systemTexts());
       if (model?.api === "ollama-chat" || anthropicPromotable && (previous?.role === "user" || previous?.role === "toolResult") && (!next || next.role === "assistant"))
@@ -37380,7 +37841,7 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
         continue;
       }
       const alternatives = {};
-      const texts = piResponsesAssistantTexts(projectedMessages[index], model, host, alternatives);
+      const texts = piResponsesAssistantTexts(projectedMessages[index], model, host, alternatives, object11(projectedMessages[index])?.[PI_NATIVE_TAG_STRIP_PROVENANCE]);
       if (!texts) {
         responsesMessages = undefined;
         break;
@@ -37417,7 +37878,7 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
     }
     return [row];
   });
-  return {
+  const prepared = {
     messages: rows,
     ...imageBudget?.count ? { imageBudget } : {},
     ...responsesApi && !responsesMessages ? { structuralSkipReason: "Responses history transform is not modeled" } : model?.api === "openai-completions" && !chatMessages ? { structuralSkipReason: "Chat history transform is not modeled" } : {},
@@ -37428,9 +37889,17 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
     ...modelsContinuePad ? { anthropicContinuePad: true } : {},
     ...modelsContinuePad && baseRows.some((row) => row.optionalThinking) ? { anthropicOptional: { rows: baseRows, promotable } } : {},
     ...model?.api?.startsWith("google-") ? {
-      googleFunctionIds: object10(model.compat)?.supportsFunctionPartId === true
+      googleFunctionIds: object11(model.compat)?.supportsFunctionPartId === true
     } : {}
   };
+  if (host === "omp" && PI_DATE_REMINDER_APIS.has(model?.api ?? ""))
+    dateReminderPlans.set(prepared, {
+      ...modelsContinuePad ? { plan: { rows: baseRows, promotable } } : {},
+      firstUser: firstUserRow ? baseRows.indexOf(firstUserRow) : -1,
+      midConversationSystem: object11(model?.compat)?.supportsMidConversationSystem === true,
+      developerRole: object11(model?.compat)?.supportsDeveloperRole === true
+    });
+  return prepared;
 }
 function responsesLane(api) {
   return [
@@ -37440,7 +37909,7 @@ function responsesLane(api) {
   ].includes(api ?? "");
 }
 function payloadStructure(payload, ollama = false, responsesItems = false, imageProjection = false) {
-  const body = object10(payload);
+  const body = object11(payload);
   if (!body)
     return;
   const google = piGoogleConversation(payload);
@@ -37455,12 +37924,12 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
     return;
   const rows = [];
   for (const value of messages) {
-    const message = object10(value);
+    const message = object11(value);
     if (!message)
       return;
     if (rows.length === 0 && (message.role === "system" || message.role === "developer"))
       continue;
-    if (message.role === "system" && Array.isArray(message.content) && message.content.every((block) => ["tool_addition", "tool_removal"].includes(String(object10(block)?.type))))
+    if (message.role === "system" && Array.isArray(message.content) && message.content.every((block) => ["tool_addition", "tool_removal"].includes(String(object11(block)?.type))))
       continue;
     if (responses && message.type === "reasoning")
       continue;
@@ -37517,7 +37986,7 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
       continue;
     }
     if (message.role === "user" && Array.isArray(message.content)) {
-      const results = message.content.filter((block) => object10(block)?.type === "tool_result" || bedrock && object10(block)?.toolResult);
+      const results = message.content.filter((block) => object11(block)?.type === "tool_result" || bedrock && object11(block)?.toolResult);
       if (results.length) {
         for (const block of results) {
           const id = bedrock ? block.toolResult?.toolUseId : block.tool_use_id;
@@ -37564,11 +38033,11 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
     }
     if (Array.isArray(message.tool_calls)) {
       for (const call of message.tool_calls) {
-        const source = object10(call);
+        const source = object11(call);
         if (!source)
           return;
         if (source.id === undefined && ollama) {
-          const fn = object10(source.function);
+          const fn = object11(source.function);
           if (typeof fn?.name !== "string")
             return;
           row.calls.push("");
@@ -37604,7 +38073,7 @@ function googleStructure(contents, imageProjection = false) {
     return;
   const rows = [];
   for (const value of contents) {
-    const message = object10(value);
+    const message = object11(value);
     if (!message || !Array.isArray(message.parts))
       return;
     if (message.role !== "user" && message.role !== "model")
@@ -37619,11 +38088,11 @@ function googleStructure(contents, imageProjection = false) {
     };
     const results = [];
     for (const value of message.parts) {
-      const part = object10(value);
+      const part = object11(value);
       if (!part)
         return;
       if (part.functionCall) {
-        const call = object10(part.functionCall);
+        const call = object11(part.functionCall);
         if (row.role !== "assistant" || typeof call?.name !== "string" || call.id !== undefined && typeof call.id !== "string")
           return;
         row.calls.push(call.id ?? "");
@@ -37631,7 +38100,7 @@ function googleStructure(contents, imageProjection = false) {
         row.callNames.push(call.name);
       }
       if (part.functionResponse) {
-        const result = object10(part.functionResponse);
+        const result = object11(part.functionResponse);
         if (row.role !== "user" || typeof result?.name !== "string" || result.id !== undefined && typeof result.id !== "string")
           return;
         results.push({
@@ -37665,11 +38134,11 @@ function matchesUserText(content, text, api, responses, googleOrBedrock) {
   if (responses || googleOrBedrock) {
     if (!Array.isArray(content) || content.length !== 1)
       return false;
-    const block = object10(content[0]);
+    const block = object11(content[0]);
     return !!block && block.text === text && (responses ? block.type === "input_text" : Object.keys(block).length === 1);
   }
   if ((api === "anthropic-messages" || api === "factory-droid-agent") && Array.isArray(content)) {
-    const block = content.length === 1 ? object10(content[0]) : undefined;
+    const block = content.length === 1 ? object11(content[0]) : undefined;
     return block?.type === "text" && block.text === text;
   }
   return content === text;
@@ -37722,7 +38191,7 @@ function trimPreparedImageRows(rows, budget, drops) {
   flush();
   return projected;
 }
-function countAnthropicOptionalAlignments(plan, base, wire, compare) {
+function countAnthropicOptionalAlignments(plan, base, wire, compare, reminders, firstUser = -1) {
   const pad = {
     role: "user",
     calls: [],
@@ -37754,11 +38223,16 @@ function countAnthropicOptionalAlignments(plan, base, wire, compare) {
     const place = (next) => {
       if (current < 0)
         return at;
-      const nextRole = next === undefined ? undefined : role(next);
+      let after = at + 1;
+      while (after < wire.length && reminders?.has(wire[after]))
+        after++;
+      const controls = after > at + 1;
+      if (controls && (firstUser < 0 || current < firstUser))
+        return;
+      const nextRole = controls ? wire[at + 1].role : next === undefined ? undefined : role(next);
       if (!matches(final(current, previous, nextRole), at))
         return;
-      let after = at + 1;
-      if (role(current) === "assistant" && nextRole === "assistant") {
+      if (!controls && role(current) === "assistant" && nextRole === "assistant") {
         if (!matches(pad, after))
           return;
         after++;
@@ -37768,7 +38242,7 @@ function countAnthropicOptionalAlignments(plan, base, wire, compare) {
     for (let next = current + 1;next < base.length; next++) {
       const after = place(next);
       if (after !== undefined)
-        add(next, current < 0 ? undefined : role(current), after, count);
+        add(next, current < 0 ? undefined : wire[after - 1]?.role, after, count);
       if (!base[next].optionalThinking)
         return;
     }
@@ -37778,7 +38252,7 @@ function countAnthropicOptionalAlignments(plan, base, wire, compare) {
       return;
     }
     const after = place(undefined);
-    if (after === wire.length || after === wire.length - 1 && role(current) === "assistant" && isAnthropicContinuePadRow(wire[after]))
+    if (after === wire.length || after === wire.length - 1 && wire[after - 1]?.role === "assistant" && isAnthropicContinuePadRow(wire[after]))
       complete = Math.min(2, complete + count);
   };
   advance(-1, undefined, 0, 1);
@@ -37796,6 +38270,70 @@ function countAnthropicOptionalAlignments(plan, base, wire, compare) {
   return complete;
 }
 function piPreparedStructureMismatch(payload, prepared, onImageTrim) {
+  const plan = prepared && dateReminderPlans.get(prepared);
+  try {
+    const messages = plan ? object11(payload)?.messages : undefined;
+    if (Array.isArray(messages)) {
+      for (const value of messages) {
+        const message = object11(value);
+        if (message?.role !== "system" && message?.role !== "developer")
+          break;
+        if (piDateReminderWireText(message.content, plan?.cwd) !== undefined)
+          return "comparison=role";
+      }
+    }
+  } catch {}
+  const mismatch = preparedStructureMismatch(payload, prepared, onImageTrim);
+  if (!mismatch)
+    return mismatch;
+  try {
+    if (!prepared || !plan)
+      return mismatch;
+    if (!plan.plan) {
+      if (plan.firstUser < 0)
+        return mismatch;
+      const root = prepared.messages[plan.firstUser];
+      const body = object11(payload);
+      const routeRows = Array.isArray(body?.input) ? prepared.responsesMessages ?? prepared.messages : prepared.api === "openai-completions" ? prepared.chatMessages ?? prepared.messages : prepared.messages;
+      const firstUser = routeRows.indexOf(root);
+      if (firstUser < 0)
+        return mismatch;
+      const filtered = piWithoutDateReminders(payload, prepared.api ?? "", plan.cwd, plan.developerRole, (prefix) => {
+        const rows = payloadStructure(prefix, prepared.api === "ollama-chat", !!prepared.responsesMessages);
+        return !!rows && rows.length > firstUser;
+      });
+      return filtered === undefined ? mismatch : preparedStructureMismatch(filtered, prepared, onImageTrim);
+    }
+    const messages = object11(payload)?.messages;
+    if (!Array.isArray(messages))
+      return mismatch;
+    for (const value of messages) {
+      const message = object11(value);
+      if (piDateReminderWireText(message?.content, plan.cwd) !== undefined && Object.keys(message ?? {}).some((key) => !["role", "content"].includes(key)))
+        return mismatch;
+    }
+    const wire = payloadStructure(payload, false, false, !!prepared.imageBudget && piWireImageCount(payload) < prepared.imageBudget.count);
+    if (!wire)
+      return mismatch;
+    const reminders = new Set(wire.filter((row) => piDateReminderWireText(row.wireContent, plan.cwd) !== undefined));
+    if (!reminders.size)
+      return mismatch;
+    for (let index = 0;index < wire.length; index++) {
+      const row = wire[index];
+      if (!reminders.has(row))
+        continue;
+      const previous = wire[index - 1];
+      const next = wire[index + 1];
+      const promoted = plan.midConversationSystem && (previous?.role === "user" || previous?.role === "toolResult") && (!next || next.role === "assistant");
+      if (row.wireRole !== (promoted ? "system" : "user") || row.calls.length || row.results.length)
+        return mismatch;
+    }
+    return preparedStructureMismatch(payload, { ...prepared, anthropicOptional: plan.plan }, onImageTrim, reminders, wire, plan.firstUser);
+  } catch {
+    return mismatch;
+  }
+}
+function preparedStructureMismatch(payload, prepared, onImageTrim, reminders, reminderWire, firstUser) {
   let stage = "image count";
   let row = 0;
   let expectedRows;
@@ -37810,10 +38348,10 @@ function piPreparedStructureMismatch(payload, prepared, onImageTrim) {
       return "comparison=image count";
     const imageProjection = trimmed > 0;
     stage = "wire rows";
-    const body = object10(payload);
+    const body = object11(payload);
     const ollama = prepared?.api === "ollama-chat" && !!body && Array.isArray(body.messages) && body.input === undefined && body.system === undefined && body.inferenceConfig === undefined;
     const responses = body?.messages === undefined && Array.isArray(body?.input);
-    rows = payloadStructure(payload, ollama, responses && !!prepared?.responsesMessages, imageProjection);
+    rows = reminderWire ?? payloadStructure(payload, ollama, responses && !!prepared?.responsesMessages, imageProjection);
     const chat = !!body && Array.isArray(body.messages) && (prepared?.api === "openai-completions" || body.system === undefined) && body.input === undefined && body.inferenceConfig === undefined;
     stage = "prepared rows";
     expectedRows = responses && prepared?.responsesMessages ? prepared.responsesMessages : chat && prepared?.chatMessages ? prepared.chatMessages : prepared?.messages;
@@ -37837,7 +38375,7 @@ function piPreparedStructureMismatch(payload, prepared, onImageTrim) {
       if (expected.systemText !== undefined) {
         const texts = expected.systemText;
         const content = actual.wireContent;
-        const actualTexts = typeof content === "string" ? [content] : Array.isArray(content) && content.every((part) => object10(part)?.type === "text" && typeof object10(part)?.text === "string") ? content.map((part) => part.text) : undefined;
+        const actualTexts = typeof content === "string" ? [content] : Array.isArray(content) && content.every((part) => object11(part)?.type === "text" && typeof object11(part)?.text === "string") ? content.map((part) => part.text) : undefined;
         if (!actualTexts || (typeof content === "string" ? content !== texts.join(`
 `) : JSON.stringify(actualTexts) !== JSON.stringify(texts)))
           return "content";
@@ -37868,7 +38406,7 @@ function piPreparedStructureMismatch(payload, prepared, onImageTrim) {
     };
     if (optionalPlan) {
       stage = "optional assistants";
-      const alignments = countAnthropicOptionalAlignments(optionalPlan, imageProjection && imageBudget ? trimPreparedImageRows(optionalPlan.rows, imageBudget, trimmed) : optionalPlan.rows, rows, compareRow);
+      const alignments = countAnthropicOptionalAlignments(optionalPlan, imageProjection && imageBudget ? trimPreparedImageRows(optionalPlan.rows, imageBudget, trimmed) : optionalPlan.rows, rows, compareRow, reminders, firstUser);
       if (alignments > 1)
         return structureDetail(0, expectedRows, rows, "alignment");
       if (alignments === 1) {
@@ -39628,7 +40166,7 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       }
       const result = await budget.waitMandatory(Promise.resolve(withSqliteTurnDeadline2(() => Math.max(0, budget.remainingOutcome() - PI_CONTEXT_BUDGET.completionReserveMs), () => withSqliteTransformPass2(() => handler(event, ctx, budget)))));
       if (result?.messages) {
-        const prepared = preparePiDispatch(result.messages, fenceEnabled ? ctx.model : undefined, fenceEnabled);
+        const prepared = preparePiDispatch(result.messages, fenceEnabled ? ctx.model : undefined, fenceEnabled, ctx.cwd);
         if (prepared.messages !== result.messages)
           result.messages = prepared.messages;
         active.managedSignature = piManagedSignature(result.messages);
@@ -39807,7 +40345,7 @@ function createPiFallbackIndex() {
 }
 
 // src/pi-fit-reclaim.ts
-import { createHash as createHash12, randomUUID as randomUUID4 } from "node:crypto";
+import { createHash as createHash13, randomUUID as randomUUID4 } from "node:crypto";
 var pendingInput = new Set;
 var KEY2 = "piUpperEstimateReclaim";
 function piFitOverflowPossible(args) {
@@ -39843,7 +40381,7 @@ function piUpperReclaimCursor(args) {
     sessionId: args.sessionId,
     modelKey: args.modelKey,
     contextWindow: args.contextWindow ?? null,
-    head: head ? createHash12("sha256").update(JSON.stringify([
+    head: head ? createHash13("sha256").update(JSON.stringify([
       Buffer.from(head.cachedM0Bytes ?? []).toString("base64"),
       Buffer.from(head.cachedM1Bytes ?? []).toString("base64"),
       head.cachedM0MuralDataUrl ?? null
@@ -39930,7 +40468,7 @@ async function waitForPiHistorianInTurn(sessionId, remainingMs, wait) {
 }
 
 // src/pi-lkg-fit-envelope.ts
-import { createHash as createHash13 } from "node:crypto";
+import { createHash as createHash14 } from "node:crypto";
 function readPiLkgFitEnvelope(ctx, pi, modelKey, frozen, wireSchema) {
   try {
     if (!modelKey || typeof pi.getAllTools !== "function")
@@ -39992,7 +40530,7 @@ function readPiLkgFitEnvelope(ctx, pi, modelKey, frozen, wireSchema) {
       refusalToolDefinitionTokens,
       toolDefinitionsMeasured: refusalToolDefinitionTokens !== undefined,
       envelopeBytes: Buffer.byteLength(envelopeJson),
-      envelopeSignature: activeNames ? createHash13("sha256").update(envelopeJson).update(JSON.stringify(activeNames)).digest("hex") : undefined,
+      envelopeSignature: activeNames ? createHash14("sha256").update(envelopeJson).update(JSON.stringify(activeNames)).digest("hex") : undefined,
       calibration
     };
   } catch {
@@ -40001,13 +40539,13 @@ function readPiLkgFitEnvelope(ctx, pi, modelKey, frozen, wireSchema) {
 }
 
 // src/pi-message-identity.ts
-import { createHash as createHash16 } from "node:crypto";
+import { createHash as createHash17 } from "node:crypto";
 
 // src/pi-tool-identity.ts
-import { createHash as createHash15 } from "node:crypto";
+import { createHash as createHash16 } from "node:crypto";
 
 // src/served-array-ledger.ts
-import { createHash as createHash14 } from "node:crypto";
+import { createHash as createHash15 } from "node:crypto";
 import {
   closeSync as closeSync2,
   fstatSync,
@@ -40285,7 +40823,7 @@ function getPiLastServedArray(sessionId) {
   return previous ? `[${previous.serializedMessages.join(",")}]` : undefined;
 }
 function sha256(value) {
-  return createHash14("sha256").update(value).digest("hex");
+  return createHash15("sha256").update(value).digest("hex");
 }
 function safeSessionFileStem(sessionId) {
   const readable = sessionId.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 96);
@@ -40570,7 +41108,7 @@ function readPiServedCachedArray(sessionId) {
   const memory = getPiLastServedArray(sessionId);
   const slot = memory === undefined ? getSlot(sessionId) : undefined;
   const jsonPrefix = memory ?? slot?.jsonPrefix;
-  if (jsonPrefix === undefined || createHash15("sha256").update(jsonPrefix).digest("hex") !== getPiLastServedDigest(sessionId))
+  if (jsonPrefix === undefined || createHash16("sha256").update(jsonPrefix).digest("hex") !== getPiLastServedDigest(sessionId))
     return;
   let parsed;
   try {
@@ -40594,7 +41132,7 @@ function piMessageEntryFingerprint(message) {
   const m = message;
   if (typeof m.role !== "string")
     return null;
-  const contentHash = createHash16("sha256").update(stableStringify(m.content)).digest("hex");
+  const contentHash = createHash17("sha256").update(stableStringify(m.content)).digest("hex");
   return JSON.stringify([
     typeof m.responseId === "string" ? m.responseId : null,
     typeof m.timestamp === "number" || typeof m.timestamp === "string" ? m.timestamp : null,
@@ -41963,11 +42501,6 @@ function replayPiReminderStrips(args) {
 }
 
 // src/strip-placeholders-pi.ts
-var MARKER_ONLY_PATTERN = /^(?:(?:§\d+§|\[dropped(?: §\d+§)?\]|\[cleared\])\s*)+$/;
-function isPiMarkerOnlyText(text) {
-  const trimmed = text.trim();
-  return trimmed.length > 0 && MARKER_ONLY_PATTERN.test(trimmed);
-}
 function messageIsPlaceholderOnly(message) {
   if (!message || typeof message !== "object")
     return false;
@@ -41975,7 +42508,7 @@ function messageIsPlaceholderOnly(message) {
   if (msg.role !== "assistant")
     return false;
   if (typeof msg.content === "string")
-    return msg.content.trim().length === 0 || isPiMarkerOnlyText(msg.content);
+    return msg.content.trim().length === 0 || isMarkerOnlyText(msg.content);
   if (!Array.isArray(msg.content))
     return false;
   if (msg.content.length === 0)
@@ -41989,7 +42522,7 @@ function messageIsPlaceholderOnly(message) {
     if (typeof text !== "string")
       return false;
     sawVisibleContent = true;
-    if (text.trim().length > 0 && !isPiMarkerOnlyText(text))
+    if (text.trim().length > 0 && !isMarkerOnlyText(text))
       return false;
   }
   return sawVisibleContent;
@@ -42812,7 +43345,7 @@ function createPiAssistantPart(working, messageIndex, partIndex, markDirty) {
     setToolOutput() {
       throw new Error("setToolOutput on assistant part");
     },
-    getToolMetadata() {
+    getToolMetadata(options) {
       const current = working[messageIndex].content;
       const p = current[partIndex];
       if (p?.type !== "toolCall") {
@@ -42823,7 +43356,7 @@ function createPiAssistantPart(working, messageIndex, partIndex, markDirty) {
       try {
         const serialized = JSON.stringify(p.arguments);
         inputByteSize = serialized.length;
-        inputTokenCount = serialized ? estimateTokens(serialized) : 0;
+        inputTokenCount = serialized && !options?.skipInputTokenCount ? estimateTokens(serialized) : 0;
       } catch {
         inputByteSize = 0;
         inputTokenCount = 0;
@@ -43186,6 +43719,7 @@ function buildPiTextIdentityPlan(db, sessionId, tagger, transcript, reuseCandida
       sourceCache.set(tagId, source);
   }
   const driftedMessageIds = new Set;
+  const reusableTextMessageIds = new Set;
   const legacyReminderTagNumbers = new Set;
   for (const [messageId, currentSources] of currentSourcesByMessageId) {
     const legacyRows = legacyRowsByMessageId.get(messageId) ?? [];
@@ -43213,6 +43747,8 @@ function buildPiTextIdentityPlan(db, sessionId, tagger, transcript, reuseCandida
     });
     if (!vectorMatches)
       driftedMessageIds.add(messageId);
+    else if (!messageId.startsWith("pi-msg-") && legacyRows.every((row) => sourceCache.has(row.tagId) && !legacyReminderTagNumbers.has(row.tagId)))
+      reusableTextMessageIds.add(messageId);
   }
   const reusableMessageIds = new Set;
   for (const messageId of reuseCandidates) {
@@ -43223,7 +43759,8 @@ function buildPiTextIdentityPlan(db, sessionId, tagger, transcript, reuseCandida
     driftedMessageIds,
     legacyReminderTagNumbers,
     reusableMessageIds,
-    sourceCache
+    sourceCache,
+    reusableTextMessageIds
   };
 }
 var piBranchProjectionBySession = new Map;
@@ -44677,6 +45214,27 @@ function registerPiContextHandler(pi, baseOptions) {
     }
     return s;
   };
+  pi.on("session_tree", (event, ctx) => {
+    if (event.oldLeafId === event.newLeafId)
+      return;
+    const sessionId = resolveSessionId2(ctx);
+    if (!sessionId)
+      return;
+    let entries = [];
+    let offset = 0;
+    scheduleClearAndReindex(baseOptions.db, sessionId, {
+      prepare: async () => {
+        if (resolveSessionId2(ctx) !== sessionId)
+          return false;
+        entries = ctx.sessionManager.getBranch();
+        const alignment = resolvePiOrdinalAlignment(baseOptions.db, sessionId, entries);
+        offset = alignment.offset;
+        return !isPiOrdinalAlignmentUnanchored(alignment);
+      },
+      getCount: () => countPiRawMessages(entries, offset),
+      readPage: (_session, after, limit, watermark) => convertEntriesToRawMessagePage(entries, after, limit, watermark, offset)
+    });
+  });
   pi.on("thinking_level_select", async (event, ctx) => {
     if (event.previousLevel === event.level)
       return;
@@ -44770,7 +45328,7 @@ function registerPiContextHandler(pi, baseOptions) {
       withoutSqliteTransformPass2(() => options.maybeAutoEmbedSession?.(sessionId, projectDirectory, projectIdentity));
       if (!options.compactionOff) {
         budget.stage = "tag snapshot hydration";
-        const hydration = ensurePiTagSnapshotReady(options.db, sessionId, budget);
+        const hydration = ensurePiTagSnapshotReady(options.db, sessionId, budget, "pass");
         if (hydration)
           await guardAwait(hydration);
       }
@@ -45534,6 +46092,21 @@ function registerPiContextHandler(pi, baseOptions) {
           });
         }
       }
+      if (options.autoSearch && !options.autoSearch.enabled && !options.compactionOff && result.prefixMutationAllowed) {
+        await runAutoSearchHintForPi({
+          sessionId,
+          db: options.db,
+          messages: outputMessages,
+          entryIds: strictEntryIds,
+          entryIdByRef: result.postCommitEntryIdByRef,
+          options: {
+            enabled: false,
+            scoreThreshold: options.autoSearch.scoreThreshold,
+            minPromptChars: options.autoSearch.minPromptChars,
+            projectPath: projectIdentity
+          }
+        });
+      }
       logTransformTiming(sessionId, "autoSearch", tAutoSearch);
       const tTodoCapture = performance.now();
       const injectTodo = () => {
@@ -46003,7 +46576,7 @@ function registerPiContextHandler(pi, baseOptions) {
         budget.failureReason = err.message;
         if (sessionIdForError) {
           try {
-            prewarmPiTagSnapshot(lkgOptions.db, sessionIdForError);
+            prewarmPiTagSnapshot(lkgOptions.db, sessionIdForError, "pass");
           } catch {}
         }
         throw err;
@@ -46069,7 +46642,7 @@ function registerPiContextHandler(pi, baseOptions) {
               })
             });
             assertPiTagSnapshotReady(lkgOptions.db, sessionIdForError);
-            const drops = getPiTagSnapshotView(lkgOptions.db, sessionIdForError).filter((tag) => tag.status === "dropped");
+            const drops = projectPiReplayDrops(recoveryTranscript, getPiPassTagSnapshotView(lkgOptions.db, sessionIdForError));
             const changed = applyFlushedStatuses(sessionIdForError, lkgOptions.db, buildPersistedDropTargets(recoveryTranscript, drops, {
               allowReasoningPrefixRewrite: true
             }), drops);
@@ -47074,6 +47647,21 @@ async function runPipeline(args) {
   try {
     nativeRemovalInputs = getNativeReplayState(args.db, args.sessionId).toolInputs;
   } catch {}
+  const removalBatch = (edit) => withPiToolRemovalBatch({ db: args.db, sessionId: args.sessionId, saved: nativeRemovalInputs }, edit);
+  const applyToolRemovalGroup = (edit) => {
+    const savedRemovalInputs = nativeRemovalInputs;
+    nativeRemovalInputs = savedRemovalInputs && new Map(savedRemovalInputs);
+    try {
+      return args.db.transaction(() => removalBatch((flush) => {
+        const result = edit();
+        flush();
+        return result;
+      })).immediate();
+    } catch (cause) {
+      nativeRemovalInputs = savedRemovalInputs;
+      throw cause instanceof PiToolRemovalBatchError ? cause : new PiToolRemovalBatchError(cause);
+    }
+  };
   const tTranscriptBuild = performance.now();
   const transcript = createPiTranscript(args.messages, args.sessionId, args.messages.map(stableIdResolver), {
     preserveReasoningToolArcs: args.reasoningClearing?.preserveReasoningToolArcs,
@@ -47243,9 +47831,11 @@ async function runPipeline(args) {
   afterFallbackAdoptionForTests?.(args.stableIdSchemeCutover === true);
   const textIdentityPlan = buildPiTextIdentityPlan(args.db, args.sessionId, args.tagger, transcript, args.reusableMessageIds);
   const tTag = performance.now();
+  const strippedSubagentThinking = args.sessionMeta.isSubagent && (!thinkingRecovery.restore || rewritingSignedPrefix) ? frozenBindingEntryIds(args.db, args.sessionId) : new Set;
   const mutationView = transcript.messages.map((message) => ({
     ...message,
-    parts: message.parts
+    parts: message.parts,
+    requiresToolArcSkeleton: strippedSubagentThinking.has(message.info.id ?? "") ? false : message.requiresToolArcSkeleton
   }));
   const recoveryNormalized = !!args.recoveryPrefix && (isCacheBustingPass || identityRebuild);
   const taggingView = args.recoveryPrefix && !recoveryNormalized ? mutationView.filter((message) => !args.recoveryPrefix?.untaggedInputIds.has(message.info.id ?? "")) : mutationView;
@@ -47266,6 +47856,7 @@ async function runPipeline(args) {
       preserveTagOnlyAssistantText: true,
       entryFingerprintByMessageId,
       reuseMessageIds: textIdentityPlan.reusableMessageIds,
+      reuseTextMessageIds: textIdentityPlan.reusableTextMessageIds,
       textIdentityDriftMessageIds: textIdentityPlan.driftedMessageIds,
       textIdentitySourceCache: textIdentityPlan.sourceCache,
       textTokenCache: tagTextTokenCache,
@@ -47346,19 +47937,63 @@ async function runPipeline(args) {
       message.content = content;
     });
   }
+  const tLegacyToolConversion = performance.now();
   if (foldBustsServedPrefixThisPass) {
+    const savedRemovalInputs = nativeRemovalInputs;
     try {
+      nativeRemovalInputs = savedRemovalInputs && new Map(savedRemovalInputs);
       let converted = 0;
-      args.db.transaction(() => {
+      args.db.transaction(() => removalBatch((flush) => {
         converted = convertLegacyToolSkeletons(args.db, args.sessionId, targets, {
-          keepFullDrop: (callId) => nativeRemovalInputs === undefined || callId !== null && nativeRemovalInputs.get(callId) === NATIVE_TOOL_REMOVAL_MARKER
+          prepareRemovals: (rows) => preparePiToolRemovalChecks({
+            db: args.db,
+            rows,
+            targets,
+            messages: args.messages,
+            prepare: transcript.prepareToolRemovalMeasurements
+          }),
+          keepFullDrop: (callId) => nativeRemovalInputs === undefined || callId !== null && authorizePiToolRemoval({
+            db: args.db,
+            sessionId: args.sessionId,
+            callId,
+            saved: nativeRemovalInputs,
+            canApply: false
+          }) === true
         }).size;
-      }).immediate();
+        flush();
+      })).immediate();
       if (converted > 0) {
         sessionLog2(args.sessionId, `pi HARD fold converted ${converted} legacy dropped-tool skeleton(s) to real-or-absent`);
       }
     } catch (error) {
+      nativeRemovalInputs = savedRemovalInputs;
       sessionLog2(args.sessionId, `pi legacy dropped-tool skeleton conversion failed (kept legacy bytes): ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  logTransformTiming(args.sessionId, "convertLegacyToolSkeletons", tLegacyToolConversion);
+  if (args.sessionMeta.isSubagent && isCacheBustingPass && !protectedSignedPrefix && !args.compactionOff) {
+    const savedRemovalInputs = nativeRemovalInputs;
+    try {
+      nativeRemovalInputs = savedRemovalInputs && new Map(savedRemovalInputs);
+      const converted = args.db.transaction(() => removalBatch((flush) => {
+        const conversions = prepareAgedToolSkeletonConversions(args.db, args.sessionId, newTargets, {
+          prepareRemovals: (rows) => preparePiToolRemovalChecks({
+            db: args.db,
+            rows,
+            targets: newTargets,
+            messages: args.messages,
+            prepare: transcript.prepareToolRemovalMeasurements
+          })
+        });
+        conversions.persist(args.db);
+        flush();
+        return conversions.converted.size;
+      })).immediate();
+      if (converted > 0)
+        recordFirstApplicationWireEdit(true);
+    } catch (error) {
+      nativeRemovalInputs = savedRemovalInputs;
+      throw error;
     }
   }
   try {
@@ -47378,7 +48013,9 @@ async function runPipeline(args) {
   const deferredHistoryRefreshWasPending = deferredHistoryWasPendingAtPassStart;
   const shouldReadPendingOps = !args.compactionOff && (publishedWorkDrainAllowed || args.schedulerDecision === "execute" || args.forceMaterialization || hasPendingMaterializeSignal || foldExecutedThisPass || firstRenderBust);
   const pendingOps = shouldReadPendingOps ? getPendingOps(args.db, args.sessionId) : [];
+  const tReclaimDistance = performance.now();
   const reclaimDistance = isCacheBustingPass ? toolReclaimDistanceEntries(mutationView, targets) : [];
+  logTransformTiming(args.sessionId, "toolReclaimDistanceEntries", tReclaimDistance);
   const protectedToolTags = protectedToolTagNumbers(getActiveTagsBySession2(args.db, args.sessionId), args.protectedTools);
   for (const number of identityAdoption.protectedTagNumbers)
     protectedToolTags.add(number);
@@ -47415,13 +48052,14 @@ async function runPipeline(args) {
         try {
           nativeRemovalInputs = saved && new Map(saved);
           probingExecuteRemoval = true;
-          args.db.transaction(() => {
+          args.db.transaction(() => removalBatch((flush) => {
             for (const [number, target] of targets) {
               if (target.prepareDrop?.() !== false)
                 allowed.add(number);
             }
+            flush();
             throw rollback;
-          }).immediate();
+          })).immediate();
         } catch (error) {
           if (error !== rollback)
             allowed.clear();
@@ -47460,13 +48098,13 @@ async function runPipeline(args) {
     pendingDecisionLogObserverForTests?.(pendingDecisionLog);
     try {
       const tApplyPending = performance.now();
-      pendingOpsDidMutate = applyPendingOperations(args.sessionId, args.db, newTargets, new Set([
+      pendingOpsDidMutate = applyToolRemovalGroup(() => applyPendingOperations(args.sessionId, args.db, newTargets, new Set([
         ...args.contextUsage.percentage >= 95 ? [] : protectedTagNumbersForPass,
         ...protectedToolTags,
         ...identityAdoption.protectedTagNumbers
       ]), pendingOperationTags, pendingOps, [], new Set, (reduction) => droppedTokenReductions.push(reduction), undefined, (eligible) => {
         eligiblePendingDropTagIds = eligible;
-      });
+      }));
       if (pendingOpsDidMutate) {
         droppedCount += pendingOps.length;
       }
@@ -47496,7 +48134,26 @@ async function runPipeline(args) {
   const flushedDroppedTags = getDroppedTagsByNumbers2(args.db, args.sessionId, targetTagNumbers);
   logTransformTiming(args.sessionId, "getDroppedTagsByNumbers", tGetTags, `targets=${targetTagNumbers.length} fetched=${flushedDroppedTags.length}`);
   const tFlushed = performance.now();
-  runPersistedReplayStage("flushed-status-failure", undefined, () => applyFlushedStatuses(args.sessionId, args.db, targets, flushedDroppedTags));
+  runPersistedReplayStage("flushed-status-failure", undefined, () => {
+    const render = () => applyFlushedStatuses(args.sessionId, args.db, targets, flushedDroppedTags);
+    const savedRemovalInputs = nativeRemovalInputs;
+    const needsRemovalPreparation = savedRemovalInputs !== undefined && flushedDroppedTags.some((tag) => tag.type === "tool" && tag.dropMode === "full" && savedRemovalInputs.get(tag.messageId) !== NATIVE_TOOL_REMOVAL_MARKER);
+    if (!isCacheBustingPass || !needsRemovalPreparation)
+      return render();
+    try {
+      nativeRemovalInputs = savedRemovalInputs && new Map(savedRemovalInputs);
+      return args.db.transaction(() => removalBatch((flush) => {
+        prepareFlushedToolRemovals(targets, flushedDroppedTags);
+        flush();
+        return render();
+      })).immediate();
+    } catch (error) {
+      nativeRemovalInputs = savedRemovalInputs;
+      if (error instanceof PiToolRemovalBatchError)
+        return render();
+      throw error;
+    }
+  });
   logTransformTiming(args.sessionId, "applyFlushedStatuses", tFlushed);
   logTransformTiming(args.sessionId, "batchFinalize:flushed", tFlushed);
   const messageIdToMaxTag = buildMessageIdToMaxTag(targets);
@@ -47545,7 +48202,7 @@ async function runPipeline(args) {
   let routineCleanupApplied = false;
   let heuristicsResult = null;
   const tActiveTags = performance.now();
-  const allTagsForPass = getPiTagSnapshotView(args.db, args.sessionId);
+  const allTagsForPass = getPiPassTagSnapshotView(args.db, args.sessionId);
   const activeTags = getPiActiveTagSnapshotView(args.db, args.sessionId, allTagsForPass);
   logTransformTiming(args.sessionId, "getTagsBySessionSnapshot", tActiveTags, `all=${allTagsForPass.length} active=${activeTags.length}`);
   if (shouldRunHeuristics) {
@@ -47567,7 +48224,7 @@ async function runPipeline(args) {
         clearEmergencyDropSample(args.db, args.sessionId);
       }
       routineCleanupApplied = (emergencyDropEligible ? args.contextUsage.percentage >= 95 || getEmergencyInputSample(args.db, args.sessionId) === 0 : args.sessionMeta.isSubagent || !routinePressureAlreadyApplied) || hasPendingMaterializeSignal || rideSignals.explicitFlush || deferredMaterialize || independentMutationBeforeHeuristics;
-      heuristicsResult = applyPiHeuristicCleanup(args.sessionId, args.db, newTargets, args.messages, {
+      heuristicsResult = applyToolRemovalGroup(() => applyPiHeuristicCleanup(args.sessionId, args.db, newTargets, args.messages, {
         protectedTags: args.protectedTags,
         prepareToolRemovalMeasurements: transcript.prepareToolRemovalMeasurements,
         protectedToolTags,
@@ -47581,18 +48238,18 @@ async function runPipeline(args) {
           usagePercentage: args.contextUsage.percentage,
           passAlreadyPriced: independentMutationBeforeHeuristics
         } : undefined,
-        caveman: args.isSubagent ? undefined : args.heuristics.caveman
-      }, activeTags, stableIdResolver);
+        caveman: args.isSubagent ? undefined : args.heuristics?.caveman
+      }, activeTags, stableIdResolver));
       if (!routineCleanupApplied && heuristicsResult.emergencyDroppedTools > 0) {
-        const ridingCleanup = applyPiHeuristicCleanup(args.sessionId, args.db, newTargets, args.messages, {
+        const ridingCleanup = applyToolRemovalGroup(() => applyPiHeuristicCleanup(args.sessionId, args.db, newTargets, args.messages, {
           protectedTags: args.protectedTags,
           protectedToolTags,
           protectedCutoff: usesTokenProtection ? protectionWindowForPass.cutoff : undefined,
           routine: true,
           staleReduceStripEnabled: true,
           onStaleReduceEdit: recordStaleReduceEdit,
-          caveman: args.isSubagent ? undefined : args.heuristics.caveman
-        }, getActiveTagsBySession2(args.db, args.sessionId), stableIdResolver);
+          caveman: args.isSubagent ? undefined : args.heuristics?.caveman
+        }, getActiveTagsBySession2(args.db, args.sessionId), stableIdResolver));
         heuristicsResult = {
           droppedTools: heuristicsResult.droppedTools + ridingCleanup.droppedTools,
           deduplicatedTools: heuristicsResult.deduplicatedTools + ridingCleanup.deduplicatedTools,
@@ -47631,6 +48288,8 @@ async function runPipeline(args) {
       }
       logTransformTiming(args.sessionId, "applyHeuristicCleanup", tHeuristic, `droppedTools=${heuristicsResult.droppedTools} deduplicatedTools=${heuristicsResult.deduplicatedTools} droppedInjections=${heuristicsResult.droppedInjections} staleReduce=${heuristicsResult.droppedStaleReduceCalls} compressedTextTags=${heuristicsResult.compressedTextTags} mutatedTextTags=${heuristicsResult.mutatedTextTags}`);
     } catch (err) {
+      if (err instanceof PiToolRemovalBatchError)
+        throw err;
       sessionLog2(args.sessionId, `heuristic cleanup failed (continuing): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
@@ -47769,7 +48428,7 @@ async function runPipeline(args) {
     }
     autoReclaimTargetCount = syntheticPendingOps.length;
     if (syntheticPendingOps.length > 0) {
-      autoReclaimDidMutate = applyPendingOperations(args.sessionId, args.db, newTargets, protectedTagNumbersForPass, undefined, [], syntheticPendingOps, editMarkerTagIds, (reduction) => droppedTokenReductions.push(reduction));
+      autoReclaimDidMutate = applyToolRemovalGroup(() => applyPendingOperations(args.sessionId, args.db, newTargets, protectedTagNumbersForPass, undefined, [], syntheticPendingOps, editMarkerTagIds, (reduction) => droppedTokenReductions.push(reduction)));
       if (autoReclaimDidMutate) {
         droppedCount += syntheticPendingOps.length;
         autoReclaimDidMutateThisPass = true;
@@ -47790,10 +48449,7 @@ async function runPipeline(args) {
             noteImagePosition(message.info.id, tagNumber);
         }
       }
-      const imageToolTags = new Map(allTagsForPass.filter((tag) => tag.type === "tool").map((tag) => [
-        `${tag.toolOwnerMessageId ?? ""}\x00${tag.messageId}`,
-        tag.tagNumber
-      ]));
+      const imageToolCoordinates = [];
       const imageToolOwners = new Map;
       for (let index = 0;index < workingMessages.length; index++) {
         const message = workingMessages[index];
@@ -47803,12 +48459,26 @@ async function runPipeline(args) {
             if (part.type !== "toolCall")
               continue;
             imageToolOwners.set(part.id, id ?? "");
-            noteImagePosition(id, imageToolTags.get(`${id ?? ""}\x00${part.id}`) ?? 0);
+            imageToolCoordinates.push({ id, key: `${id ?? ""}\x00${part.id}` });
           }
         } else if (message.role === "toolResult") {
-          noteImagePosition(id, imageToolTags.get(`${imageToolOwners.get(message.toolCallId) ?? ""}\x00${message.toolCallId}`) ?? 0);
+          imageToolCoordinates.push({
+            id,
+            key: `${imageToolOwners.get(message.toolCallId) ?? ""}\x00${message.toolCallId}`
+          });
         }
       }
+      const imageToolKeys = new Set(imageToolCoordinates.map(({ key }) => key));
+      const imageToolTags = new Map;
+      for (const tag of allTagsForPass) {
+        if (tag.type !== "tool")
+          continue;
+        const key = `${tag.toolOwnerMessageId ?? ""}\x00${tag.messageId}`;
+        if (imageToolKeys.has(key))
+          imageToolTags.set(key, tag.tagNumber);
+      }
+      for (const { id, key } of imageToolCoordinates)
+        noteImagePosition(id, imageToolTags.get(key) ?? 0);
       const protectedImageToolKeys = new Set(activeTags.filter((tag) => tag.type === "tool" && protectedToolTags.has(tag.tagNumber)).map((tag) => tag.toolOwnerMessageId ? `${tag.toolOwnerMessageId}\x00${tag.messageId}` : tag.messageId));
       const imageResult = stripPiProcessedImages({
         db: args.db,
@@ -47842,6 +48512,13 @@ async function runPipeline(args) {
   const tTranscriptCommit = performance.now();
   transcript.commit();
   logTransformTiming(args.sessionId, "transcriptCommit", tTranscriptCommit);
+  if (applyNativeResponseTagReplayPi({
+    db: args.db,
+    sessionId: args.sessionId,
+    messages: args.messages,
+    canApply: isCacheBustingPass
+  }) > 0)
+    recordFirstApplicationWireEdit(true);
   let nativeInputs;
   let nativeReasoningIds;
   try {
@@ -48143,7 +48820,7 @@ async function runPipeline(args) {
     onAdopt: (message) => sessionLog2(args.sessionId, message)
   });
   protectionFloorResolution = resolveProtectionFloor();
-  const protectedTagNumbers = usesTokenProtection ? computeProtectionWindow(allTagsForPass, protectionFloorResolution.floor, activeCalibration.toolsRatio).protectedTagNumbers : newestActiveTagNumbersByCount(activeTags, args.protectedTags);
+  const protectedTagNumbers = usesTokenProtection ? protectedPiPassTagNumbers(allTagsForPass, protectionFloorResolution.floor, activeCalibration.toolsRatio) : newestActiveTagNumbersByCount(activeTags, args.protectedTags);
   const channelPendingOps = shouldApplyPendingOps ? getPendingOps(args.db, args.sessionId) : shouldReadPendingOps ? pendingOps : getPendingOps(args.db, args.sessionId);
   const channelBaselineSnapshot = {
     tagCacheKey: fallbackCache.index,
@@ -50842,7 +51519,7 @@ function buildStatusDetail(pi, ctx, deps, sessionId, state, host = readStatusHos
       enabled: deps.dreamer?.runnable === true,
       scheduleSummary: deps.dreamer?.scheduleSummary ?? null,
       lastRunAt: safeRead(() => getMostRecentTaskRunAt(deps.db, deps.projectIdentity), null),
-      backlog: safeRead(() => getDreamTaskBacklogs(deps.db, deps.projectIdentity, CANONICAL_DREAM_TASKS.filter((task) => deps.smartNotesEnabled !== false || task !== "evaluate-smart-notes")), {}),
+      backlog: safeRead(() => getDreamTaskBacklogs(deps.db, deps.projectIdentity, CANONICAL_DREAM_TASKS.filter((task) => deps.smartNotesEnabled !== false || task !== "evaluate-smart-notes"), { display: true }), {}),
       failures: safeRead(() => getFailingDreamTasks(deps.db, deps.projectIdentity).filter((state) => deps.smartNotesEnabled !== false || state.task !== "evaluate-smart-notes"), []),
       skipped: safeRead(() => getSkippedDreamTasks(deps.db, deps.projectIdentity).filter((task) => deps.smartNotesEnabled !== false || task !== "evaluate-smart-notes"), []),
       tickFailure: safeRead(() => getDreamerTickFailure(deps.db), null)
@@ -52912,7 +53589,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
         return;
       }
       const emptyHistorian = empty.find((chain) => chain.owner === "historian");
-      const historianLine = historian ? `registered historian trigger (model=${historian.model}${historian.fallbackModels?.length ? `, fallbacks=${historian.fallbackModels.join(",")}` : ""}, executeThreshold=${formatExecuteThresholdForLog(historian.executeThresholdPercentage)})` : emptyHistorian ? `registered historian trigger: DISABLED (no configured model is registered in Pi: ${formatEmptyPiModelChain(emptyHistorian)})` : undefined;
+      const historianLine = historian ? `registered historian trigger (model=${historian.model}${historian.fallbackModels?.length ? `, fallbacks=${historian.fallbackModels.map(formatPiModelForLog).join(",")}` : ""}, executeThreshold=${formatExecuteThresholdForLog(historian.executeThresholdPercentage)})` : emptyHistorian ? `registered historian trigger: DISABLED (no configured model is registered in Pi: ${formatEmptyPiModelChain(emptyHistorian)})` : undefined;
       if (historianLine && !loggedPiModelChainLines.has(historianLine)) {
         loggedPiModelChainLines.add(historianLine);
         info(historianLine);
@@ -53038,7 +53715,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
   registerPiCloneSessionTransitions(pi.on.bind(pi), {
     db,
     signalPendingMarker: signalPiDeferredCompactionMarkerDrain,
-    onInherited: (sessionId) => prewarmPiTagSnapshot(db, sessionId)
+    onInherited: (sessionId) => prewarmPiTagSnapshot(db, sessionId, "pass")
   });
   pi.on("session_start", async (event, ctx) => {
     bindStaleBuildNotice(ctx, import.meta.url);
@@ -53061,7 +53738,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
     await handlePiCloneSessionStart(event, ctx, {
       db,
       signalPendingMarker: signalPiDeferredCompactionMarkerDrain,
-      onInherited: (sessionId) => prewarmPiTagSnapshot(db, sessionId)
+      onInherited: (sessionId) => prewarmPiTagSnapshot(db, sessionId, "pass")
     });
     const sessionId = resolveSessionId(ctx);
     if (!piMarkerRehydrationLogged && pendingPiMarkerSessions.length > 0 && sessionId) {
@@ -53078,7 +53755,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
       });
     }
     if (sessionId)
-      prewarmPiTagSnapshot(db, sessionId);
+      prewarmPiTagSnapshot(db, sessionId, "pass");
   });
   pi.on("agent_start", (_event, ctx) => {
     setEmbeddingSessionBusy2(ctx.sessionManager.getSessionId(), true);
@@ -53708,7 +54385,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
     try {
       const incomingSessionId = readSessionId(ctx);
       if (incomingSessionId && _event?.reason !== "fork")
-        prewarmPiTagSnapshot(db, incomingSessionId);
+        prewarmPiTagSnapshot(db, incomingSessionId, "pass");
       if (!outgoingSessionId || outgoingSessionId === readSessionId(ctx))
         return;
       clearPiSystemPromptSession(outgoingSessionId);
@@ -53728,6 +54405,11 @@ function formatExecuteThresholdForLog(value) {
   const overrides = Object.entries(value).filter(([key]) => key !== "default").map(([key, pct]) => `${key}=${pct}%`);
   const base = `${value.default}%`;
   return overrides.length > 0 ? `${base} (${overrides.join(", ")})` : base;
+}
+function formatPiModelForLog(entry) {
+  if (typeof entry === "string")
+    return entry;
+  return `${entry.model}${entry.qualifier ? ` (thinking_level=${entry.qualifier})` : ""}`;
 }
 export {
   __test,

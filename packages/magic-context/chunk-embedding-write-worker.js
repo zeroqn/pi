@@ -11,35 +11,37 @@ import {
   isWorkerCloseMessage,
   exitOnWorkerClose
 } from "./index-54wmg4rj.js";
-import"./index-my0dn413.js";
-import"./index-fgs78jyd.js";
-import"./index-gwxaz0z5.js";
+import"./index-3rq8rbt9.js";
+import"./index-gymgz20n.js";
+import"./index-dnp1jjar.js";
+import"./index-ar863dwd.js";
 import"./index-399p688g.js";
-import"./index-8hmqdav2.js";
-import"./index-8a2wvrda.js";
+import"./index-mkh1cm5k.js";
+import"./index-rgvqh5x7.js";
 import {
   replaceCompartmentChunkEmbeddings2,
   recordChunkEmbedBackoff2,
   loadUnembeddedSessionChunkCandidates2,
   countUnembeddedSessionCompartments2
-} from "./index-wb2t932e.js";
+} from "./index-6gtz99am.js";
 import {
   recordSessionProjectIdentity,
   acquireGitSweepLease,
   renewGitSweepLease,
   releaseGitSweepLease
-} from "./index-j3pz3a1b.js";
-import"./index-hxp6q5f8.js";
-import"./index-n4wyxcgr.js";
+} from "./index-mp0gh04g.js";
+import"./index-6pk49fc3.js";
 import {
   LATEST_SUPPORTED_VERSION,
   enforceSchemaFence
-} from "./index-j0t5pwjg.js";
-import"./index-0dr64gsy.js";
-import"./index-w1avzkdt.js";
+} from "./index-cx7ctxbc.js";
+import"./index-3bb24eb6.js";
+import"./index-vd4cwnaz.js";
+import"./index-3pk2mhaq.js";
 import"./index-135e8hvg.js";
-import"./index-23t8ryqw.js";
-import"./index-hqw0rt9k.js";
+import"./index-n0zjvs3h.js";
+import"./index-c6wbq66z.js";
+import"./index-0wtm7g7f.js";
 
 // ../plugin/src/features/magic-context/chunk-embedding-write-worker.ts
 import { parentPort, workerData } from "node:worker_threads";

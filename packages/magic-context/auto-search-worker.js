@@ -24,16 +24,16 @@ var [
   { Database, registerSqliteDiagnosticSink },
   { log }
 ] = await Promise.all([
-  import("./embedding-backfill-4t85k2r0.js"),
+  import("./embedding-backfill-a3g9emmy.js"),
   import("./embedding-cache-7rp4gqzr.js"),
   import("./storage-memory-0ndn65fm.js"),
-  import("./project-embedding-registry-50g9677r.js"),
-  import("./search-vv8vv85m.js"),
-  import("./compartment-chunk-embedding-g9a977b8.js"),
+  import("./project-embedding-registry-y58wvzcw.js"),
+  import("./search-q6z8b884.js"),
+  import("./compartment-chunk-embedding-0s8qx62y.js"),
   import("./embedding-activity-ew6dshfd.js"),
   import("./harness-9872e0ym.js"),
   import("./sqlite-v89bj0yy.js"),
-  import("./logger-shetp43v.js")
+  import("./logger-2j70hhz4.js")
 ]);
 setHarness(input.harness);
 registerSqliteDiagnosticSink(log, getHarness);
@@ -127,6 +127,7 @@ async function run(jobInput) {
     } else {
       const jobStarted = performance.now();
       const steps = {};
+      const diagnostics = input.options.autoSearchDiagnostics;
       const results = await unifiedSearch(db, input.sessionId, input.projectPath, input.query, {
         ...input.options,
         backfillMemoryEmbeddings: false,
@@ -134,7 +135,11 @@ async function run(jobInput) {
         measurementDisabled: true,
         embedQuery: async (text) => (await request({ kind: "query", text })).result ?? null,
         isEmbeddingRuntimeEnabled: () => input.embeddingRuntimeEnabled,
-        stepTimings: steps
+        stepTimings: steps,
+        onAutoSearchDiagnostics: diagnostics ? () => port.postMessage({
+          kind: "diagnostics",
+          diagnostics
+        }) : undefined
       });
       port.postMessage({
         kind: "result",
