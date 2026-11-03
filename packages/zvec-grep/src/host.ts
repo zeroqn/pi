@@ -29,12 +29,15 @@ import {
 	buildSearchArgs,
 	createZgCli,
 	formatRootResults,
+	indexRepairFor,
 	runAcrossRoots,
+	startIndexBuild,
 	tokenizeRgCommand,
+	type IndexBuildOutcome,
 	type SearchParams,
 	type ZgCli,
 } from "./cli.ts";
-import { resolveTargetRoots } from "./config.ts";
+import { configuredEmbedding, discardSeededManifest, resolveTargetRoots } from "./config.ts";
 
 export type ZvecGrepHostContext = {
 	/** The session's directory: what `root` defaults to, and where the config's project source is read. */
@@ -57,7 +60,17 @@ export type ZvecGrepHostContext = {
 	 * handle answers `undefined` between cells.
 	 */
 	signal?: () => AbortSignal | undefined;
+	/** Test seam: start a background build. The default spawns `zg --index`, detached. */
+	startBuild?: (root: string, options: { rebuild: boolean }) => Promise<IndexBuildOutcome>;
+	/** Test seam: whether a search may start an index build at all (`ZVEC_GREP_PI_AUTOINDEX`). */
+	autoIndex?: () => boolean;
 };
+
+/** Implicit indexing is on unless `ZVEC_GREP_PI_AUTOINDEX` is 0/false/off. */
+export function autoIndexEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+	const value = env.ZVEC_GREP_PI_AUTOINDEX?.trim().toLowerCase();
+	return value !== "0" && value !== "false" && value !== "off";
+}
 
 type Kind = "string" | "strings" | "boolean" | "number" | "one-of";
 
@@ -194,6 +207,51 @@ export function createZvecGrepHost(context: ZvecGrepHostContext): {
 	zvec_grep_rg: (...args: unknown[]) => Promise<string>;
 } {
 	const cli = context.cli ?? createZgCli();
+	/** Builds this session has started, by root: a second search must not start a second one. */
+	const builds = new Map<string, { rebuild: boolean; startedAt: number }>();
+	const autoIndex = context.autoIndex ?? (() => autoIndexEnabled());
+	const startBuild =
+		context.startBuild ??
+		(async (root: string, options: { rebuild: boolean }): Promise<IndexBuildOutcome> => {
+			// An unbuilt manifest this extension pre-seeded is the node shape, which the Rust `zg`
+			// refuses outright; dropping it is what `/zg-index` does after the same refusal, and doing
+			// it before the spawn spares the background child a failure it cannot retry from.
+			discardSeededManifest(root);
+			const style = await cli.style(context.cwd);
+			return startIndexBuild(cli.binary, style, root, {
+				model: configuredEmbedding(context.cwd),
+				rebuild: options.rebuild,
+			});
+		});
+
+	/**
+	 * What a caller is told when its search could not run for want of an index.
+	 *
+	 * A returned sentence, not a raised error: the build has already been started, and "retry in a
+	 * minute" is the instruction that gets the caller a real answer. Raising `RuntimeError` would tell
+	 * it the search failed, which is true but useless.
+	 */
+	async function indexNote(root: string, repair: { rebuild: boolean }): Promise<string> {
+		const subject = repair.rebuild
+			? "the index there was written by another zg version, so it has to be rebuilt"
+			: "nothing is indexed there yet";
+		const head = `zvec-grep: no usable index for ${root} — ${subject}, so nothing was searched.`;
+		const inflight = builds.get(root);
+		if (inflight) {
+			const seconds = Math.max(0, Math.round((Date.now() - inflight.startedAt) / 1000));
+			return `${head}\nA ${inflight.rebuild ? "rebuild" : "build"} started ${seconds}s ago in this session is still running; retry in a moment.`;
+		}
+		const outcome = await startBuild(root, repair);
+		builds.set(root, { rebuild: repair.rebuild, startedAt: Date.now() });
+		const model = configuredEmbedding(context.cwd);
+		const command = [cli.binary, ...outcome.args].join(" ");
+		return [
+			head,
+			`A ${repair.rebuild ? "rebuild" : "build"} just started in the background: \`${command}\` (${model ? `model ${model}` : "zg's default model for a new index"}${outcome.pid ? `, pid ${outcome.pid}` : ""}).`,
+			"It does the work behind this session (in the shared daemon when one is running) and keeps going after this turn: do not start it again.",
+			"Retry this search in about a minute; meanwhile `await zvec_grep_rg(...)` gives exact matches with no index at all.",
+		].join("\n");
+	}
 
 	async function zvec_grep_search(...args: unknown[]): Promise<string> {
 		const bound = bind(args, "zvec_grep_search", SEARCH_SPECS, "query");
@@ -209,8 +267,29 @@ export function createZvecGrepHost(context: ZvecGrepHostContext): {
 		// `spawnExec`'s job (it escalates SIGTERM to SIGKILL after five seconds, as pi's exec does).
 		const outcomes = await runAcrossRoots(cli, roots, argv, context.signal?.(), SEARCH_TIMEOUT_MS);
 		const { text, failed } = formatRootResults("zvec-grep search", outcomes, { header: roots.length > 1 });
-		if (failed === outcomes.length) throw fail("RuntimeError", text);
-		return text;
+		// A workspace with no usable index is the one failure a caller cannot fix by rewording the
+		// query, so it is repaired rather than reported: the build is requested from here (through the
+		// shared daemon when it is up), and the answer says what happened.
+		const repairs: Array<{ root: string; repair: { rebuild: boolean } }> = [];
+		if (autoIndex()) {
+			for (const outcome of outcomes) {
+				if (outcome.result.code === 0) continue;
+				const repair = indexRepairFor(`${outcome.result.stderr}\n${outcome.result.stdout}`);
+				if (repair) repairs.push({ root: outcome.root, repair });
+			}
+		}
+		if (repairs.length === 0) {
+			if (failed === outcomes.length) throw fail("RuntimeError", text);
+			return text;
+		}
+		if (repairs.some(({ root }) => !builds.has(root))) context.progress?.("Starting an index build…");
+		const notes: string[] = [];
+		for (const { root, repair } of repairs) notes.push(await indexNote(root, repair));
+		const note = notes.join("\n\n");
+		// Every failure was a missing/unusable index: the note is the whole answer, and the failure
+		// text under it would only repeat what the note already said.
+		if (failed === outcomes.length && repairs.length === outcomes.length) return note;
+		return `${text}\n\n${note}`;
 	}
 
 	async function zvec_grep_rg(...args: unknown[]): Promise<string> {

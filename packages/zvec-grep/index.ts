@@ -26,10 +26,18 @@
  * at it once; every search and index then uses that one index, so ranking is fused across all repos.
  * Per-repo indexes with a `roots` fan-out (strategy B) remain available as an explicit escalation.
  *
+ * One shared daemon for the whole machine, and an index that builds itself when it is missing, are both
+ * defaults rather than commands: `session_start` ensures the daemon (`src/cli.ts::ensureServer`), and a
+ * search in an unindexed workspace starts the build and says so (`src/host.ts`), so a session that never
+ * runs a `/` command still gets the warm path. `ZVEC_GREP_PI_SERVER=0` and `ZVEC_GREP_PI_AUTOINDEX=0`
+ * put either back under human control.
+ *
  * Optional configuration:
  *   ZVEC_GREP_BIN        Path to the zg binary (default: "zg")
  *   ZVEC_GREP_CLI_STYLE  "modern" | "legacy" to skip auto-detection
  *   ZVEC_GREP_PI_STATUS  "0" to disable the session_start footer status
+ *   ZVEC_GREP_PI_SERVER  "0" to stop session_start starting/reusing the shared daemon
+ *   ZVEC_GREP_PI_AUTOINDEX  "0" to stop a search starting a missing index's build
  *   ZVEC_GREP_PI_WORKSPACE  Strategy A parent workspace root (A default)
  *   ZVEC_GREP_PI_ROOTS   Strategy B comma/newline-separated roots (opt-in)
  *   ZVEC_GREP_EMBEDDING  Embedding model for a new index
@@ -60,11 +68,13 @@ import {
 	INDEX_TIMEOUT_MS,
 	STATUS_TIMEOUT_MS,
 	createZgCli,
+	ensureServer,
 	indexWorkspace,
 	lastNonEmptyLine,
 	parseIndexArgs,
 	serverAction,
 	type Exec,
+	type ServerState,
 } from "./src/cli.ts";
 import {
 	configuredEmbedding,
@@ -104,6 +114,7 @@ export const ZVEC_GREP_GUIDELINES = [
 	"Use await zvec_grep_rg(command) for exhaustive exact, literal or regex search when ranked indexed results are not appropriate; scope it with a path, -g/--glob or -t/--type, and append `| head -N` to bound the output.",
 	"Its arguments are snake_case (file_types, excluded_file_types, symbol_type, prefer_symbol, modified_after, modified_before); the old camelCase spellings still bind. An unknown parameter raises ValueError and nothing runs, on purpose — a misspelled argument is meant to be loud.",
 	"excluded_file_types needs a filter the Rust zg's storage engine cannot parse; express an exclusion as a negated glob instead, e.g. globs=[\"!*.ts\"].",
+	"A search in a workspace with no usable index does not fail: it starts the index build in the background and says so. Retry it in about a minute instead of indexing by hand, and use zvec_grep_rg in the meantime.",
 ];
 
 /** What this package contributes to one session. It does not branch on `isChild`: a delegated coding task wants search as much as its spawner does, and there is no UI to gate on. */
@@ -136,6 +147,26 @@ registerContributor(zvecGrepRegistration);
 function statusEnabled(): boolean {
 	const value = process.env.ZVEC_GREP_PI_STATUS?.trim().toLowerCase();
 	return value !== "0" && value !== "false" && value !== "off";
+}
+
+/**
+ * Whether this session starts (or reuses) the shared daemon at session start.
+ *
+ * On by default, because the daemon is what makes a second session cheap: every indexed search in every
+ * session on this machine then runs inside one process — one engine, one loaded model per workspace —
+ * instead of one engine per call. `ZVEC_GREP_PI_SERVER=0` opts out for a machine where the daemon is
+ * somebody else's business.
+ */
+function serverEnabled(): boolean {
+	const value = process.env.ZVEC_GREP_PI_SERVER?.trim().toLowerCase();
+	return value !== "0" && value !== "false" && value !== "off";
+}
+
+/** The words a status line puts after `daemon` for the state `ensureServer` reported. */
+function serverLine(server: ServerState | undefined): string {
+	if (!server) return "daemon manual";
+	if (!server.ready) return `daemon unreachable (${server.detail})`;
+	return `daemon ${server.detail}${server.started ? ", started here" : ""}`;
 }
 
 /**
@@ -379,12 +410,17 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 					cwd: targetRoot,
 					timeout: STATUS_TIMEOUT_MS,
 				});
+				// The daemon's own answer, because "is one running" is the first thing a session asks
+				// when a search behaves like a cold one. It names the PID and URL it is serving.
+				const daemon = await serverAction(cli, style, "status", ctx.cwd);
+				const daemonText = (daemon.stdout || daemon.stderr).trim();
 				const text = (result.stdout || result.stderr).trim();
+				const body = [text, daemonText && `-- server --\n${daemonText}`].filter(Boolean).join("\n\n");
 				if (result.code !== 0) {
-					ctx.ui.notify(`zvec-grep status failed: ${text || `exit ${result.code}`}`, "error");
+					ctx.ui.notify(`zvec-grep status failed: ${text || `exit ${result.code}`}\n\n${daemonText}`, "error");
 					return;
 				}
-				ctx.ui.notify(text || "(no status output)", "info");
+				ctx.ui.notify(body || "(no status output)", "info");
 			} catch (error) {
 				ctx.ui.notify(
 					`zvec-grep status failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -438,16 +474,18 @@ export default function zvecGrepExtension(pi: ExtensionAPI) {
 		if (!statusEnabled()) return;
 		try {
 			const style = await cli.style(ctx.cwd);
+			// One daemon per machine, reused by every session that resolves the same home. Starting it
+			// here rather than inside the first search keeps that first search as cheap as every other
+			// one: the engine and the workspace's model are already warm when it arrives.
+			const server = serverEnabled() ? await ensureServer(cli, style, ctx.cwd) : undefined;
 			const cliArgs = style === "legacy" ? ["status"] : ["--status"];
 			const targetRoot = configuredWorkspaceRoot(ctx.cwd) ?? ctx.cwd;
 			const result = await cli.run(cliArgs, {
 				cwd: targetRoot,
 				timeout: STATUS_TIMEOUT_MS,
 			});
-			ctx.ui.setStatus(
-				"zvec-grep",
-				status(result.code === 0 ? "index ready" : "no index — run /zg-index"),
-			);
+			const indexLine = result.code === 0 ? "index ready" : "no index — run /zg-index";
+			ctx.ui.setStatus("zvec-grep", status(`${indexLine} · ${serverLine(server)}`));
 		} catch {
 			// zg is not installed or not on PATH; the host functions surface the error when used.
 		}

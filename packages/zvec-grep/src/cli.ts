@@ -16,6 +16,7 @@ export const SEARCH_TIMEOUT_MS = 10 * 60 * 1000;
 export const RG_TIMEOUT_MS = 2 * 60 * 1000;
 export const INDEX_TIMEOUT_MS = 60 * 60 * 1000;
 export const STATUS_TIMEOUT_MS = 30 * 1000;
+export const SERVER_TIMEOUT_MS = 30 * 1000;
 export const MAX_OUTPUT_CHARS = 80_000;
 /** What is buffered per stream before it is dropped. Four times the bound: `boundOutput` keeps the
  * head, so a cap above it cannot change what a caller sees — it only stops a runaway `--rg` from
@@ -393,12 +394,132 @@ export function parseIndexArgs(args: string): {
 	};
 }
 
+/** argv for `zg --server <action>`, in the generation's spelling. */
+export function serverArgs(style: CliStyle, action: "on" | "off" | "status"): string[] {
+	return style === "legacy" ? ["server", action] : ["--server", action];
+}
+
 export async function serverAction(
 	cli: ZgCli,
 	style: CliStyle,
 	action: "on" | "off" | "status",
 	cwd: string,
 ): Promise<ExecResult> {
-	const args = style === "legacy" ? ["server", action] : ["--server", action];
-	return cli.run(args, { cwd, timeout: STATUS_TIMEOUT_MS });
+	return cli.run(serverArgs(style, action), { cwd, timeout: SERVER_TIMEOUT_MS });
+}
+
+/** `PID: 12345` from a `--server status` answer, or `undefined` when it named none. */
+export function daemonPid(text: string): string | undefined {
+	const match = /^\s*PID:\s*(\d+)\s*$/m.exec(text);
+	return match?.[1];
+}
+
+export type ServerState = {
+	/** A daemon answers on this home's address. */
+	ready: boolean;
+	/** This call started it, rather than finding one already running. */
+	started: boolean;
+	/** `PID 12345`, the failure text, or "" — what a status line can say after the word daemon. */
+	detail: string;
+};
+
+/**
+ * Ensure the shared daemon is running, and **reuse** one that already is.
+ *
+ * The daemon is per *home* (`ZVEC_GREP_HOME`, else `$HOME/.zvec-grep`) and per machine: one process
+ * serves every session that resolves the same home, and a `zg --server on` from a second session
+ * answers with the first one's PID. None of that coordination is done here — `start_server` closes the
+ * check/spawn race itself with a cross-process startup claim ("the winner alone may spawn; waiters
+ * re-check state after the claim is released and reuse the ready daemon"), so N sessions starting at
+ * once still end with one daemon and no error.
+ *
+ * `--check-ready` makes the exit code the answer, which is why the modern generation is asked that way.
+ * The legacy generation has no such flag, so its printed state is read instead.
+ *
+ * Measured against 0.3.0: ~120 ms when a daemon answers, ~360 ms cold, ~110 ms when `on` only has to
+ * reuse. Cheap enough to run once per session, which is what `session_start` does.
+ */
+export async function ensureServer(cli: ZgCli, style: CliStyle, cwd: string): Promise<ServerState> {
+	const args = serverArgs(style, "status");
+	if (style !== "legacy") args.push("--check-ready");
+	const status = await cli.run(args, { cwd, timeout: SERVER_TIMEOUT_MS });
+	const ready =
+		style === "legacy" ? status.code === 0 && /\bready\b/i.test(status.stdout) : status.code === 0;
+	if (ready) {
+		const pid = daemonPid(status.stdout);
+		return { ready: true, started: false, detail: pid ? `on (PID ${pid})` : "on" };
+	}
+	const started = await serverAction(cli, style, "on", cwd);
+	const text = `${started.stdout}\n${started.stderr}`.trim();
+	if (started.code !== 0) {
+		return { ready: false, started: false, detail: lastNonEmptyLine(text) || `off (exit ${started.code})` };
+	}
+	const pid = daemonPid(started.stdout);
+	return { ready: true, started: true, detail: pid ? `on (PID ${pid})` : "on" };
+}
+
+/** argv for a build. No model means `zg`'s own default for a new index. */
+export function indexBuildArgs(
+	style: CliStyle,
+	options: { model?: string; rebuild?: boolean } = {},
+): string[] {
+	const args = style === "legacy" ? ["index"] : ["--index"];
+	if (options.model) args.push("--embedding", options.model);
+	if (options.rebuild) args.push("--rebuild");
+	return args;
+}
+
+export type IndexBuildOutcome = { args: string[]; pid?: number };
+
+/**
+ * Start a build and walk away.
+ *
+ * Deliberately not `spawnExec`: that awaits its child and kills it when the run's signal aborts, and a
+ * build is neither — it outlives the cell, the turn and this process. `detached` puts it in its own
+ * process group, `stdio: "ignore"` denies it a pipe whose owner might go away, and `unref` lets this
+ * process exit without waiting for it. With a daemon up the child's own `--index` posts
+ * `/admin/index`, so the *daemon* does the work and `submit` joins a job another session already
+ * started for the same root.
+ */
+export function startIndexBuild(
+	binary: string,
+	style: CliStyle,
+	root: string,
+	options: { model?: string; rebuild?: boolean } = {},
+): IndexBuildOutcome {
+	const args = indexBuildArgs(style, options);
+	try {
+		const child = spawn(binary, args, {
+			cwd: root,
+			shell: false,
+			detached: true,
+			stdio: "ignore",
+		});
+		// A missing binary arrives asynchronously; the search that got us here already reported it.
+		child.on("error", () => {});
+		child.unref();
+		return { args, pid: child.pid };
+	} catch {
+		return { args };
+	}
+}
+
+/**
+ * Whether a failed search means "this workspace has no *usable* index", and what repairing it takes.
+ *
+ * Three sentences reach here, all of them from the engine, and the distinction matters because one
+ * repairs by building and the other two by rebuilding: a workspace with nothing indexed (`No index
+ * found in …`), an index another `zg` version wrote (`This index is incompatible with the current
+ * version of zg`), and a manifest whose index version the engine does not support (`unsupported index
+ * version … rebuild the index with …`, the `rebuild_required` reader).
+ */
+export function indexRepairFor(detail: string): { rebuild: boolean } | undefined {
+	if (
+		!/no index found|index is incompatible|rebuild the index|unsupported index version|rebuild_required/i.test(
+			detail,
+		)
+	) {
+		return undefined;
+	}
+	return { rebuild: /\brebuild\b/i.test(detail) };
 }

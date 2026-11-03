@@ -10,7 +10,12 @@ import { ZVEC_GREP_GUIDELINES } from "../index.ts";
  * `ZVEC_GREP_PI_WORKSPACE` is pinned for every test in this file: the default-root cases then resolve
  * against a scratch directory instead of reading whatever a machine happens to have configured.
  */
-const ENV_KEYS = ["ZVEC_GREP_PI_ROOTS", "ZVEC_GREP_PI_WORKSPACE", "ZVEC_GREP_EMBEDDING"] as const;
+const ENV_KEYS = [
+	"ZVEC_GREP_PI_ROOTS",
+	"ZVEC_GREP_PI_WORKSPACE",
+	"ZVEC_GREP_EMBEDDING",
+	"ZVEC_GREP_PI_AUTOINDEX",
+] as const;
 const saved = new Map<string, string | undefined>();
 let workspace = "";
 const dirs: string[] = [];
@@ -42,6 +47,8 @@ function harness(
 		reply?: Reply;
 		perRoot?: Record<string, Reply>;
 		signal?: () => AbortSignal | undefined;
+		autoIndex?: boolean;
+		startBuild?: (root: string, build: { rebuild: boolean }) => Promise<{ args: string[]; pid?: number }>;
 	} = {},
 ) {
 	const calls: Array<{ args: string[]; cwd: string; timeout: number; signal?: AbortSignal }> = [];
@@ -53,13 +60,20 @@ function harness(
 	};
 	const cli = createZgCli({ exec, env: { ZVEC_GREP_CLI_STYLE: options.style ?? "legacy" } });
 	const progress: string[] = [];
+	const builds: Array<{ root: string; rebuild: boolean }> = [];
 	const host = createZvecGrepHost({
 		cwd: "/session/dir",
 		cli,
 		progress: (text) => progress.push(text),
+		autoIndex: () => options.autoIndex ?? true,
+		startBuild: async (root, build) => {
+			if (options.startBuild) return options.startBuild(root, build);
+			builds.push({ root, rebuild: build.rebuild });
+			return { args: ["--index"], pid: 4242 };
+		},
 		...(options.signal ? { signal: options.signal } : {}),
 	});
-	return { calls, host, progress };
+	return { builds, calls, host, progress };
 }
 
 /** The error a call raised, so its Python name can be asserted (monty maps by `.name`). */
@@ -318,5 +332,82 @@ describe("the run's signal (long-work ticket 08)", () => {
 		};
 		for (let waited = 0; waited < 3000 && alive(); waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(alive()).toBe(false);
+	});
+});
+
+describe("index on demand", () => {
+	const NO_INDEX = {
+		code: 1,
+		stderr:
+			"Error[ZG.ENGINE.NOT_FOUND]: No index found in /ws. Run `zg --index --embedding <model>` to build it, then retry the query.",
+	};
+
+	test("a search with no index starts a build and says so, instead of failing", async () => {
+		const { builds, host, progress } = harness({ reply: NO_INDEX });
+		const text = await host.zvec_grep_search({ query: "where is auth" } as never);
+		expect(builds).toEqual([{ root: workspace, rebuild: false }]);
+		expect(text).toContain("no usable index");
+		expect(text).toContain("nothing is indexed there yet");
+		expect(text).toContain("pid 4242");
+		expect(text).toContain("zvec_grep_rg");
+		expect(text).not.toContain("Error[ZG.ENGINE.NOT_FOUND]");
+		expect(progress).toContain("Starting an index build…");
+	});
+
+	test("the build is requested once per root, not once per search", async () => {
+		const { builds, host } = harness({ reply: NO_INDEX });
+		await host.zvec_grep_search({ query: "a" } as never);
+		const second = await host.zvec_grep_search({ query: "b" } as never);
+		expect(builds).toHaveLength(1);
+		expect(second).toContain("still running");
+	});
+
+	test("an index another zg version wrote is rebuilt, not just built", async () => {
+		const { builds, host } = harness({
+			reply: {
+				code: 1,
+				stderr:
+					"This index is incompatible with the current version of zg.\n\nRebuild the index for /ws to continue:\n  zg --index --rebuild /ws",
+			},
+		});
+		await host.zvec_grep_search({ query: "x" } as never);
+		expect(builds).toEqual([{ root: workspace, rebuild: true }]);
+	});
+
+	test("a failure that is not about the index still raises", async () => {
+		const { builds, host } = harness({ reply: { code: 2, stderr: "connection refused" } });
+		const error = await raised(() => host.zvec_grep_search({ query: "x" } as never));
+		expect(error.name).toBe("RuntimeError");
+		expect(builds).toHaveLength(0);
+	});
+
+	test("with implicit indexing off, the old refusal stands", async () => {
+		const { builds, host } = harness({ reply: NO_INDEX, autoIndex: false });
+		const error = await raised(() => host.zvec_grep_search({ query: "x" } as never));
+		expect(error.name).toBe("RuntimeError");
+		expect(error.message).toContain("No index found");
+		expect(builds).toHaveLength(0);
+	});
+
+	test("one indexed root answers while the other starts its build", async () => {
+		const { builds, host } = harness({ perRoot: { "/a": { stdout: "hit-a" }, "/b": NO_INDEX } });
+		const text = await host.zvec_grep_search({ query: "x", roots: ["/a", "/b"] } as never);
+		expect(builds).toEqual([{ root: "/b", rebuild: false }]);
+		expect(text.startsWith("### /a\nhit-a")).toBe(true);
+		expect(text).toContain("no usable index for /b");
+	});
+
+	test("the shipped seam is what starts the build: binary, argv, detached default", async () => {
+		const seen: Array<{ command: string; args: string[]; cwd: string }> = [];
+		const { host } = harness({
+			reply: NO_INDEX,
+			style: "modern",
+			startBuild: async (root, build) => {
+				seen.push({ command: "zg", args: ["--index", ...(build.rebuild ? ["--rebuild"] : [])], cwd: root });
+				return { args: ["--index"], pid: 7 };
+			},
+		});
+		await host.zvec_grep_search({ query: "x" } as never);
+		expect(seen).toEqual([{ command: "zg", args: ["--index"], cwd: workspace }]);
 	});
 });

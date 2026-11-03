@@ -8,7 +8,11 @@ import {
 	buildRgArgs,
 	buildSearchArgs,
 	createZgCli,
+	daemonPid,
+	ensureServer,
 	explainFailure,
+	indexBuildArgs,
+	indexRepairFor,
 	formatRootResults,
 	indexWorkspace,
 	lastNonEmptyLine,
@@ -388,5 +392,97 @@ describe("explainFailure", () => {
 		expect(text).toContain('globs=["!*.ts"]');
 		// Only the engine's own line, and only its head: the SQL tail never reaches the cell.
 		expect(text).not.toContain("OR file_name = '.mts'");
+	});
+});
+
+/** A `zg` whose reply is chosen per argv, so the daemon handshake can be driven. */
+function serverZg(replies: Array<{ match: string; stdout?: string; stderr?: string; code?: number }>) {
+	const seen: string[][] = [];
+	const exec: Exec = async (_command, args) => {
+		if (args[0] === "--version") return { stdout: "0.3.0", stderr: "", code: 0 };
+		seen.push(args);
+		for (const reply of replies) {
+			if (args.join(" ").includes(reply.match)) {
+				return { stdout: reply.stdout ?? "", stderr: reply.stderr ?? "", code: reply.code ?? 0 };
+			}
+		}
+		return { stdout: "", stderr: "", code: 0 };
+	};
+	return { exec, seen };
+}
+
+describe("the shared daemon", () => {
+	test("a daemon already answering is reused: no `on`, and its PID is reported", async () => {
+		const zg = serverZg([
+			{ match: "--server status", stdout: "Server: ready\nPID: 4312\nURL: http://127.0.0.1:7999/mcp\n", code: 0 },
+		]);
+		const cli = createZgCli({ exec: zg.exec, env: {} });
+		const state = await ensureServer(cli, "modern", "/ws");
+		expect(state).toEqual({ ready: true, started: false, detail: "on (PID 4312)" });
+		expect(zg.seen).toEqual([["--server", "status", "--check-ready"]]);
+	});
+
+	test("a cold machine is started, and the starter says so", async () => {
+		const zg = serverZg([
+			{ match: "--check-ready", stderr: "", code: 1 },
+			{ match: "--server on", stdout: "Server: ready\nPID: 9001\n", code: 0 },
+		]);
+		const cli = createZgCli({ exec: zg.exec, env: {} });
+		const state = await ensureServer(cli, "modern", "/ws");
+		expect(state).toEqual({ ready: true, started: true, detail: "on (PID 9001)" });
+		expect(zg.seen).toEqual([["--server", "status", "--check-ready"], ["--server", "on"]]);
+	});
+
+	test("a start that fails reports the CLI's own line", async () => {
+		const zg = serverZg([
+			{ match: "--check-ready", code: 1 },
+			{ match: "--server on", stderr: "Error: server address 127.0.0.1:7999 is already in use", code: 1 },
+		]);
+		const cli = createZgCli({ exec: zg.exec, env: {} });
+		const state = await ensureServer(cli, "modern", "/ws");
+		expect(state.ready).toBe(false);
+		expect(state.detail).toContain("already in use");
+	});
+
+	test("the legacy generation has no --check-ready, so its printed state is read", async () => {
+		const zg = serverZg([
+			{ match: "server status", stdout: "Server: ready\n", code: 0 },
+		]);
+		const cli = createZgCli({ exec: zg.exec, env: {} });
+		const state = await ensureServer(cli, "legacy", "/ws");
+		expect(state).toEqual({ ready: true, started: false, detail: "on" });
+		expect(zg.seen).toEqual([["server", "status"]]);
+	});
+
+	test("the PID is read from a status answer, and its absence is not an error", () => {
+		expect(daemonPid("Server: ready\nPID: 41\n")).toBe("41");
+		expect(daemonPid("Server: stopped\n")).toBeUndefined();
+	});
+});
+
+describe("a background build", () => {
+	test("argv carries the generation, the model and the rebuild flag", () => {
+		expect(indexBuildArgs("modern")).toEqual(["--index"]);
+		expect(indexBuildArgs("legacy")).toEqual(["index"]);
+		expect(indexBuildArgs("modern", { model: "local/potion-code-16m-v2" })).toEqual([
+			"--index", "--embedding", "local/potion-code-16m-v2",
+		]);
+		expect(indexBuildArgs("modern", { rebuild: true })).toEqual(["--index", "--rebuild"]);
+	});
+
+	test("a failed search is classified by what the engine said", () => {
+		expect(indexRepairFor("No index found in /ws. Run `zg --index --embedding <model>` to build it")).toEqual({
+			rebuild: false,
+		});
+		expect(
+			indexRepairFor(
+				"This index is incompatible with the current version of zg.\n\nRebuild the index for /ws to continue: zrg --index --rebuild /ws",
+			),
+		).toEqual({ rebuild: true });
+		expect(indexRepairFor("unsupported index version 1; rebuild the index with `zg --index --rebuild`")).toEqual({
+			rebuild: true,
+		});
+		expect(indexRepairFor("connection refused")).toBeUndefined();
+		expect(indexRepairFor("no index")).toBeUndefined();
 	});
 });
