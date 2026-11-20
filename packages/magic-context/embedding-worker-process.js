@@ -1,7 +1,7 @@
 import"./index-0h2mkab2.js";
 import {
   log2
-} from "./index-gymgz20n.js";
+} from "./index-tm11k42a.js";
 import"./index-dnp1jjar.js";
 import {
   inRootAsyncContext2

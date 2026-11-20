@@ -1,0 +1,20 @@
+import {
+  setLogLineForwarder2,
+  writeForwardedLogLine2,
+  log2,
+  sessionLog2,
+  getLoggerDiagnostics2,
+  flushLogger2,
+  getLogFilePath2
+} from "./index-tm11k42a.js";
+import"./index-0h2mkab2.js";
+import"./index-dnp1jjar.js";
+export {
+  flushLogger2 as flushLogger,
+  getLogFilePath2 as getLogFilePath,
+  getLoggerDiagnostics2 as getLoggerDiagnostics,
+  log2 as log,
+  sessionLog2 as sessionLog,
+  setLogLineForwarder2 as setLogLineForwarder,
+  writeForwardedLogLine2 as writeForwardedLogLine
+};

@@ -4,8 +4,8 @@ import {
   harnessOwnsOpenCodeStore2
 } from "./index-0h2mkab2.js";
 import {
+  getMagicContextHistorianSessionDir,
   ensureCortexKitArtifactGitignore,
-  getProjectMagicContextHistorianDir,
   getMagicContextStorageDir,
   isMagicContextStorageOutsideEngram,
   claimStorageBackupWarningCheck,
@@ -15,7 +15,7 @@ import {
   log2,
   sessionLog2,
   flushLogger2
-} from "./index-gymgz20n.js";
+} from "./index-tm11k42a.js";
 import {
   sanitizeDiagnosticText,
   hasShareabilitySensitiveText
@@ -99,6 +99,9 @@ import {
   MEMORY_MURAL_BLOCK,
   buildMagicContextSection,
   resolveMuralWire,
+  requestToolsFingerprint,
+  classifyRequestToolsChange,
+  requestToolSchemaDigest,
   updateCompactionMarkerAfterPublication,
   COMPARTMENT_RENDER_EPOCH,
   MEMORY_RENDER_FORMAT_EPOCH,
@@ -123,6 +126,9 @@ import {
   renderHistorianMemoryBlock,
   DEFAULT_MEMORY_BUDGET_TOKENS,
   DEFAULT_USER_PROFILE_BUDGET_TOKENS,
+  resolveWorkspaceRenderContext,
+  sourceNamesForMemories,
+  readM0ProjectMemories,
   trimMemoriesToBudgetV2,
   trimWorkspaceMemoriesToBudgetV2,
   trimUserMemoriesToBudget,
@@ -140,6 +146,8 @@ import {
   restoreOmpMentions,
   resolvePiHarnessDetection,
   resolvePiHarnessKind,
+  readSubagentStartupError,
+  inheritPiOrdinalAlignment,
   resolvePiOrdinalAlignment,
   piRawOrdinalOffsetSource,
   resolvePiOrdinalAlignmentForContext,
@@ -161,7 +169,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-x5y4ar97.js";
+} from "./index-20d9e2pt.js";
 import"./index-4knyh1kt.js";
 import {
   canonicalModelIdentity,
@@ -176,10 +184,11 @@ import {
   nextOccurrence,
   nextDueAtMs,
   resolveModelConfigValue,
+  normalizeProtectedToolName,
   DEFAULT_HISTORIAN_TIMEOUT_MS,
   DREAM_TASK_PROMOTION_DEFAULTS,
   LIVE_RELOAD_CONFIG_PATHS
-} from "./index-ccanzg8p.js";
+} from "./index-vcegxfwg.js";
 import {
   FAIL_CLOSED_DOCTOR_COMMAND,
   formatFailClosedBlockingMessage,
@@ -199,7 +208,7 @@ import {
   resolveProjectIdentityForSession,
   beginBootQuietPeriod,
   scheduleAfterBootQuiet
-} from "./index-6pk49fc3.js";
+} from "./index-453s1hj6.js";
 import {
   detectThinkingBindingMismatch,
   detectLatestTurnThinkingMismatch,
@@ -208,22 +217,129 @@ import {
   MAX_EXECUTE_THRESHOLD,
   escalationBands,
   decodeMergedReasoningParts,
+  UNKNOWN_FIT_RATIO,
+  hasMeasuredDecisionCalibration,
+  providerMass,
+  localBudget,
+  calibrationForModelKey,
+  historyLocalBudget,
   HYGIENE_PROVIDER_UNITS_VERSION,
   sessionDecisionCalibration,
   transitionSessionHygieneUnits,
-  rowWindowMass,
-  computeProtectionWindow,
-  readEpochFloorSnapshot,
-  getProtectionWindowForSession,
+  adoptedProtectedToolsPolicy,
+  protectedToolTagNumbers,
+  protectedToolTokenCount,
+  stripWellFormedLeadingTagPrefix,
+  stripPersistedAssistantText,
+  byteSize,
+  stripTagPrefix,
+  peelLeadingMcTagNotation,
+  prependTag,
+  rememberCurrentToolOutputCount,
+  currentReclaimableToolOutputCount,
+  isRecord,
+  TEXT_TAG_IDENTITY_MARKER,
+  PI_FALLBACK_PREFIXES_JSON,
+  contentTagOwnerMessageId,
+  TailHygieneJsonMemo,
+  piJsonHash,
+  estimateImageTokensFromDataUrl,
+  TODO_STATUSES,
+  TODO_PRIORITIES,
+  normalizeTodoStateJson,
+  buildSyntheticTodoPart,
+  stripChannel1ReminderSpans,
+  compareMeasuredTailPrefix,
+  formatTailHygienePrefixMismatch,
+  freezeTailHygieneMeasurement,
+  effectiveTailHygiene,
+  CHANNEL1_SENTINEL,
+  CHANNEL1_FLOOR_TOKENS,
+  decideChannel1,
+  evaluateChannel2,
+  buildChannel2Reminder,
+  buildChannel1Reminder,
+  CACHED_TRIM_PARTIAL_SQL,
   ensureSessionMetaRow,
   persistCachedM0,
   clearCachedM0M1,
   ReplayDocumentError,
   readReplayEnvelope,
   updateReplayDocument,
+  getReasoningRemovalState,
+  modelAcceptsEmptyContent,
+  isAnthropicFamilyRoute,
+  variantChangeBustsProviderCache,
+  isInActiveAnthropicTurn,
+  activeAnthropicTurnStart,
+  hasAnthropicReasoning,
+  isMarkerOnlyText,
+  findLatestAssistantReasoningMutationExemptMessage,
+  DEFAULT_KEEP_REASONING_TOKENS,
+  resolveKeepReasoningTokens,
+  reasoningStepCost,
+  reasoningBudgetCutoff,
+  reasoningTextAndOpaque,
+  opaqueThinkingCost,
+  estimatePartImageTokens,
+  planEmergencyDrop,
+  measureEmergencyTag,
+  tagsSinceReading,
+  queuePendingDropForUnchangedTag,
+  getPendingOps,
+  getPendingOpsCount,
+  clearPendingOps,
+  removePendingOp,
+  updateTagByteSize2,
+  getRecentTagOwnerMessageIds2,
+  AGE_RECLAIM_MIN_TOKENS2,
+  getOldestActiveUnprotectedToolTags2,
+  getActiveToolTagsForAgeReclaim2,
+  getTriggerTagTokenUpperBound2,
+  updateTagInputByteSize2,
+  updateTagTokenCount2,
+  setTagTokenCount2,
+  getPersistedToolTagAccounting2,
+  getAllStatusTagTokenTotalsFlat2,
+  tryGetReasoningTokenEstimatesByMessage2,
+  updateTagInputTokenCount2,
+  tagTokenCountIsNull2,
+  backfillTagTokenCounts2,
+  insertTag2,
+  updateTagStatus2,
+  markTagDropped2,
+  updateTagDropMode2,
+  updateCavemanDepth2,
+  hasPiFallbackMessageTags2,
+  findAdoptableFallbackTags2,
+  hasPiFallbackToolOwnerTags2,
+  findPiFallbackToolOwnerTags2,
+  PiTagIdentityConflictError2,
+  getPiMessageTagCandidates2,
+  findPiTagIdentityConflict2,
+  adoptPiFallbackToolOwnerTag2,
+  adoptPiFallbackMessageTag2,
+  getMaxTagNumberBySession2,
+  getAssignableTagNumberByMessageId2,
+  deriveTagLoadFloor2,
+  getTagsBySession2,
+  getActiveTagsBySession2,
+  getTagsForPendingOperations2,
+  getTagsByNumbers2,
+  getNewestToolTagNumbers2,
+  getDroppedTagsByNumbers2,
+  getMaxDroppedTagNumber2,
+  getToolTagNumberByOwner2,
+  getNullOwnerToolTag2,
+  adoptNullOwnerToolTag2,
+  rowWindowMass,
+  computeProtectionWindow,
+  readEpochFloorSnapshot,
+  getProtectionWindowForSession,
   isProviderOverflowFailClosedProven,
   getEmergencyRecoveryArmedAt,
   describeProtectedTailDrainBudgetSkip,
+  loadPersistedUsage,
   loadProtectedTailMeta,
   markProtectedTailPolicyV3Seeded,
   recordProtectedTailPublicationFloor,
@@ -303,155 +419,8 @@ import {
   getSessionsWithPendingPiMarker,
   setSessionWorkMetrics,
   getSessionWorkMetrics,
-  resolveEpochFloorForPass,
-  askAnswerLines,
-  removeUnsupportedCommitHashes,
-  completedToolArcCrossesBoundary,
-  estimateTrueRawMessageTokens,
-  buildToolArcs,
-  fenceBoundaryForCompletedToolArcs,
-  fenceBoundaryForToolArcs,
-  buildTrueRawTokenIndex,
-  computeRawRangeFingerprint,
-  invalidateTrueRawTokenCache,
-  stripSystemInjection,
-  isFilePart,
-  hasUserAnswerMetadata,
-  DreamTokenBudgetExceeded,
-  TOKEN_BUDGET_FINALIZE_MESSAGE,
-  TOKEN_BUDGET_TOOL_REFUSAL,
-  registerBudgetFinalizeChild,
-  releaseBudgetFinalizeChild,
-  createDreamTokenBudget,
-  droppedInputMarker,
-  createDroppedInputGuard,
-  isEditTool,
-  applyEditMarkerToInput,
-  modelAcceptsEmptyContent,
-  isAnthropicFamilyRoute,
-  variantChangeBustsProviderCache,
-  isInActiveAnthropicTurn,
-  activeAnthropicTurnStart,
-  hasAnthropicReasoning,
-  isMarkerOnlyText,
-  findLatestAssistantReasoningMutationExemptMessage,
-  DEFAULT_KEEP_REASONING_TOKENS,
-  resolveKeepReasoningTokens,
-  reasoningStepCost,
-  reasoningBudgetCutoff,
-  reasoningTextAndOpaque,
-  opaqueThinkingCost,
-  estimatePartImageTokens,
-  SKELETON_REAL_INPUT_MAX_BYTES,
-  toolInputStringBytes,
-  hasRawMessageProvider2,
-  setRawMessageProvider2,
-  withRawMessageProvider2,
-  cleanUserText2,
-  withRawSessionMessageCache2,
-  readRawSessionMessages2,
-  getRawSessionMessageOrdinalCount2,
-  visitRawSessionMessages2,
-  visitRawSessionMessagesAsync2,
-  readRawSessionMessageRange2,
-  prepareRawSessionOrdinals2,
-  primeTailRawMessageCache2,
-  getCachedAbsoluteMessageCount2,
-  primeInMemoryTailRawMessageCache2,
-  readRawSessionMessageIdOrdinalsForRange2,
-  compareRawSessionMessageOrder2,
-  getRawSessionMessageCount2,
-  getRawSessionTagKeysThrough2,
-  getLegacyProtectedTailStartOrdinal2,
-  readSessionChunk2
-} from "./index-6vfy5y6a.js";
-import {
-  UNKNOWN_FIT_RATIO,
-  hasMeasuredDecisionCalibration,
-  providerMass,
-  localBudget,
-  calibrationForModelKey,
-  historyLocalBudget,
-  adoptedProtectedToolsPolicy,
-  protectedToolTagNumbers,
-  protectedToolTokenCount,
-  stripWellFormedLeadingTagPrefix,
-  stripPersistedAssistantText,
-  byteSize,
-  stripTagPrefix,
-  peelLeadingMcTagNotation,
-  prependTag,
-  rememberCurrentToolOutputCount,
-  currentReclaimableToolOutputCount,
-  isRecord,
-  TEXT_TAG_IDENTITY_MARKER,
-  PI_FALLBACK_PREFIXES_JSON,
-  contentTagOwnerMessageId,
-  TailHygieneJsonMemo,
-  piJsonHash,
-  estimateImageTokensFromDataUrl,
-  normalizeTodoStateJson,
-  buildSyntheticTodoPart,
-  stripChannel1ReminderSpans,
-  compareMeasuredTailPrefix,
-  formatTailHygienePrefixMismatch,
-  freezeTailHygieneMeasurement,
-  effectiveTailHygiene,
-  CHANNEL1_SENTINEL,
-  CHANNEL1_FLOOR_TOKENS,
-  decideChannel1,
-  evaluateChannel2,
-  buildChannel2Reminder,
-  buildChannel1Reminder,
-  planEmergencyDrop,
-  measureEmergencyTag,
-  queuePendingDropForUnchangedTag,
-  getPendingOps,
-  getPendingOpsCount,
-  clearPendingOps,
-  removePendingOp,
-  updateTagByteSize2,
-  getRecentTagOwnerMessageIds2,
-  AGE_RECLAIM_MIN_TOKENS2,
-  getOldestActiveUnprotectedToolTags2,
-  getActiveToolTagsForAgeReclaim2,
-  getTriggerTagTokenUpperBound2,
-  updateTagInputByteSize2,
-  updateTagTokenCount2,
-  getPersistedToolTagAccounting2,
-  getAllStatusTagTokenTotalsFlat2,
-  tryGetReasoningTokenEstimatesByMessage2,
-  updateTagInputTokenCount2,
-  tagTokenCountIsNull2,
-  backfillTagTokenCounts2,
-  insertTag2,
-  updateTagStatus2,
-  markTagDropped2,
-  updateTagDropMode2,
-  updateCavemanDepth2,
-  hasPiFallbackMessageTags2,
-  findAdoptableFallbackTags2,
-  hasPiFallbackToolOwnerTags2,
-  findPiFallbackToolOwnerTags2,
-  PiTagIdentityConflictError2,
-  getPiMessageTagCandidates2,
-  findPiTagIdentityConflict2,
-  adoptPiFallbackToolOwnerTag2,
-  adoptPiFallbackMessageTag2,
-  getMaxTagNumberBySession2,
-  getAssignableTagNumberByMessageId2,
-  deriveTagLoadFloor2,
-  getTagsBySession2,
-  getActiveTagsBySession2,
-  getTagsForPendingOperations2,
-  getTagsByNumbers2,
-  getNewestToolTagNumbers2,
-  getDroppedTagsByNumbers2,
-  getMaxDroppedTagNumber2,
-  getToolTagNumberByOwner2,
-  getNullOwnerToolTag2,
-  adoptNullOwnerToolTag2
-} from "./index-asxy48qe.js";
+  resolveEpochFloorForPass
+} from "./index-pehdap7a.js";
 import {
   textMentionsRecentCommit,
   hasMeaningfulUserText2,
@@ -463,7 +432,15 @@ import {
   estimateTokens,
   estimateFixedPromptTokens,
   normalizeText
-} from "./index-3rq8rbt9.js";
+} from "./index-pefn1gt5.js";
+import {
+  stableStringify,
+  BoundedSessionMap,
+  getTableColumnNames,
+  observeTemporalDecisions,
+  freezeTemporalDecisions,
+  tagIdentityRevisionKey
+} from "./index-jhmz9tgv.js";
 import {
   inRootAsyncContext2,
   Database2,
@@ -477,13 +454,6 @@ import {
   isTransientSqliteError2,
   withAsyncPrivilegedWriter2
 } from "./index-2qtx0q6h.js";
-import {
-  stableStringify,
-  getTableColumnNames,
-  observeTemporalDecisions,
-  freezeTemporalDecisions,
-  tagIdentityRevisionKey
-} from "./index-3pk2mhaq.js";
 import {
   piHarnessKindFromExecutable,
   getErrorMessage,
@@ -501,7 +471,7 @@ import {
   openCurrentDatabase,
   openDatabaseAsync,
   closeDatabase
-} from "./index-cx7ctxbc.js";
+} from "./index-bwxj48h8.js";
 import {
   LkgRecoveryFenceError,
   clearLkgFenceProcessState,
@@ -515,6 +485,9 @@ import {
   forgetUnpublishedAutoSearchNoHint,
   registerAutoSearchWork,
   cancelAutoSearchWork,
+  PI_IDENTITY_FOLD_GUARD_LIMIT,
+  readPiIdentityFoldGuards,
+  writePiIdentityFoldGuards,
   readSessionActivity,
   observeSessionActivity,
   backfillSessionActivity,
@@ -547,7 +520,6 @@ import {
   escapeXmlAttr,
   escapeXmlContent,
   getUncoveredCompartmentEndThrough,
-  isPartialCompartmentEnd,
   readProjectDocsCanonical,
   providerResponseFailed,
   isSuccessfulProviderCompletion,
@@ -567,6 +539,12 @@ import {
   drainStaleLkgSlots,
   createDbLkgPersistence,
   replayLkg,
+  beginServedRequest,
+  noteServedPassPermission,
+  noteServedReplay,
+  countServedRefusal,
+  dropServedRecord,
+  commitServedRequest,
   registerLkgPersistence,
   LKG_SNAPSHOT_ARRAY,
   LKG_SNAPSHOT_OBJECT,
@@ -603,6 +581,7 @@ import {
   externalHistorianFailureReason,
   subprocessExitHistorianFailureReason,
   countHistorianRuns,
+  getRecentFailedHistorianRunTimes,
   recordHistorianRun,
   summarizeImportance,
   tallyFactsByCategory,
@@ -618,7 +597,7 @@ import {
   getSourceContents,
   recordSubagentInvocation,
   getLatestHistorianInvocationId
-} from "./index-0hsvna5t.js";
+} from "./index-6ymz4yb0.js";
 import {
   resolveOpenCodeDbPath,
   assertOpenCodeStoreGeneration,
@@ -627,18 +606,69 @@ import {
   clearOpenCodeDbReadFailure,
   claimOpenCodeDbDiagnosticOnce
 } from "./index-n0zjvs3h.js";
-import"./index-399p688g.js";
+import"./index-8sqebjzk.js";
+import {
+  reuseWorker
+} from "./index-wfqysrwq.js";
 import {
   createWorkerShutdown
-} from "./index-54wmg4rj.js";
+} from "./index-x2n261wp.js";
 import {
   RAW_SUMMARY_TEXT_MAX_CHARS2
-} from "./index-mkh1cm5k.js";
-import"./index-ea37qn4x.js";
+} from "./index-xjhq27z9.js";
+import {
+  askAnswerLines,
+  removeUnsupportedCommitHashes,
+  completedToolArcCrossesBoundary,
+  estimateTrueRawMessageTokens,
+  buildToolArcs,
+  fenceBoundaryForCompletedToolArcs,
+  fenceBoundaryForToolArcs,
+  buildTrueRawTokenIndex,
+  computeRawRangeFingerprint,
+  invalidateTrueRawTokenCache,
+  stripSystemInjection,
+  isFilePart,
+  hasUserAnswerMetadata,
+  DreamTokenBudgetExceeded,
+  TOKEN_BUDGET_FINALIZE_MESSAGE,
+  TOKEN_BUDGET_TOOL_REFUSAL,
+  registerBudgetFinalizeChild,
+  releaseBudgetFinalizeChild,
+  createDreamTokenBudget,
+  droppedInputMarker,
+  createDroppedInputGuard,
+  isEditTool,
+  applyEditMarkerToInput,
+  SKELETON_REAL_INPUT_MAX_BYTES,
+  toolInputStringBytes,
+  hasRawMessageProvider2,
+  setRawMessageProvider2,
+  withRawMessageProvider2,
+  cleanUserText2,
+  withRawSessionMessageCache2,
+  readRawSessionMessages2,
+  getRawSessionMessageOrdinalCount2,
+  visitRawSessionMessages2,
+  visitRawSessionMessagesAsync2,
+  readRawSessionMessageRange2,
+  prepareRawSessionOrdinals2,
+  primeTailRawMessageCache2,
+  getCachedAbsoluteMessageCount2,
+  primeInMemoryTailRawMessageCache2,
+  readRawSessionMessageIdOrdinalsForRange2,
+  hasRawSessionMessageById2,
+  compareRawSessionMessageOrder2,
+  getRawSessionMessageCount2,
+  getRawSessionTagKeysThrough2,
+  getLegacyProtectedTailStartOrdinal2,
+  readSessionChunk2
+} from "./index-5vqnvjb2.js";
+import"./index-nvh6d3bz.js";
 import {
   formatSynapseLaneDescriptor
-} from "./index-ar863dwd.js";
-import"./index-rgvqh5x7.js";
+} from "./index-5rcjs14a.js";
+import"./index-ghp32f9m.js";
 import {
   buildCanonicalChunkTextFromFts2,
   buildCompartmentSummaryFallbackText2,
@@ -648,7 +678,7 @@ import {
   replaceCompartmentChunkEmbeddings2,
   deleteChunkEmbedBackoffForSession2,
   chunkWindowSourceKey2
-} from "./index-6gtz99am.js";
+} from "./index-cxczethe.js";
 import {
   recordSessionProjectIdentity,
   GIT_SWEEP_LEASE_RENEWAL_MS,
@@ -657,7 +687,7 @@ import {
   markGitSweepSuccessAndRelease,
   parkGitSweepNonIndexable,
   releaseGitSweepLease
-} from "./index-mp0gh04g.js";
+} from "./index-79xfn84y.js";
 import {
   embedPauseBySession,
   embedRunStateBySession,
@@ -673,13 +703,10 @@ import {
   clearCompressionDepthRange,
   cleanSearchText,
   matchedSearchSnippet
-} from "./index-2bfj5gcg.js";
+} from "./index-pvd2xhwy.js";
 import {
   rememberV1HiddenRun
 } from "./index-6x556c2q.js";
-import {
-  BoundedSessionMap
-} from "./index-c6wbq66z.js";
 import {
   V2_MEMORY_CATEGORIES
 } from "./index-135e8hvg.js";
@@ -691,7 +718,7 @@ import {
   expandWorkspaceIdentitySetWithAliases,
   sourceNameForMemory,
   computeWorkspaceEpochFingerprint
-} from "./index-vd4cwnaz.js";
+} from "./index-gavj3e6h.js";
 import {
   configureContextDatabasePragmas2
 } from "./index-fapenpch.js";
@@ -716,7 +743,7 @@ import {
   createPrimer,
   updatePrimerSupport,
   updatePrimerAnswer
-} from "./index-r74njrfh.js";
+} from "./index-k7a8x7ba.js";
 import {
   setEmbeddingSessionBusy2,
   isEmbeddingHostBusy2
@@ -737,6 +764,7 @@ import {
   getMemoriesByProjects2,
   getMaxMemoryIdForProjects2,
   getMemoryById2,
+  updateMemoryVerification2,
   setMemoryClassification2,
   archiveMemory2,
   getMemoryCountsByStatus2
@@ -751,7 +779,7 @@ import {
   getCachedLocalEmbeddingPooling,
   resolveLocalEmbeddingWorkerRuntime,
   getLoadedLocalEmbeddingRuntimes
-} from "./index-kd79p7yt.js";
+} from "./index-24bz7rbe.js";
 import {
   describeShadowBackfillWriteRefusal2,
   contentSha2562,
@@ -764,16 +792,16 @@ import {
   getProjectEmbeddingMaxInputTokens2,
   embedTextForProject2,
   embedBatchForProject2,
-  embedItemsForProject2,
+  embedItemsWindowBounded2,
   embedUnembeddedMemoriesForProject2,
   drainCommitBacklogForProject2,
   embedSessionCompartmentChunks2,
   getEmbeddingCoverageStatus2,
   getAutoEmbeddingSessionCoverage2
-} from "./index-4113vdfg.js";
+} from "./index-ta1axkrq.js";
 import {
   cosineSimilarity
-} from "./index-9m0jvsz2.js";
+} from "./index-xchq5xgq.js";
 import {
   USER_FACING_FAILURES,
   renderUserFacingFailure,
@@ -807,8 +835,8 @@ import {
   scheduleClearAndReindex,
   clearSessionTracking,
   createAutoSearchDiagnostics
-} from "./index-6td53h94.js";
-import"./index-d0w84hy5.js";
+} from "./index-9ze00rza.js";
+import"./index-3s39a1md.js";
 import {
   DREAMER_PRIMER_INVESTIGATOR_ALLOWED_TOOLS,
   buildHiddenAgentRegistrations,
@@ -820,10 +848,11 @@ import {
   HISTORIAN_CACHE_TAIL_ENV2,
   HISTORIAN_MAX_OUTPUT_TOKENS_ENV2,
   SUBAGENT_OUTPUT_CEILING_ENV2
-} from "./index-2tmjp88s.js";
+} from "./index-0b5kqg7n.js";
 import {
   PI_CONTEXT_BUDGET,
   PiContextDeadlineError,
+  PiHistorianJoinDeadlineError,
   PiContextSupersededError,
   PiContextBudget,
   PiTagHydrationError,
@@ -835,11 +864,11 @@ import {
   drainPiTagSnapshotSession,
   assertPiTagSnapshotReady,
   ensurePiTagSnapshotReady
-} from "./index-am0e75f3.js";
-import"./index-cq71g4dk.js";
-import"./index-1cvyaw9a.js";
-import"./index-kfs7073b.js";
-import"./index-e9n1n9ah.js";
+} from "./index-wdeb9me3.js";
+import"./index-71rg8j43.js";
+import"./index-8d2z6503.js";
+import"./index-xradeq5h.js";
+import"./index-xrhj81gf.js";
 import {
   __toESM
 } from "./index-22jkk6wg.js";
@@ -850,9 +879,6 @@ import {
   computeNormalizedHash
 } from "./index-9x1f96r8.js";
 import {
-  normalizeProtectedToolName
-} from "./index-674f6qs2.js";
-import {
   sameProjectDirectory
 } from "./index-wrr9rp9a.js";
 import {
@@ -862,7 +888,7 @@ import {
 import {
   logSlowWriteTransaction,
   WriteTransactionSteps
-} from "./index-0wtm7g7f.js";
+} from "./index-1ts77n1b.js";
 import {
   setStoragePrivatePermissionEnforcement,
   ensureStorageDirectorySync,
@@ -871,7 +897,7 @@ import {
 } from "./index-81nthk8j.js";
 
 // src/index.ts
-import { AsyncLocalStorage as AsyncLocalStorage3 } from "node:async_hooks";
+import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
 import { createRequire as createRequire2 } from "node:module";
 import { join as join17, resolve as resolve3 } from "node:path";
 
@@ -3594,7 +3620,7 @@ function startHostStallProfilerSwitch() {
 // package.json
 var package_default = {
   name: "@cortexkit/pi-magic-context",
-  version: "0.49.35",
+  version: "0.49.67",
   type: "module",
   description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
   main: "dist/index.js",
@@ -3623,7 +3649,7 @@ var package_default = {
   ],
   "//": "The build intentionally bundles typebox (no --external typebox) and keeps it a regular dependency. OMP's extension loader rewrites every bare `typebox` import to its own omptype-based shim, whose schemas are callable objects rather than JSON Schema; they fail structuredClone during tool registration, so an external typebox import stops Magic Context loading on OMP. src/typebox-bundling.test.ts guards this.",
   scripts: {
-    build: "bun ../../scripts/check-bun.mjs && tsc -p ../retina-local-fs/tsconfig.build.json && bun ../../scripts/clean-dist-chunks.mjs dist index.js subagent-entry.js historian-calibration-extension.js embedding-worker-process.js raw-ordinal-warmup-worker.js tag-snapshot-worker-pi.js transformers-web.js transformers-node-wasm.js && bun build ../plugin/src/features/magic-context/memory/transformers-web-entry.ts --outfile dist/transformers-web.js --target browser --format esm --external onnxruntime-web && bun ../plugin/scripts/build-transformers-node-wasm.ts dist && bun build src/index.ts src/tag-snapshot-worker-pi.ts src/subagent-entry.ts src/historian-calibration-extension.ts ../plugin/src/features/magic-context/memory/embedding-worker.ts ../plugin/src/features/magic-context/memory/embedding-worker-process.ts ../plugin/src/features/magic-context/migration-worker.ts ../plugin/src/hooks/magic-context/auto-search-worker.ts ../plugin/src/hooks/magic-context/raw-ordinal-warmup-worker.ts ../plugin/src/features/magic-context/compaction-marker-candidates-worker.ts ../plugin/src/features/magic-context/chunk-embedding-write-worker.ts --outdir dist --entry-naming '[name].[ext]' --target node --format esm --splitting --external @earendil-works/pi-coding-agent --external @oh-my-pi/pi-coding-agent --external @earendil-works/pi-tui --external onnxruntime-node --external onnxruntime-web --external sharp --external bun:ffi --external node:sqlite",
+    build: "bun ../../scripts/check-bun.mjs && tsc -p ../retina-local-fs/tsconfig.build.json && bun ../../scripts/clean-dist-chunks.mjs dist index.js subagent-entry.js historian-calibration-extension.js embedding-worker-process.js raw-ordinal-warmup-worker.js tag-snapshot-worker-pi.js transformers-web.js transformers-node-wasm.js && bun build ../plugin/src/features/magic-context/memory/transformers-web-entry.ts --outfile dist/transformers-web.js --target browser --format esm --external onnxruntime-web && bun ../plugin/scripts/build-transformers-node-wasm.ts dist && bun build src/index.ts src/tag-snapshot-worker-pi.ts src/subagent-entry.ts src/historian-calibration-extension.ts ../plugin/src/features/magic-context/memory/embedding-worker.ts ../plugin/src/features/magic-context/memory/embedding-worker-process.ts ../plugin/src/features/magic-context/migration-worker.ts ../plugin/src/hooks/magic-context/auto-search-worker.ts ../plugin/src/hooks/magic-context/raw-ordinal-warmup-worker.ts ../plugin/src/features/magic-context/compaction-marker-candidates-worker.ts ../plugin/src/features/magic-context/chunk-embedding-write-worker.ts --outdir dist --entry-naming '[name].[ext]' --target node --format esm --splitting --external @earendil-works/pi-coding-agent --external @oh-my-pi/pi-coding-agent --external @earendil-works/pi-tui --external @earendil-works/pi-ai --external onnxruntime-node --external onnxruntime-web --external sharp --external bun:ffi --external node:sqlite",
     "build:e2e-argv": `bun ../../scripts/clean-dist-chunks.mjs ../../tests/docker/.generated subagent-runner-e2e.mjs && bun build src/subagent-runner.ts --outdir ../../tests/docker/.generated --entry-naming 'subagent-runner-e2e.mjs' --splitting --target node --format esm --external node:sqlite && node --input-type=module -e 'const { __test } = await import("../../tests/docker/.generated/subagent-runner-e2e.mjs"); if (typeof __test.buildArgs !== "function" || typeof __test.resolvePiInvocation !== "function") throw new Error("argv renderer exports missing"); console.log("Node argv renderer: 2 exports loaded")'`,
     typecheck: "tsc -p ../retina-local-fs/tsconfig.build.json && tsc --noEmit",
     test: "bun ../../scripts/check-bun.mjs && bun install --frozen-lockfile && MC_SLOW_TESTS=0 BUN_JSC_useOMGJIT=0 bun test --parallel=4 --timeout 30000",
@@ -3661,6 +3687,9 @@ var package_default = {
     "omp-coding-agent-1812": "npm:@oh-my-pi/pi-coding-agent@18.12.3",
     "omp-coding-agent-18126": "npm:@oh-my-pi/pi-coding-agent@18.12.6",
     "omp-coding-agent-18132": "npm:@oh-my-pi/pi-coding-agent@18.13.2",
+    "omp-coding-agent-18186": "npm:@oh-my-pi/pi-coding-agent@18.18.6",
+    "omp-coding-agent-18190": "npm:@oh-my-pi/pi-coding-agent@18.19.0",
+    "omp-coding-agent-18220": "npm:@oh-my-pi/pi-coding-agent@18.22.0",
     "omp-pi-ai-171": "npm:@oh-my-pi/pi-ai@17.1.7",
     "omp-pi-ai-1889": "npm:@oh-my-pi/pi-ai@18.8.9",
     "omp-pi-ai-1811": "npm:@oh-my-pi/pi-ai@18.11.3",
@@ -3668,6 +3697,12 @@ var package_default = {
     "omp-pi-ai-18126": "npm:@oh-my-pi/pi-ai@18.12.6",
     "omp-pi-ai-1813": "npm:@oh-my-pi/pi-ai@18.13.0",
     "omp-pi-ai-18132": "npm:@oh-my-pi/pi-ai@18.13.2",
+    "omp-pi-ai-18180": "npm:@oh-my-pi/pi-ai@18.18.0",
+    "omp-pi-ai-18181": "npm:@oh-my-pi/pi-ai@18.18.1",
+    "omp-pi-ai-18186": "npm:@oh-my-pi/pi-ai@18.18.6",
+    "omp-pi-ai-18190": "npm:@oh-my-pi/pi-ai@18.19.0",
+    "omp-pi-ai-18200": "npm:@oh-my-pi/pi-ai@18.20.0",
+    "omp-pi-ai-18203": "npm:@oh-my-pi/pi-ai@18.20.3",
     "pi-agent-core-087": "npm:@earendil-works/pi-agent-core@0.87.1",
     "pi-ai-086": "npm:@earendil-works/pi-ai@0.86.0",
     "pi-ai-087": "npm:@earendil-works/pi-ai@0.87.1",
@@ -3713,6 +3748,158 @@ var package_default = {
 
 // src/clone-inheritance.ts
 import { open, stat } from "node:fs/promises";
+
+// src/drop-branches-pi.ts
+var KEY = "piDropBranches";
+var installed = new WeakSet;
+function trackPiDropLeaf(db, sessionId, leaf) {
+  if (!installed.has(db)) {
+    db.exec(`
+			CREATE TEMP TABLE IF NOT EXISTS pi_drop_leaf (session_id TEXT PRIMARY KEY, leaf TEXT);
+			CREATE TEMP TRIGGER IF NOT EXISTS pi_drop_queued AFTER INSERT ON main.pending_ops
+			WHEN NEW.operation = 'drop' AND EXISTS (SELECT 1 FROM pi_drop_leaf WHERE session_id = NEW.session_id AND leaf IS NOT NULL)
+			BEGIN
+				UPDATE session_meta SET deferred_execute_state = json_set(
+					COALESCE(NULLIF(deferred_execute_state, ''), '{}'),
+					'$.${KEY}.pending."' || NEW.tag_id || '"',
+					(SELECT leaf FROM pi_drop_leaf WHERE session_id = NEW.session_id))
+				WHERE session_id = NEW.session_id;
+			END;
+			CREATE TEMP TRIGGER IF NOT EXISTS pi_drop_applied AFTER UPDATE OF status ON main.tags
+			WHEN NEW.status = 'dropped' AND OLD.status != 'dropped'
+				AND EXISTS (SELECT 1 FROM pi_drop_leaf WHERE session_id = NEW.session_id AND leaf IS NOT NULL)
+			BEGIN
+				UPDATE session_meta SET deferred_execute_state = json_remove(json_set(
+					COALESCE(NULLIF(deferred_execute_state, ''), '{}'),
+					'$.${KEY}.drops."' || NEW.tag_number || '"',
+					COALESCE(json_extract(deferred_execute_state, '$.${KEY}.pending."' || NEW.tag_number || '"'),
+						(SELECT leaf FROM pi_drop_leaf WHERE session_id = NEW.session_id))),
+					'$.${KEY}.pending."' || NEW.tag_number || '"')
+				WHERE session_id = NEW.session_id;
+			END;
+			CREATE TEMP TRIGGER IF NOT EXISTS pi_drop_retired AFTER UPDATE OF status ON main.tags
+			WHEN NEW.status = 'compacted'
+			BEGIN
+				UPDATE session_meta SET deferred_execute_state = json_remove(
+					COALESCE(NULLIF(deferred_execute_state, ''), '{}'),
+					'$.${KEY}.drops."' || NEW.tag_number || '"', '$.${KEY}.pending."' || NEW.tag_number || '"')
+				WHERE session_id = NEW.session_id AND json_type(deferred_execute_state, '$.${KEY}') = 'object';
+			END;
+		`);
+    installed.add(db);
+  }
+  ensureSessionMetaRow(db, sessionId);
+  db.prepare("INSERT INTO pi_drop_leaf VALUES (?, ?) ON CONFLICT(session_id) DO UPDATE SET leaf = excluded.leaf").run(sessionId, leaf);
+}
+function state(db, sessionId) {
+  const row = db.prepare("SELECT deferred_execute_state AS state FROM session_meta WHERE session_id = ?").get(sessionId);
+  const value = row?.state ? JSON.parse(row.state) : {};
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error("Invalid session metadata JSON");
+  return value;
+}
+function journal(value) {
+  const result = { drops: {}, pending: {} };
+  if (!value || typeof value !== "object")
+    return result;
+  for (const kind of ["drops", "pending"]) {
+    const entries = value[kind];
+    if (!entries || typeof entries !== "object")
+      continue;
+    for (const [tag, leaf] of Object.entries(entries)) {
+      if (/^\d+$/.test(tag) && typeof leaf === "string" && leaf)
+        result[kind][tag] = leaf;
+    }
+  }
+  return result;
+}
+function save(db, sessionId, document, value) {
+  document[KEY] = value;
+  db.prepare("UPDATE session_meta SET deferred_execute_state = ? WHERE session_id = ?").run(JSON.stringify(document), sessionId);
+}
+function piDropBranchIds(entries) {
+  const ids = new Set;
+  let parent = null;
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object")
+      return null;
+    const row = entry;
+    if (typeof row.id !== "string" || !row.id || row.parentId !== parent || ids.has(row.id))
+      return null;
+    ids.add(row.id);
+    parent = row.id;
+  }
+  return ids;
+}
+function cancelPiAbandonedPendingDrops(db, sessionId, ids) {
+  if (!ids)
+    return 0;
+  const abandoned = (saved) => Object.entries(saved.pending).filter(([, leaf]) => !ids.has(leaf));
+  if (!abandoned(journal(state(db, sessionId)[KEY])).length)
+    return 0;
+  return db.transaction(() => {
+    const document = state(db, sessionId);
+    const saved = journal(document[KEY]);
+    const offPending = abandoned(saved);
+    if (!offPending.length)
+      return 0;
+    for (const [tag] of offPending) {
+      db.prepare("DELETE FROM pending_ops WHERE session_id = ? AND tag_id = ?").run(sessionId, Number(tag));
+      delete saved.pending[tag];
+    }
+    save(db, sessionId, document, saved);
+    return offPending.length;
+  }).immediate();
+}
+function reconcilePiDropBranches(db, sessionId, ids, canRebuild) {
+  if (!canRebuild || !ids)
+    return 0;
+  return db.transaction(() => {
+    const document = state(db, sessionId);
+    const saved = journal(document[KEY]);
+    const offBranch = Object.entries(saved.drops).filter(([, leaf]) => !ids.has(leaf));
+    if (!offBranch.length)
+      return 0;
+    const native = getNativeReplayState(db, sessionId);
+    let restored = 0;
+    for (const [tag] of offBranch) {
+      const row = db.prepare("UPDATE tags SET status = 'active', drop_mode = 'full' WHERE session_id = ? AND tag_number = ? AND status = 'dropped' RETURNING message_id, type").get(sessionId, Number(tag));
+      if (row) {
+        restored++;
+        if (row.type === "tool")
+          native.toolInputs.delete(row.message_id);
+      }
+      delete saved.drops[tag];
+    }
+    if (restored && !updateReplayDocument(db, sessionId, (doc) => {
+      if (doc.piNative === undefined)
+        return false;
+      if (!doc.piNative || typeof doc.piNative !== "object" || Array.isArray(doc.piNative))
+        throw new Error("Invalid Pi native replay state");
+      doc.piNative = {
+        ...doc.piNative,
+        toolInputs: Object.fromEntries(native.toolInputs)
+      };
+      return true;
+    }))
+      throw new Error("Cannot persist restored Pi tool inputs");
+    save(db, sessionId, document, saved);
+    return restored;
+  }).immediate();
+}
+function copyPiDropBranches(db, source, destination) {
+  const sourceJournal = journal(state(db, source)[KEY]);
+  const tags = new Set(db.prepare("SELECT tag_number FROM tags WHERE session_id = ?").all(destination).map((row) => String(row.tag_number)));
+  for (const kind of ["drops", "pending"]) {
+    for (const tag of Object.keys(sourceJournal[kind]))
+      if (!tags.has(tag))
+        delete sourceJournal[kind][tag];
+  }
+  ensureSessionMetaRow(db, destination);
+  save(db, destination, state(db, destination), sourceJournal);
+}
+
+// src/clone-inheritance.ts
 var CONTENT_ID_SUFFIX = /:(?:p|file)\d+$/;
 var BARE_SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 var loggedCloneStartFailures = new Set;
@@ -3897,9 +4084,14 @@ async function inheritPiCloneSession(event, ctx, deps, isStartup) {
       throw new Error("Pi clone branch is unavailable");
     }
     stage = "copy-state";
+    const filter = createCloneFilter(branchEntries);
     const result = copySessionStateForClone(deps.db, sourceSessionId, destinationSessionId, {
-      ...createCloneFilter(branchEntries),
-      requireEmptyDestinationMeta: isStartup
+      ...filter,
+      requireEmptyDestinationMeta: isStartup,
+      selectPendingPiMarker: (raw, compartments) => {
+        copyPiDropBranches(deps.db, sourceSessionId, destinationSessionId);
+        return filter.selectPendingPiMarker(raw, compartments);
+      }
     });
     if (result.kind === "destination-not-empty") {
       writeLog(`[magic-context][pi] clone-inheritance: skipped source=${sourceSessionId} dest=${destinationSessionId} stage=destination-guard reason=destination-not-empty`);
@@ -4203,12 +4395,17 @@ function countCompartmentsSince(db, projectPath, since) {
   return row?.cnt ?? 0;
 }
 function countProjectSessionsSince(db, projectPath, since) {
-  const row = since === null ? db.prepare("SELECT COUNT(*) AS cnt FROM session_projects WHERE project_path = ?").get(projectPath) : db.prepare(`SELECT COUNT(*) AS cnt FROM session_projects sp
-                        LEFT JOIN schema_migrations_meta activity
-                          ON activity.key = 'retrospective_activity:' || sp.session_id
-                        LEFT JOIN message_history_index history ON history.session_id = sp.session_id
-                       WHERE sp.project_path = ?
-                         AND COALESCE(CAST(activity.value AS INTEGER), history.updated_at) > ?`).get(projectPath, since);
+  const scope = `FROM session_projects sp
+        LEFT JOIN session_meta m ON m.session_id = sp.session_id
+       WHERE sp.project_path = ? AND sp.harness = ?
+         AND COALESCE(m.is_subagent, 0) = 0`;
+  const row = since === null ? db.prepare(`SELECT COUNT(*) AS cnt ${scope}`).get(projectPath, getHarness2()) : db.prepare(`SELECT COUNT(*) AS cnt ${scope}
+                          AND COALESCE(
+                              (SELECT CAST(value AS INTEGER) FROM schema_migrations_meta
+                               WHERE key = 'retrospective_activity:' || sp.session_id),
+                              (SELECT updated_at FROM message_history_index
+                               WHERE session_id = sp.session_id AND harness = sp.harness)
+                          ) > ?`).get(projectPath, getHarness2(), since);
   return row?.cnt ?? 0;
 }
 function countMappedMemories(db, projectPath) {
@@ -4221,6 +4418,10 @@ function countMappedMemories(db, projectPath) {
                 AND v.file_path <> ''`).get(projectPath, Date.now());
   return row?.cnt ?? 0;
 }
+var CURRENT_VERIFY_SKIP_SQL = `COALESCE(CASE WHEN json_valid(m.metadata_json) THEN
+    json_extract(m.metadata_json, '$.dreamerVerifySkip.contentHash') = m.normalized_hash
+    AND json_type(m.metadata_json, '$.dreamerVerifySkip.fingerprint') = 'text'
+    ELSE 0 END, 0)`;
 function countUnverifiedMappedMemories(db, projectPath) {
   const row = db.prepare(`SELECT COUNT(DISTINCT m.id) AS cnt
                FROM memories m
@@ -4229,7 +4430,8 @@ function countUnverifiedMappedMemories(db, projectPath) {
                 AND m.status IN ('active','permanent')
                 AND (m.expires_at IS NULL OR m.expires_at > ?)
                 AND v.file_path <> ''
-                AND v.verified_at = 0`).get(projectPath, Date.now());
+                AND v.verified_at = 0
+                AND NOT (${CURRENT_VERIFY_SKIP_SQL})`).get(projectPath, Date.now());
   return row?.cnt ?? 0;
 }
 function countBroadCycleCandidates(db, projectPath, cycleStartAt) {
@@ -4238,6 +4440,7 @@ function countBroadCycleCandidates(db, projectPath, cycleStartAt) {
               WHERE m.project_path = ?
                 AND m.status IN ('active','permanent')
                 AND (m.expires_at IS NULL OR m.expires_at > ?)
+                AND NOT (${CURRENT_VERIFY_SKIP_SQL})
                 AND (
                     SELECT MAX(v.verified_at)
                       FROM memory_verifications v
@@ -4346,7 +4549,7 @@ function getDreamTaskBacklog(db, projectPath, task, options = {}) {
     case "verify-broad": {
       const total = countMappedMemories(db, projectPath);
       const cycleStartAt = getTaskScheduleState(db, projectPath, "verify-broad")?.lastBroadRunAt;
-      const pending = cycleStartAt == null ? total : countBroadCycleCandidates(db, projectPath, cycleStartAt);
+      const pending = countBroadCycleCandidates(db, projectPath, cycleStartAt ?? Number.MAX_SAFE_INTEGER);
       return { pending, total };
     }
     case "curate": {
@@ -4473,6 +4676,7 @@ function getDreamTaskBacklogs(db, projectPath, tasks = CANONICAL_DREAM_TASKS, op
   }
   const optionKey = (value) => value === undefined ? "omitted" : value === null ? "null" : `number:${value}`;
   const key = JSON.stringify([
+    getHarness2(),
     projectPath,
     tasks,
     optionKey(options.lastRunAt),
@@ -4562,7 +4766,7 @@ function openOpenCodeDb() {
 }
 
 // ../plugin/src/features/magic-context/dreamer/task-executor.ts
-import { createHash as createHash10 } from "node:crypto";
+import { createHash as createHash11 } from "node:crypto";
 import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
 
 // ../plugin/src/agents/dreamer.ts
@@ -4585,7 +4789,7 @@ var DREAMER_REVIEWER_AGENT = "dreamer-reviewer";
 // ../plugin/src/features/magic-context/schema-fence-probe.ts
 var STALE_CHILD_SPAWN_FAILURE = "stale_schema_fence";
 var STALE_CHILD_SPAWN_LATCH_THRESHOLD = 2;
-var state = {
+var state2 = {
   consecutiveFailures: 0,
   totalFailures: 0,
   latched: false,
@@ -4593,23 +4797,23 @@ var state = {
   failure: null
 };
 function recordStaleFence(persistedVersion, supportedVersion, reason = "newer_schema") {
-  state.consecutiveFailures += 1;
-  state.totalFailures += 1;
-  const latched = state.consecutiveFailures >= STALE_CHILD_SPAWN_LATCH_THRESHOLD;
-  state.latched ||= latched;
+  state2.consecutiveFailures += 1;
+  state2.totalFailures += 1;
+  const latched = state2.consecutiveFailures >= STALE_CHILD_SPAWN_LATCH_THRESHOLD;
+  state2.latched ||= latched;
   const failure = {
     failureClass: STALE_CHILD_SPAWN_FAILURE,
     reason,
     persistedVersion,
     supportedVersion,
-    consecutiveFailures: state.consecutiveFailures,
-    totalFailures: state.totalFailures,
-    latched: state.latched
+    consecutiveFailures: state2.consecutiveFailures,
+    totalFailures: state2.totalFailures,
+    latched: state2.latched
   };
-  state.failure = failure;
-  const shouldSurface = state.latched && !state.noticeEmitted;
+  state2.failure = failure;
+  const shouldSurface = state2.latched && !state2.noticeEmitted;
   if (shouldSurface)
-    state.noticeEmitted = true;
+    state2.noticeEmitted = true;
   return { allowSpawn: false, failure, shouldSurface };
 }
 function probeChildSpawnFence(db) {
@@ -4628,9 +4832,9 @@ function probeChildSpawnFence(db) {
   } catch {
     return recordStaleFence(LATEST_SUPPORTED_VERSION, LATEST_SUPPORTED_VERSION, "read_error");
   }
-  state.consecutiveFailures = 0;
-  state.latched = false;
-  state.noticeEmitted = false;
+  state2.consecutiveFailures = 0;
+  state2.latched = false;
+  state2.noticeEmitted = false;
   return { allowSpawn: true };
 }
 
@@ -4701,7 +4905,6 @@ class HiddenCompletionRefusal extends Error {
   }
 }
 // ../plugin/src/features/magic-context/dreamer/provider-output-failure.ts
-import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash as createHash3 } from "node:crypto";
 var MAX_NEAR_ZERO_OUTPUT_TOKENS = 32;
 
@@ -4709,52 +4912,18 @@ class DreamerProviderOutputFailureError extends Error {
   fingerprint;
   outputTokens;
   reasoningTokens;
-  quotaResetAt;
   transient = true;
-  constructor(fingerprint, outputTokens, reasoningTokens, responseText, quotaResetAt) {
+  constructor(fingerprint, outputTokens, reasoningTokens, responseText) {
     const preview = responseText.trim().replace(/\s+/g, " ").slice(0, 160);
-    super(quotaResetAt !== undefined ? `provider quota exhausted until ${new Date(quotaResetAt).toISOString()} (account-pool rate limit)` : `dreamer provider-outage completion (output_tokens=${outputTokens}, reasoning_tokens=${reasoningTokens}): ${JSON.stringify(preview)}`);
+    super(`dreamer provider-outage completion (output_tokens=${outputTokens}, reasoning_tokens=${reasoningTokens}): ${JSON.stringify(preview)}`);
     this.fingerprint = fingerprint;
     this.outputTokens = outputTokens;
     this.reasoningTokens = reasoningTokens;
-    this.quotaResetAt = quotaResetAt;
     this.name = "DreamerProviderOutputFailureError";
   }
 }
-var primaryQuotas = new AsyncLocalStorage;
-function withDreamerModelCooldown(run) {
-  return primaryQuotas.getStore() ? run() : primaryQuotas.run(new Map, run);
-}
-function rememberPrimaryQuota(model, error) {
-  const quotas = primaryQuotas.getStore();
-  if (!quotas || model === "primary" || !(error instanceof DreamerProviderOutputFailureError) || error.quotaResetAt === undefined || error.quotaResetAt <= Date.now())
-    return null;
-  const cached = new DreamerProviderOutputFailureError(error.fingerprint, error.outputTokens, error.reasoningTokens, "", error.quotaResetAt);
-  cached.message = error.message;
-  quotas.set(model, cached);
-  return error;
-}
-function primaryQuotaFailure(model) {
-  const quotas = primaryQuotas.getStore();
-  const error = quotas?.get(model);
-  if (!error)
-    return null;
-  if (error.quotaResetAt === undefined || error.quotaResetAt <= Date.now()) {
-    quotas?.delete(model);
-    return null;
-  }
-  const failure = new DreamerProviderOutputFailureError(error.fingerprint, error.outputTokens, error.reasoningTokens, "", error.quotaResetAt);
-  failure.message = error.message;
-  return failure;
-}
-function quotaResetAt(responseText, now) {
-  const notice = /^All [1-9]\d* account\(s\) rate-limited for [\w.-]+\. Quota resets in ((?:\d+[hms] ?)+)\. Add more accounts with `opencode auth login` or wait and retry\.$/.exec(responseText.trim());
-  if (!notice)
-    return;
-  const units = { h: 3600000, m: 60000, s: 1000 };
-  const duration = [...notice[1].matchAll(/(\d+)([hms])/g)].reduce((sum, match) => sum + Number(match[1]) * units[match[2]], 0);
-  const resetAt = now + duration;
-  return duration > 0 && Number.isSafeInteger(resetAt) && resetAt < 8640000000000000 ? resetAt : undefined;
+function isAccountPoolQuotaNotice(responseText) {
+  return /^All [1-9]\d* account\(s\) rate-limited for [\w.-]+\. Quota resets in (?:\d+[hms] ?)+\. Add more accounts with `opencode auth login` or wait and retry\.$/.test(responseText.trim());
 }
 function finiteTokenCount(value) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
@@ -4786,7 +4955,7 @@ function latestAssistantCompletion(messages) {
   }
   return latest;
 }
-function providerOutputFailureFromInvalidManifest(messages, responseText, now = Date.now()) {
+function providerOutputFailureFromInvalidManifest(messages, responseText) {
   const completion = latestAssistantCompletion(messages);
   if (completion?.finish?.toLowerCase() !== "stop")
     return null;
@@ -4796,11 +4965,10 @@ function providerOutputFailureFromInvalidManifest(messages, responseText, now = 
   const normalized = responseText.trim().replace(/\s+/g, " ").toLowerCase();
   if (!normalized)
     return null;
-  const resetAt = quotaResetAt(responseText, now);
-  if (resetAt === undefined && completion.outputTokens > MAX_NEAR_ZERO_OUTPUT_TOKENS)
+  if (!isAccountPoolQuotaNotice(responseText) && completion.outputTokens > MAX_NEAR_ZERO_OUTPUT_TOKENS)
     return null;
   const fingerprint = createHash3("sha256").update(normalized).digest("hex").slice(0, 16);
-  return new DreamerProviderOutputFailureError(fingerprint, completion.outputTokens, completion.reasoningTokens, responseText, resetAt);
+  return new DreamerProviderOutputFailureError(fingerprint, completion.outputTokens, completion.reasoningTokens, responseText);
 }
 
 // ../plugin/src/v2/hooks/hidden-child.ts
@@ -4944,6 +5112,94 @@ function toModelEntry(spec) {
     return model ? { model } : undefined;
   }
   return spec;
+}
+
+// ../plugin/src/shared/hidden-model-cooldown.ts
+var MAX_SKIP_MS = 7 * 24 * 60 * 60 * 1000;
+var MIN_SKIP_MS = 60000;
+var RETRY_LATER_REASON = "provider said to retry later";
+
+class HiddenModelCooldowns {
+  now;
+  entries = new Map;
+  constructor(now = () => Date.now()) {
+    this.now = now;
+  }
+  record(model, error) {
+    if (!model?.includes("/"))
+      return;
+    const now = this.now();
+    const delay = retryDelay(error, now);
+    if (delay === undefined || !Number.isFinite(delay) || delay <= MIN_SKIP_MS)
+      return;
+    this.entries.set(model, {
+      model,
+      until: now + Math.min(delay, MAX_SKIP_MS),
+      reason: RETRY_LATER_REASON
+    });
+  }
+  succeeded(model) {
+    if (model)
+      this.entries.delete(model);
+  }
+  live() {
+    const now = this.now();
+    for (const [model, entry] of this.entries) {
+      if (entry.until <= now)
+        this.entries.delete(model);
+    }
+    return [...this.entries.values()];
+  }
+  startIndex(models, log) {
+    const live = new Map(this.live().map((entry) => [entry.model, entry]));
+    let start = models.findIndex((model) => !live.has(model));
+    if (start < 0) {
+      start = 0;
+      for (let i = 1;i < models.length; i++) {
+        if ((live.get(models[i])?.until ?? Infinity) < (live.get(models[start])?.until ?? Infinity))
+          start = i;
+      }
+    }
+    const logged = new Set;
+    for (const model of models.slice(0, start)) {
+      const entry = live.get(model);
+      if (entry && !logged.has(model)) {
+        log(`skipping ${model} until ${new Date(entry.until).toISOString()}: provider said to retry later`);
+        logged.add(model);
+      }
+    }
+    return start;
+  }
+}
+function retryDelay(error, now, depth = 0) {
+  if (!isRecord(error) || depth > 4)
+    return;
+  const data = typeof error.statusCode === "number" || typeof error.status === "number" ? error : isRecord(error.data) ? error.data : error;
+  const status = data.statusCode ?? data.status;
+  if (status === 412 || status === 429 || status === 503) {
+    if (typeof data.retryAfterMs === "number")
+      return data.retryAfterMs;
+    const headers = data.responseHeaders;
+    if (isRecord(headers)) {
+      const value = Object.entries(headers).find(([name]) => name.toLowerCase() === "retry-after")?.[1];
+      if (typeof value === "string") {
+        const text = value.trim();
+        if (/^\d+$/.test(text))
+          return Number(text) * 1000;
+        if (/^(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} GMT|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), \d{2}-[A-Z][a-z]{2}-\d{2} \d{2}:\d{2}:\d{2} GMT|(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) [A-Z][a-z]{2} [ \d]\d \d{2}:\d{2}:\d{2} \d{4})$/.test(text))
+          return Date.parse(text) - now;
+      }
+    }
+  }
+  return retryDelay(error.hostError ?? error.cause, now, depth + 1);
+}
+var hiddenModelCooldowns = new HiddenModelCooldowns;
+function selectHiddenModelStart(primary, fallbacks = [], note) {
+  if (!primary)
+    return { primary, fallbacks };
+  const chain = [primary, ...fallbacks];
+  const start = hiddenModelCooldowns.startIndex(chain.map((entry) => toModelEntry(entry)?.model ?? ""), note);
+  return { primary: chain[start], fallbacks: chain.slice(start + 1) };
 }
 
 // ../plugin/src/shared/model-suggestion-retry.ts
@@ -5184,14 +5440,11 @@ function throwWithPromptFailure(legacyError, failedAttempts, args, timeoutMs, tr
   const error = legacyError instanceof Error ? legacyError : new Error(extractMessage(legacyError));
   const last = failedAttempts.at(-1);
   const failureClass = last?.failureClass ?? "unknown";
-  const quota = failedAttempts.find((failure) => failure.error instanceof DreamerProviderOutputFailureError && failure.error.quotaResetAt !== undefined)?.error;
-  if (quota && error !== quota && !error.message.includes(quota.message))
-    error.message = `${quota.message}; ${error.message}`;
-  const providerError = failureClass === "provider_error" || quota ? sanitizeDiagnosticText(`${quota ? `${quota.message}; ` : ""}${shortErr(last?.error ?? legacyError)}`).slice(0, 500) : null;
+  const providerError = failureClass === "provider_error" ? sanitizeDiagnosticText(shortErr(last?.error ?? legacyError)).slice(0, 500) : null;
   promptFailureDetails.set(error, {
     failureClass,
     modelAttempted: last?.attempt.label ?? null,
-    modelsTried: failedAttempts.filter((failure) => !failure.attempt.skipped).map((failure) => failure.attempt.label),
+    modelsTried: failedAttempts.map((failure) => failure.attempt.label),
     providerError,
     timeoutMs: failureClass === "provider_timeout" ? timeoutMs : null,
     childSessionId: transport ? transport.childSessionId ?? null : args.path.id || null,
@@ -5208,6 +5461,8 @@ async function attemptOnce(client, args, timeoutMs, signal, callContext, label, 
     await promptWithTimeout(client, attemptArgs, timeoutMs, signal, transport, firstOutputTimeoutMs);
     return;
   } catch (error) {
+    if (!signal?.aborted && !isPromptTimeoutError(error))
+      hiddenModelCooldowns.record(label, error);
     if (isNonRetryable(error, signal) || !allowModelSuggestions)
       throw error;
     const suggestion = parseModelSuggestion(error);
@@ -5248,7 +5503,19 @@ function createChainClock(options, timeoutMs) {
     }
   };
 }
+function cooldownStart(args, options) {
+  const model = args.body.model;
+  if (!model)
+    return { args, options };
+  const selected = selectHiddenModelStart({ model: `${model.providerID}/${model.modelID}`, qualifier: args.body.variant }, options.fallbackModels, log2);
+  const { variant: _variant, ...body } = args.body;
+  return {
+    args: copyPromptArgs(args, { ...body, ...modelBodyField(selected.primary) }),
+    options: { ...options, fallbackModels: selected.fallbacks }
+  };
+}
 async function promptSyncWithModelSuggestionRetry(client, args, options = {}) {
+  ({ args, options } = cooldownStart(args, options));
   const timeoutMs = options.timeoutMs ?? 300000;
   const callContext = options.callContext ?? "subagent";
   const fallbacks = options.fallbackModels ?? [];
@@ -5320,6 +5587,8 @@ async function attemptAndValidate(client, args, timeoutMs, signal, callContext, 
   try {
     output = await raceWithSignal(options.fetchOutput(args, attempt), options.signal);
   } catch (error) {
+    if (!signal?.aborted && !isPromptTimeoutError(error))
+      hiddenModelCooldowns.record(attempt.label, error);
     throw {
       error,
       failureClass: classifyPromptFailure(error, "output", signal),
@@ -5331,7 +5600,7 @@ async function attemptAndValidate(client, args, timeoutMs, signal, callContext, 
     const text = extractLatestAssistantText(messages);
     if (text) {
       const failure = providerOutputFailureFromInvalidManifest(messages, text);
-      if (failure?.quotaResetAt !== undefined)
+      if (failure && isAccountPoolQuotaNotice(text))
         throw failure;
     }
     if (!extractLatestAssistantText(output)) {
@@ -5340,11 +5609,14 @@ async function attemptAndValidate(client, args, timeoutMs, signal, callContext, 
         const error = new Error(`Host recorded assistant error: ${describeAssistantError(assistantFailure.error)}`);
         Object.assign(error, {
           name: "DreamerProviderOutputFailureError",
-          transient: true
+          transient: true,
+          hostError: assistantFailure.error
         });
+        hiddenModelCooldowns.record(attempt.label, assistantFailure.error);
         throw error;
       }
     }
+    hiddenModelCooldowns.succeeded(attempt.label);
     const validated = await options.validateOutput(output, attempt);
     return { output, validated, attempt };
   } catch (error) {
@@ -5359,6 +5631,7 @@ async function attemptAndValidate(client, args, timeoutMs, signal, callContext, 
   }
 }
 async function promptSyncWithValidatedOutputRetry(client, args, options) {
+  ({ args, options } = cooldownStart(args, options));
   const timeoutMs = options.timeoutMs ?? 300000;
   const callContext = options.callContext ?? "subagent";
   const fallbacks = options.fallbackModels ?? [];
@@ -5369,23 +5642,9 @@ async function promptSyncWithValidatedOutputRetry(client, args, options) {
   const failedAttempts = [];
   let firstError = null;
   let lastError = null;
-  const cooledPrimary = primaryQuotaFailure(explicitPrimaryLabel);
   const clock = createChainClock(options, timeoutMs);
   const primaryStartedAt = Date.now();
   try {
-    if (cooledPrimary)
-      throw {
-        error: cooledPrimary,
-        failureClass: "provider_error",
-        attempt: {
-          label: explicitPrimaryLabel,
-          attemptIndex: 0,
-          isFallback: false,
-          totalAttempts,
-          model: baseBody.model,
-          skipped: true
-        }
-      };
     const budget = clock.budget(0);
     return await attemptAndValidate(client, baseArgs, budget.timeoutMs, options.signal, callContext, {
       label: explicitPrimaryLabel,
@@ -5400,19 +5659,13 @@ async function promptSyncWithValidatedOutputRetry(client, args, options) {
     clock.settle(failure.error, primaryStartedAt);
     firstError = failure.error;
     lastError = failure.error;
-    if (failure.error instanceof DreamerProviderOutputFailureError && failure.error.quotaResetAt !== undefined)
-      failure.error.message = failure.error.message.replace(/^provider quota exhausted/, "primary quota exhausted");
-    const quota = !cooledPrimary && rememberPrimaryQuota(explicitPrimaryLabel, failure.error);
-    if (quota)
-      log2(`[${callContext}] ${quota.message}; skipping ${explicitPrimaryLabel} for this run until reset`);
     if (isNonRetryable(failure.error, options.signal)) {
       throwWithPromptFailure(failure.error, failedAttempts, args, timeoutMs, options.transport);
     }
     if (fallbacks.length === 0) {
       throwWithPromptFailure(failure.error, failedAttempts, args, timeoutMs, options.transport);
     }
-    if (!cooledPrimary && !quota)
-      log2(`[${callContext}] primary (${explicitPrimaryLabel}) failed validation/prompt: ${shortErr(failure.error)}; ${fallbacks.length} fallback(s) configured, subject to remaining budget`);
+    log2(`[${callContext}] primary (${explicitPrimaryLabel}) failed validation/prompt: ${shortErr(failure.error)}; ${fallbacks.length} fallback(s) configured, subject to remaining budget`);
   }
   for (let i = 0;i < fallbacks.length; i += 1) {
     const fallback = toModelEntry(fallbacks[i]);
@@ -5825,6 +6078,18 @@ function messageId(message) {
   const id = infoOf(message).id;
   return typeof id === "string" ? id : null;
 }
+function recordedAssistantError(message) {
+  const info = infoOf(message);
+  if (info.error != null)
+    return info.error;
+  if (isSettledAssistant(message))
+    return;
+  const parts = message?.parts;
+  if (!Array.isArray(parts))
+    return;
+  const retry = parts.slice().reverse().find((part) => part !== null && typeof part === "object" && part.type === "retry");
+  return retry?.error ?? undefined;
+}
 function isSettledAssistant(message) {
   const info = infoOf(message);
   if (info.role !== "assistant")
@@ -5940,6 +6205,22 @@ async function promptAsyncAndWaitForIdle(client, request, options = {}) {
   let completionBaseline = new Set((await readMessages(session, sessionId, dir, signal)).map(messageId).filter((id) => id !== null));
   const initialBaseline = new Set(completionBaseline);
   activeSessionErrors.set(sessionId, undefined);
+  const failForHostError = async (hostError) => {
+    await abortChildRun(client, sessionId);
+    const error = new Error(`Host recorded session error: ${describeAssistantError(hostError)}`);
+    Object.assign(error, {
+      name: "DreamerProviderOutputFailureError",
+      transient: true,
+      [HOST_SESSION_ERROR]: true,
+      hostError
+    });
+    annotateSubagentInvocationError(error, {
+      attemptedModel: requestModelRef(request),
+      modelConfigKey: options.modelConfigKey,
+      hostError
+    });
+    throw error;
+  };
   try {
     let sent;
     try {
@@ -5974,22 +6255,17 @@ async function promptAsyncAndWaitForIdle(client, request, options = {}) {
       await sleep(pollIntervalMs, signal);
       const hostError = activeSessionErrors.get(sessionId);
       if (hostError !== undefined) {
-        const error = new Error(`Host recorded session error: ${describeAssistantError(hostError)}`);
-        Object.assign(error, {
-          name: "DreamerProviderOutputFailureError",
-          transient: true,
-          [HOST_SESSION_ERROR]: true,
-          hostError
-        });
-        annotateSubagentInvocationError(error, {
-          attemptedModel: requestModelRef(request),
-          modelConfigKey: options.modelConfigKey,
-          hostError
-        });
-        throw error;
+        await failForHostError(hostError);
       }
       const status = await readStatus(session, sessionId, dir, signal);
       const messages = await readMessages(session, sessionId, dir, signal);
+      const latestAssistant = messages.slice().reverse().find((message) => {
+        const id = messageId(message);
+        return id !== null && !completionBaseline.has(id) && infoOf(message).role === "assistant";
+      });
+      const assistantError = recordedAssistantError(latestAssistant);
+      if (assistantError !== undefined)
+        await failForHostError(assistantError);
       if (!sawOutput && messages.some((message) => {
         const id = messageId(message);
         return id !== null && !initialBaseline.has(id) && showsModelOutput(message);
@@ -7110,11 +7386,11 @@ var USER_OBSERVATIONS_DISABLED_TOGGLE = `<user_observation_extraction>disabled</
 User-memory review is not running (the dreamer is disabled): do NOT emit a <user_observations> block.`;
 function buildCompartmentAgentPrompt(inputs) {
   const parts = [];
+  parts.push(...readEnabledProjectMemories(inputs.memoryEnabled, () => inputs.projectMemory ? [inputs.projectMemory] : []));
   if (inputs.seedExamples)
     parts.push(inputs.seedExamples);
   if (inputs.sessionReferences)
     parts.push(inputs.sessionReferences);
-  parts.push(...readEnabledProjectMemories(inputs.memoryEnabled, () => inputs.projectMemory ? [inputs.projectMemory] : []));
   if (inputs.extractionFree) {
     parts.push(`<extraction>disabled</extraction>
 Structural recomp mode: emit compartments and <meta> only. Do NOT emit <facts>, <events>, <user_observations>, or <primer_candidates>.`);
@@ -7133,6 +7409,34 @@ Memory is disabled for this project: do NOT emit a <facts> block. Produce compar
   return parts.join(`
 
 `);
+}
+function logHistorianPromptSizes(sessionId, system, prompt) {
+  const sourceStart = prompt.indexOf(`<new_messages>
+
+`);
+  const sourceEnd = prompt.lastIndexOf(`
+
+</new_messages>
+
+${HISTORIAN_TRANSCRIPT_GUARD}`);
+  const hasSource = sourceStart !== -1 && sourceEnd > sourceStart;
+  const blockBytes = (tag) => {
+    if (!hasSource)
+      return 0;
+    const start = prompt.indexOf(`<${tag}>`);
+    const close = `</${tag}>`;
+    const end = prompt.indexOf(close, start + 1);
+    return start >= 0 && end > start && end < sourceStart ? Buffer.byteLength(prompt.slice(start, end + close.length)) : 0;
+  };
+  const memoryBytes = blockBytes("project-memory");
+  const seedBytes = blockBytes("compartment_examples_from_other_projects");
+  const referenceBytes = blockBytes("session_references");
+  const newMessageBytes = hasSource ? Buffer.byteLength(prompt.slice(sourceStart, sourceEnd + `
+
+</new_messages>`.length)) : 0;
+  const systemBytes = Buffer.byteLength(system);
+  const userBytes = Buffer.byteLength(prompt);
+  sessionLog2(sessionId, `historian request sizes: systemBytes=${systemBytes} userBytes=${userBytes} memoryBytes=${memoryBytes} seedBytes=${seedBytes} referenceBytes=${referenceBytes} newMessageBytes=${newMessageBytes}`);
 }
 
 // ../plugin/src/hooks/magic-context/compartment-runner-mapping.ts
@@ -9206,9 +9510,9 @@ function fnv1a(input) {
   }
   return h >>> 0;
 }
-function selectSeeds(sessionId, chunkStart, count = SEED_FLOOR) {
+function selectSeeds(sessionId, _chunkStart, count = SEED_FLOOR) {
   const bands = seedsByBand();
-  const seed = fnv1a(`${sessionId}:${chunkStart}`);
+  const seed = fnv1a(sessionId);
   const picks = [];
   const bandOrder = [];
   for (let i = 0;i < SEED_BANDS.length; i++) {
@@ -9355,7 +9659,22 @@ function fitHistorianPrompt(args) {
   const requested = Math.max(0, Math.floor(args.requestedChunkTokens));
   const seeds = selectSeeds(args.sessionId, args.chunkStart);
   const references = selectSessionReferences(args.sessionCompartments, seeds, args.sessionId, args.chunkStart);
-  const memories = orderHistorianMemories(readEnabledProjectMemories(args.memoryEnabled, () => typeof args.memories === "function" ? args.memories() : args.memories));
+  const memories = readEnabledProjectMemories(args.memoryEnabled, () => {
+    const project = args.memoryProject;
+    const projectPath = project?.projectPath;
+    const workspace = project && resolveWorkspaceRenderContext(project);
+    const rows = project ? projectPath && workspace ? readM0ProjectMemories(project.db, projectPath, workspace) : [] : (typeof args.memories === "function" ? args.memories() : args.memories) ?? [];
+    const budget = args.memoryInjectionBudgetTokens ?? DEFAULT_MEMORY_BUDGET_TOKENS;
+    const { selected } = workspace?.isWorkspaced ? trimWorkspaceMemoriesToBudgetV2(args.sessionId, rows, budget, workspace, {
+      sourceNameByMemoryId: sourceNamesForMemories({
+        memories: rows,
+        projectPath,
+        workspace
+      })
+    }) : trimMemoriesToBudgetV2(args.sessionId, rows, budget);
+    const selectedIds = new Set(selected.map((memory) => memory.id));
+    return orderHistorianMemories(rows.filter((memory) => selectedIds.has(memory.id)));
+  });
   const render = (refs, memoryCount, seedCount) => ({
     seedExamples: renderSeedExamplesBlock(seeds.slice(0, seedCount)),
     sessionReferences: renderSessionReferencesBlock(references, refs),
@@ -9503,9 +9822,6 @@ function fitHistorianPrompt(args) {
 }
 
 // ../plugin/src/hooks/magic-context/compartment-runner-historian.ts
-function historianResponseDumpDir(directory) {
-  return getProjectMagicContextHistorianDir(directory);
-}
 var MAX_HISTORIAN_RETRIES = 2;
 var unknownProducerWindows = new Set;
 var HISTORIAN_REASONING_PART_TYPES = new Set(["reasoning", "thinking", "redacted_thinking"]);
@@ -9594,6 +9910,7 @@ function createV1HiddenCompletionExecutor(client, db, directory) {
     async attempt(handle, request) {
       if (!client)
         throw new Error("Hidden completion client is unavailable");
+      hostErrors.delete(handle.id);
       const identity = runIdentities.get(handle.id);
       const requestedModel = request.body?.model;
       const requestedRef = requestedModel && typeof requestedModel.providerID === "string" && typeof requestedModel.modelID === "string" ? `${requestedModel.providerID}/${requestedModel.modelID}` : undefined;
@@ -9635,10 +9952,10 @@ function createV1HiddenCompletionExecutor(client, db, directory) {
         preferResponseOnMissingData: true
       });
       const assistantFailure = extractLatestAssistantFailure(messages);
-      const hostError = hostErrors.get(handle.id);
-      if (assistantFailure) {
-        const finish = assistantFailure.finish ? ` (finish=${assistantFailure.finish})` : "";
-        const error = new Error(`Historian host recorded an assistant error${finish}: ${describeAssistantFailure(assistantFailure.error)}`, hostError === undefined ? undefined : { cause: hostError });
+      const hostError = assistantFailure?.error ?? hostErrors.get(handle.id);
+      if (assistantFailure || hostError !== undefined) {
+        const finish = assistantFailure?.finish ? ` (finish=${assistantFailure.finish})` : "";
+        const error = new Error(`Historian host recorded an assistant error${finish}: ${describeAssistantFailure(assistantFailure?.error ?? hostError)}`, hostError === undefined ? undefined : { cause: hostError });
         annotateSubagentInvocationError(error, {
           attemptedModel: handle.attemptedModel,
           modelConfigKey: handle.modelConfigKey,
@@ -9684,6 +10001,8 @@ function historianReasoningBudgetDiagnostic(outputTokens, tokens) {
   return `historian ran out of output budget while reasoning (length-capped at ${outputTokens} tokens, no text${tokens ? `; ${formatRunTokenLog(tokens)}` : ""}) — set historian.maxTokens or route historian.model to a low-reasoning lane/variant`;
 }
 async function runValidatedHistorianPass(args) {
+  const selected = selectHiddenModelStart(args.model, args.fallbackModels, (message) => sessionLog2(args.parentSessionId, message));
+  args = { ...args, model: selected.primary, fallbackModels: selected.fallbacks };
   const firstRun = await runHistorianPrompt({
     ...args,
     dumpLabel: `${args.dumpLabelBase}-initial`,
@@ -9917,6 +10236,7 @@ async function runHistorianPrompt(args) {
             });
             if (failure)
               throw new Error(failure);
+            logHistorianPromptSizes(parentSessionId, system, prompt);
             return executor.attempt(opened, request);
           }, { childSessionId: opened.childSessionId }),
           timeoutMs: timeoutMs ?? DEFAULT_HISTORIAN_TIMEOUT_MS,
@@ -9942,6 +10262,7 @@ async function runHistorianPrompt(args) {
       }
     }
     completion = await executor.collect(handle, 50);
+    hiddenModelCooldowns.succeeded(handle.attemptedModel ?? toModelEntry(modelOverride)?.model);
     const lengthCapped = completion.lengthCapped;
     const tokens = {
       ...runTokenLog(undefined, args.maxOutputTokens),
@@ -9975,9 +10296,10 @@ async function runHistorianPrompt(args) {
         invocationId: invocationId ?? undefined
       };
     }
-    const dumpPath = dumpHistorianResponse(parentSessionId, sessionDirectory, dumpLabel ?? "historian-response", result);
+    const dumpPath = dumpHistorianResponse(parentSessionId, dumpLabel ?? "historian-response", result);
     return { ok: true, result, dumpPath, invocationId: invocationId ?? undefined };
   } catch (modelError) {
+    hiddenModelCooldowns.record(handle?.attemptedModel ?? toModelEntry(modelOverride)?.model, modelError);
     const desc = describeError(modelError);
     sessionLog2(parentSessionId, `historian prompt failed: ${desc.brief} promptLength=${prompt.length}${desc.stackHead ? ` stackHead="${desc.stackHead}"` : ""}`);
     recordInvocation({
@@ -10128,14 +10450,12 @@ function cleanupHistorianDump(sessionId, dumpPath) {
     });
   }
 }
-function dumpHistorianResponse(sessionId, directory, label, text) {
+function dumpHistorianResponse(sessionId, label, text) {
   try {
-    const dumpDir = historianResponseDumpDir(directory);
+    const dumpDir = getMagicContextHistorianSessionDir(sessionId);
     mkdirSync(dumpDir, { recursive: true });
-    ensureCortexKitArtifactGitignore(directory);
-    const safeSessionId = sanitizeDumpName(sessionId);
     const safeLabel = sanitizeDumpName(label);
-    const dumpPath = join7(dumpDir, `${safeSessionId}-${safeLabel}-${Date.now()}.xml`);
+    const dumpPath = join7(dumpDir, `${safeLabel}-${Date.now()}.xml`);
     writeFileSync(dumpPath, text, "utf8");
     sessionLog2(sessionId, "compartment agent: historian response dumped", {
       label,
@@ -12451,6 +12771,7 @@ function writeDocsProposal(projectDir, output, budget, expected, head) {
   const result = validateDocsProposal(projectDir, output, budget, expected);
   const dir = proposalDir(projectDir);
   mkdirSync2(join8(dir, "superseded"), { recursive: true });
+  ensureCortexKitArtifactGitignore(projectDir);
   const stamp = `${new Date().toISOString().replace(/[:.]/g, "-")}-${Math.random().toString(36).slice(2, 8)}`;
   const path = join8(dir, `${stamp}.md`);
   const body = `# Docs update proposal
@@ -16617,7 +16938,7 @@ function insertDreamRun(db, run) {
 }
 
 // ../plugin/src/features/magic-context/dreamer/verify.ts
-import { createHash as createHash9 } from "node:crypto";
+import { createHash as createHash10 } from "node:crypto";
 
 // ../plugin/src/features/magic-context/dreamer/verify-diff.ts
 import { execFile as execFile3 } from "node:child_process";
@@ -16738,7 +17059,56 @@ Read only these changed line ranges if they may affect the claim.`
 }
 
 // ../plugin/src/features/magic-context/dreamer/verify-gate.ts
+import path12 from "node:path";
+
+// ../plugin/src/features/magic-context/dreamer/verify-state.ts
+import { createHash as createHash9 } from "node:crypto";
+import { readFile, realpath as realpath2 } from "node:fs/promises";
 import path11 from "node:path";
+function verificationMetadata(memory) {
+  try {
+    const parsed = JSON.parse(memory.metadataJson ?? "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+      return parsed;
+  } catch {}
+  return {};
+}
+async function verificationFilesFingerprint(directory, files) {
+  const root = await resolveGitTopLevel(directory) ?? path11.resolve(directory);
+  const hash = createHash9("sha256");
+  for (const file of [...new Set(files)].sort()) {
+    const absolute = path11.resolve(root, file);
+    const withinRoot = (candidate) => {
+      const relative = path11.relative(root, candidate);
+      return relative !== ".." && !relative.startsWith(`..${path11.sep}`) && !path11.isAbsolute(relative);
+    };
+    if (!withinRoot(absolute))
+      return null;
+    hash.update(JSON.stringify(file));
+    try {
+      if (!withinRoot(await realpath2(absolute)))
+        return null;
+      hash.update(createHash9("sha256").update(await readFile(absolute)).digest("hex"));
+    } catch (error) {
+      if (error.code !== "ENOENT")
+        return null;
+      hash.update("missing");
+    }
+  }
+  return hash.digest("hex");
+}
+function recordVerificationVerdict(db, memory, verdict, at, fingerprint = null) {
+  const metadata = verificationMetadata(memory);
+  delete metadata.dreamerVerifySkip;
+  if (verdict === "skip" && fingerprint) {
+    metadata.dreamerVerifySkip = { contentHash: memory.normalizedHash, fingerprint, at };
+  }
+  metadata.dreamerVerifyVerdict = verdict;
+  metadata.dreamerVerifyAttemptedAt = at;
+  db.prepare("UPDATE memories SET metadata_json = ? WHERE id = ?").run(JSON.stringify(metadata), memory.id);
+}
+
+// ../plugin/src/features/magic-context/dreamer/verify-gate.ts
 function minOf(values) {
   return values.reduce((acc, v) => v < acc ? v : acc, Number.POSITIVE_INFINITY);
 }
@@ -16770,7 +17140,22 @@ async function partitionVerifyScope(args) {
   const runStartedAt = args.now ?? Date.now();
   const active = getMemoriesByProject2(args.db, args.projectIdentity);
   const verById = getMemoryVerifications(args.db, active.map((m) => m.id));
-  const candidates = active.filter((m) => (verById.get(m.id)?.files.length ?? 0) > 0);
+  const candidates = [];
+  const unchangedSkippedIds = [];
+  const changedSkippedIds = new Set;
+  for (const memory of active) {
+    const files = verById.get(memory.id)?.files ?? [];
+    if (!files.length)
+      continue;
+    const skip = verificationMetadata(memory).dreamerVerifySkip;
+    if (skip && skip.contentHash === memory.normalizedHash && typeof skip.fingerprint === "string" && skip.fingerprint === await verificationFilesFingerprint(args.projectDirectory, files)) {
+      unchangedSkippedIds.push(memory.id);
+    } else {
+      candidates.push(memory);
+      if (skip)
+        changedSkippedIds.add(memory.id);
+    }
+  }
   const toPrompt = (m) => {
     const verifiedAt = verById.get(m.id)?.verifiedAt ?? 0;
     let verifiedCommit = null;
@@ -16797,7 +17182,7 @@ async function partitionVerifyScope(args) {
       leaseKey: args.leaseKey,
       runStartedAt
     });
-    const broadCandidates = candidates.filter((m) => (verById.get(m.id)?.verifiedAt ?? 0) < broadCycleStartAt).sort((a, b) => {
+    const broadCandidates = candidates.filter((m) => changedSkippedIds.has(m.id) || (verById.get(m.id)?.verifiedAt ?? 0) < broadCycleStartAt).sort((a, b) => {
       const verifiedAtA = verById.get(a.id)?.verifiedAt ?? 0;
       const verifiedAtB = verById.get(b.id)?.verifiedAt ?? 0;
       return verifiedAtA - verifiedAtB || a.id - b.id;
@@ -16808,7 +17193,10 @@ async function partitionVerifyScope(args) {
       mode: "broad",
       inScope: broadCandidates.map(toPrompt),
       inScopeIds: broadCandidates.map((m) => m.id),
-      skippedIds: candidates.filter((m) => !broadIds.has(m.id)).map((m) => m.id),
+      skippedIds: [
+        ...unchangedSkippedIds,
+        ...candidates.filter((m) => !broadIds.has(m.id)).map((m) => m.id)
+      ],
       broadCycleStartAt,
       reason: `broad cycle (${broadCandidates.length} remain; started ${broadCycleStartAt})`
     };
@@ -16819,7 +17207,7 @@ async function partitionVerifyScope(args) {
       mode: "incremental",
       inScope: [],
       inScopeIds: [],
-      skippedIds: [],
+      skippedIds: unchangedSkippedIds,
       reason: "no file-mapped memories in scope"
     };
   }
@@ -16828,11 +17216,11 @@ async function partitionVerifyScope(args) {
     mode,
     inScope: candidates.map(toPrompt),
     inScopeIds: candidates.map((m) => m.id),
-    skippedIds: [],
+    skippedIds: unchangedSkippedIds,
     reason
   });
   const resolvedGitRoot = await resolveGitTopLevel(args.projectDirectory);
-  const gitRoot = resolvedGitRoot ?? path11.resolve(args.projectDirectory);
+  const gitRoot = resolvedGitRoot ?? path12.resolve(args.projectDirectory);
   const verifiedTimes = candidates.map((m) => verById.get(m.id)?.verifiedAt ?? 0).filter((t) => t > 0);
   const sinceMs = verifiedTimes.length > 0 ? minOf(verifiedTimes) : runStartedAt;
   const changeTimes = await readGitFileChangeTimesSince(args.projectDirectory, sinceMs, resolvedGitRoot ?? undefined);
@@ -16842,11 +17230,11 @@ async function partitionVerifyScope(args) {
   const head = await readGitHead(args.projectDirectory);
   const uncommitted = head ? await readGitChangedFilesSince(args.projectDirectory, head, resolvedGitRoot ?? undefined) ?? new Set : new Set;
   const inScope = [];
-  const skippedIds = [];
+  const skippedIds = [...unchangedSkippedIds];
   for (const m of candidates) {
     const v = verById.get(m.id);
     const verifiedAt = v?.verifiedAt ?? 0;
-    if (verifiedAt === 0) {
+    if (verifiedAt === 0 || changedSkippedIds.has(m.id)) {
       inScope.push(toPrompt(m));
       continue;
     }
@@ -17076,9 +17464,6 @@ function closeBroadCycle(args, cycleStartAt) {
   });
 }
 async function runVerify(args) {
-  return withDreamerModelCooldown(() => runVerifyWithCooldown(args));
-}
-async function runVerifyWithCooldown(args) {
   const runStartedAt = Date.now();
   const result = {
     verified: 0,
@@ -17216,6 +17601,7 @@ async function verifyOneBatch(args, batch, sliceMs, signal) {
   let budgetFinalized = false;
   let failedCompletion;
   let headAtPrompt = null;
+  const skipSnapshots = new Map;
   const onBudgetUpdate = (state) => {
     budgetFinalized ||= state.finalizeFired;
     args.onBudgetUpdate?.({
@@ -17232,6 +17618,11 @@ async function verifyOneBatch(args, batch, sliceMs, signal) {
     });
   };
   try {
+    if (!args.moduleRoute) {
+      for (const memory of batch) {
+        skipSnapshots.set(memory.id, await raceWithSignal(verificationFilesFingerprint(args.sessionDirectory, memory.mappedFiles), batchSignal));
+      }
+    }
     headAtPrompt = await raceWithSignal(readGitHead(args.sessionDirectory), batchSignal);
     const evidence = !args.forceBroad && batch.every((m) => m.verifiedAt) ? await raceWithSignal(buildVerifyDiffEvidence(args.sessionDirectory, batch), batchSignal) : null;
     const prompt = buildVerifyPrompt(args.projectIdentity, await raceWithSignal(seedVerifyCandidates(batch, args.sessionDirectory), batchSignal), evidence);
@@ -17273,7 +17664,7 @@ async function verifyOneBatch(args, batch, sliceMs, signal) {
         tokens: run.completion.usage
       });
       reportUsage(run.completion.messages ?? [], run.childSessionId, run.completion.usage.input + (run.completion.usage.cacheRead ?? 0) + (run.completion.usage.cacheWrite ?? 0));
-      return await applyParsedVerifyManifest(args, batch, run.validated, evidence?.head ?? headAtPrompt, budgetFinalized);
+      return await applyParsedVerifyManifest(args, batch, run.validated, evidence?.head ?? headAtPrompt, budgetFinalized, skipSnapshots);
     }
     const client = args.client;
     if (!client)
@@ -17333,7 +17724,7 @@ async function verifyOneBatch(args, batch, sliceMs, signal) {
     promptSettled = true;
     recordInvocation4(args, startedAt, { status: "completed", messages: run.output });
     reportUsage(run.output, agentSessionId);
-    return await applyParsedVerifyManifest(args, batch, run.validated, evidence?.head ?? headAtPrompt, budgetFinalized);
+    return await applyParsedVerifyManifest(args, batch, run.validated, evidence?.head ?? headAtPrompt, budgetFinalized, skipSnapshots);
   } catch (error) {
     const desc = describeError(error);
     const providerFailure = error instanceof DreamerProviderOutputFailureError ? error : undefined;
@@ -17353,7 +17744,7 @@ async function verifyOneBatch(args, batch, sliceMs, signal) {
     if (interrupted) {
       const text = verifyAssistantText(messages) ?? failedCompletion?.text ?? "";
       const recovered = parsePartialVerifyManifest(text, new Set(batch.map((m) => m.id)));
-      const counts = await applyParsedVerifyManifest(args, batch, recovered, headAtPrompt, true);
+      const counts = await applyParsedVerifyManifest(args, batch, recovered, headAtPrompt, true, skipSnapshots);
       return {
         ...counts,
         timedOut: !(error instanceof DreamTokenBudgetExceeded),
@@ -17385,7 +17776,7 @@ async function verifyOneBatch(args, batch, sliceMs, signal) {
     signal.removeEventListener("abort", abort);
   }
 }
-async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budgetFinalized = false) {
+async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budgetFinalized = false, skipSnapshots) {
   const batchIds = new Set(batch.map((m) => m.id));
   const batchById = new Map(batch.map((memory) => [memory.id, memory]));
   const valid = {
@@ -17464,6 +17855,15 @@ async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budg
     }
     writes.push({ kind: "archive", id: a.id, reason: a.reason });
   }
+  if (!args.moduleRoute) {
+    for (const entry of valid.skipped) {
+      const original = batchById.get(entry.id);
+      if (!original)
+        continue;
+      const fingerprint = skipSnapshots ? skipSnapshots.get(entry.id) ?? null : await verificationFilesFingerprint(args.sessionDirectory, original.mappedFiles);
+      writes.push({ kind: "skip", id: entry.id, fingerprint });
+    }
+  }
   let verified = 0;
   let updated = 0;
   let archived = 0;
@@ -17493,7 +17893,7 @@ async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budg
           name: "memory.set_verification",
           arguments: {
             memory_project: args.projectIdentity,
-            command_id: `${args.moduleRoute.moduleCommandId}:${createHash9("sha256").update(rows.map((row) => row.memory_id).join(",")).digest("hex").slice(0, 16)}`,
+            command_id: `${args.moduleRoute.moduleCommandId}:${createHash10("sha256").update(rows.map((row) => row.memory_id).join(",")).digest("hex").slice(0, 16)}`,
             rows
           }
         }
@@ -17525,9 +17925,17 @@ async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budg
         continue;
       if (w.kind === "verify") {
         recordMemoryVerifications(args.db, w.id, w.files, now);
-        if (verifiedHead)
-          recordVerifiedCommit(args.db, memory, now, verifiedHead);
+        updateMemoryVerification2(args.db, w.id, "verified");
+        recordVerificationVerdict(args.db, memory, "verified", now);
+        const verifiedMemory = getMemoryById2(args.db, w.id);
+        if (verifiedHead && verifiedMemory)
+          recordVerifiedCommit(args.db, verifiedMemory, now, verifiedHead);
         verified += 1;
+      } else if (w.kind === "skip") {
+        if (memory.content !== batchById.get(w.id)?.content)
+          continue;
+        updateMemoryVerification2(args.db, w.id, "unverified");
+        recordVerificationVerdict(args.db, memory, "skip", now, w.fingerprint);
       } else if (w.kind === "update") {
         const duplicate = getMemoryByHash2(args.db, memory.projectPath, memory.category, w.hash);
         if (duplicate && duplicate.id !== memory.id) {
@@ -17536,6 +17944,8 @@ async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budg
           continue;
         }
         rewriteMemoryContent(args.db, memory, w.content, w.hash);
+        updateMemoryVerification2(args.db, w.id, "unverified");
+        recordVerificationVerdict(args.db, memory, "update", now);
         queueMemoryMutation(args.db, {
           projectPath: args.projectIdentity,
           mutationType: "update",
@@ -17546,6 +17956,8 @@ async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budg
         updated += 1;
       } else {
         archiveMemory2(args.db, w.id, w.reason);
+        updateMemoryVerification2(args.db, w.id, "stale");
+        recordVerificationVerdict(args.db, memory, "archive", now);
         queueMemoryMutation(args.db, {
           projectPath: args.projectIdentity,
           mutationType: "archive",
@@ -18339,7 +18751,7 @@ function parseFrictionGateVerdict(verdict) {
 }
 function computeRetrospectiveWindowKey(flagged) {
   const anchors = flagged.map((message) => `${message.sessionId}:${message.ts}`).sort().join("|");
-  return createHash10("sha256").update(anchors).digest("hex").slice(0, 32);
+  return createHash11("sha256").update(anchors).digest("hex").slice(0, 32);
 }
 function renderFrictionWindow(messages, flaggedOrdinals, radius = 2) {
   const flagged = new Set(flaggedOrdinals);
@@ -19234,9 +19646,6 @@ function recordTransientFailure(db, projectIdentity, due, finishedAt, error, sch
 var LEASE_WAIT_POLL_MS = 2000;
 var MANUAL_RUN_LEASE_WAIT_MS = 60000;
 async function runDomainGroup(deps, group, cb) {
-  return withDreamerModelCooldown(() => runDomainGroupWithCooldown(deps, group, cb));
-}
-async function runDomainGroupWithCooldown(deps, group, cb) {
   const { db, projectIdentity, executor } = deps;
   const leaseKey = leaseKeyFor(group[0].config.task, projectIdentity);
   const holderId = crypto.randomUUID();
@@ -20439,16 +20848,17 @@ function resolvePiInvocation(options = {}) {
   const platform = options.platform ?? process.platform;
   const env = options.env ?? process.env;
   const resolvePackageJson = options.resolvePackageJson ?? defaultResolvePiPackageJson;
+  const scriptRuntime = isGenericRuntimeExecutable(execPath) ? execPath : "node";
   const running = resolvePiCliFromRunningEntry(currentScript, fs);
   const checkedPaths = [...running.checkedPaths];
   if (running.cliPath) {
     return {
-      command: execPath,
+      command: scriptRuntime,
       prefixArgs: [running.cliPath],
       targetHarness: running.targetHarness ?? piHarnessKindFromExecutable(running.cliPath) ?? resolvePiHarnessKind()
     };
   }
-  if (!isGenericRuntimeExecutable(execPath)) {
+  if (piHarnessKindFromExecutable(execPath) !== undefined || !isGenericRuntimeExecutable(execPath) && currentScript?.startsWith(BUN_VIRTUAL_SCRIPT_PREFIX)) {
     return {
       command: execPath,
       prefixArgs: [],
@@ -20458,7 +20868,7 @@ function resolvePiInvocation(options = {}) {
   const bundled = resolveBundledPiCli(currentScript, fs, resolvePackageJson, checkedPaths);
   if (bundled.cliPath) {
     return {
-      command: execPath,
+      command: scriptRuntime,
       prefixArgs: [bundled.cliPath],
       targetHarness: bundled.targetHarness ?? piHarnessKindFromExecutable(bundled.cliPath) ?? resolvePiHarnessKind()
     };
@@ -20956,9 +21366,19 @@ class PiSubagentRunner {
       let mappingMessages = [];
       const isMemoryMapper = options.agent.replace(/^magic-context-/, "") === "dreamer-memory-mapper";
       let settled = false;
+      let startupFailure;
       const settle = (result) => {
         if (settled)
           return;
+        if (startupFailure) {
+          result = {
+            ok: false,
+            reason: "spawn_failed",
+            error: startupFailure,
+            durationMs: result.durationMs,
+            meta: result.meta
+          };
+        }
         settled = true;
         if (zenChild) {
           const classified = classifyZenFreeTierFailure(result, options.model, options.agent, this.invocation.targetHarness);
@@ -21105,6 +21525,13 @@ class PiSubagentRunner {
         }, (message) => sessionLog2(options.accountingSessionId ?? "pi-subagent", message));
       };
       let stderr = "";
+      const observeStartupFailure = (event) => {
+        const error = readSubagentStartupError(event);
+        if (!error)
+          return;
+        startupFailure ??= error;
+        terminateChild(child);
+      };
       let stderrLine = "";
       const stderrDecoder = new StringDecoder("utf8");
       child.stderr?.on("data", (chunk) => {
@@ -21116,10 +21543,11 @@ class PiSubagentRunner {
 `);
         stderrLine = (lines.pop() ?? "").slice(-4096);
         for (const line of lines) {
-          if (settled || !(line.startsWith('{"type":"mc_system_prompt"') || line.startsWith('{"type":"mc_temperature"')))
+          if (settled || !(line.startsWith('{"type":"mc_system_prompt"') || line.startsWith('{"type":"mc_temperature"') || line.startsWith('{"type":"magic_context_startup_error"')))
             continue;
           const parsed = parsePiEventLine(line);
           if (parsed.ok) {
+            observeStartupFailure(parsed.event);
             telemetry.observe(parsed.event);
             observeTemperatureDecision(parsed.event);
           }
@@ -21189,6 +21617,7 @@ class PiSubagentRunner {
           return;
         }
         const event = parsed.event;
+        observeStartupFailure(event);
         observeTemperatureDecision(event);
         if (typeof event !== "object" || event === null)
           return;
@@ -21634,7 +22063,14 @@ function resolveProviderModelAttempt(model, targetHarness) {
   };
 }
 function isProviderCredentialFailure(result, attempt) {
-  return attempt.translated && !result.ok && result.reason === "non_zero_exit" && getResultStderr(result).includes(`No API key found for ${attempt.attemptedProvider}`);
+  if (!attempt.translated || result.ok)
+    return false;
+  const missingKey = `No API key found for ${attempt.attemptedProvider}`;
+  if (result.reason === "non_zero_exit")
+    return getResultStderr(result).includes(missingKey);
+  if (result.reason === "model_failed")
+    return (result.error ?? "").includes(missingKey);
+  return false;
 }
 var PROMPT_ARGV_MAX_BYTES = 96 * 1024;
 function buildArgs(options, opts) {
@@ -22258,7 +22694,8 @@ var TOOL_KEYS = [
   "query",
   "symbol",
   "module",
-  "action"
+  "action",
+  "command"
 ];
 function record2(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -23910,7 +24347,7 @@ function parseCacheTtl(ttl) {
 }
 function createScheduler(config) {
   return {
-    shouldExecute(sessionMeta, contextUsage, currentTime = Date.now(), sessionId, modelKey, contextLimit) {
+    shouldExecute(sessionMeta, contextUsage, _currentTime, sessionId, modelKey, contextLimit) {
       if (contextUsage.percentage === 0 && sessionMeta.lastResponseTime === 0) {
         return "defer";
       }
@@ -23923,34 +24360,9 @@ function createScheduler(config) {
       if (contextUsage.percentage >= threshold) {
         return "execute";
       }
-      let ttlMs;
-      try {
-        ttlMs = parseCacheTtl(sessionMeta.cacheTtl);
-      } catch (error) {
-        if (sessionId) {
-          sessionLog2(sessionId, `invalid cache_ttl "${sessionMeta.cacheTtl}"; falling back to default 5m`, error);
-        } else {
-          log2(`[magic-context] invalid cache_ttl "${sessionMeta.cacheTtl}"; falling back to default 5m`, error);
-        }
-        ttlMs = parseCacheTtl("5m");
-      }
-      const elapsedTime = currentTime - sessionMeta.lastResponseTime;
-      if (elapsedTime > ttlMs) {
-        return "execute";
-      }
       return "defer";
     }
   };
-}
-function computeHardCacheExpired(cacheTtl, lastResponseTime, now, onInvalid) {
-  let ttlMs;
-  try {
-    ttlMs = parseCacheTtl(cacheTtl);
-  } catch (error) {
-    onInvalid?.(error);
-    ttlMs = 5 * 60 * 1000;
-  }
-  return lastResponseTime > 0 && now - lastResponseTime > ttlMs;
 }
 
 // ../plugin/src/features/magic-context/tagger.ts
@@ -24348,7 +24760,8 @@ var canonicalReasons = new Set([
   "coverage_fold",
   "profile_transition",
   "host_compaction",
-  "tag_identity_repair"
+  "tag_identity_repair",
+  "latest_turn_thinking_removed"
 ]);
 var piReasonAliases = {
   project_memory_change: "project_memory_epoch",
@@ -24365,6 +24778,7 @@ var pendingDecisionBySession = new Map;
 var pendingPiDecisionBySession = new Map;
 var lastBoundMessageIdBySession = new Map;
 var scheduledWriteTokensBySession = new Map;
+var scheduledWriteWaitersBySession = new Map;
 var systemHashChangedSessions = new Set;
 var piSystemHashChangedSessions = new Set;
 var unbustedPassBySession = new Map;
@@ -24448,26 +24862,24 @@ function schedulePiTransformDecisionResolve(args) {
     return false;
   pendingPiDecisionBySession.delete(args.sessionId);
   const token = addScheduledWriteToken(args.sessionId);
+  const assertQueuedWrite = args.assertQueuedWrite ?? args.assertCurrentPass;
   inRootAsyncContext2(() => setTimeout(() => {
+    if (!hasScheduledWriteToken(args.sessionId, token))
+      return;
     try {
-      if (!hasScheduledWriteToken(args.sessionId, token))
-        return;
-      try {
-        pending.publicationGuard?.();
-        args.assertCurrentPass?.();
-      } catch {
-        sessionLog2(args.sessionId, "DISCARDED CONTEXT RESULT: queued Pi transform decision");
-        return;
-      }
-      writeTransformDecisionBestEffort(dbPath, {
-        ...pending,
-        sessionId: args.sessionId,
-        harness: "pi",
-        messageId: targetMessageId
-      });
-    } finally {
+      pending.publicationGuard?.();
+      assertQueuedWrite?.();
+    } catch {
       deleteScheduledWriteToken(args.sessionId, token);
+      sessionLog2(args.sessionId, "DISCARDED CONTEXT RESULT: queued Pi transform decision");
+      return;
     }
+    writeQueuedTransformDecision(dbPath, token, {
+      ...pending,
+      sessionId: args.sessionId,
+      harness: "pi",
+      messageId: targetMessageId
+    });
   }, 0));
   return true;
 }
@@ -24489,8 +24901,12 @@ function deleteScheduledWriteToken(sessionId, token) {
   if (!tokens)
     return;
   tokens.delete(token);
-  if (tokens.size === 0)
+  if (tokens.size === 0) {
     scheduledWriteTokensBySession.delete(sessionId);
+    for (const resolve of scheduledWriteWaitersBySession.get(sessionId) ?? [])
+      resolve();
+    scheduledWriteWaitersBySession.delete(sessionId);
+  }
 }
 function findNewestPiAssistantEntryIdAfter(entries, snapshotNewestAssistantEntryId) {
   if (!Array.isArray(entries))
@@ -24524,11 +24940,25 @@ function findNewestPiAssistantEntryIdAfter(entries, snapshotNewestAssistantEntry
   }
   return null;
 }
-function writeTransformDecisionBestEffort(dbPath, row) {
+var DECISION_WRITE_RETRY_DELAYS_MS = [10, 25, 50, 100, 250, 500, 1000];
+function writeQueuedTransformDecision(dbPath, token, row, attempt = 0) {
+  let retryInMs;
   try {
-    const writer = writerOverrideForTests ?? writeTransformDecisionRow;
-    writer(dbPath, row);
-  } catch {}
+    if (!hasScheduledWriteToken(row.sessionId, token))
+      return;
+    try {
+      (writerOverrideForTests ?? writeTransformDecisionRow)(dbPath, row);
+    } catch (error) {
+      if (isTransientSqliteError2(error))
+        retryInMs = DECISION_WRITE_RETRY_DELAYS_MS[attempt];
+    }
+  } finally {
+    if (retryInMs === undefined)
+      deleteScheduledWriteToken(row.sessionId, token);
+  }
+  if (retryInMs === undefined)
+    return;
+  inRootAsyncContext2(() => setTimeout(() => writeQueuedTransformDecision(dbPath, token, row, attempt + 1), retryInMs));
 }
 function writeTransformDecisionRow(dbPath, row) {
   const db = new Database2(dbPath);
@@ -24708,7 +25138,6 @@ var CACHE_LOSING_FOLD_REASONS = new Set([
   "model_change",
   "system_hash",
   "tool_definitions",
-  "ttl_idle",
   "host_compaction"
 ]);
 function sameBytes(left, right) {
@@ -25082,7 +25511,7 @@ function hasReclaimRide(signals) {
   return signals.hardFold || signals.force || signals.explicitFlush || signals.publishedHistory || signals.subagentExecute === true || signals.executeReclaim === true || signals.servedShapeRepair === true;
 }
 function prefixMutationPermitted(gate) {
-  return !gate.signedThinkingHold || gate.firstRender || gate.idleExpiry || gate.emergency;
+  return !gate.signedThinkingHold || gate.firstRender || gate.hostCheckpointHead === true || gate.emergency;
 }
 function reclaimRidePermitted(signals, gate) {
   return prefixMutationPermitted(gate) && hasReclaimRide(signals);
@@ -25509,10 +25938,6 @@ var NON_EMERGENCY_MAX_CAP = 250000;
 var FORCE80_MAX_CAP = 500000;
 var FORCE95_MAX_CAP = 750000;
 var NORMAL_HYSTERESIS_TOKENS = 256;
-var MIN_FORCE_ELIGIBLE_TOKENS_CAP = 1000;
-function deriveMinForceEligibleTokens(scaledN) {
-  return Math.min(MIN_FORCE_ELIGIBLE_TOKENS_CAP, Math.max(1, Math.floor(scaledN / 8)));
-}
 function clampPercentage(value) {
   if (!Number.isFinite(value))
     return 0;
@@ -25710,7 +26135,9 @@ function resolveProtectedTailBoundary(ctx) {
   const offset = Math.max(1, ctx.lastCompartmentEndOrdinal + 1);
   const absoluteMessageCount = getCachedAbsoluteMessageCount2(ctx.sessionId) ?? getRawSessionMessageOrdinalCount2(ctx.sessionId);
   const messages = readRawSessionMessageRange2(ctx.sessionId, Math.max(1, offset - 1), absoluteMessageCount);
-  const storedTotals = ctx.storedTokenTotalsForMessages?.(messages.map((m) => m.id), messages) ?? ctx.storedTokenTotals;
+  const storedWeights = ctx.storedTokenTotalsForMessages?.(messages.map((m) => m.id), messages);
+  const storedTotals = storedWeights?.totals ?? ctx.storedTokenTotals;
+  const storedRemovedTotals = storedWeights?.summaryRemovedTotals ?? ctx.storedSummaryRemovedTokenTotals;
   const index = buildTrueRawTokenIndex(ctx.sessionId, messages, {
     providerShapeVersion: ctx.providerShapeVersion,
     cacheNamespace: ctx.cacheNamespace,
@@ -25720,6 +26147,14 @@ function resolveProtectedTailBoundary(ctx) {
       const v = storedTotals.get(m.id);
       return v === undefined ? null : v;
     } : undefined
+  });
+  const summaryRemovedIndex = buildTrueRawTokenIndex(ctx.sessionId, messages, {
+    providerShapeVersion: ctx.providerShapeVersion,
+    cacheNamespace: ctx.cacheNamespace,
+    calibration: ctx.calibration,
+    absoluteMessageCount,
+    measure: "summary-removed",
+    storedTotalForMessage: storedRemovedTotals ? (m) => storedRemovedTotals.get(m.id) ?? null : undefined
   });
   const rawMessageCount = index.rawMessageCount;
   const usagePercentage = clampPercentage(ctx.usage?.percentage ?? 0);
@@ -25747,11 +26182,13 @@ function resolveProtectedTailBoundary(ctx) {
       priorBoundaryOrdinal: ctx.priorBoundaryOrdinal,
       migrationFloorActive: ctx.migrationFloorActive,
       emergencyTailScale: ctx.emergencyTailScale,
+      recovery: ctx.recovery,
       providerShapeVersion: ctx.providerShapeVersion,
       cacheNamespace: ctx.cacheNamespace,
       createdAt,
       rawRangeFingerprint: "",
       trueRawEligibleTokens: 0,
+      summaryRemovedEligibleTokens: 0,
       oversizeAtomicUnit: false,
       boundaryReason: "empty-session"
     };
@@ -25790,11 +26227,13 @@ function resolveProtectedTailBoundary(ctx) {
       priorBoundaryOrdinal: ctx.priorBoundaryOrdinal,
       migrationFloorActive: false,
       emergencyTailScale: ctx.emergencyTailScale,
+      recovery: ctx.recovery,
       providerShapeVersion: ctx.providerShapeVersion,
       cacheNamespace: ctx.cacheNamespace,
       createdAt,
       rawRangeFingerprint,
       trueRawEligibleTokens: index.rangeTokens(offset, protectedTailStart),
+      summaryRemovedEligibleTokens: summaryRemovedIndex.rangeTokens(offset, protectedTailStart),
       oversizeAtomicUnit: false,
       boundaryReason: firstOpenArc ? "open-tool-arc" : "manual-full-recomp"
     };
@@ -25871,7 +26310,7 @@ function resolveProtectedTailBoundary(ctx) {
     observeDiagnostics: (value) => {
       headDiagnostics = value;
     },
-    index,
+    index: summaryRemovedIndex,
     protectedTailStart,
     offset,
     arcs,
@@ -25904,12 +26343,14 @@ function resolveProtectedTailBoundary(ctx) {
     priorBoundaryOrdinal: ctx.priorBoundaryOrdinal,
     migrationFloorActive: ctx.migrationFloorActive,
     emergencyTailScale: ctx.emergencyTailScale,
+    recovery: ctx.recovery,
     liftLivePromptFloor: ctx.liftLivePromptFloor === true ? true : undefined,
     providerShapeVersion: ctx.providerShapeVersion,
     cacheNamespace: ctx.cacheNamespace,
     createdAt,
     rawRangeFingerprint,
     trueRawEligibleTokens: index.rangeTokens(offset, eligibleEndOrdinal),
+    summaryRemovedEligibleTokens: summaryRemovedIndex.rangeTokens(offset, eligibleEndOrdinal),
     oversizeAtomicUnit: head.oversizeAtomicUnit,
     boundaryReason,
     diagnostics: boundaryDiagnostics({
@@ -25957,8 +26398,11 @@ function resolveBoundaryContext(args) {
   const calibration = sessionDecisionCalibration(args.db, args.sessionId);
   const storedTokenTotalsForMessages = (messageIds, messages = []) => {
     try {
-      const totals = getAllStatusTagTokenTotalsFlat2(args.db, args.sessionId, args.taggerFloor ?? 0, calibration, messageIds).totals;
-      return omitIncompleteFileTokenTotals(args.db, args.sessionId, messages, totals);
+      const weights = getAllStatusTagTokenTotalsFlat2(args.db, args.sessionId, args.taggerFloor ?? 0, calibration, messageIds);
+      return {
+        totals: omitIncompleteFileTokenTotals(args.db, args.sessionId, messages, weights.totals),
+        summaryRemovedTotals: weights.summaryRemovedTotals
+      };
     } catch (error) {
       sessionLog2(args.sessionId, "protected-tail stored-token map unavailable (live fallback):", error);
       return;
@@ -25978,6 +26422,7 @@ function resolveBoundaryContext(args) {
     protectedTailPolicyVersion: meta.protectedTailPolicyVersion,
     migrationFloorActive,
     emergencyTailScale: args.emergencyTailScale,
+    recovery: args.recovery,
     liftLivePromptFloor: args.liftLivePromptFloor,
     providerShapeVersion: args.providerShapeVersion ?? "opencode-v1",
     cacheNamespace: args.cacheNamespace ?? `opencode:${args.sessionId}`,
@@ -25994,7 +26439,9 @@ function resolveWrapupProtectedTailBoundary(args) {
   const offset = Math.max(1, ctx.lastCompartmentEndOrdinal + 1);
   const absoluteMessageCount = getCachedAbsoluteMessageCount2(ctx.sessionId) ?? getRawSessionMessageOrdinalCount2(ctx.sessionId);
   const messages = readRawSessionMessageRange2(ctx.sessionId, Math.max(1, offset - 1), absoluteMessageCount);
-  const storedTotals = ctx.storedTokenTotalsForMessages?.(messages.map((m) => m.id), messages) ?? ctx.storedTokenTotals;
+  const storedWeights = ctx.storedTokenTotalsForMessages?.(messages.map((m) => m.id), messages);
+  const storedTotals = storedWeights?.totals ?? ctx.storedTokenTotals;
+  const storedRemovedTotals = storedWeights?.summaryRemovedTotals ?? ctx.storedSummaryRemovedTokenTotals;
   const index = buildTrueRawTokenIndex(ctx.sessionId, messages, {
     providerShapeVersion: ctx.providerShapeVersion,
     cacheNamespace: ctx.cacheNamespace,
@@ -26004,6 +26451,14 @@ function resolveWrapupProtectedTailBoundary(args) {
       const value = storedTotals?.get(m.id);
       return value === undefined ? null : value;
     } : undefined
+  });
+  const summaryRemovedIndex = buildTrueRawTokenIndex(ctx.sessionId, messages, {
+    providerShapeVersion: ctx.providerShapeVersion,
+    cacheNamespace: ctx.cacheNamespace,
+    calibration: ctx.calibration,
+    absoluteMessageCount,
+    measure: "summary-removed",
+    storedTotalForMessage: storedRemovedTotals ? (m) => storedRemovedTotals.get(m.id) ?? null : undefined
   });
   const rawMessageCount = index.rawMessageCount;
   const anchorRawMessageCount = Math.max(0, Math.min(rawMessageCount, Math.floor(args.anchorRawMessageCount ?? rawMessageCount)));
@@ -26066,7 +26521,7 @@ function resolveWrapupProtectedTailBoundary(args) {
     observeDiagnostics: (value) => {
       headDiagnostics = value;
     },
-    index,
+    index: summaryRemovedIndex,
     protectedTailStart: targetProtectedTailStart,
     offset,
     arcs: buildToolArcs(messages),
@@ -26103,6 +26558,7 @@ function resolveWrapupProtectedTailBoundary(args) {
     createdAt,
     rawRangeFingerprint,
     trueRawEligibleTokens: index.rangeTokens(offset, targetProtectedTailStart),
+    summaryRemovedEligibleTokens: summaryRemovedIndex.rangeTokens(offset, eligibleEndOrdinal),
     oversizeAtomicUnit: head.oversizeAtomicUnit,
     boundaryReason,
     diagnostics: boundaryDiagnostics({
@@ -26147,9 +26603,11 @@ function hasRunnableCompartmentWindow(snapshot) {
     return false;
   if (snapshot.eligibleEndOrdinal <= snapshot.offset)
     return false;
+  if (snapshot.recovery || snapshot.usagePercentage >= 95 || snapshot.mode === "manual-wrapup" || snapshot.mode === "manual-full-recomp")
+    return true;
   const forceMaterializationPercentage = escalationBands(snapshot.executeThresholdPercentage).forceMaterializationPercentage;
   if (snapshot.usagePercentage >= forceMaterializationPercentage || snapshot.emergencyTailScale) {
-    return snapshot.trueRawEligibleTokens >= deriveMinForceEligibleTokens(snapshot.N) || snapshot.eligibleEndOrdinal > snapshot.offset;
+    return snapshot.summaryRemovedEligibleTokens >= snapshot.contextLimit * 0.02;
   }
   return snapshot.eligibleEndOrdinal > snapshot.offset;
 }
@@ -26308,7 +26766,6 @@ function shouldWaitForNewHistorianHistory(snapshot, options = {}) {
 var PROACTIVE_TRIGGER_OFFSET_PERCENTAGE = 2;
 var POST_DROP_TARGET_RATIO = 0.75;
 var MIN_PROACTIVE_TAIL_TOKEN_ESTIMATE = 6000;
-var MIN_PROACTIVE_TAIL_MESSAGE_COUNT = 12;
 var DEFAULT_MIN_COMMIT_CLUSTERS_FOR_TRIGGER = 3;
 var TAIL_SIZE_TRIGGER_MULTIPLIER = 3;
 var BLOCK_UNTIL_DONE_PERCENTAGE = 95;
@@ -26400,7 +26857,6 @@ var TAIL_INFO_DEFAULTS = {
   nextStartOrdinal: 1,
   hasNewRawHistory: false,
   hasProtectedEligibleHead: false,
-  isMeaningful: false,
   tokenEstimate: 0,
   chunkHasMore: false,
   trueRawEligibleTokens: 0,
@@ -26413,6 +26869,17 @@ function resolveBoundaryContextLimit(usage, fallbackContextLimit) {
     return Math.max(1, Math.round(usage.inputTokens / (usage.percentage / 100)));
   }
   return 128000;
+}
+function scanFormattedHead(db, sessionId, triggerBudget, offset, eligibleEnd) {
+  const seed = sessionDecisionCalibration(db, sessionId);
+  const sourceRatio = Math.max(seed.proseRatio, seed.toolsRatio);
+  const scanBudget = Math.floor(Math.max(MIN_PROACTIVE_TAIL_TOKEN_ESTIMATE, triggerBudget * TAIL_SIZE_TRIGGER_MULTIPLIER) / sourceRatio);
+  const chunk = readSessionChunk2(sessionId, scanBudget, offset, eligibleEnd);
+  return {
+    tokenEstimate: Math.ceil(chunk.tokenEstimate * sourceRatio),
+    chunkHasMore: chunk.hasMore,
+    commitClusterCount: chunk.commitClusterCount
+  };
 }
 function getUnsummarizedTailInfo(db, sessionId, triggerBudget, usage, executeThresholdPercentage, contextLimit, inMemoryTail, taggerFloor = 0, liftLivePromptFloor = false) {
   return withRawSessionMessageCache2(() => {
@@ -26456,20 +26923,15 @@ function getUnsummarizedTailInfo(db, sessionId, triggerBudget, usage, executeThr
           boundarySnapshot: boundary
         };
       }
-      const seed = sessionDecisionCalibration(db, sessionId);
-      const sourceRatio = Math.max(seed.proseRatio, seed.toolsRatio);
-      const scanBudget = Math.floor(Math.max(MIN_PROACTIVE_TAIL_TOKEN_ESTIMATE, triggerBudget * TAIL_SIZE_TRIGGER_MULTIPLIER) / sourceRatio);
-      const chunk = readSessionChunk2(sessionId, scanBudget, rawEligibility.offset, boundary.eligibleEndOrdinal);
-      const isMeaningful = chunk.hasMore || boundary.trueRawEligibleTokens >= MIN_PROACTIVE_TAIL_TOKEN_ESTIMATE || Math.ceil(chunk.tokenEstimate * sourceRatio) >= MIN_PROACTIVE_TAIL_TOKEN_ESTIMATE || chunk.messageCount >= MIN_PROACTIVE_TAIL_MESSAGE_COUNT;
+      const formatted = scanFormattedHead(db, sessionId, triggerBudget, rawEligibility.offset, boundary.eligibleEndOrdinal);
+      const proactiveAdmission = formatted.chunkHasMore ? "has_more" : boundary.trueRawEligibleTokens >= MIN_PROACTIVE_TAIL_TOKEN_ESTIMATE ? "true_raw" : formatted.tokenEstimate >= MIN_PROACTIVE_TAIL_TOKEN_ESTIMATE ? "formatted" : undefined;
       return {
         nextStartOrdinal: rawEligibility.offset,
         hasNewRawHistory: true,
         hasProtectedEligibleHead,
-        isMeaningful,
-        tokenEstimate: Math.ceil(chunk.tokenEstimate * sourceRatio),
-        chunkHasMore: chunk.hasMore,
+        proactiveAdmission,
+        ...formatted,
         trueRawEligibleTokens: boundary.trueRawEligibleTokens,
-        commitClusterCount: chunk.commitClusterCount,
         boundarySnapshot: boundary
       };
     } catch (error) {
@@ -26562,9 +27024,13 @@ function checkCompartmentTrigger(db, sessionId, sessionMeta, usage, _previousPer
     }
     return { shouldFire: false };
   }
+  const recovery = getOverflowState(db, sessionId).needsEmergencyRecovery;
+  if (tailInfo.boundarySnapshot && recovery) {
+    tailInfo.boundarySnapshot = { ...tailInfo.boundarySnapshot, recovery: true };
+  }
   if (tailInfo.boundarySnapshot && shouldWaitForNewHistorianHistory(tailInfo.boundarySnapshot, {
     usagePercentage: usage.percentage,
-    emergency: getOverflowState(db, sessionId).needsEmergencyRecovery
+    emergency: recovery
   })) {
     sessionLog2(sessionId, "compartment trigger: waiting for new history after no forward progress");
     return { shouldFire: false };
@@ -26581,8 +27047,12 @@ function checkCompartmentTrigger(db, sessionId, sessionMeta, usage, _previousPer
       sessionLog2(sessionId, `historian redundancy skip: summarizer not needed this pass — force band is ${forceMaterializationPercentage}%; queued/automatic drops are projected to reclaim to ${projectedPostDropPercentage.toFixed(1)}% (target ${relativePostDropTarget.toFixed(1)}%) on this pass (${rideLabel})`);
       return { shouldFire: false };
     }
-    sessionLog2(sessionId, `compartment trigger: force-firing at ${usage.percentage.toFixed(1)}% (projected post-drop ${formatProjectedPostDropPercentage(projectedPostDropPercentage)})`);
+    const admittedBy = recovery ? "overflow_recovery" : usage.percentage >= BLOCK_UNTIL_DONE_PERCENTAGE ? "emergency_95" : "force_band";
+    const logForceFire = (trueRawTokens, formattedTokens) => {
+      sessionLog2(sessionId, `compartment trigger: force-firing at ${usage.percentage.toFixed(1)}% (projected post-drop ${formatProjectedPostDropPercentage(projectedPostDropPercentage)}) admittedBy=${admittedBy} trueRawTokens=${trueRawTokens} formattedTokens=${formattedTokens}`);
+    };
     if (tailInfo.boundarySnapshot && hasRunnableCompartmentWindow(tailInfo.boundarySnapshot)) {
+      logForceFire(tailInfo.trueRawEligibleTokens, tailInfo.tokenEstimate);
       return {
         shouldFire: true,
         reason: "force_band",
@@ -26598,7 +27068,7 @@ function checkCompartmentTrigger(db, sessionId, sessionMeta, usage, _previousPer
           absoluteMessageCount: resolvedInMemoryTail.absoluteMessageCount
         });
       }
-      return resolveOpenCodeProtectedTailBoundary({
+      const boundary = resolveOpenCodeProtectedTailBoundary({
         db,
         sessionId,
         mode: "trigger",
@@ -26606,19 +27076,30 @@ function checkCompartmentTrigger(db, sessionId, sessionMeta, usage, _previousPer
         executeThresholdPercentage,
         usage,
         usageSource: "live",
-        emergencyTailScale: scale
+        emergencyTailScale: scale,
+        recovery
       });
+      if (!hasRunnableCompartmentWindow(boundary))
+        return null;
+      let formattedTokens;
+      try {
+        formattedTokens = scanFormattedHead(db, sessionId, triggerBudget, boundary.offset, boundary.eligibleEndOrdinal).tokenEstimate;
+      } catch {
+        formattedTokens = "unavailable";
+      }
+      logForceFire(boundary.trueRawEligibleTokens, formattedTokens);
+      return boundary;
     });
-    if (hasRunnableCompartmentWindow(scaledBoundary)) {
+    if (scaledBoundary) {
       return { shouldFire: true, reason: "force_band", boundarySnapshot: scaledBoundary };
     }
-    sessionLog2(sessionId, "compartment trigger: force_band skipped — raw exists but protected head genuinely empty after emergency tail scale");
+    sessionLog2(sessionId, "compartment trigger: force_band skipped — no protected head meets summary admission after emergency tail scale");
     return { shouldFire: false };
   }
   const clusterEnabled = commitClusterTrigger?.enabled ?? true;
   const minClusters = commitClusterTrigger?.min_clusters ?? DEFAULT_MIN_COMMIT_CLUSTERS_FOR_TRIGGER;
   if (clusterEnabled && tailInfo.commitClusterCount >= minClusters && tailInfo.tokenEstimate >= triggerBudget) {
-    sessionLog2(sessionId, `compartment trigger: commit-cluster fire — ${tailInfo.commitClusterCount} clusters (min=${minClusters}), ~${tailInfo.tokenEstimate} tokens in eligible prefix`);
+    sessionLog2(sessionId, `compartment trigger: commit-cluster fire — ${tailInfo.commitClusterCount} clusters (min=${minClusters}) admittedBy=commit_clusters trueRawTokens=${tailInfo.trueRawEligibleTokens} formattedTokens=${tailInfo.tokenEstimate}`);
     return {
       shouldFire: true,
       reason: "commit_clusters",
@@ -26626,7 +27107,8 @@ function checkCompartmentTrigger(db, sessionId, sessionMeta, usage, _previousPer
     };
   }
   if (tailInfo.tokenEstimate >= triggerBudget * TAIL_SIZE_TRIGGER_MULTIPLIER || tailInfo.chunkHasMore && tailInfo.tokenEstimate > 0) {
-    sessionLog2(sessionId, `compartment trigger: tail-size fire — ~${tailInfo.tokenEstimate} TC-chunked tokens (hasMore=${tailInfo.chunkHasMore}, true-raw ~${tailInfo.trueRawEligibleTokens}) exceeds ${triggerBudget * TAIL_SIZE_TRIGGER_MULTIPLIER} budget threshold`);
+    const admittedBy = tailInfo.chunkHasMore ? "has_more" : "formatted";
+    sessionLog2(sessionId, `compartment trigger: tail-size fire — budget threshold ${triggerBudget * TAIL_SIZE_TRIGGER_MULTIPLIER} admittedBy=${admittedBy} trueRawTokens=${tailInfo.trueRawEligibleTokens} formattedTokens=${tailInfo.tokenEstimate}`);
     return {
       shouldFire: true,
       reason: "tail_size",
@@ -26642,13 +27124,13 @@ function checkCompartmentTrigger(db, sessionId, sessionMeta, usage, _previousPer
     sessionLog2(sessionId, `historian redundancy skip: summarizer not needed this pass — usage is ${usage.percentage.toFixed(1)}%; queued/automatic drops are projected to reclaim to ${projectedPostDropPercentage.toFixed(1)}% (target ${relativePostDropTarget.toFixed(1)}%) on this pass (${rideLabel})`);
     return { shouldFire: false };
   }
-  if (!tailInfo.hasProtectedEligibleHead || !tailInfo.isMeaningful) {
+  if (!tailInfo.hasProtectedEligibleHead || !tailInfo.proactiveAdmission) {
     let floorOnly = false;
     const boundary = tailInfo.boundarySnapshot;
     const floor = boundary?.diagnostics?.livePromptFloor;
     if (!consumedFloorMark && floor?.ordinal && floor.from > floor.to) {
       const withoutFloor = getUnsummarizedTailInfo(db, sessionId, triggerBudget, usage, executeThresholdPercentage, contextLimit, resolvedInMemoryTail, taggerFloor, true);
-      floorOnly = withoutFloor.hasProtectedEligibleHead && withoutFloor.isMeaningful;
+      floorOnly = withoutFloor.hasProtectedEligibleHead && withoutFloor.proactiveAdmission !== undefined;
       if (floorOnly && primaryExecute && usage.percentage >= executeThresholdPercentage && writeExecuteReclaimState(db, sessionId, {
         floorOrdinal: floor.ordinal,
         floorPromptId: floor.messageId ?? null
@@ -26660,7 +27142,7 @@ function checkCompartmentTrigger(db, sessionId, sessionMeta, usage, _previousPer
     sessionLog2(sessionId, `compartment trigger: not firing at ${usage.percentage.toFixed(1)}% — ${refusal}; offset=${tailInfo.nextStartOrdinal} protectedStart=${boundary?.protectedTailStart ?? "none"} eligibleEnd=${boundary?.eligibleEndOrdinal ?? "none"} rawTokens=${tailInfo.trueRawEligibleTokens} chunkTokens=${tailInfo.tokenEstimate}`);
     return { shouldFire: false };
   }
-  sessionLog2(sessionId, `compartment trigger: proactive fire at ${usage.percentage.toFixed(1)}% (floor=${proactiveTriggerPercentage}% projected post-drop=${formatProjectedPostDropPercentage(projectedPostDropPercentage)} target=${relativePostDropTarget.toFixed(1)}%)`);
+  sessionLog2(sessionId, `compartment trigger: proactive fire at ${usage.percentage.toFixed(1)}% (floor=${proactiveTriggerPercentage}% projected post-drop=${formatProjectedPostDropPercentage(projectedPostDropPercentage)} target=${relativePostDropTarget.toFixed(1)}%) admittedBy=${tailInfo.proactiveAdmission} trueRawTokens=${tailInfo.trueRawEligibleTokens} formattedTokens=${tailInfo.tokenEstimate}`);
   return {
     shouldFire: true,
     reason: "projected_headroom",
@@ -26796,6 +27278,140 @@ function foldExecutesThisPass(foldDue, materialized) {
   return foldDue && materialized;
 }
 
+// ../plugin/src/hooks/magic-context/historian-failure-report.ts
+var REPEATED_HISTORIAN_FAILURE_WARNING_STEP = 3;
+var REPEATED_HISTORIAN_FAILURE_WARNING_INTERVAL_MS = 30 * 60 * 1000;
+var ACTIONS = "What to do: run /ctx-status for detail; change the historian model or its fallback models in magic-context.jsonc (user or project config); or run /ctx-recomp to rebuild the history.";
+var REFUSAL_ERROR_MAX_CHARS = 500;
+var WARNING_ERROR_MAX_CHARS = 200;
+function readHistorianFailureStreak(db, sessionId, options = {}) {
+  const state = getHistorianFailureState(db, sessionId);
+  const count = state.failureCount;
+  let since = null;
+  if (count > 0) {
+    const recorded = count - Math.max(0, options.unrecordedFailures ?? 0);
+    if (recorded <= 0) {
+      since = state.lastFailureAt;
+    } else {
+      const times = getRecentFailedHistorianRunTimes(db, sessionId, recorded);
+      since = times.length === recorded ? times[recorded - 1] ?? null : null;
+    }
+  }
+  return { count, lastError: state.lastError, lastFailureAt: state.lastFailureAt, since };
+}
+function formatHistorianClockTime(at, now = Date.now()) {
+  const date = new Date(at);
+  const pad = (value) => String(value).padStart(2, "0");
+  const clock = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  const today = new Date(now);
+  const sameDay = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+  return sameDay ? clock : `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${clock}`;
+}
+function formatHistorianSeconds(ms) {
+  const seconds = Math.max(0, ms) / 1000;
+  return String(Number(seconds.toFixed(seconds >= 10 ? 0 : 3)));
+}
+function singleLine(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+function quoteError(error, maxChars) {
+  const text = sanitizeDiagnosticText(singleLine(error));
+  return text.length > maxChars ? `${text.slice(0, maxChars - 1).trimEnd()}…` : text;
+}
+function endSentence(text) {
+  return /[.!?]$/.test(text) ? text : `${text}.`;
+}
+function usageClause(usagePercentage) {
+  return typeof usagePercentage === "number" && Number.isFinite(usagePercentage) ? `context is at ${Math.round(usagePercentage)}% of the window` : "context is nearly full";
+}
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+function chunkLabel(chunk) {
+  return chunk ? `messages ${chunk.start}-${chunk.end}` : "";
+}
+function streakSentence(failures, now) {
+  if (failures.count <= 0)
+    return null;
+  const since = failures.since !== null ? `, since ${formatHistorianClockTime(failures.since, now)}` : "";
+  return `Summary runs failed in a row: ${failures.count}${since}.`;
+}
+function failureBelongsToRun(failures, run) {
+  return failures.count > 0 && failures.lastFailureAt !== null && run?.startedAt !== undefined && failures.lastFailureAt >= run.startedAt;
+}
+function describeHistorianJoinRefusal(input) {
+  const now = input.now ?? Date.now();
+  const { run, failures } = input;
+  const sentences = [
+    `This turn was not sent: ${usageClause(input.usagePercentage)}, and Magic Context waited ${formatHistorianSeconds(input.waitedMs)} s for a history summary that did not finish in time.`
+  ];
+  const subject = run?.chunk ? `The summary of ${chunkLabel(run.chunk)}` : "The summary run";
+  const ownFailure = failureBelongsToRun(failures, run);
+  const lastError = failures.lastError ? quoteError(failures.lastError, REFUSAL_ERROR_MAX_CHARS) : "";
+  if (ownFailure) {
+    sentences.push(endSentence(`${subject} failed: ${lastError || "no reason recorded"}`));
+  } else if (run && run.endedAt === undefined) {
+    sentences.push(run.startedAt !== undefined ? `${subject} is still running after ${formatHistorianSeconds(now - run.startedAt)} s.` : `${subject} is still running.`);
+  } else if (run) {
+    sentences.push(`${subject} finished after the wait ended.`);
+  }
+  if (!ownFailure && failures.count > 0 && lastError && failures.lastFailureAt !== null) {
+    sentences.push(endSentence(`The previous run failed at ${formatHistorianClockTime(failures.lastFailureAt, now)}: ${lastError}`));
+  }
+  const streak = streakSentence(failures, now);
+  if (streak)
+    sentences.push(streak);
+  sentences.push(ACTIONS);
+  return sentences.join(" ");
+}
+function describeRepeatedHistorianFailures(input) {
+  const now = input.now ?? Date.now();
+  const { failures } = input;
+  const facts = [
+    streakSentence(failures, now) ?? "Summary runs are failing.",
+    ...input.chunk ? [`Last chunk: ${chunkLabel(input.chunk)}.`] : [],
+    ...failures.lastError ? [
+      endSentence(`Last error: ${quoteError(failures.lastError, WARNING_ERROR_MAX_CHARS)}`)
+    ] : [],
+    `${capitalize(usageClause(input.usagePercentage))}; at 95% a turn can be refused if no summary finishes in time.`
+  ];
+  return [
+    "## Magic Context — History summaries keep failing",
+    "",
+    facts.join(" "),
+    "",
+    ACTIONS
+  ].join(`
+`);
+}
+var repeatedFailureWarnings = new Map;
+function shouldWarnRepeatedHistorianFailures(sessionId, failureCount, now = Date.now()) {
+  const step = REPEATED_HISTORIAN_FAILURE_WARNING_STEP;
+  if (failureCount < step || failureCount % step !== 0)
+    return false;
+  const last = repeatedFailureWarnings.get(sessionId);
+  if (last && failureCount > last.count && now - last.at < REPEATED_HISTORIAN_FAILURE_WARNING_INTERVAL_MS) {
+    return false;
+  }
+  repeatedFailureWarnings.set(sessionId, { count: failureCount, at: now });
+  return true;
+}
+function takeRepeatedHistorianFailureWarning(input) {
+  const now = input.now ?? Date.now();
+  if (!shouldWarnRepeatedHistorianFailures(input.sessionId, input.failureCount, now)) {
+    return null;
+  }
+  const failures = readHistorianFailureStreak(input.db, input.sessionId, {
+    unrecordedFailures: input.unrecordedFailures
+  });
+  return describeRepeatedHistorianFailures({
+    chunk: input.chunk,
+    failures: { ...failures, count: input.failureCount },
+    usagePercentage: loadPersistedUsage(input.db, input.sessionId)?.usage.percentage,
+    now
+  });
+}
+
 // ../plugin/src/hooks/magic-context/reasoning-removal.ts
 var REMOVABLE_REASONING_TYPES = new Set(["reasoning", "thinking", "redacted_thinking"]);
 
@@ -26825,6 +27441,66 @@ function latestAssistantTurnStart(messages) {
 }
 function latestAssistantTurnMessages(messages) {
   return new Set(messages.slice(latestAssistantTurnStart(messages)));
+}
+function isSentAssistantMessage(message) {
+  if (!isRecord(message) || role(message) !== "assistant")
+    return false;
+  const parts = content(message);
+  if (!Array.isArray(parts) || parts.length === 0)
+    return false;
+  if (message.stopReason === "error" || message.stopReason === "aborted")
+    return false;
+  const error = isRecord(message.info) ? message.info.error : undefined;
+  if (error === undefined || error === null)
+    return true;
+  return isRecord(error) && error.name === "MessageAbortedError" && parts.some((part) => isRecord(part) && part.type !== "step-start" && part.type !== "reasoning");
+}
+var PI_USER_ON_WIRE_ROLES = new Set([
+  "user",
+  "developer",
+  "custom",
+  "hookMessage",
+  "bashExecution",
+  "pythonExecution",
+  "fileMention",
+  "branchSummary",
+  "compactionSummary"
+]);
+var TOOL_RESULT_TYPES = new Set(["tool_result", "toolResult", "tool-result"]);
+function isUserMessageOnWire(message) {
+  if (!isRecord(message))
+    return false;
+  if (isRecord(message.info)) {
+    if (message.info.role !== "user" || !Array.isArray(message.parts))
+      return false;
+    return message.parts.some((part) => isRecord(part) && part.ignored !== true && !TOOL_RESULT_TYPES.has(String(part.type)) && !(part.type === "text" && part.text === ""));
+  }
+  if (!PI_USER_ON_WIRE_ROLES.has(String(message.role)))
+    return false;
+  if (message.excludeFromContext === true)
+    return false;
+  if (message.role !== "user")
+    return true;
+  if (typeof message.content === "string")
+    return message.content.length > 0;
+  return Array.isArray(message.content) && message.content.some((block) => !isRecord(block) || !TOOL_RESULT_TYPES.has(String(block.type)));
+}
+function providerLatestTurn(messages) {
+  let last = messages.length - 1;
+  while (last >= 0 && !isSentAssistantMessage(messages[last]))
+    last -= 1;
+  if (last < 0)
+    return;
+  let start = last;
+  while (start > 0 && !isUserMessageOnWire(messages[start - 1]))
+    start -= 1;
+  let first = start;
+  while (first < last && !isSentAssistantMessage(messages[first]))
+    first += 1;
+  let end = last + 1;
+  while (end < messages.length && !isUserMessageOnWire(messages[end]))
+    end += 1;
+  return { start, first, last, end };
 }
 function isAnthropicThinkingPart(part, familyRoute) {
   return isRecord(part) && THINKING_TYPES.has(String(part.type ?? part.kind)) && (familyRoute || isRecord(part.metadata) && isRecord(part.metadata.anthropic));
@@ -26881,18 +27557,110 @@ function protectNewTagMutations(messages, targets, protectedParts, prefixBound) 
 
 // ../plugin/src/hooks/magic-context/latest-thinking-recovery.ts
 var LATEST_THINKING_RESTORE = "latest_thinking_original";
+var TURN_STATE = `${LATEST_THINKING_RESTORE}_turn:`;
 var knownRejectedSessions = new Set;
-var lastPassTurnAnchor = new Map;
-var ACTIVE = `${LATEST_THINKING_RESTORE}:`;
-var ARMED = `${LATEST_THINKING_RESTORE}_armed:`;
-var UNRECOVERABLE = `${LATEST_THINKING_RESTORE}_unavailable`;
-var LATEST_THINKING_UNSAFE = "ANTHROPIC_LATEST_TURN_EDIT_UNSAFE: The provider rejected edits to this thinking turn and its original context cannot be safely replayed. Send a new user message or /clear to continue.";
-function armLatestThinkingRecovery(db, sessionId) {
+var REFUSE_AT_REJECTION = 3;
+var STAGES = new Set(["armed", "restoring", "remove", "removed", "refused"]);
+function readState(target) {
+  if (!target.startsWith(TURN_STATE))
+    return;
+  try {
+    const value = JSON.parse(target.slice(TURN_STATE.length));
+    if (!isRecord(value) || !STAGES.has(String(value.stage)) || typeof value.first !== "string" || typeof value.last !== "string" || typeof value.rejections !== "number")
+      return;
+    return {
+      stage: value.stage,
+      first: value.first,
+      last: value.last,
+      rejections: value.rejections,
+      ...typeof value.pass === "string" ? { pass: value.pass } : {},
+      ...typeof value.model === "string" ? { model: value.model } : {},
+      ...typeof value.provider === "string" ? { provider: value.provider } : {},
+      ...value.accepted === true ? { accepted: true } : {}
+    };
+  } catch {
+    return;
+  }
+}
+function encodeState(state) {
+  return TURN_STATE + JSON.stringify({
+    stage: state.stage,
+    first: state.first,
+    last: state.last,
+    rejections: state.rejections,
+    ...state.pass ? { pass: state.pass } : {},
+    ...state.model ? { model: state.model } : {},
+    ...state.provider ? { provider: state.provider } : {},
+    ...state.accepted ? { accepted: true } : {}
+  });
+}
+function identifyTurn(messages, id) {
+  const turn = providerLatestTurn(messages);
+  if (!turn)
+    return;
+  const first = id(messages[turn.first], turn.first);
+  const last = id(messages[turn.last], turn.last);
+  return first && last ? { turn, bound: { first, last } } : undefined;
+}
+var lastPassTurn = new Map;
+var PROCESS_TOKEN = Math.random().toString(36).slice(2, 10);
+var passCounter = 0;
+var LATEST_THINKING_UNSAFE = "ANTHROPIC_LATEST_TURN_EDIT_UNSAFE: The provider keeps rejecting the thinking of this conversation's latest assistant turn, even after Magic Context restored or removed it. Sending a new message does not help, because the provider checks that same turn again. Switch the model once, or run /clear, to continue.";
+var LATEST_THINKING_NOT_SAVED = "Magic Context could not save the change this request needs after the provider rejected the thinking of the latest assistant turn (its database was busy or changed at the same moment). Nothing was sent. Send your message again.";
+function escalate(state, rejections) {
+  switch (state.stage) {
+    case "armed":
+      return "armed";
+    case "restoring":
+    case "remove":
+      return "remove";
+    case "removed":
+      if (state.accepted)
+        return "remove";
+      return rejections >= REFUSE_AT_REJECTION ? "refused" : "removed";
+    case "refused":
+      return "refused";
+  }
+}
+function armLatestThinkingRecovery(db, sessionId, modelID) {
   knownRejectedSessions.add(sessionId);
   ensureSessionMetaRow(db, sessionId);
   const current = getThinkingBindingRecoveryTarget(db, sessionId);
-  const anchor = lastPassTurnAnchor.get(sessionId);
-  const next = current?.startsWith(ACTIVE) ? UNRECOVERABLE + ":" + current.slice(ACTIVE.length) : current?.startsWith(UNRECOVERABLE) || current?.startsWith(ARMED) ? current : anchor !== undefined ? ARMED + anchor : LATEST_THINKING_RESTORE;
+  const state = current ? readState(current) : undefined;
+  const pass = lastPassTurn.get(sessionId);
+  let next;
+  if (state) {
+    if (pass !== undefined && state.pass === pass.pass)
+      return;
+    const rejections = state.accepted ? 1 : state.rejections + 1;
+    const stage = escalate(state, rejections);
+    const last = pass?.first === state.first ? pass.last : state.last;
+    next = encodeState({
+      ...state,
+      stage,
+      last,
+      rejections,
+      pass: pass?.pass,
+      accepted: false
+    });
+    sessionLog2(sessionId, `latest-turn thinking recovery: provider rejected the bound turn again (rejection ${rejections}, first=${state.first} last=${last}); ${state.stage} -> ${stage}`);
+  } else if (pass) {
+    const model = pass.model ?? modelID;
+    const provider = pass.model ? pass.provider : undefined;
+    next = encodeState({
+      stage: "armed",
+      first: pass.first,
+      last: pass.last,
+      rejections: 1,
+      pass: pass.pass,
+      ...model ? { model } : {},
+      ...provider ? { provider } : {}
+    });
+    sessionLog2(sessionId, `latest-turn thinking recovery: armed for the provider's latest turn (first=${pass.first} last=${pass.last} model=${provider ? `${provider}/` : ""}${model ?? "unknown"})`);
+  } else {
+    next = LATEST_THINKING_RESTORE;
+    sessionLog2(sessionId, "latest-turn thinking recovery: rejection not bound, no pass in this process built the rejected request");
+  }
   db.prepare("UPDATE session_meta SET thinking_binding_recovery_target = ? WHERE session_id = ?").run(next, sessionId);
 }
 function clone(value) {
@@ -26915,72 +27683,253 @@ function replayableOriginal(part) {
   const signature = part.signature ?? part.thinkingSignature ?? metadata.signature ?? part.data ?? metadata.redactedData;
   return typeof signature === "string" && signature.length > 0 && part.text !== "[cleared]" && part.thinking !== "[cleared]";
 }
+var NO_RECOVERY = { restore: false, ended: false };
+var LATEST_TURN_THINKING_REMOVED_REASON = "latest_turn_thinking_removed";
+function replaceTarget(db, sessionId, expected, next) {
+  return db.prepare("UPDATE session_meta SET thinking_binding_recovery_target = ? WHERE session_id = ? AND thinking_binding_recovery_target = ?").run(next, sessionId, expected).changes > 0;
+}
+function decisionMessageId(decision) {
+  if (decision === "binding_mismatch_order:end" || decision === TOOL_SWEEP_SCOPED_MARKER)
+    return;
+  return decodeMergedReasoningParts(decision)?.[0] ?? (decision.startsWith(THINKING_BINDING_RECOVERY_FROZEN_PREFIX) ? decision.slice(THINKING_BINDING_RECOVERY_FROZEN_PREFIX.length) : decision);
+}
+function sentAssistantIds(args, turn) {
+  const ids = [];
+  for (let index = turn.start;index < turn.end; index += 1) {
+    const message = args.messages[index];
+    if (!isSentAssistantMessage(message))
+      continue;
+    const id = args.id(message, index);
+    if (id)
+      ids.push(id);
+  }
+  return ids;
+}
+function magicContextEditedTurn(args, turn, modelID) {
+  const ids = new Set(sentAssistantIds(args, turn));
+  for (const decision of getMergedReasoningStrippedIds(args.db, args.sessionId)) {
+    const id = decisionMessageId(decision);
+    if (id !== undefined && ids.has(id))
+      return true;
+  }
+  try {
+    for (const id of getReasoningRemovalState(args.db, args.sessionId).messageIds) {
+      if (ids.has(id))
+        return true;
+    }
+  } catch {}
+  return !isPrefixBoundThinkingModel(undefined, modelID) && clearedByWatermark(args, turn);
+}
+function clearedByWatermark(args, turn) {
+  try {
+    const row = args.db.prepare("SELECT cleared_reasoning_through_tag AS watermark FROM session_meta WHERE session_id = ?").get(args.sessionId);
+    const watermark = row?.watermark ?? 0;
+    if (!(watermark > 0))
+      return false;
+    const textTags = args.db.prepare("SELECT MAX(tag_number) AS n FROM tags WHERE session_id = ? AND message_id >= ? AND message_id < ?");
+    const toolTags = args.db.prepare("SELECT MAX(tag_number) AS n FROM tags WHERE session_id = ? AND type = 'tool' AND tool_owner_message_id = ?");
+    for (let index = turn.start;index < turn.end; index += 1) {
+      const message = args.messages[index];
+      if (!isSentAssistantMessage(message))
+        continue;
+      if (!args.parts(message).some(isThinkingPart))
+        continue;
+      const id = args.id(message, index);
+      if (!id)
+        continue;
+      const text = textTags.get(args.sessionId, `${id}:`, `${id};`);
+      const tool = toolTags.get(args.sessionId, id);
+      const newest = Math.max(text?.n ?? 0, tool?.n ?? 0);
+      if (newest > 0 && newest <= watermark)
+        return true;
+    }
+  } catch {}
+  return false;
+}
+function restoreBlocker(args, turn) {
+  if (turn.start === 0)
+    return "no-turn-start";
+  const turnMessages = args.messages.slice(turn.start, turn.end);
+  if (!turnMessages.some((message) => args.parts(message).some(replayableOriginal)))
+    return "missing-thinking-original";
+  const ids = new Map(args.messages.map((message, index) => [args.id(message, index), index]));
+  for (const decision of getMergedReasoningStrippedIds(args.db, args.sessionId)) {
+    const id = decisionMessageId(decision);
+    if (id === undefined)
+      continue;
+    const index = ids.get(id);
+    if (index === undefined || index >= turn.start && !args.parts(args.messages[index]).some(replayableOriginal))
+      return `missing-original:${id}`;
+  }
+  return;
+}
+function refuse(sessionId, why) {
+  sessionLog2(sessionId, `latest-turn thinking recovery: refused locally (${why})`);
+  throw contextRefusalError(LATEST_THINKING_UNSAFE);
+}
+function refuseUnsaved(sessionId, why) {
+  sessionLog2(sessionId, `latest-turn thinking recovery: refused locally (${why})`);
+  throw contextRefusalError(LATEST_THINKING_NOT_SAVED);
+}
+function frozenBindingIds(args) {
+  const frozen = new Set;
+  for (const decision of getMergedReasoningStrippedIds(args.db, args.sessionId)) {
+    if (decision.startsWith(THINKING_BINDING_RECOVERY_FROZEN_PREFIX))
+      frozen.add(decision.slice(THINKING_BINDING_RECOVERY_FROZEN_PREFIX.length));
+  }
+  return frozen;
+}
+function frozenTurnIds(args, turn) {
+  const frozen = frozenBindingIds(args);
+  return sentAssistantIds(args, turn).filter((id) => frozen.has(id));
+}
+function persistBindingRemoval(db, sessionId, ids) {
+  return addMergedReasoningStrippedIds(db, sessionId, ids.map(thinkingBindingRecoveryFrozenId));
+}
+function removeTurnThinking(args, target, state, turn, current) {
+  const frozen = frozenBindingIds(args);
+  const ids = [];
+  let parts = 0;
+  for (let index = turn.start;index < turn.end; index += 1) {
+    const message = args.messages[index];
+    if (!isSentAssistantMessage(message))
+      continue;
+    const thinking = args.parts(message).filter(isThinkingPart).length;
+    if (thinking === 0)
+      continue;
+    const id = args.id(message, index);
+    if (!id)
+      refuse(args.sessionId, "a thinking message of the turn has no stable id");
+    if (frozen.has(id))
+      continue;
+    ids.push(id);
+    parts += thinking;
+  }
+  if (ids.length === 0) {
+    replaceTarget(args.db, args.sessionId, target, encodeState({ ...state, stage: "refused", last: current.last }));
+    refuse(args.sessionId, "the rejected turn has no thinking left to remove");
+  }
+  const persist = args.persistRemoval ?? ((next) => persistBindingRemoval(args.db, args.sessionId, next));
+  let persisted = false;
+  try {
+    args.db.transaction(() => {
+      if (!persist(ids))
+        throw new Error("thinking removal was not persisted");
+      const next = encodeState({ ...state, stage: "removed", last: current.last });
+      if (!replaceTarget(args.db, args.sessionId, target, next))
+        throw new Error("recovery state changed concurrently");
+    }).immediate();
+    persisted = true;
+  } catch (error) {
+    sessionLog2(args.sessionId, "latest-turn thinking recovery: removal write failed:", error);
+  }
+  if (!persisted)
+    refuseUnsaved(args.sessionId, "the thinking removal could not be saved");
+  sessionLog2(args.sessionId, `latest-turn thinking recovery: removed thinking from the bound turn (parts=${parts} messages=${ids.length} first=${state.first} last=${current.last})`);
+  return {
+    restore: false,
+    ended: false,
+    removedThisPass: true,
+    removedIds: frozenTurnIds(args, turn)
+  };
+}
 function prepareLatestThinkingRecovery(args) {
-  const start = latestAssistantTurnStart(args.messages);
-  const anchor = start > 0 ? args.id(args.messages[start - 1], start - 1) : undefined;
-  if (anchor === undefined)
-    lastPassTurnAnchor.delete(args.sessionId);
+  const identified = identifyTurn(args.messages, args.id);
+  if (identified)
+    lastPassTurn.set(args.sessionId, {
+      ...identified.bound,
+      pass: `${PROCESS_TOKEN}:${++passCounter}`,
+      ...args.modelID ? { model: args.modelID } : {},
+      ...args.modelID && args.providerID ? { provider: args.providerID } : {}
+    });
   else
-    lastPassTurnAnchor.set(args.sessionId, anchor);
+    lastPassTurn.delete(args.sessionId);
   let target;
   try {
     target = getThinkingBindingRecoveryTarget(args.db, args.sessionId);
   } catch (error) {
     if (knownRejectedSessions.has(args.sessionId))
-      throw contextRefusalError(LATEST_THINKING_UNSAFE);
-    return { restore: false, ended: false };
+      refuseUnsaved(args.sessionId, "the recovery state could not be read");
+    return NO_RECOVERY;
   }
   if (!target || !target.startsWith(LATEST_THINKING_RESTORE)) {
     knownRejectedSessions.delete(args.sessionId);
-    return { restore: false, ended: false };
+    return NO_RECOVERY;
   }
-  const armedAnchor = target.startsWith(ARMED) ? target.slice(ARMED.length) : undefined;
-  if (target === LATEST_THINKING_RESTORE || armedAnchor !== undefined && armedAnchor !== anchor) {
-    args.db.prepare("UPDATE session_meta SET thinking_binding_recovery_target = '' WHERE session_id = ? AND thinking_binding_recovery_target = ?").run(args.sessionId, target);
+  const state = readState(target);
+  if (!state) {
+    replaceTarget(args.db, args.sessionId, target, "");
     knownRejectedSessions.delete(args.sessionId);
-    return { restore: false, ended: false };
+    sessionLog2(args.sessionId, "latest-turn thinking recovery: cleared a rejection that names no turn");
+    return NO_RECOVERY;
+  }
+  const unbind = (why) => {
+    replaceTarget(args.db, args.sessionId, target, "");
+    knownRejectedSessions.delete(args.sessionId);
+    sessionLog2(args.sessionId, `latest-turn thinking recovery: unbound because ${why} (stage=${state.stage} first=${state.first} last=${state.last})`);
+    return { restore: false, ended: state.stage === "restoring" };
+  };
+  if (args.modelID && state.model && args.modelID.toLowerCase() !== state.model.toLowerCase())
+    return unbind(`the request now goes to ${args.modelID}`);
+  if (args.providerID && state.provider && args.providerID.toLowerCase() !== state.provider.toLowerCase())
+    return unbind(`the request now goes through ${args.providerID}`);
+  const current = identified?.bound;
+  if (!identified || !current || current.first !== state.first)
+    return unbind(`a newer turn was accepted (now first=${current?.first ?? "none"} last=${current?.last ?? "none"})`);
+  const turn = identified.turn;
+  if (current.last !== state.last && state.stage !== "restoring") {
+    if (state.stage !== "removed")
+      return unbind(`a newer message of the turn was accepted (now last=${current.last})`);
+    replaceTarget(args.db, args.sessionId, target, encodeState({ ...state, last: current.last, accepted: true }));
+    sessionLog2(args.sessionId, `latest-turn thinking recovery: a request without the turn's removed thinking was accepted (first=${state.first} last=${current.last})`);
+    return { ...NO_RECOVERY, removedIds: frozenTurnIds(args, identified.turn) };
   }
   knownRejectedSessions.add(args.sessionId);
-  const savedAnchor = target.startsWith(ACTIVE) ? target.slice(ACTIVE.length) : target.startsWith(UNRECOVERABLE + ":") ? target.slice(UNRECOVERABLE.length + 1) : undefined;
-  if (savedAnchor !== undefined && savedAnchor !== anchor) {
-    args.db.prepare("UPDATE session_meta SET thinking_binding_recovery_target = '' WHERE session_id = ? AND thinking_binding_recovery_target = ?").run(args.sessionId, target);
-    knownRejectedSessions.delete(args.sessionId);
-    return { restore: false, ended: true };
+  switch (state.stage) {
+    case "refused":
+      return refuse(args.sessionId, `the provider rejected the turn first=${state.first} ${state.rejections} times`);
+    case "removed":
+      return { ...NO_RECOVERY, removedIds: frozenTurnIds(args, turn) };
+    case "restoring": {
+      const blocker = restoreBlocker(args, turn);
+      if (blocker === undefined)
+        return { restore: true, ended: false };
+      sessionLog2(args.sessionId, `latest-turn thinking recovery: restore no longer possible (${blocker}); removing the turn's thinking instead`);
+      return removeTurnThinking(args, target, state, turn, current);
+    }
+    case "armed": {
+      if (magicContextEditedTurn(args, turn, args.modelID)) {
+        const blocker = restoreBlocker(args, turn);
+        if (blocker === undefined) {
+          replaceTarget(args.db, args.sessionId, target, encodeState({ ...state, stage: "restoring", last: current.last }));
+          sessionLog2(args.sessionId, `latest-turn thinking recovery: restore applied to the bound turn (first=${state.first} last=${current.last})`);
+          return { restore: true, ended: false };
+        }
+        sessionLog2(args.sessionId, `latest-turn thinking recovery: restore unavailable (${blocker}); removing the turn's thinking instead`);
+      }
+      return removeTurnThinking(args, target, state, turn, current);
+    }
+    case "remove":
+      return removeTurnThinking(args, target, state, turn, current);
   }
-  if (target.startsWith(UNRECOVERABLE) || !anchor)
-    throw contextRefusalError(LATEST_THINKING_UNSAFE);
-  if (armedAnchor !== undefined) {
-    args.db.prepare("UPDATE session_meta SET thinking_binding_recovery_target = ? WHERE session_id = ? AND thinking_binding_recovery_target = ?").run(ACTIVE + anchor, args.sessionId, target);
-  }
-  const active = args.messages.slice(start);
-  if (!active.some((message) => args.parts(message).some(replayableOriginal)))
-    throw contextRefusalError(LATEST_THINKING_UNSAFE + " [missing-thinking-original]");
-  const ids = new Map(args.messages.map((message, index) => [args.id(message, index), index]));
-  for (const decision of getMergedReasoningStrippedIds(args.db, args.sessionId)) {
-    if (decision === "binding_mismatch_order:end" || decision === TOOL_SWEEP_SCOPED_MARKER)
-      continue;
-    const id = decodeMergedReasoningParts(decision)?.[0] ?? (decision.startsWith("binding_mismatch:") ? decision.slice("binding_mismatch:".length) : decision);
-    const index = ids.get(id);
-    if (index === undefined || index >= start && !args.parts(args.messages[index]).some(replayableOriginal))
-      throw contextRefusalError(LATEST_THINKING_UNSAFE + ` [missing-original:${id}]`);
-  }
-  return { restore: true, ended: false };
 }
-function latestThinkingRecoveryCoversActiveTurn(args) {
+function latestThinkingRestoringTurnMessages(args) {
   let target;
   try {
     target = getThinkingBindingRecoveryTarget(args.db, args.sessionId);
   } catch {
-    return false;
+    return;
   }
-  const bound = target?.startsWith(ARMED) ? target.slice(ARMED.length) : target?.startsWith(ACTIVE) ? target.slice(ACTIVE.length) : undefined;
-  if (bound === undefined)
-    return false;
-  const start = latestAssistantTurnStart(args.messages);
-  return start > 0 && args.id(args.messages[start - 1], start - 1) === bound;
+  const state = target ? readState(target) : undefined;
+  if (state?.stage !== "restoring")
+    return;
+  const identified = identifyTurn(args.messages, args.id);
+  if (identified?.bound.first !== state.first)
+    return;
+  return new Set(args.messages.slice(identified.turn.start));
 }
 function captureOriginalTurn(messages, parts, setParts) {
-  const start = Math.max(0, latestAssistantTurnStart(messages) - 1);
+  const start = Math.max(0, (providerLatestTurn(messages)?.start ?? latestAssistantTurnStart(messages)) - 1);
   const originals = messages.slice(start).map((message) => ({ message, parts: clone(parts(message)) }));
   const before = messages.slice(0, start);
   return (target = messages) => {
@@ -26994,10 +27943,17 @@ function captureOriginalTurn(messages, parts, setParts) {
   };
 }
 function armBindingRecoverySafely(db, sessionId) {
-  if (getThinkingBindingRecoveryTarget(db, sessionId)?.startsWith(LATEST_THINKING_RESTORE))
-    armLatestThinkingRecovery(db, sessionId);
-  else
-    armThinkingBindingRecovery(db, sessionId);
+  const target = getThinkingBindingRecoveryTarget(db, sessionId);
+  if (target?.startsWith(LATEST_THINKING_RESTORE)) {
+    const stage = readState(target)?.stage;
+    if (stage !== "removed" && stage !== "refused") {
+      armLatestThinkingRecovery(db, sessionId);
+      return;
+    }
+    knownRejectedSessions.delete(sessionId);
+    sessionLog2(sessionId, `latest-turn thinking recovery: binding rejection handed to the binding recovery (stage=${stage})`);
+  }
+  armThinkingBindingRecovery(db, sessionId);
 }
 
 // ../plugin/src/hooks/magic-context/reasoning-budget-status.ts
@@ -27085,6 +28041,102 @@ function opencodeReasoningBudgetStatus(messages, budget, prefixBound, proseRatio
   };
 }
 
+// ../plugin/src/hooks/magic-context/recovery-fit.ts
+var RECOVERY_REFUSAL_NOTICE = "Magic Context is still summarizing older history so this conversation fits the model's context window. Send your message again to continue.";
+var RECOVERY_NO_HISTORY_REFUSAL_NOTICE = "This conversation no longer fits the model's context window, and Magic Context has no more older history it can summarize. Switch to a model with a larger context window to continue.";
+function recoveryLineTokens(windowTokens) {
+  return Math.floor(windowTokens * BLOCK_UNTIL_DONE_PERCENTAGE / 100);
+}
+function recoveryAdmissionLimitTokens(windowTokens, historyRemains) {
+  return historyRemains ? recoveryLineTokens(windowTokens) : Math.floor(windowTokens);
+}
+function recoveryRefusalNotice(historyRemains) {
+  return historyRemains ? RECOVERY_REFUSAL_NOTICE : RECOVERY_NO_HISTORY_REFUSAL_NOTICE;
+}
+
+// ../plugin/src/hooks/magic-context/request-tools-release.ts
+var NAMESPACE3 = "requestToolsRelease";
+var MAX_MODEL_RECORDS = 8;
+function parseEntry(value) {
+  if (typeof value !== "object" || value === null)
+    return null;
+  const record = value;
+  if (typeof record.modelKey !== "string" || typeof record.names !== "string" || typeof record.descriptions !== "string" || typeof record.schemas !== "string")
+    return null;
+  return {
+    modelKey: record.modelKey,
+    names: record.names,
+    descriptions: record.descriptions,
+    schemas: record.schemas
+  };
+}
+function parseStored(value) {
+  const models = value?.models;
+  if (!Array.isArray(models))
+    return [];
+  const entries = [];
+  for (const item of models) {
+    const entry = parseEntry(item);
+    if (entry)
+      entries.push(entry);
+  }
+  return entries;
+}
+function sameEntry(left, right) {
+  return left !== undefined && left.modelKey === right.modelKey && left.names === right.names && left.descriptions === right.descriptions && left.schemas === right.schemas;
+}
+function isLatest(entries, current) {
+  return sameEntry(entries.at(-1), current);
+}
+function withLatest(entries, current) {
+  const next = entries.filter((entry) => entry.modelKey !== current.modelKey);
+  next.push(current);
+  return next.slice(-MAX_MODEL_RECORDS);
+}
+function evaluateRequestToolsRelease(args) {
+  const current = { modelKey: args.modelKey, ...args.fingerprint };
+  let entries = [];
+  let readable = true;
+  try {
+    entries = parseStored(readReplayEnvelope(args.db, args.sessionId, "read")[NAMESPACE3]);
+  } catch (error) {
+    readable = false;
+    sessionLog2(args.sessionId, "request tools record unreadable:", error);
+  }
+  const stored = entries.find((entry) => entry.modelKey === current.modelKey);
+  const change = stored ? classifyRequestToolsChange(stored, current) : null;
+  if (change !== null) {
+    sessionLog2(args.sessionId, `request tools changed (kind=${change === "schemas" ? "schema-only" : change}, model=${current.modelKey}, schemas ${stored?.schemas.slice(0, 12)}→${current.schemas.slice(0, 12)}): releasing signed thinking`);
+  } else if (readable && !stored) {
+    sessionLog2(args.sessionId, `request tools fingerprint adopted for model=${current.modelKey}${entries.length > 0 ? ` (records kept for ${entries.map((entry) => entry.modelKey).join(",")})` : ""}`);
+  }
+  return {
+    change,
+    commit: () => {
+      if (!readable || isLatest(entries, current))
+        return;
+      try {
+        let next = entries;
+        const written = updateReplayDocument(args.db, args.sessionId, (doc) => {
+          const latest = parseStored(doc[NAMESPACE3]);
+          if (isLatest(latest, current))
+            return false;
+          next = withLatest(latest, current);
+          doc.version = 2;
+          doc[NAMESPACE3] = { models: next };
+          return true;
+        });
+        if (written)
+          entries = next;
+        else
+          sessionLog2(args.sessionId, "request tools record not written");
+      } catch (error) {
+        sessionLog2(args.sessionId, "request tools record write failed:", error);
+      }
+    }
+  };
+}
+
 // ../plugin/src/hooks/magic-context/signed-thinking-hold.ts
 var HEAVY_REASONING_TOKENS = 1500;
 var HEAVY_REASONING_WINDOW_STEPS = 15;
@@ -27169,8 +28221,13 @@ function decideSignedThinkingHold(args) {
       heavyStepTokens,
       capPercentage
     };
-  if (!(args.usagePercentage < capPercentage))
-    return { held: false, reason: "above_cap", heavyStepsBack, heavyStepTokens, capPercentage };
+  const ended = readingEndsHold({
+    usagePercentage: args.usagePercentage,
+    capPercentage,
+    forceBandPressure: args.forceBandPressure
+  });
+  if (ended !== null)
+    return { held: false, reason: ended, heavyStepsBack, heavyStepTokens, capPercentage };
   return {
     held: true,
     reason: "heavy_reasoning",
@@ -27178,6 +28235,11 @@ function decideSignedThinkingHold(args) {
     heavyStepTokens,
     capPercentage
   };
+}
+function readingEndsHold(args) {
+  if (!(args.usagePercentage < args.capPercentage))
+    return "above_cap";
+  return args.forceBandPressure ? "force_band" : null;
 }
 
 // ../plugin/src/hooks/magic-context/strict-thinking-prefix.ts
@@ -27527,10 +28589,56 @@ ${typeof state?.output === "string" ? state.output : JSON.stringify(state?.outpu
   };
 }
 
+// ../plugin/src/hooks/magic-context/transform-context-state.ts
+var usageRefusals = new WeakMap;
+function recordUsageRefusal(db, sessionId, refusedAt = Date.now()) {
+  let sessions = usageRefusals.get(db);
+  if (!sessions) {
+    sessions = new Map;
+    usageRefusals.set(db, sessions);
+  }
+  if (!sessions.has(sessionId))
+    sessions.set(sessionId, refusedAt);
+}
+function shouldResetRefusedUsage(db, sessionId, meta, liveReading) {
+  const refusals = usageRefusals.get(db);
+  const refusedAt = refusals?.get(sessionId);
+  if (refusedAt === undefined)
+    return false;
+  const readingAt = liveReading?.hasUsageTokens ? liveReading.updatedAt : meta.lastResponseTime;
+  if (readingAt > refusedAt) {
+    refusals?.delete(sessionId);
+    return false;
+  }
+  const now = Date.now();
+  const foldedAt = meta.cachedM0MaterializedAt ?? 0;
+  if (foldedAt > refusedAt && foldedAt <= now)
+    return true;
+  return !!db.prepare("SELECT 1 FROM compartments WHERE session_id = ? AND harness = ? AND created_at > ? AND created_at <= ? LIMIT 1").get(sessionId, getHarness2(), refusedAt, now);
+}
+function resolveUnknownUsageFromWireEstimate(input) {
+  if (input.usage.inputTokens > 0 || !input.pricedPass)
+    return input.usage;
+  const wireTokens = input.wireEstimateTokens;
+  if (typeof wireTokens !== "number" || !Number.isFinite(wireTokens) || wireTokens <= 0) {
+    return input.usage;
+  }
+  const providerTokens = input.providerProvenInputTokens;
+  const providerLimit = input.providerProvenLimitTokens;
+  const canUseProviderMass = input.wireEstimateTrusted === false && typeof providerTokens === "number" && Number.isFinite(providerTokens) && providerTokens > 0 && typeof providerLimit === "number" && Number.isFinite(providerLimit) && providerLimit > 0;
+  const tokens = canUseProviderMass ? Math.max(wireTokens, providerTokens) : wireTokens;
+  const limit = input.windowTokens;
+  const estimatedPercentage = typeof limit === "number" && Number.isFinite(limit) && limit > 0 ? tokens / limit * 100 : input.usage.percentage;
+  return {
+    inputTokens: tokens,
+    percentage: Math.max(input.usage.percentage, estimatedPercentage)
+  };
+}
+
 // ../plugin/src/hooks/magic-context/transform-stage-logger.ts
-import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
+import { AsyncLocalStorage } from "node:async_hooks";
 var SLOW_STAGE_MS = 100;
-var passes = new AsyncLocalStorage2;
+var passes = new AsyncLocalStorage;
 async function withTransformTimingSummary(run) {
   const pass = {
     stages: [],
@@ -27584,7 +28692,7 @@ function recoveryReasoningPrefixes(messages, partsKey) {
 }
 
 // ../plugin/src/shared/tag-transcript.ts
-import { createHash as createHash11 } from "node:crypto";
+import { createHash as createHash12 } from "node:crypto";
 function buildPersistedDropTargets(transcript, tags, options = {}) {
   const targets = new Map;
   const tools = new Map(tags.filter((tag) => tag.type === "tool").map((tag) => [makeToolCompositeKey(tag.toolOwnerMessageId ?? "", tag.messageId), tag]));
@@ -27667,7 +28775,7 @@ function buildPersistedDropTargets(transcript, tags, options = {}) {
   return targets;
 }
 function textIdentityDigest(value) {
-  return createHash11("sha256").update(value).digest("hex");
+  return createHash12("sha256").update(value).digest("hex");
 }
 function buildContentDerivedTextIds(messageId, parts) {
   const sources = parts.filter((part) => part.kind === "text").map((part) => stripTagPrefix(part.getText() ?? ""));
@@ -27842,6 +28950,9 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
               timing.identity += performance.now() - identityStart;
           }
           existing.identityReusable &&= reuseIdentity;
+          if (part.kind === "tool_result") {
+            noteResultBlock(existing, part, text, tokenCacheKey);
+          }
           applyToolPrefixAndTarget({
             skipPrefixInjection,
             part,
@@ -27870,6 +28981,8 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
             occurrences: [{ message, part, kind: part.kind }],
             maxByteSize: reusableAccounting.byteSize,
             maxTokenCount: reusableAccounting.tokenCount ?? 0,
+            resultImageTokens: 0,
+            resultTexts: [],
             toolName: null,
             inputByteSize: reusableAccounting.inputByteSize,
             inputTokenCount: reusableAccounting.inputTokenCount,
@@ -27911,6 +29024,8 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
             occurrences: [{ message, part, kind: part.kind }],
             maxByteSize: persistedAccounting?.byteSize ?? outputByteSize,
             maxTokenCount: persistedAccounting?.tokenCount ?? outputTokenCount,
+            resultImageTokens: 0,
+            resultTexts: [],
             toolName: filingToolNameFor(part) ?? accounting.toolName,
             inputByteSize: persistedAccounting?.inputByteSize ?? (part.kind === "tool_use" ? accounting.inputByteSize : 0),
             inputTokenCount: persistedAccounting?.inputTokenCount ?? (part.kind === "tool_use" ? firstInputTokenCount : null),
@@ -27936,6 +29051,8 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
         toolAggregates.set(aggregateKey, aggregate);
         if (part.kind === "tool_use") {
           openToolAggregateKeysByCallId.set(callId, [...pendingKeys, aggregateKey]);
+        } else {
+          noteResultBlock(aggregate, part, text, tokenCacheKey);
         }
         applyToolPrefixAndTarget({
           skipPrefixInjection,
@@ -27953,6 +29070,16 @@ function tagTranscript(sessionId, transcript, tagger, db, options = {}) {
         }
       }
     }
+  }
+  for (const aggregate of toolAggregates.values()) {
+    applyImageResultAccounting({
+      db,
+      sessionId,
+      tagger,
+      aggregate,
+      timing,
+      tokenCache: options.toolTokenCache
+    });
   }
   if (timing && options.onTiming) {
     options.onTiming("identity", timing.identity);
@@ -27985,9 +29112,35 @@ function applyGrownToolResultAccounting(args) {
   }
   args.aggregate.maxByteSize = args.byteSize;
   args.aggregate.maxTokenCount = tokenCount;
+  args.aggregate.tokenCountGrewThisPass = true;
   updateTagByteSize2(args.db, args.sessionId, args.aggregate.tagId, args.byteSize);
   updateTagTokenCount2(args.db, args.sessionId, args.aggregate.tagId, tokenCount);
   syncToolAggregateAccounting(args.tagger, args.sessionId, args.aggregate);
+}
+function noteResultBlock(aggregate, part, text, tokenCacheKey) {
+  const imageTokens = part.imageTokens?.() ?? 0;
+  if (imageTokens > 0)
+    aggregate.resultImageTokens += imageTokens;
+  else if (text.length > 0)
+    aggregate.resultTexts.push({ part, text, tokenCacheKey });
+}
+function applyImageResultAccounting(args) {
+  const { aggregate } = args;
+  if (aggregate.resultImageTokens === 0)
+    return;
+  const tokenStart = args.timing ? performance.now() : 0;
+  let textTokens = 0;
+  for (const block of aggregate.resultTexts) {
+    textTokens = Math.max(textTokens, getCachedToolPartTokenCount(block.part, block.text, args.tokenCache, block.tokenCacheKey));
+  }
+  if (args.timing)
+    args.timing.tokenCounting += performance.now() - tokenStart;
+  const tokenCount = textTokens + aggregate.resultImageTokens;
+  if (tokenCount === aggregate.maxTokenCount && !aggregate.tokenCountGrewThisPass)
+    return;
+  aggregate.maxTokenCount = tokenCount;
+  setTagTokenCount2(args.db, args.sessionId, aggregate.tagId, tokenCount);
+  syncToolAggregateAccounting(args.tagger, args.sessionId, aggregate);
 }
 function readAggregateToolAccounting(part, timing, tokenCache, tokenCacheKey, persisted) {
   const text = part.getText() ?? "";
@@ -28094,6 +29247,9 @@ function getToolPartByteSize(part, text) {
 function getToolPartTokenCount(part, text) {
   if (text.length > 0 || part.kind !== "tool_result")
     return estimateTokens(text);
+  const imageTokens = part.imageTokens?.() ?? 0;
+  if (imageTokens > 0)
+    return imageTokens;
   const raw = part.rawByteSize?.();
   if (typeof raw === "number" && raw > 0) {
     const record = isRecord2(part) ? part : undefined;
@@ -28131,10 +29287,13 @@ function safeJsonStringify(value) {
 function isRecord2(value) {
   return typeof value === "object" && value !== null;
 }
+function isUntaggedAssistantText(role, text, preserveTagOnlyAssistantText) {
+  return role === "assistant" && (stripWellFormedLeadingTagPrefix(text).trim().length === 0 || preserveTagOnlyAssistantText === true && text.includes("§") && stripPersistedAssistantText(text).length === 0);
+}
 function tagTextPart(args) {
   const identityStart = args.timing ? performance.now() : 0;
   const text = args.part.getText() ?? "";
-  if (args.message.info.role === "assistant" && (stripWellFormedLeadingTagPrefix(text).trim().length === 0 || args.preserveTagOnlyAssistantText && text.includes("§") && stripPersistedAssistantText(text).length === 0)) {
+  if (isUntaggedAssistantText(args.message.info.role, text, args.preserveTagOnlyAssistantText)) {
     if (args.timing)
       args.timing.identity += performance.now() - identityStart;
     return;
@@ -28806,7 +29965,7 @@ async function acquireSearchWorker(db, key, entry, input, signal) {
     }
     const fresh = !slot;
     if (!slot) {
-      const worker = inRootAsyncContext2(() => new Worker(entry, { workerData: { ...input, persistent: true } }));
+      const worker = inRootAsyncContext2(() => input.job === "backfill" && entry.href === defaultAutoSearchWorkerEntry().href ? reuseWorker(entry, { workerData: input }) : new Worker(entry, { workerData: { ...input, persistent: true } }));
       const shutdown = createWorkerShutdown(worker, "auto-search", AUTO_SEARCH_WORKER_CLOSE_DEADLINE_MS);
       slot = {
         worker,
@@ -28884,6 +30043,7 @@ function queueAutoSearchBackfill(db, sessionId, projectPath, query) {
   pending.set(key, work);
   return work;
 }
+var nextSearchJobId = 0;
 async function executeAutoSearchWorker(db, sessionId, projectPath, query, options, entry, job) {
   if (options.signal?.aborted)
     return [];
@@ -28904,6 +30064,7 @@ async function executeAutoSearchWorker(db, sessionId, projectPath, query, option
   const signal = deadlineSignal ? AbortSignal.any([deadlineSignal, lifecycle.signal]) : lifecycle.signal;
   const snapshot = getProjectEmbeddingSnapshot2(projectPath);
   const input = {
+    jobId: ++nextSearchJobId,
     job,
     path,
     harness: getHarness2(),
@@ -29023,6 +30184,8 @@ async function executeAutoSearchWorker(db, sessionId, projectPath, query, option
     const onMessage = async (reply) => {
       if (released)
         return;
+      if (entry.href === defaultAutoSearchWorkerEntry().href && reply.jobId !== input.jobId)
+        return;
       if (reply.kind === "diagnostics") {
         if (!settled && options.autoSearchDiagnostics) {
           const workerStarted = options.autoSearchDiagnostics.workerStarted;
@@ -29050,7 +30213,7 @@ async function executeAutoSearchWorker(db, sessionId, projectPath, query, option
       }
       if (reply.kind === "messages" || reply.kind === "accepted")
         return;
-      const response = { id: reply.id };
+      const response = { id: reply.id, jobId: input.jobId };
       if (!signal.aborted) {
         const requestedAt = performance.now();
         try {
@@ -29462,11 +30625,11 @@ async function embedAndStoreCompartmentChunks(db, sessionId, projectPath, compar
       if (currentModelId !== "off" && chunkEmbeddingWindowsAreCurrent2(db, compartment.id, currentModelId, windows, projectPath)) {
         continue;
       }
-      const result = await embedItemsForProject2(projectPath, windows.map((window) => ({
+      const result = await embedItemsWindowBounded2(projectPath, windows.map((window) => ({
         id: `chunk:${compartment.id}:${window.windowIndex}`,
         text: window.text,
         contentSha256: contentSha2562(window.text)
-      })), undefined, db, sessionId);
+      })), undefined, db, sessionId, { stopOnIncompleteSlice: true });
       if (!result)
         continue;
       if (chunkEmbeddingWindowsAreCurrent2(db, compartment.id, currentModelId, windows, projectPath)) {
@@ -29529,6 +30692,11 @@ function persistFilteredNoise(db, sessionId, chunk, eligibleEnd) {
   const start = chunk.startIndex;
   if (chunk.text || chunk.messageCount !== 0 || eligibleEnd <= start || rows.length !== eligibleEnd - start || rows.some((row, index) => row.ordinal !== start + index || !row.messageId))
     return false;
+  const endId = rows[rows.length - 1].messageId;
+  if (!hasRawSessionMessageById2(sessionId, endId)) {
+    sessionLog2(sessionId, `historian skipped a filtered-noise marker for ordinals ${start}-${eligibleEnd - 1}: its end row ${endId} is no longer in the host store`);
+    return false;
+  }
   const saved = db.transaction(() => {
     const prior = getCompartments(db, sessionId);
     const last = prior.at(-1);
@@ -29556,37 +30724,6 @@ function persistFilteredNoise(db, sessionId, chunk, eligibleEnd) {
   if (saved)
     sessionLog2(sessionId, `historian skipped ordinals ${start}-${eligibleEnd - 1}: all ${rows.length} raw rows excluded by chunk filters (no-content boundary marker)`);
   return saved;
-}
-
-// src/pi-history-retirement.ts
-var KEY = "piHistorianRetirement";
-function readState(db, sessionId) {
-  const row = db.prepare("SELECT deferred_execute_state AS state FROM session_meta WHERE session_id = ?").get(sessionId);
-  const state = row?.state ? JSON.parse(row.state) : {};
-  if (!state || typeof state !== "object" || Array.isArray(state))
-    throw new Error("Invalid session metadata JSON");
-  return state;
-}
-function readPiHistoryRetirement(db, sessionId) {
-  const target = readState(db, sessionId)[KEY];
-  return typeof target === "string" && target.length > 0 ? target : null;
-}
-function queuePiHistoryRetirement(db, sessionId, throughMessageId) {
-  ensureSessionMetaRow(db, sessionId);
-  const state = readState(db, sessionId);
-  state[KEY] = throughMessageId;
-  db.prepare("UPDATE session_meta SET deferred_execute_state = ? WHERE session_id = ?").run(JSON.stringify(state), sessionId);
-}
-function acknowledgePiHistoryRetirement(db, sessionId, publishedEnd, ordinalOf) {
-  const state = readState(db, sessionId);
-  const target = state[KEY];
-  if (typeof target !== "string")
-    return;
-  const ordinal = ordinalOf(target);
-  if (ordinal === undefined || ordinal > publishedEnd)
-    return;
-  delete state[KEY];
-  db.prepare("UPDATE session_meta SET deferred_execute_state = ? WHERE session_id = ?").run(JSON.stringify(state), sessionId);
 }
 
 // src/system-entry-pi.ts
@@ -29737,6 +30874,198 @@ function adoptPiCompactionSystemSnapshot(messages, entries, compactionId, foldin
   }
 }
 
+// src/pi-history-cut.ts
+function isPiContextEmitEligible(entry) {
+  if (!entry || typeof entry !== "object")
+    return false;
+  const row = entry;
+  if (typeof row.id !== "string")
+    return false;
+  return row.type === "message" || row.type === "custom_message" || row.type === "branch_summary" && typeof row.summary === "string" && row.summary.length > 0;
+}
+function piCutMessageForEntry(entry) {
+  if (!isPiContextEmitEligible(entry))
+    return;
+  const row = entry;
+  if (row.type === "custom_message")
+    return { role: "custom" };
+  if (row.type === "branch_summary")
+    return { role: "branchSummary" };
+  return row.message && typeof row.message === "object" ? row.message : undefined;
+}
+function planPiHistoryCut(messages, cutoffIndex, promptReachesBoundary) {
+  const remove = new Set;
+  for (let i = 0;i <= cutoffIndex; i++) {
+    if (!isPiSystemEntry(messages[i]))
+      remove.add(i);
+  }
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const removedCallKeys = new Set;
+    const removedResultKeys = new Set;
+    for (const index of remove) {
+      const msg = messages[index];
+      if (!msg)
+        continue;
+      if (msg.role === "assistant") {
+        for (const callId of getPiToolCallIds(msg)) {
+          removedCallKeys.add(toolPairKey(callId, index));
+        }
+      } else if (msg.role === "toolResult") {
+        const callId = getPiToolResultCallId(msg);
+        const ownerIndex = callId ? findToolResultOwnerAssistantIndex(messages, index, callId) : null;
+        if (callId && ownerIndex !== null) {
+          removedResultKeys.add(toolPairKey(callId, ownerIndex));
+        }
+      }
+    }
+    for (let i = 0;i < messages.length; i++) {
+      if (remove.has(i))
+        continue;
+      const msg = messages[i];
+      if (!msg)
+        continue;
+      if (msg.role === "toolResult") {
+        const callId = getPiToolResultCallId(msg);
+        const ownerIndex = callId ? findToolResultOwnerAssistantIndex(messages, i, callId) : null;
+        if (callId && ownerIndex !== null && removedCallKeys.has(toolPairKey(callId, ownerIndex))) {
+          remove.add(i);
+          changed = true;
+        }
+        continue;
+      }
+      if (msg.role === "assistant") {
+        const callIds = getPiToolCallIds(msg);
+        if (callIds.some((callId) => removedResultKeys.has(toolPairKey(callId, i)))) {
+          remove.add(i);
+          changed = true;
+        }
+      }
+    }
+  }
+  const keptPrompt = keptPromptIndex(messages, cutoffIndex, remove, promptReachesBoundary);
+  if (keptPrompt >= 0)
+    remove.delete(keptPrompt);
+  return remove;
+}
+function firstMessageKeptByPiHistoryCut(messages, remove) {
+  for (let i = 0;i < messages.length; i++) {
+    if (!remove.has(i) && !isPiSystemEntry(messages[i]))
+      return i;
+  }
+  return -1;
+}
+function resolvePiMarkerKeptEntry(branchEntries, endMessageId) {
+  const boundaryId = endMessageId.startsWith(SYNTH_USER_ID_PREFIX) ? endMessageId.slice(SYNTH_USER_ID_PREFIX.length) : endMessageId;
+  if (boundaryId.length === 0)
+    return { kind: "missing" };
+  const messages = [];
+  const ids = [];
+  for (const entry of branchEntries) {
+    const message = piCutMessageForEntry(entry);
+    const id = entry.id;
+    if (!message || id.length === 0)
+      continue;
+    messages.push(message);
+    ids.push(id);
+  }
+  const cutoffIndex = ids.indexOf(boundaryId);
+  if (cutoffIndex < 0)
+    return { kind: "missing" };
+  if (!messages.slice(cutoffIndex + 1).some((m) => !isPiSystemEntry(m)))
+    return { kind: "waiting" };
+  const kept = firstMessageKeptByPiHistoryCut(messages, planPiHistoryCut(messages, cutoffIndex));
+  return kept < 0 ? { kind: "waiting" } : { kind: "resolved", entryId: ids[kept] };
+}
+function keptPromptIndex(messages, cutoffIndex, removed, promptReachesBoundary) {
+  let promptIndex = -1;
+  for (let i = cutoffIndex;i >= 0; i--) {
+    if (messages[i]?.role === "user") {
+      promptIndex = i;
+      break;
+    }
+  }
+  if (promptIndex < 0)
+    return -1;
+  for (let i = cutoffIndex + 1;i < messages.length; i++) {
+    if (removed.has(i))
+      continue;
+    const message = messages[i];
+    if (message?.role === "user")
+      return -1;
+    if (message?.role === "assistant" && message.stopReason !== "error")
+      break;
+  }
+  if (promptReachesBoundary && !promptReachesBoundary(promptIndex))
+    return -1;
+  return promptIndex;
+}
+function toolPairKey(callId, assistantIndex) {
+  return `${callId}\x00${assistantIndex}`;
+}
+function findToolResultOwnerAssistantIndex(messages, resultIndex, callId) {
+  for (let i = resultIndex - 1;i >= 0; i--) {
+    const msg = messages[i];
+    if (msg?.role === "assistant" && getPiToolCallIds(msg).includes(callId)) {
+      return i;
+    }
+  }
+  for (let i = resultIndex + 1;i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg?.role === "assistant" && getPiToolCallIds(msg).includes(callId)) {
+      return i;
+    }
+  }
+  return null;
+}
+function getPiToolCallIds(message) {
+  if (!Array.isArray(message.content))
+    return [];
+  const ids = [];
+  for (const part of message.content) {
+    if (part && typeof part === "object" && part.type === "toolCall" && typeof part.id === "string") {
+      ids.push(part.id);
+    }
+  }
+  return ids;
+}
+function getPiToolResultCallId(message) {
+  const callId = message.toolCallId;
+  return typeof callId === "string" && callId.length > 0 ? callId : null;
+}
+
+// src/pi-history-retirement.ts
+var KEY2 = "piHistorianRetirement";
+function readState2(db, sessionId) {
+  const row = db.prepare("SELECT deferred_execute_state AS state FROM session_meta WHERE session_id = ?").get(sessionId);
+  const state = row?.state ? JSON.parse(row.state) : {};
+  if (!state || typeof state !== "object" || Array.isArray(state))
+    throw new Error("Invalid session metadata JSON");
+  return state;
+}
+function readPiHistoryRetirement(db, sessionId) {
+  const target = readState2(db, sessionId)[KEY2];
+  return typeof target === "string" && target.length > 0 ? target : null;
+}
+function queuePiHistoryRetirement(db, sessionId, throughMessageId) {
+  ensureSessionMetaRow(db, sessionId);
+  const state = readState2(db, sessionId);
+  state[KEY2] = throughMessageId;
+  db.prepare("UPDATE session_meta SET deferred_execute_state = ? WHERE session_id = ?").run(JSON.stringify(state), sessionId);
+}
+function acknowledgePiHistoryRetirement(db, sessionId, publishedEnd, ordinalOf) {
+  const state = readState2(db, sessionId);
+  const target = state[KEY2];
+  if (typeof target !== "string")
+    return;
+  const ordinal = ordinalOf(target);
+  if (ordinal === undefined || ordinal > publishedEnd)
+    return;
+  delete state[KEY2];
+  db.prepare("UPDATE session_meta SET deferred_execute_state = ? WHERE session_id = ?").run(JSON.stringify(state), sessionId);
+}
+
 // src/pi-historian-runner.ts
 var HISTORIAN_AGENT_NAME = "magic-context-historian";
 var DEFAULT_HISTORIAN_TIMEOUT_MS2 = 600000;
@@ -29817,6 +31146,7 @@ async function runHistorianSubagentWithTransientRetriesGuarded(args) {
       if (failure)
         throw new Error(failure);
       args.onDispatch?.();
+      logHistorianPromptSizes(args.sessionId, args.options.systemPrompt, args.options.userMessage);
       result = await args.runner.run({
         ...args.options,
         cacheTail: retryIndex > 0 ? "write" : args.options.cacheTail ?? "skip",
@@ -29976,6 +31306,37 @@ async function runPiHistorian(deps) {
       });
     }
   };
+  let selectedChunk;
+  const notifyCountedFailure = async (failureCount, notice) => {
+    let warning = null;
+    try {
+      warning = takeRepeatedHistorianFailureWarning({
+        db,
+        sessionId,
+        failureCount,
+        chunk: selectedChunk,
+        unrecordedFailures: 1
+      });
+    } catch (error) {
+      sessionLog2(sessionId, "historian repeated-failure warning failed", {
+        error: describeError(error).brief
+      });
+    }
+    if (!warning) {
+      await notify(notice);
+      return;
+    }
+    issueNotified = true;
+    lastHistorianAlertBySession.set(sessionId, Date.now());
+    sessionLog2(sessionId, `historian repeated-failure warning sent: count=${failureCount}`);
+    try {
+      await notifyIssue?.(warning);
+    } catch (error) {
+      sessionLog2(sessionId, "historian notify failed", {
+        error: describeError(error).brief
+      });
+    }
+  };
   updateSessionMeta(db, sessionId, { compartmentInProgress: true });
   const invocationBaseline = getLatestHistorianInvocationId(db, sessionId);
   const telemetry = {
@@ -30001,7 +31362,7 @@ async function runPiHistorian(deps) {
         sessionLog2(sessionId, `historian failure: source=existing-validation reason="${existingValidationError}"`);
         {
           const failCount = incrementHistorianFailure(db, sessionId, existingValidationError);
-          await notify(buildHistorianFailureNotice(failCount, existingValidationError));
+          await notifyCountedFailure(failCount, buildHistorianFailureNotice(failCount, existingValidationError));
         }
         return;
       }
@@ -30020,7 +31381,10 @@ async function runPiHistorian(deps) {
       }) : { ok: true };
       if (!validation.ok && validation.reason === "stale_snapshot" && refreshBoundarySnapshot) {
         try {
-          const refreshed = refreshBoundarySnapshot(boundarySnapshot);
+          const refreshed = {
+            ...refreshBoundarySnapshot(boundarySnapshot),
+            recovery: boundarySnapshot.recovery || forceDrainQuota
+          };
           if (hasRunnableCompartmentWindow(refreshed)) {
             sessionLog2(sessionId, `historian: refreshed stale protected-tail snapshot at run time (was: ${validation.detail ?? "stale"}) — eligible head ${refreshed.offset}-${refreshed.eligibleEndOrdinal - 1}`);
             boundarySnapshot = refreshed;
@@ -30087,7 +31451,8 @@ async function runPiHistorian(deps) {
         chunkStart: Math.max(1, offset),
         lastOrdinal: eligibleEndOrdinal - 1,
         sessionCompartments: priorCompartments,
-        memories: () => projectPath ? getMemoriesByProject2(db, projectPath, ["active", "permanent"]) : [],
+        memoryProject: { db, projectPath: projectPath ?? undefined },
+        memoryInjectionBudgetTokens: deps.memoryInjectionBudgetTokens,
         memoryEnabled: memoryEnabled !== false,
         userObservationsRequested
       });
@@ -30099,9 +31464,9 @@ async function runPiHistorian(deps) {
           return;
         }
         sessionLog2(sessionId, `historian failure: source=prompt-fit reason="${promptFit.reason}"`);
-        incrementHistorianFailure(db, sessionId, promptFit.reason);
+        const failCount = incrementHistorianFailure(db, sessionId, promptFit.reason);
         retainDrainReservationForRetryThrottle = true;
-        await notify(buildHistorianWindowTooSmallNotice());
+        await notifyCountedFailure(failCount, buildHistorianWindowTooSmallNotice());
         return;
       }
       const chunkTokens = promptFit.chunkTokens;
@@ -30114,7 +31479,7 @@ async function runPiHistorian(deps) {
         db,
         sessionId,
         runId: crypto2.randomUUID(),
-        trueRawTokens: boundarySnapshot.trueRawEligibleTokens,
+        trueRawTokens: boundarySnapshot.summaryRemovedEligibleTokens,
         usagePercentage: boundarySnapshot.usagePercentage,
         usable,
         perRunCap,
@@ -30129,6 +31494,8 @@ async function runPiHistorian(deps) {
       drainReservation = reserve.reservation;
       const chunk = readSessionChunk2(sessionId, chunkTokens, offset, eligibleEndOrdinal, { expandTools: deps.expandTools });
       const forceKeepLastCompartmentForChunk = forceKeepLastCompartment === true && !chunk.hasMore;
+      selectedChunk = { start: chunk.startIndex, end: chunk.endIndex };
+      deps.onChunkSelected?.(selectedChunk);
       if (!chunk.text || chunk.messageCount === 0) {
         if (persistFilteredNoise(db, sessionId, chunk, eligibleEndOrdinal)) {
           telemetry.status = "noop";
@@ -30157,7 +31524,7 @@ async function runPiHistorian(deps) {
         sessionLog2(sessionId, `historian failure: source=chunk-coverage reason="${chunkCoverageError}" chunkRange=${chunk.startIndex}-${chunk.endIndex}`);
         {
           const failCount = incrementHistorianFailure(db, sessionId, chunkCoverageError);
-          await notify(buildHistorianFailureNotice(failCount, chunkCoverageError));
+          await notifyCountedFailure(failCount, buildHistorianFailureNotice(failCount, chunkCoverageError));
         }
         rollbackDrainReservation();
         return;
@@ -30196,6 +31563,9 @@ async function runPiHistorian(deps) {
       }
       if (chunkText !== chunk.text) {
         sessionLog2(sessionId, `historian pre-flight: truncated formatted input for ${chunk.startIndex}-${chunk.endIndex} to fit ${chunkTokens} tokens`);
+      }
+      if (deps.recoveryTriggerReason) {
+        sessionLog2(sessionId, `historian recovery fire: admittedBy=${deps.recoveryTriggerReason} trueRawTokens=${boundarySnapshot.trueRawEligibleTokens} formattedChunkTokens=${chunk.tokenEstimate}`);
       }
       const prompt = buildCompartmentAgentPrompt({
         seedExamples: promptFit.seedExamples,
@@ -30356,7 +31726,7 @@ ${chunkText}`,
         sessionLog2(sessionId, `historian failure: ${errorMsg}`);
         {
           const failCount = incrementHistorianFailure(db, sessionId, errorMsg);
-          await notify(buildHistorianFailureNotice(failCount, errorMsg));
+          await notifyCountedFailure(failCount, buildHistorianFailureNotice(failCount, errorMsg));
         }
         return;
       }
@@ -30413,7 +31783,7 @@ ${chunkText}`,
         sessionLog2(sessionId, `historian failure: source=no-progress newCompartmentCount=${newCompartments.length} lastNewEnd=${lastNewEnd} priorEnd=${offset - 1}`);
         {
           const failCount = incrementHistorianFailure(db, sessionId, errorMsg);
-          await notify(buildHistorianFailureNotice(failCount, errorMsg));
+          await notifyCountedFailure(failCount, buildHistorianFailureNotice(failCount, errorMsg));
         }
         recordHistorianNoProgress(boundarySnapshot, inEmergency);
         rollbackDrainReservation();
@@ -30424,9 +31794,7 @@ ${chunkText}`,
       let firstKeptEntryId = null;
       if (readBranchEntries) {
         try {
-          const branchEntries = readBranchEntries();
-          const alignment = resolvePiOrdinalAlignment(db, sessionId, branchEntries);
-          firstKeptEntryId = isPiOrdinalAlignmentUnanchored(alignment) ? null : findFirstKeptEntryId(branchEntries, lastNewEnd, alignment.offset);
+          firstKeptEntryId = lastNewEndMessageId ? placePiMarkerKeptEntry(db, sessionId, readBranchEntries(), lastNewEndMessageId, lastNewEnd) : null;
           if (!firstKeptEntryId) {
             sessionLog2(sessionId, `historian: native compaction marker waiting; no resolvable firstKeptEntryId at or after ordinal ${lastNewEnd + 1}`);
           }
@@ -30497,8 +31865,6 @@ ${chunkText}`,
         clearHistorianDrainFailure(db, sessionId);
         recordProtectedTailPublicationFloor(db, sessionId, lastNewEnd + 1);
         acknowledgePiHistoryRetirement(db, sessionId, lastNewEnd, (id) => provider.readMessages().find((message) => message.id === id)?.ordinal);
-        if (!isWrapupInProgress(db, sessionId))
-          clearEmergencyRecovery(db, sessionId);
         if (lastNewEndMessageId) {
           setPendingPiCompactionMarkerState(db, sessionId, {
             firstKeptEntryId,
@@ -30630,7 +31996,7 @@ ${chunkText}`,
     sessionLog2(sessionId, `historian failure: source=exception ${desc.brief}${desc.stackHead ? ` stackHead="${desc.stackHead}"` : ""}`);
     if (!issueNotified) {
       const failCount = incrementHistorianFailure(db, sessionId, desc.brief);
-      await notify(buildHistorianFailureNotice(failCount, desc.brief));
+      await notifyCountedFailure(failCount, buildHistorianFailureNotice(failCount, desc.brief));
     }
   } finally {
     if (!completedSuccessfully) {
@@ -30739,6 +32105,17 @@ function buildPiCompactionSummary(compartments) {
   }
   const shown = titles.slice(0, MAX_SUMMARY_TITLES).join("; ");
   return `Magic Context compacted ${titles.length} segments: ${shown}; …and ${titles.length - MAX_SUMMARY_TITLES} more`;
+}
+function placePiMarkerKeptEntry(db, sessionId, branchEntries, endMessageId, endOrdinal) {
+  const alignment = resolvePiOrdinalAlignment(db, sessionId, branchEntries);
+  if (isPiOrdinalAlignmentUnanchored(alignment))
+    return null;
+  const kept = resolvePiMarkerKeptEntry(branchEntries, endMessageId);
+  if (kept.kind === "resolved")
+    return kept.entryId;
+  if (kept.kind === "waiting")
+    return null;
+  return findFirstKeptEntryId(branchEntries, endOrdinal, alignment.offset);
 }
 function findFirstKeptEntryId(entries, lastCompactedOrdinal, ordinalOffset = 0) {
   const boundary = resolvePiFirstKeptEntry(entries, lastCompactedOrdinal, ordinalOffset);
@@ -30852,7 +32229,13 @@ function applyDeferredPiCompactionMarker(deps, sessionId, pending) {
     }
     const branchEntries = deps.readBranchEntries();
     let firstKeptEntryId = pending.firstKeptEntryId;
-    if (!firstKeptEntryId) {
+    let placedByCut = false;
+    const kept = resolvePiMarkerKeptEntry(branchEntries, pending.endMessageId);
+    if (kept.kind !== "missing" && !isPiOrdinalAlignmentUnanchored(resolvePiOrdinalAlignment(deps.db, sessionId, branchEntries))) {
+      placedByCut = true;
+      firstKeptEntryId = kept.kind === "resolved" ? kept.entryId : null;
+    }
+    if (!placedByCut && !firstKeptEntryId) {
       const alignment = resolvePiOrdinalAlignment(deps.db, sessionId, branchEntries);
       if (isPiOrdinalAlignmentUnanchored(alignment)) {
         if (alignment.kind === "unanchored" && alignment.reason === "anchor-missing" && hasMergedSyntheticBoundary(branchEntries, pending.endMessageId)) {
@@ -30978,8 +32361,235 @@ function recordPiTransformTiming(sample) {
   timingObserver?.(sample);
 }
 
+// src/pi-request-tools.ts
+var schemaDigests = {
+  omp: new WeakMap,
+  anthropic: new WeakMap,
+  "anthropic-strict": new WeakMap,
+  raw: new WeakMap
+};
+function anthropicWireSchema(parameters, strict) {
+  const schema = typeof parameters === "object" && parameters !== null ? parameters : {};
+  const legacy = {
+    type: "object",
+    properties: schema.properties ?? {},
+    required: schema.required ?? []
+  };
+  return strict ? { ...schema, ...legacy } : legacy;
+}
+function schemaDigest(tool, mode, wireSchema) {
+  const key = tool.parameters;
+  const cacheable = typeof key === "object" && key !== null || typeof key === "function";
+  const cache = schemaDigests[mode];
+  if (cacheable) {
+    const cached = cache.get(key);
+    if (cached !== undefined)
+      return cached;
+  }
+  const digest = requestToolSchemaDigest(mode === "omp" && wireSchema ? wireSchema(tool) : mode === "anthropic" || mode === "anthropic-strict" ? anthropicWireSchema(tool.parameters, mode === "anthropic-strict") : tool.parameters);
+  if (cacheable)
+    cache.set(key, digest);
+  return digest;
+}
+var CLAUDE_CODE_TOOL_NAMES = new Map([
+  "Read",
+  "Write",
+  "Edit",
+  "Bash",
+  "Grep",
+  "Glob",
+  "AskUserQuestion",
+  "EnterPlanMode",
+  "ExitPlanMode",
+  "KillShell",
+  "NotebookEdit",
+  "Skill",
+  "Task",
+  "TaskOutput",
+  "TodoWrite",
+  "WebFetch",
+  "WebSearch"
+].map((name) => [name.toLowerCase(), name]));
+var identityName = (name) => name;
+var claudeCodeName = (name) => CLAUDE_CODE_TOOL_NAMES.get(name.toLowerCase()) ?? name;
+function compatFlag(model, flag) {
+  const value = model?.compat?.[flag];
+  return typeof value === "boolean" ? value : undefined;
+}
+function supportsToolReferences(model) {
+  const declared = compatFlag(model, "supportsToolReferences");
+  if (declared !== undefined)
+    return declared;
+  if (model.provider !== "anthropic" || typeof model.id !== "string")
+    return false;
+  if (model.id.includes("haiku"))
+    return false;
+  const version = model.id.match(/^claude-(?:opus|sonnet|fable)-(\d+)(?:-(\d+))?(?:-|$)/);
+  if (!version)
+    return false;
+  const major = Number(version[1]);
+  const minor = version[2] && version[2].length < 8 ? Number(version[2]) : 0;
+  return major > 4 || major === 4 && minor >= 5;
+}
+function deferredAndReferencedNames(messages, normalizeName) {
+  const deferred = new Set;
+  const referenced = new Set;
+  for (const message of messages) {
+    const { role, content, addedToolNames } = message ?? {};
+    if (role === "assistant" && Array.isArray(content)) {
+      for (const block of content) {
+        const { type, name } = block ?? {};
+        if (type === "toolCall" && typeof name === "string")
+          referenced.add(normalizeName(name));
+      }
+    } else if (role === "toolResult" && Array.isArray(addedToolNames)) {
+      for (const name of addedToolNames) {
+        if (typeof name !== "string")
+          continue;
+        const normalized = normalizeName(name);
+        if (!referenced.has(normalized))
+          deferred.add(normalized);
+      }
+    }
+  }
+  for (const name of deferred)
+    referenced.add(name);
+  return { deferred, referenced };
+}
+function calledToolNames(messages) {
+  const names = new Set;
+  for (const message of messages) {
+    const content = message?.content;
+    if (!Array.isArray(content))
+      continue;
+    for (const part of content) {
+      const { type, name } = part ?? {};
+      if (typeof type === "string" && type.toLowerCase().includes("tool") && typeof name === "string")
+        names.add(name);
+    }
+  }
+  return names;
+}
+function readPiRequestSendsTool(pi, name) {
+  try {
+    if (typeof pi.getAllTools !== "function" || typeof pi.getActiveTools !== "function")
+      return;
+    const active = pi.getActiveTools();
+    if (!Array.isArray(active))
+      return;
+    if (!active.includes(name))
+      return false;
+    const all = pi.getAllTools();
+    if (!Array.isArray(all))
+      return;
+    return all.some((tool) => typeof tool === "object" && tool !== null && tool.name === name);
+  } catch {
+    return;
+  }
+}
+function readPiRequestToolsFingerprint(pi, wireSchema, messages, route = {}) {
+  try {
+    if (typeof pi.getAllTools !== "function" || typeof pi.getActiveTools !== "function")
+      return;
+    const all = pi.getAllTools();
+    const active = pi.getActiveTools();
+    if (!Array.isArray(all) || !Array.isArray(active))
+      return;
+    const registered = new Map;
+    for (const tool of all) {
+      if (!tool || typeof tool !== "object")
+        return;
+      const { name } = tool;
+      if (typeof name !== "string")
+        return;
+      registered.set(name, tool);
+    }
+    const model = route.model;
+    const anthropicWriter = route.host === "pi" && wireSchema === undefined && model?.api === "anthropic-messages";
+    const mode = wireSchema ? "omp" : anthropicWriter ? compatFlag(model, "supportsStrictTools") === true ? "anthropic-strict" : "anthropic" : "raw";
+    const normalizeName = anthropicWriter && route.oauth === true ? claudeCodeName : identityName;
+    const sent = new Map;
+    for (const name of active) {
+      if (typeof name !== "string")
+        return;
+      const tool = registered.get(name);
+      if (!tool)
+        continue;
+      sent.set(normalizeName(name), tool);
+    }
+    const split = anthropicWriter && model && supportsToolReferences(model) ? deferredAndReferencedNames(messages, normalizeName) : undefined;
+    const anyImmediate = [...sent.keys()].some((name) => !split?.deferred.has(name));
+    const tools = [];
+    for (const [name, tool] of sent) {
+      const description = typeof tool.description === "string" ? tool.description : "";
+      tools.push({
+        name,
+        description,
+        schemaDigest: schemaDigest({
+          name: tool.name,
+          description,
+          parameters: tool.parameters
+        }, mode, wireSchema),
+        deferLoading: split ? anyImmediate && split.deferred.has(name) : tool.defer_loading === true || tool.deferLoading === true
+      });
+    }
+    return requestToolsFingerprint(tools, () => split?.referenced ?? calledToolNames(messages));
+  } catch {
+    return;
+  }
+}
+
+// src/ctx-reduce-callable-pi.ts
+var CTX_REDUCE = "ctx_reduce";
+function piCtxReduceCallable(pi, compactionOff, session) {
+  if (compactionOff)
+    return false;
+  const sent = readPiRequestSendsTool(pi, CTX_REDUCE);
+  if (sent !== undefined)
+    return sent;
+  return session ? readServedPiCtxReduceCallable(session.db, session.sessionId) : true;
+}
+var NAMESPACE4 = "piCtxReduceCallable";
+var servedBySession = new BoundedSessionMap(1000);
+function readServedPiCtxReduceCallable(db, sessionId) {
+  const cached = servedBySession.get(sessionId);
+  if (cached !== undefined)
+    return cached;
+  let served = true;
+  try {
+    const stored = readReplayEnvelope(db, sessionId, "read")[NAMESPACE4];
+    if (typeof stored === "boolean")
+      served = stored;
+  } catch (error) {
+    sessionLog2(sessionId, "ctx_reduce served record unreadable:", error);
+  }
+  servedBySession.set(sessionId, served);
+  return served;
+}
+function recordServedPiCtxReduceCallable(db, sessionId, callable) {
+  if (readServedPiCtxReduceCallable(db, sessionId) === callable)
+    return;
+  servedBySession.set(sessionId, callable);
+  const written = updateReplayDocument(db, sessionId, (doc) => {
+    const stored = doc[NAMESPACE4];
+    if ((typeof stored === "boolean" ? stored : true) === callable)
+      return false;
+    doc.version = 2;
+    doc[NAMESPACE4] = callable;
+    return true;
+  });
+  if (!written)
+    sessionLog2(sessionId, "ctx_reduce served record not written");
+}
+function clearPiCtxReduceCallableSession(sessionId) {
+  servedBySession.delete(sessionId);
+}
+
 // src/ctx-reduce-nudge-pi.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
+
+// src/tail-hygiene-walk-pi.ts
+import { createHash as createHash13 } from "node:crypto";
 
 // src/provider-visible-parts-pi.ts
 function isRecord4(value) {
@@ -31037,10 +32647,15 @@ function providerVisiblePiPart(value, providerApi) {
 // src/tail-hygiene-walk-pi.ts
 var TAG_PREFIX = /^§(\d+)§\s*/;
 var SYNTHETIC_TODO_PREFIX = "mc_synthetic_todo_";
-var MAX_CONTENT_MEMO_ENTRIES = 1e5;
+var MAX_CONTENT_MEMO_ENTRIES = 250000;
 var MAX_CONTENT_MEMO_BYTES = 64 * 1024 * 1024;
+var INLINE_CONTENT_KEY_CHARS = 64;
 var contentMemo = new Map;
 var contentMemoBytes = 0;
+var contentMemoHits = 0;
+var contentMemoMisses = 0;
+var contentMemoEvictions = 0;
+var contentMemoTokenizations = 0;
 function clearPiTailHygieneContentMemo() {
   contentMemo.clear();
   contentMemoBytes = 0;
@@ -31074,12 +32689,15 @@ function safeStableStringify(value) {
   }
 }
 function memoizedContent(kind, content) {
-  const key = `${kind}\x00${content}`;
+  const key = contentMemoKey(kind, content);
   const cached = contentMemo.get(key);
-  if (cached)
+  if (cached) {
+    contentMemoHits += 1;
     return cached;
+  }
+  contentMemoMisses += 1;
   const measured = {
-    hash: fnv1a32(key),
+    hash: fnv1a32(`${kind}\x00${content}`),
     tokens: kind === "excluded" ? 0 : undefined,
     keyBytes: key.length * 2 + 32
   };
@@ -31093,15 +32711,26 @@ function memoizedContent(kind, content) {
     if (removed)
       contentMemoBytes -= removed.keyBytes;
     contentMemo.delete(oldest);
+    contentMemoEvictions += 1;
   }
   return measured;
 }
-function memoizedTokens(kind, content) {
+function contentMemoKey(kind, content) {
+  if (content.length <= INLINE_CONTENT_KEY_CHARS)
+    return `${kind}\x00=${content}`;
+  const digest = createHash13("sha256").update(content, "utf16le").digest("base64");
+  return `${kind}\x00#${content.length}\x00${digest}`;
+}
+function measuredContent(kind, content) {
   const measured = memoizedContent(kind, content);
   if (measured.tokens === undefined) {
+    contentMemoTokenizations += 1;
     measured.tokens = estimateTokens(content);
   }
-  return measured.tokens;
+  return { contentHash: measured.hash, tokens: measured.tokens };
+}
+function memoizedTokens(kind, content) {
+  return measuredContent(kind, content).tokens;
 }
 function partHash(kind, content) {
   return memoizedContent(kind, content).hash;
@@ -31596,7 +33225,7 @@ function measurePiTailHygiene(input) {
           key: `${messageKey}\x00text:0`,
           kind: "text",
           content,
-          tokens: memoizedTokens("text", content),
+          ...measuredContent("text", content),
           tag
         });
       }
@@ -31634,7 +33263,7 @@ function measurePiTailHygiene(input) {
               key: `${key}\x00toolOutput`,
               kind: "toolOutput",
               content,
-              tokens: memoizedTokens("toolOutput", content),
+              ...measuredContent("toolOutput", content),
               tag: arc?.sentinel ? undefined : tag
             });
           }
@@ -31650,7 +33279,7 @@ function measurePiTailHygiene(input) {
             key: `${key}\x00text`,
             kind: "text",
             content,
-            tokens: memoizedTokens("text", content),
+            ...measuredContent("text", content),
             tag
           });
         }
@@ -31688,7 +33317,7 @@ function measurePiTailHygiene(input) {
             key: `${key}\x00toolInput`,
             kind: "toolInput",
             content,
-            tokens: memoizedTokens("toolInput", content),
+            ...measuredContent("toolInput", content),
             tag: arc?.sentinel ? undefined : arc?.tag
           });
         }
@@ -32033,6 +33662,50 @@ var DEDUP_SAFE_TOOLS = new Set([
   "mcp_lsp_goto_definition",
   "mcp_lsp_prepare_rename"
 ]);
+function piServedLocalTokens(tag, target, imageTokens) {
+  let tokens = 0;
+  const parts = target?.mutationParts;
+  if (parts && parts.length > 0) {
+    for (const { part } of parts) {
+      const transcriptPart = part;
+      const text = transcriptPart.kind === "tool_use" && transcriptPart.getToolInput ? JSON.stringify(transcriptPart.getToolInput() ?? {}) : transcriptPart.getText?.() ?? "";
+      tokens += estimateTokens(text);
+    }
+  } else {
+    const content = target?.getContent?.();
+    tokens = content ? estimateTokens(content) : 0;
+  }
+  if (tag.type !== "tool")
+    return { tools: 0, prose: tokens };
+  return { tools: tokens + (imageTokens?.get(tag.messageId) ?? 0), prose: 0 };
+}
+function snapshotPiEmergencyServedMass(tags, targets, imageTokens) {
+  const snapshot = new Map;
+  for (const tag of tags) {
+    if (tag.status !== "active")
+      continue;
+    snapshot.set(tag.tagNumber, {
+      tag: { type: tag.type, messageId: tag.messageId },
+      ...piServedLocalTokens(tag, targets.get(tag.tagNumber), imageTokens)
+    });
+  }
+  return snapshot;
+}
+function piServedMassRemovedSince(snapshot, activeNow, targets, calibration, imageTokens) {
+  const provider = (counts) => counts.tools * calibration.toolsRatio + counts.prose * calibration.proseRatio;
+  let removed = 0;
+  for (const [tagNumber, counts] of snapshot) {
+    const before = provider(counts);
+    const now = provider(piServedLocalTokens(counts.tag, targets.get(tagNumber), imageTokens));
+    if (activeNow.has(tagNumber))
+      removed += Math.max(before - now, 0);
+    else if (now === before)
+      removed += before;
+    else
+      removed += Math.max(before - now, 0);
+  }
+  return removed;
+}
 function buildPiToolFingerprints(messages, resolveStableId) {
   const fingerprints = new Map;
   for (let i = 0;i < messages.length; i++) {
@@ -32176,13 +33849,31 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
     const priorInputSample = getEmergencyInputSample(db, sessionId);
     const candidateTags = tags.filter((t) => t.status === "active" && t.type === "tool" && targets.get(t.tagNumber)?.canDrop?.());
     const recentTags = new Set(candidateTags.slice().sort((a, b) => b.tagNumber - a.tagNumber).slice(0, 20).map((tag) => tag.tagNumber));
-    const calibration = sessionDecisionCalibration(db, sessionId);
+    const calibration = emergency.fitCalibration ?? sessionDecisionCalibration(db, sessionId);
     const tPrepare = performance.now();
     config.prepareToolRemovalMeasurements?.(tags.flatMap((tag) => tag.status === "active" && tag.type === "tool" && tag.messageId && targets.get(tag.tagNumber)?.measureReclaim ? [tag.messageId] : []));
     logStep("prepareNativeRemovals", tPrepare);
     const tMeasure = performance.now();
-    const activeTags = tags.filter((t) => t.status === "active").map((tag) => measureEmergencyTag(tag, targets.get(tag.tagNumber), calibration, targets.get(tag.tagNumber)?.requiresToolArcSkeleton === true || (emergency.usagePercentage ?? 0) < 95 && recentTags.has(tag.tagNumber) && hasSmallToolInput(targets.get(tag.tagNumber))));
+    const activeTags = tags.filter((t) => t.status === "active").map((tag) => {
+      const target = targets.get(tag.tagNumber);
+      const imageTokens = emergency.toolImageTokens?.get(tag.messageId) ?? 0;
+      const observation = target?.measureReclaim;
+      const measuredTarget = imageTokens && observation ? {
+        ...target,
+        measureReclaim(skeleton) {
+          const measured = observation(skeleton);
+          return measured ? {
+            ...measured,
+            beforeTools: measured.beforeTools + imageTokens,
+            afterTools: measured.afterTools + (target.canDrop?.() ? 0 : imageTokens)
+          } : measured;
+        }
+      } : target;
+      const measured = measureEmergencyTag(tag, measuredTarget, calibration, targets.get(tag.tagNumber)?.requiresToolArcSkeleton === true || (emergency.usagePercentage ?? 0) < 95 && recentTags.has(tag.tagNumber) && hasSmallToolInput(targets.get(tag.tagNumber)));
+      return emergency.sinceReading?.has(tag.tagNumber) ? { ...measured, sinceReading: true } : measured;
+    });
     const byTag = new Map(activeTags.map((tag) => [tag.tagNumber, tag]));
+    const removedThisPassTokens = emergency.servedBeforePass ? piServedMassRemovedSince(emergency.servedBeforePass, new Set(activeTags.map((tag) => tag.tagNumber)), targets, calibration, emergency.toolImageTokens) : 0;
     const droppableTags = candidateTags.flatMap((tag) => {
       const measured = byTag.get(tag.tagNumber);
       return measured ? [measured] : [];
@@ -32196,6 +33887,7 @@ function applyPiHeuristicCleanup(sessionId, db, targets, piMessages, config, pre
       maxTag,
       protectedCutoff,
       currentTotalInputTokens: emergency.currentTotalInputTokens,
+      removedThisPassTokens,
       ceilingTokens: emergency.ceilingTokens,
       usagePercentage: emergency.usagePercentage,
       priorInputSample,
@@ -33568,86 +35260,34 @@ function trimPiMessagesToBoundary(piMessages, entryIds, cutoffMessageId, trimMut
       break;
     }
   }
-  if (cutoffIndex < 0 && sessionId && hasRawMessageProvider2(sessionId)) {
+  let promptReachesBoundary;
+  if (cutoffIndex >= 0) {
+    idCutBoundaryByMessages.set(piMessages, cutoffMessageId);
+  } else if (sessionId && piMessages.length > 0 && hasRawMessageProvider2(sessionId)) {
+    let placement;
     try {
-      const branch = readRawSessionMessages2(sessionId);
-      const positions = new Map(branch.map((message, index) => [message.id, index]));
-      const boundaryPosition = positions.get(cutoffMessageId);
-      if (boundaryPosition === undefined)
-        return 0;
-      let previous = -1;
-      for (const [index, message] of piMessages.entries()) {
-        if (isPiSystemEntry(message))
-          continue;
-        const id = resolveStableId(message, index, entryIds);
-        const position = positions.get(id) ?? positions.get(`${SYNTH_USER_ID_PREFIX}${id}`);
-        if (position === undefined || position <= previous)
-          return 0;
-        previous = position;
-        if (position <= boundaryPosition)
-          cutoffIndex = index;
-      }
-    } catch {
+      placement = placeCutByBranchPosition(piMessages, entryIds, cutoffMessageId, sessionId);
+    } catch (error) {
+      placement = {
+        placed: false,
+        reason: `the branch could not be read (${error instanceof Error ? error.message : String(error)})`,
+        firstUnplacedRole: "unknown"
+      };
+    }
+    if (!placement.placed) {
+      if (idCutBoundaryByMessages.get(piMessages) !== cutoffMessageId)
+        logUnplacedCut(sessionId, cutoffMessageId, piMessages.length, placement.reason, placement.firstUnplacedRole);
       return 0;
     }
+    cutoffIndex = placement.cutoffIndex;
+    promptReachesBoundary = placement.promptReachesBoundary;
   }
   if (cutoffIndex < 0)
     return 0;
-  const remove = new Set;
-  let preserved = 0;
-  for (let i = 0;i <= cutoffIndex; i++) {
-    if (isPiSystemEntry(piMessages[i]))
-      preserved++;
-    else
-      remove.add(i);
-  }
+  const preserved = piMessages.slice(0, cutoffIndex + 1).filter((message) => isPiSystemEntry(message)).length;
   if (preserved > 0)
     sessionLog2(sessionId ?? "unknown", `pi system entries preserved across fold: ${preserved}`);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    const removedCallKeys = new Set;
-    const removedResultKeys = new Set;
-    for (const index of remove) {
-      const msg = piMessages[index];
-      if (!msg)
-        continue;
-      if (msg.role === "assistant") {
-        for (const callId of getPiToolCallIds(msg)) {
-          removedCallKeys.add(toolPairKey(callId, index));
-        }
-      } else if (msg.role === "toolResult") {
-        const callId = getPiToolResultCallId(msg);
-        const ownerIndex = callId ? findToolResultOwnerAssistantIndex(piMessages, index, callId) : null;
-        if (callId && ownerIndex !== null) {
-          removedResultKeys.add(toolPairKey(callId, ownerIndex));
-        }
-      }
-    }
-    for (let i = 0;i < piMessages.length; i++) {
-      if (remove.has(i))
-        continue;
-      const msg = piMessages[i];
-      if (!msg)
-        continue;
-      if (msg.role === "toolResult") {
-        const callId = getPiToolResultCallId(msg);
-        const ownerIndex = callId ? findToolResultOwnerAssistantIndex(piMessages, i, callId) : null;
-        if (callId && ownerIndex !== null && removedCallKeys.has(toolPairKey(callId, ownerIndex))) {
-          remove.add(i);
-          changed = true;
-        }
-        continue;
-      }
-      if (msg.role === "assistant") {
-        const callIds = getPiToolCallIds(msg);
-        if (callIds.some((callId) => removedResultKeys.has(toolPairKey(callId, i)))) {
-          remove.add(i);
-          changed = true;
-        }
-      }
-    }
-  }
+  const remove = planPiHistoryCut(piMessages, cutoffIndex, promptReachesBoundary);
   const retiredIds = new Set;
   if (retireDecisions) {
     for (const index of remove) {
@@ -33668,38 +35308,76 @@ function trimPiMessagesToBoundary(piMessages, entryIds, cutoffMessageId, trimMut
   retireDecisions?.(retiredIds);
   return removed;
 }
-function toolPairKey(callId, assistantIndex) {
-  return `${callId}\x00${assistantIndex}`;
-}
-function findToolResultOwnerAssistantIndex(messages, resultIndex, callId) {
-  for (let i = resultIndex - 1;i >= 0; i--) {
-    const msg = messages[i];
-    if (msg?.role === "assistant" && getPiToolCallIds(msg).includes(callId)) {
-      return i;
-    }
+function placeCutByBranchPosition(piMessages, entryIds, cutoffMessageId, sessionId) {
+  const branch = readRawSessionMessages2(sessionId);
+  const positions = new Map(branch.map((message, index) => [message.id, index]));
+  const eventPositions = new Map;
+  let firstUnplacedRole;
+  let contentMessages = 0;
+  for (const [index, message] of piMessages.entries()) {
+    if (isPiSystemEntry(message))
+      continue;
+    contentMessages++;
+    const id = resolveStableId(message, index, entryIds);
+    const position = positions.get(id) ?? positions.get(`${SYNTH_USER_ID_PREFIX}${id}`);
+    if (position === undefined)
+      firstUnplacedRole ??= String(message.role);
+    else
+      eventPositions.set(index, position);
   }
-  for (let i = resultIndex + 1;i < messages.length; i++) {
-    const msg = messages[i];
-    if (msg?.role === "assistant" && getPiToolCallIds(msg).includes(callId)) {
-      return i;
-    }
+  const unplacedRole = firstUnplacedRole ?? "none";
+  const boundaryPosition = positions.get(cutoffMessageId);
+  if (boundaryPosition === undefined)
+    return {
+      placed: false,
+      reason: "it is not on the active branch either",
+      firstUnplacedRole: unplacedRole
+    };
+  if (contentMessages > 0 && eventPositions.size === 0)
+    return {
+      placed: false,
+      reason: "none of them has a branch position",
+      firstUnplacedRole: unplacedRole
+    };
+  let cutoffIndex = -1;
+  let previous = -1;
+  for (const [index, position] of eventPositions) {
+    if (position <= previous)
+      return {
+        placed: false,
+        reason: "the context messages are not in branch order",
+        firstUnplacedRole: unplacedRole
+      };
+    previous = position;
+    if (position <= boundaryPosition)
+      cutoffIndex = index;
   }
-  return null;
-}
-function getPiToolCallIds(message) {
-  if (!Array.isArray(message.content))
-    return [];
-  const ids = [];
-  for (const part of message.content) {
-    if (part && typeof part === "object" && part.type === "toolCall" && typeof part.id === "string") {
-      ids.push(part.id);
+  return {
+    placed: true,
+    cutoffIndex,
+    promptReachesBoundary: (eventIndex) => {
+      const promptPosition = eventPositions.get(eventIndex);
+      if (promptPosition === undefined)
+        return true;
+      for (let p = promptPosition + 1;p <= boundaryPosition; p++) {
+        const message = branch[p];
+        if (message?.role === "user" && !message.id.startsWith(SYNTH_USER_ID_PREFIX))
+          return false;
+      }
+      return true;
     }
-  }
-  return ids;
+  };
 }
-function getPiToolResultCallId(message) {
-  const callId = message.toolCallId;
-  return typeof callId === "string" && callId.length > 0 ? callId : null;
+var idCutBoundaryByMessages = new WeakMap;
+var unplacedCutLoggedSessions = new Set;
+function resetPiUnplacedCutLog(sessionId) {
+  unplacedCutLoggedSessions.delete(sessionId);
+}
+function logUnplacedCut(sessionId, boundaryMessageId, eventLength, reason, firstUnplacedRole) {
+  if (unplacedCutLoggedSessions.has(sessionId))
+    return;
+  unplacedCutLoggedSessions.add(sessionId);
+  sessionLog2(sessionId, `pi history cut not placed: boundary ${boundaryMessageId} is not among the ${eventLength} context messages and ${reason}; first message without a branch position: ${firstUnplacedRole}; nothing was cut at this boundary`);
 }
 var PI_M1_PLACEHOLDER = "<session-history-since>(no new content since last materialization)</session-history-since>";
 var MAX_FORCED_MEMORIES_PER_DELTA = 10;
@@ -33825,6 +35503,7 @@ function piImageFromDataUrl(dataUrl) {
     return null;
   return { type: "image", mimeType: match[1], data: match[2] };
 }
+var PI_IMAGE_DATA_URL_PREFIX = /^data:image\/[a-zA-Z0-9.+-]+;base64,[\s\S]/;
 function resolveMuralForM0Pi(state, db, modelKey, budgetTokens, mode = "persist") {
   if (state.memoryEnabled === false)
     return;
@@ -33923,6 +35602,7 @@ function getCachedMarkers(db, state, compartmentsForNormalization, metaOverride,
     compartmentRenderEpoch: cachedUpgradeIdentity.compartmentRenderEpoch,
     memoryRenderEpoch: cachedUpgradeIdentity.memoryRenderEpoch,
     lastBaselineEndMessageId: cachedBoundary,
+    lastBaselineEndPartial: cachedRowOverride?.cached_trim_partial === 1,
     systemHash: meta.cachedM0SystemHash ?? "",
     modelKey: meta.cachedM0ModelKey ?? "",
     projectIdentity: meta.cachedM0ProjectIdentity ?? null,
@@ -33934,6 +35614,9 @@ function getCachedMarkers(db, state, compartmentsForNormalization, metaOverride,
 function lastBaselineEndMessageId(compartments) {
   const last = compartments.at(-1);
   return last?.endMessageId && last.endMessageId.length > 0 ? last.endMessageId : null;
+}
+function isPartialBoundary(compartments, id) {
+  return id !== null && compartments.some((row) => row.endMessageId === id && row.endBlockIndex != null);
 }
 function readCurrentMarkers(db, state, projectDocsHash) {
   return readCurrentMarkersFromCompartments(db, state, getRenderableCompartmentsPi(db, state), projectDocsHash);
@@ -33959,6 +35642,7 @@ function readCurrentMarkersFromCompartments(db, state, compartments, projectDocs
     compartmentRenderEpoch: COMPARTMENT_RENDER_EPOCH,
     memoryRenderEpoch: MEMORY_RENDER_FORMAT_EPOCH,
     lastBaselineEndMessageId: lastBaselineEndMessageId(compartments),
+    lastBaselineEndPartial: isPartialBoundary(compartments, lastBaselineEndMessageId(compartments)),
     systemHash: (state.hardSignals ?? EMPTY_PI_HARD_SIGNALS).systemHash,
     modelKey: piModelRefToCanonical((state.hardSignals ?? EMPTY_PI_HARD_SIGNALS).modelKey),
     projectIdentity: state.projectIdentity,
@@ -34006,9 +35690,6 @@ function mustMaterializePi(state, db, currentCompartmentsOverride, passSnapshot)
   }
   if (meta.cachedM0ProjectIdentity !== null && meta.cachedM0ProjectIdentity !== state.projectIdentity) {
     return piMaterializeMismatch("project_change", "projectIdentity", meta.cachedM0ProjectIdentity, state.projectIdentity);
-  }
-  if (hard.cacheExpired && hard.lastResponseTime > 0 && hard.lastResponseTime > (meta.cachedM0MaterializedAt ?? 0)) {
-    return piMaterializeMismatch("ttl_idle", "lastResponseTimeAfterMaterialization", meta.cachedM0MaterializedAt ?? 0, hard.lastResponseTime);
   }
   if (cached.upgradeState !== current.upgradeState) {
     return piMaterializeMismatch("renderer_upgrade", "upgradeState", cached.upgradeState, current.upgradeState);
@@ -34131,6 +35812,7 @@ function readFrozenM0InputsPi(state, db, docs = readProjectDocsForPiM0(state), m
       compartmentRenderEpoch: COMPARTMENT_RENDER_EPOCH,
       memoryRenderEpoch: MEMORY_RENDER_FORMAT_EPOCH,
       lastBaselineEndMessageId: lastBaselineEndMessageId(compartments),
+      lastBaselineEndPartial: isPartialBoundary(compartments, lastBaselineEndMessageId(compartments)),
       systemHash: (state.hardSignals ?? EMPTY_PI_HARD_SIGNALS).systemHash,
       modelKey: piModelRefToCanonical((state.hardSignals ?? EMPTY_PI_HARD_SIGNALS).modelKey),
       projectIdentity: state.projectIdentity,
@@ -34196,6 +35878,7 @@ function materializeM0Pi(state, db, passSnapshot) {
   const upgradeIdentity = withCachedM0MemoryIds(encodeCachedM0UpgradeIdentity(snapshotMarkers.upgradeState, snapshotMarkers.compartmentRenderEpoch, snapshotMarkers.muralEnabled, snapshotMarkers.renderBudgetIdentity, snapshotMarkers.memoryRenderEpoch, snapshotMarkers.renderedBudgets ?? null), renderedMemoryIds);
   steps.mark("pre_metadata");
   state.beforeCacheCommitForTest?.();
+  const commitFold = state.onFoldPrepare?.();
   try {
     db.exec("BEGIN IMMEDIATE");
   } catch (error) {
@@ -34245,6 +35928,15 @@ function materializeM0Pi(state, db, passSnapshot) {
     steps.mark("persistCachedM0");
     db.prepare("UPDATE session_meta SET memory_block_count = ?, memory_block_ids = ?, cached_m0_last_baseline_end_message_id = ? WHERE session_id = ?").run(visibleMemoryIds.length, visibleIdsJson, snapshotMarkers.lastBaselineEndMessageId, state.sessionId);
     steps.mark("sessionMeta");
+    if (commitFold) {
+      const muralWire = m0.includes("<memory-mural>") && frozenMuralDataUrl ? frozenMuralDataUrl : null;
+      commitFold(db, {
+        m0Text: muralWire ? m0 : stripMemoryMuralBlock(m0),
+        m1Text: m1Render.text,
+        muralDataUrl: muralWire && PI_IMAGE_DATA_URL_PREFIX.test(muralWire) ? muralWire : null
+      });
+      steps.mark("onFoldCommit");
+    }
     db.exec("COMMIT");
     steps.mark("commit");
     logSlowWriteTransaction("pi_materialize_cache", transactionStartedAt, undefined, performance.now(), steps.durations);
@@ -34446,6 +36138,7 @@ function readCachedPiM0M1Row(db, sessionId) {
 					cached_m0_model_key,
 					cached_m0_project_identity,
 					cached_m0_last_baseline_end_message_id,
+					${CACHED_TRIM_PARTIAL_SQL} AS cached_trim_partial,
 					memory_block_ids
 			   FROM session_meta
 			  WHERE session_id = ?`).get(sessionId);
@@ -34497,6 +36190,7 @@ function markersFromCachedPiRow(row, compartmentsForNormalization) {
     compartmentRenderEpoch: cachedUpgradeIdentity.compartmentRenderEpoch,
     memoryRenderEpoch: cachedUpgradeIdentity.memoryRenderEpoch,
     lastBaselineEndMessageId: typeof row.cached_m0_last_baseline_end_message_id === "string" && row.cached_m0_last_baseline_end_message_id.length > 0 ? row.cached_m0_last_baseline_end_message_id : null,
+    lastBaselineEndPartial: row.cached_trim_partial === 1,
     systemHash: row.cached_m0_system_hash ?? "",
     modelKey: row.cached_m0_model_key ?? "",
     projectIdentity: row.cached_m0_project_identity ?? null,
@@ -34596,7 +36290,11 @@ function softRefreshCachedM1Pi(args) {
     return {
       m0: decodeCachedM0(row.cached_m0_bytes) ?? "",
       m1: rendered.text,
-      markers: { ...markers, lastBaselineEndMessageId: advancedBoundary },
+      markers: {
+        ...markers,
+        lastBaselineEndMessageId: advancedBoundary,
+        lastBaselineEndPartial: latest?.endMessageId ? isPartialBoundary(compartments, advancedBoundary) : markers.lastBaselineEndPartial
+      },
       memoryUpdateCount: rendered.memoryUpdateCount,
       recomputed: true
     };
@@ -34651,7 +36349,7 @@ function replayCompletePiPrefix(db, state, row, compartments, messages, entryIds
   if (!mural)
     m0 = stripMemoryMuralBlock(m0);
   const trimBoundaryId = row.cached_m0_last_baseline_end_message_id;
-  const skippedVisibleMessages = trimBoundaryId ? trimPiMessagesToBoundary(messages, entryIds, trimBoundaryId, false, state.sessionId, compartments.some((c) => c.endMessageId === trimBoundaryId && c.endBlockIndex != null), (ids) => queueAutoSearchHintDecisionRetirement(db, state.sessionId, ids)) : 0;
+  const skippedVisibleMessages = trimBoundaryId ? trimPiMessagesToBoundary(messages, entryIds, trimBoundaryId, false, state.sessionId, row.cached_trim_partial === 1, (ids) => queueAutoSearchHintDecisionRetirement(db, state.sessionId, ids)) : 0;
   const head = [];
   prependM0M1Messages(head, m0, m1, mural, messages[0]?.timestamp);
   const insertionIndex = placePiInitialSystemAtHead(messages);
@@ -34672,7 +36370,12 @@ function replayCompletePiPrefix(db, state, row, compartments, messages, entryIds
     syntheticLeadingCount: insertionIndex + 2
   };
   if (state.freezePrefixForPass)
-    state.preparedPrefix = { result, messages: head, trimBoundaryId };
+    state.preparedPrefix = {
+      result,
+      messages: head,
+      trimBoundaryId,
+      trimBoundaryPartial: row.cached_trim_partial === 1
+    };
   return result;
 }
 function prepareCachedM0M1PiReplay(state, db, rowOverride) {
@@ -34690,7 +36393,7 @@ function prepareCachedM0M1PiReplay(state, db, rowOverride) {
 function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = false, passSnapshot) {
   if (state.preparedPrefix) {
     const prepared = state.preparedPrefix;
-    const skippedVisibleMessages = prepared.trimBoundaryId ? trimPiMessagesToBoundary(piMessages, entryIds, prepared.trimBoundaryId, false, state.sessionId, isPartialCompartmentEnd(db, state.sessionId, prepared.trimBoundaryId), (ids) => queueAutoSearchHintDecisionRetirement(db, state.sessionId, ids)) : 0;
+    const skippedVisibleMessages = prepared.trimBoundaryId ? trimPiMessagesToBoundary(piMessages, entryIds, prepared.trimBoundaryId, false, state.sessionId, prepared.trimBoundaryPartial, (ids) => queueAutoSearchHintDecisionRetirement(db, state.sessionId, ids)) : 0;
     const head = structuredClone(prepared.messages);
     const timestamp = piMessages[0]?.timestamp;
     if (typeof timestamp === "number") {
@@ -34853,7 +36556,8 @@ function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = fal
       };
     }
   }
-  const skippedVisibleMessages = trimBoundaryId ? trimPiMessagesToBoundary(piMessages, entryIds, trimBoundaryId, false, state.sessionId, isPartialCompartmentEnd(db, state.sessionId, trimBoundaryId), (ids) => queueAutoSearchHintDecisionRetirement(db, state.sessionId, ids)) : 0;
+  const trimBoundaryPartial = markers.lastBaselineEndPartial;
+  const skippedVisibleMessages = trimBoundaryId ? trimPiMessagesToBoundary(piMessages, entryIds, trimBoundaryId, false, state.sessionId, trimBoundaryPartial, (ids) => queueAutoSearchHintDecisionRetirement(db, state.sessionId, ids)) : 0;
   const muralWire = m0.includes("<memory-mural>") ? muralForWire(state.sessionId) : undefined;
   if (!muralWire)
     m0 = stripMemoryMuralBlock(m0);
@@ -34890,7 +36594,8 @@ function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = fal
     state.preparedPrefix = {
       result,
       messages: structuredClone(piMessages.slice(insertionIndex, insertionIndex + 2)),
-      trimBoundaryId
+      trimBoundaryId,
+      trimBoundaryPartial
     };
   return result;
 }
@@ -35019,6 +36724,22 @@ function repairPiHistoryBoundary(db, sessionId, ctx, branchEntries) {
 }
 
 // src/native-replay-pi.ts
+var DROP_PLACEHOLDER = /^\[dropped §\d+§\]$/u;
+var TAG_LABEL = /^§\d+§ /u;
+var RESPONSES_APIS = new Set([
+  "openai-responses",
+  "azure-openai-responses",
+  "openai-codex-responses"
+]);
+function isPiDropPlaceholder(text) {
+  return DROP_PLACEHOLDER.test(text);
+}
+function nativeTextMatchesBlock(nativeText, blockText) {
+  return nativeText === blockText.replace(TAG_LABEL, "");
+}
+function hookCleanedTextMatchesBlock(nativeText, blockText) {
+  return nativeTextMatchesBlock(stripPersistedAssistantText(nativeText), blockText);
+}
 function getNativeEnvelope(message) {
   if (!isRecord(message) || isPiSystemEntry(message))
     return;
@@ -35105,11 +36826,141 @@ function textIdentity(part) {
   } catch {}
   return;
 }
-function rewriteNativeAssistantTexts(message, previous, sessionId) {
+function nativeTextSlots(content, items) {
+  const slots = [];
+  for (let itemIndex = 0;itemIndex < items.length; itemIndex++) {
+    const item = items[itemIndex];
+    if (!isRecord(item))
+      return;
+    if (item.type === "reasoning" || item.type === "function_call" || item.type === "custom_tool_call")
+      continue;
+    if (item.type !== "message" || item.role !== "assistant" || !Array.isArray(item.content))
+      return;
+    for (let outputIndex = 0;outputIndex < item.content.length; outputIndex++) {
+      const output = item.content[outputIndex];
+      if (!isRecord(output) || output.type !== "output_text" || typeof output.text !== "string")
+        return;
+      slots.push({ itemIndex, outputIndex, text: output.text });
+    }
+  }
+  const blocks = content.filter((block) => isRecord(block) && block.type === "text").length;
+  return slots.length === blocks ? slots : undefined;
+}
+function hookRewrittenSlot(previous, partIndex, items) {
+  const slots = nativeTextSlots(previous, items);
+  if (!slots)
+    return;
+  let ordinal = 0;
+  let target;
+  for (let index = 0;index < previous.length; index++) {
+    const block = previous[index];
+    if (!isRecord(block) || block.type !== "text")
+      continue;
+    const slot = slots[ordinal++];
+    const item = items[slot.itemIndex];
+    if (typeof block.text !== "string")
+      return;
+    if ("textSignature" in block) {
+      const identity = textIdentity(block);
+      if (index === partIndex || !identity || item.id !== identity.id || item.phase !== identity.phase)
+        return;
+      continue;
+    }
+    if (!hookCleanedTextMatchesBlock(slot.text, block.text))
+      return;
+    if (index !== partIndex)
+      continue;
+    if (item.content.length !== 1)
+      return;
+    target = slot;
+  }
+  return target;
+}
+function emptyAssistantMessage(item) {
+  if (item.type !== "message" || item.role !== "assistant")
+    return false;
+  if (typeof item.content === "string")
+    return !/\S/u.test(item.content);
+  return Array.isArray(item.content) && !item.content.some((part) => isRecord(part) && (part.type === "output_text" && typeof part.text === "string" && /\S/u.test(part.text) || part.type === "refusal" && typeof part.refusal === "string" && /\S/u.test(part.refusal)));
+}
+function replayableNativeItems(message, model) {
+  const payload = message.providerPayload;
+  if (message.api !== model.api || message.model !== model.id || !isRecord(payload) || payload.type !== "openaiResponsesHistory" || !Array.isArray(payload.items) || (payload.provider ?? message.provider ?? model.provider) !== model.provider)
+    return;
+  return payload.items.some((item) => !isRecord(item) || item.type !== "reasoning" && !emptyAssistantMessage(item)) ? payload.items : undefined;
+}
+function signedItemText(block, items) {
+  const identity = textIdentity(block);
+  if (!identity)
+    return;
+  const matches = items.filter((item) => isRecord(item) && item.type === "message" && item.role === "assistant" && item.id === identity.id && item.phase === identity.phase);
+  const outputs = matches.length === 1 && Array.isArray(matches[0].content) ? matches[0].content.filter((output) => isRecord(output) && output.type === "output_text") : [];
+  const text = outputs[0]?.text;
+  return outputs.length === 1 && typeof text === "string" ? text : undefined;
+}
+function piNativeDropExpectations(messages, model) {
+  const expectations = [];
+  if (!model || !RESPONSES_APIS.has(String(model.api)))
+    return expectations;
+  for (let index = 0;index < messages.length; index++) {
+    const message = messages[index];
+    if (!isRecord(message) || message.role !== "assistant" || !Array.isArray(message.content) || !message.content.some((block) => isRecord(block) && block.type === "text" && typeof block.text === "string" && isPiDropPlaceholder(block.text)))
+      continue;
+    const items = replayableNativeItems(message, model);
+    if (!items)
+      continue;
+    const slots = nativeTextSlots(message.content, items);
+    let ordinal = 0;
+    for (const block of message.content) {
+      if (!isRecord(block) || block.type !== "text")
+        continue;
+      const slot = slots?.[ordinal++];
+      if (typeof block.text !== "string" || !isPiDropPlaceholder(block.text))
+        continue;
+      const native = "textSignature" in block ? signedItemText(block, items) : slot?.text;
+      expectations.push({
+        message: index,
+        placeholder: block.text,
+        ...native !== undefined && native !== block.text ? { stale: native } : {}
+      });
+    }
+  }
+  return expectations;
+}
+function wireAssistantTexts(payload) {
+  const input = isRecord(payload) ? payload.input : undefined;
+  if (!Array.isArray(input))
+    return;
+  const texts = new Set;
+  for (const item of input) {
+    if (!isRecord(item) || item.role !== "assistant")
+      continue;
+    if (typeof item.content === "string")
+      texts.add(item.content);
+    else if (Array.isArray(item.content)) {
+      for (const part of item.content)
+        if (isRecord(part) && typeof part.text === "string")
+          texts.add(part.text);
+    }
+  }
+  return texts;
+}
+function piNativeDropWireMismatch(payload, expectations) {
+  if (!expectations?.length)
+    return;
+  const texts = wireAssistantTexts(payload);
+  for (const expected of expectations)
+    if (!texts?.has(expected.placeholder) || expected.stale !== undefined && texts.has(expected.stale))
+      return `message=${expected.message} comparison=native_drop`;
+  return;
+}
+function rewriteNativeAssistantTexts(message, previous, sessionId, options = {}) {
   const envelope = getNativeEnvelope(message);
   if (envelope?.message.role !== "assistant" || !isRecord(previous) || !Array.isArray(previous.content) || !Array.isArray(envelope.message.content))
     return;
   const content = envelope.message.content;
+  const arrivedItems = envelope.items;
+  const unsignedEdits = options.unsignedEdits === true && RESPONSES_APIS.has(String(envelope.message.api)) && envelope.payload.dt === true;
   for (let index = 0;index < content.length; index++) {
     const part = content[index];
     const before = previous.content[index];
@@ -35118,6 +36969,23 @@ function rewriteNativeAssistantTexts(message, previous, sessionId) {
     if (part.text.replace(/^§\d+§ /u, "") === before.text.replace(/^§\d+§ /u, ""))
       continue;
     const identity = textIdentity(part);
+    if (identity === undefined && unsignedEdits && !("textSignature" in part)) {
+      const slot = hookRewrittenSlot(previous.content, index, arrivedItems);
+      if (slot) {
+        const item = envelope.items[slot.itemIndex];
+        const outputs = item.content.slice();
+        outputs[slot.outputIndex] = {
+          ...outputs[slot.outputIndex],
+          text: part.text.replace(TAG_LABEL, "")
+        };
+        const items = envelope.items.slice();
+        items[slot.itemIndex] = { ...item, content: outputs };
+        envelope.items = items;
+        envelope.payload = { ...envelope.payload, items };
+        envelope.message.providerPayload = envelope.payload;
+        continue;
+      }
+    }
     const sameIdentity = (value) => {
       const other = textIdentity(value);
       return identity !== undefined && other?.id === identity.id && other.phase === identity.phase;
@@ -35483,15 +37351,9 @@ function authorizePiToolRemoval(args) {
 }
 
 // src/native-replay-tag-provenance-pi.ts
-import { createHash as createHash12 } from "node:crypto";
-var PI_NATIVE_TAG_STRIP_PROVENANCE = "magicContextNativeTagStrips";
+import { createHash as createHash14 } from "node:crypto";
 function nativeResponseTagStripKey(id, phase, text) {
-  return createHash12("sha256").update(JSON.stringify([id, phase, text])).digest("hex");
-}
-function ownsNativeResponseTagStrip(decisions, id, phase, text) {
-  if (!isRecord(decisions) || phase !== undefined && phase !== "commentary" && phase !== "final_answer")
-    return false;
-  return Object.entries(decisions).some(([key, original]) => typeof original === "string" && /^§\d+§ /u.test(original) && original.replace(/^§\d+§ /u, "") === text && nativeResponseTagStripKey(id, phase, original) === key);
+  return createHash14("sha256").update(JSON.stringify([id, phase, text])).digest("hex");
 }
 
 // src/native-replay-tags-pi.ts
@@ -35540,7 +37402,6 @@ function applyNativeResponseTagReplayPi(args) {
     const frozen = saved;
     const content = message.content;
     const nativeItems = payload.items;
-    const decisions = {};
     let changed = false;
     const items = nativeItems.map((item) => {
       if (!isRecord(item) || item.type !== "message" || item.role !== "assistant" || item.phase !== undefined && item.phase !== "commentary" && item.phase !== "final_answer" || !Array.isArray(item.content) || item.content.length !== 1)
@@ -35563,7 +37424,6 @@ function applyNativeResponseTagReplayPi(args) {
           return item;
         added.add(key);
       }
-      decisions[key] = output.text;
       changed = true;
       return {
         ...item,
@@ -35573,7 +37433,6 @@ function applyNativeResponseTagReplayPi(args) {
     if (changed)
       pending.set(index, {
         ...message,
-        [PI_NATIVE_TAG_STRIP_PROVENANCE]: decisions,
         providerPayload: { ...payload, items }
       });
   }
@@ -35837,9 +37696,19 @@ function isOmpSideContext(event) {
     return row.role === "developer" && row.attribution === "agent" && textContainsReminder(row.content);
   });
 }
-var ADVISOR_PREFIX = "<conventions>\nRFC 2119 keywords: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER`=`MUST NOT`; `AVOID`=`SHOULD NOT`.\n</conventions>\n\nUser, code-quality, robustness advocate; peer-shadow main agent.\n";
+var ADVISOR_CONVENTIONS = "<conventions>\nRFC 2119 keywords: MUST, REQUIRED, SHOULD, RECOMMENDED, MAY, OPTIONAL. `NEVER`=`MUST NOT`; `AVOID`=`SHOULD NOT`.\n</conventions>\n\n";
+var ADVISOR_ROLE = `User, code-quality, robustness advocate; peer-shadow main agent.
+`;
 var ADVISOR_WORKFLOW = `<workflow>
 Receive incremental agent transcript, including thoughts.
+`;
+var SESSION_UPDATE = `### Session update
+
+`;
+var COMPACTION_SUMMARY = `Prior model work/tool state available.
+MUST build on prior work; NEVER duplicate prior work.
+
+<summary>
 `;
 var CAPTURE_PREFIX = "Automated capture turn — not a user reply; user has not responded to your previous turn.";
 function record3(value) {
@@ -35920,11 +37789,17 @@ function firstTextBlock(value) {
   const part = record3(value);
   return part?.type === "text" && typeof part.text === "string" ? part.text : undefined;
 }
+function isOmpStockAdvisorPrompt(text) {
+  if (typeof text !== "string")
+    return false;
+  const body = text.startsWith(ADVISOR_CONVENTIONS) ? text.slice(ADVISOR_CONVENTIONS.length) : text;
+  return body.startsWith(ADVISOR_ROLE) && body.includes(ADVISOR_WORKFLOW);
+}
 function isOmpAdvisorRequest(payload) {
   const request = providerRequest(payload);
   if (!request?.tools.includes("advise"))
     return false;
-  if (!request.system.some((text) => text?.startsWith(ADVISOR_PREFIX) && text.includes(ADVISOR_WORKFLOW)))
+  if (!request.system.some(isOmpStockAdvisorPrompt))
     return false;
   const first = record3(request.messages[0]);
   if (first?.role !== "user")
@@ -35932,20 +37807,202 @@ function isOmpAdvisorRequest(payload) {
   let text = firstText(first.content, request.textType)?.replace(/^<system-reminder>\nToday: [^\n]+\n<\/system-reminder>(?:\n|$)/, "");
   if (text === "" && Array.isArray(first.content))
     text = firstText(first.content.slice(1, 2), request.textType);
-  return text?.startsWith(`### Session update
-
-`) === true;
+  return text?.startsWith(SESSION_UPDATE) === true || text?.startsWith(COMPACTION_SUMMARY) === true;
 }
 function isOmpUnmanagedCaptureRequest(payload) {
+  return isOmpLegacyCaptureRequest(payload) || isOmpAutolearnCapture(payload);
+}
+function isOmpLegacyCaptureRequest(payload) {
   const request = providerRequest(payload);
   if (!request?.tools.length || !request.tools.every((name) => name === "manage_skill" || name === "learn"))
     return false;
   const last = record3(request.messages.at(-1));
   return last?.role === "user" && firstText(last.content, request.textType)?.startsWith(CAPTURE_PREFIX) === true;
 }
+var OMP_AUTOLEARN_CAPTURE_PROMPT = "Automated capture turn — not a user reply; user has not responded to your previous turn. Do not treat this prompt as their answer, approval to continue, or acceptance of any pending action; only the user can do so.\n\nIf your previous turn produced reusable output, capture it now only if it will genuinely help next time: repeatable procedure → managed skill (`manage_skill`); durable fact, convention, or user preference → remember with `learn` when memory enabled. If nothing worth keeping, do nothing.\n\nThen stop. Do not run other tools, resume prior work, answer pending questions, or produce a continuation reply. Yield; wait for the user's next prompt.";
+var DATE_CWD_REMINDER = /^<system-reminder>\nToday: [^\n]*; current working directory: '[^\n]*'\. Do not repeat this information in your reply\.\n<\/system-reminder>(?:\n|$)/;
+function textBlocks(value, type) {
+  if (typeof value === "string")
+    return [value];
+  if (!Array.isArray(value))
+    return;
+  const texts = [];
+  for (const block of value) {
+    const part = record3(block);
+    if (part?.type !== type || typeof part.text !== "string")
+      return;
+    texts.push(part.text);
+  }
+  return texts;
+}
+function isCapturePrompt(row, type) {
+  if (row.role !== "user" && row.role !== "developer")
+    return false;
+  const texts = textBlocks(row.content, type);
+  if (!texts?.length)
+    return false;
+  let [first, ...rest] = texts;
+  first = first.replace(DATE_CWD_REMINDER, "");
+  if (first === "" && rest.length)
+    [first, ...rest] = rest;
+  return rest.length === 0 && first === OMP_AUTOLEARN_CAPTURE_PROMPT;
+}
+var RESPONSES_TURN_ITEMS = new Set([
+  "reasoning",
+  "function_call",
+  "function_call_output",
+  "custom_tool_call",
+  "custom_tool_call_output"
+]);
+function isCaptureTurnRow(row) {
+  if (row.role === "assistant" || row.role === "tool")
+    return true;
+  if (typeof row.type === "string" && RESPONSES_TURN_ITEMS.has(row.type))
+    return true;
+  if (isOmpJuiceItem(row))
+    return true;
+  return row.role === "user" && Array.isArray(row.content) && row.content.length > 0 && row.content.every((block) => record3(block)?.type === "tool_result");
+}
+function isOmpAutolearnCapture(payload) {
+  const request = providerRequest(payload);
+  if (!request?.tools.some((name) => name === "manage_skill" || name === "learn"))
+    return false;
+  for (let index = request.messages.length - 1;index >= 0; index--) {
+    const row = record3(request.messages[index]);
+    if (!row)
+      return false;
+    if (isCaptureTurnRow(row))
+      continue;
+    return isCapturePrompt(row, request.textType);
+  }
+  return false;
+}
+var JUICE_VALUES = new Set(["0", "2", "4", "8", "48", "112", "960"]);
+function isOmpJuiceItem(value) {
+  const item = record3(value);
+  if (!item || Object.keys(item).length !== 2 || item.role !== "developer")
+    return false;
+  const content = item.content;
+  if (!Array.isArray(content) || content.length !== 1)
+    return false;
+  const part = record3(content[0]);
+  if (!part || Object.keys(part).length !== 2 || part.type !== "input_text")
+    return false;
+  const juice = /^# Juice: (\d+) !important$/.exec(String(part.text));
+  return juice !== null && JUICE_VALUES.has(juice[1]);
+}
+function piWithoutOmpJuice(payload, model) {
+  const body = record3(payload);
+  if (model?.api !== "openai-responses" || record3(model.compat)?.requiresReasoningOffJuiceInstruction !== true || !body || !Array.isArray(body.input) || !isOmpJuiceItem(body.input.at(-1)))
+    return payload;
+  return { ...body, input: body.input.slice(0, -1) };
+}
 
-// src/pi-dispatch-chain.ts
-import { isDeepStrictEqual } from "node:util";
+// src/pi-dispatch-date-reminder.ts
+function object(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function piDateReminderText(value, cwd) {
+  if (typeof value !== "string")
+    return false;
+  const match = /^<system-reminder>\nToday: (\d{4}-\d{2}-\d{2}); current working directory: '([^\r\n<>§]+)'\. Do not repeat this information in your reply\.\n<\/system-reminder>$/u.exec(value);
+  if (!match)
+    return false;
+  const [, date, path] = match;
+  if ([...path].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))
+    return false;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date)
+    return false;
+  if (!/^(?:\/|[A-Za-z]:\/)/u.test(path) || path.includes("\\"))
+    return false;
+  return cwd === undefined || path === cwd.replace(/\\/gu, "/");
+}
+function piDateReminderWireText(content, cwd) {
+  if (typeof content === "string")
+    return piDateReminderText(content, cwd) ? content : undefined;
+  if (!Array.isArray(content) || content.length !== 1)
+    return;
+  const block = object(content[0]);
+  const cache = object(block?.cache_control);
+  if (block?.type !== "text" || !cache || cache.type !== "ephemeral" || Object.keys(block).some((key) => !["type", "text", "cache_control"].includes(key)) || Object.keys(cache).some((key) => !["type", "ttl", "scope"].includes(key)) || cache.ttl !== undefined && cache.ttl !== "5m" && cache.ttl !== "1h" || cache.scope !== undefined && cache.scope !== "global")
+    return;
+  return piDateReminderText(block.text, cwd) ? block.text : undefined;
+}
+var PI_DATE_REMINDER_APIS = new Set([
+  "anthropic-messages",
+  "openai-completions",
+  "openai-responses",
+  "azure-openai-responses",
+  "openai-codex-responses",
+  "bedrock-converse-stream",
+  "google-generative-ai",
+  "google-vertex",
+  "google-gemini-cli",
+  "ollama-chat"
+]);
+function singleText(value, type) {
+  if (!Array.isArray(value) || value.length !== 1)
+    return;
+  const part = object(value[0]);
+  return part && (type === undefined ? Object.keys(part).length === 1 : part.type === type && Object.keys(part).length === 2) ? part.text : undefined;
+}
+function piWithoutDateReminders(payload, api, cwd, developerRole, includesPreparedFirstUser) {
+  const body = object(payload);
+  if (!body)
+    return;
+  const google = api.startsWith("google-");
+  const envelope = google ? object(body.request) ?? body : body;
+  const field = google ? "contents" : api.endsWith("responses") ? "input" : "messages";
+  const messages = envelope[field];
+  if (!Array.isArray(messages))
+    return;
+  let firstUser = false;
+  let removed = false;
+  const kept = [];
+  for (const value of messages) {
+    const row = object(value);
+    if (!row)
+      return;
+    const text = google ? singleText(row.parts) : api === "bedrock-converse-stream" ? singleText(row.content) : api.endsWith("responses") ? singleText(row.content, "input_text") ?? (api === "openai-codex-responses" ? row.content : undefined) : row.content;
+    if (piDateReminderText(text, cwd)) {
+      const keys = google ? ["role", "parts"] : api.endsWith("responses") ? ["role", "content", "type"] : ["role", "content"];
+      const role = api === "ollama-chat" ? "system" : api === "openai-codex-responses" || api === "openai-completions" && developerRole ? "developer" : "user";
+      if (!firstUser || row.role !== role || Object.keys(row).some((key) => !keys.includes(key)) || row.type !== undefined && row.type !== "message")
+        return;
+      if (!removed) {
+        const prefix = { ...envelope, [field]: kept };
+        if (!includesPreparedFirstUser(google && body.request !== undefined ? { ...body, request: prefix } : prefix))
+          return;
+      }
+      removed = true;
+      continue;
+    }
+    if (row.role === "user" && (typeof row.content === "string" || Array.isArray(row.content) && row.content.some((part) => object(part)?.type === "input_text" || object(part)?.type === "text" || typeof object(part)?.text === "string") || Array.isArray(row.parts) && row.parts.some((part) => typeof object(part)?.text === "string")))
+      firstUser = true;
+    kept.push(value);
+  }
+  if (!removed)
+    return;
+  const filtered = { ...envelope, [field]: kept };
+  return google && body.request !== undefined ? { ...body, request: filtered } : filtered;
+}
+
+// src/pi-dispatch-google.ts
+function piGoogleConversation(payload) {
+  if (!payload || typeof payload !== "object")
+    return;
+  const body = payload;
+  if (body.messages !== undefined || body.input !== undefined)
+    return;
+  if (Array.isArray(body.contents))
+    return body;
+  const request = body.request;
+  if (!request || typeof request !== "object")
+    return;
+  const conversation = request;
+  return Array.isArray(conversation.contents) ? conversation : undefined;
+}
 
 // src/pi-dispatch-omp-user.ts
 var PI_OMP_STEERING_TEMPLATE = `<system-notice>
@@ -35953,7 +38010,7 @@ User interjection during work: priority; supersedes conflicting prior instructio
 </system-notice>
 {{message}}
 `;
-function object(value) {
+function object2(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 }
 function renderSteering(text) {
@@ -36014,7 +38071,7 @@ function piOmpUserHistory(message) {
   if (message.role !== "user" || message.steering !== true)
     return message;
   const content = message.content;
-  const text = typeof content === "string" ? content : Array.isArray(content) ? content.filter((part) => object(part)?.type === "text").map((part) => object(part)?.text).join(`
+  const text = typeof content === "string" ? content : Array.isArray(content) ? content.filter((part) => object2(part)?.type === "text").map((part) => object2(part)?.text).join(`
 `) : "";
   if (!text.length)
     return message;
@@ -36024,31 +38081,80 @@ function piOmpUserHistory(message) {
     ...rest,
     content: typeof content === "string" ? wrapped : [
       { type: "text", text: wrapped },
-      ...Array.isArray(content) ? content.filter((part) => object(part)?.type === "image") : []
+      ...Array.isArray(content) ? content.filter((part) => object2(part)?.type === "image") : []
     ]
   };
 }
 
 // src/pi-dispatch-agent-history.ts
-function object2(value) {
+function object3(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 }
 var DEVELOPER_ORIGIN = Symbol("custom developer history");
+var PI_HISTORY_ORIGIN = Symbol("native history source");
+var CHECKED_FILE_MENTION_APIS = new Set([
+  "anthropic-messages",
+  "openai-completions",
+  "openai-responses",
+  "azure-openai-responses",
+  "openai-codex-responses",
+  "google-generative-ai",
+  "google-vertex",
+  "google-gemini-cli",
+  "bedrock-converse-stream",
+  "ollama-chat"
+]);
 function piIsDeveloperHistory(message) {
   return message.role === "developer" || Reflect.get(message, DEVELOPER_ORIGIN) === true;
 }
 function piAgentHistory(messages, api) {
   return messages.flatMap((value) => {
-    const message = object2(value);
+    const message = object3(value);
     if (!message)
       return [value];
     if (message.role === "user")
       return [piOmpUserHistory(message)];
+    if (message.role === "fileMention") {
+      if (!api || !CHECKED_FILE_MENTION_APIS.has(api))
+        return [value];
+      if (!Array.isArray(message.files))
+        return [value];
+      const text = message.files.filter((file) => !object3(file)?.image);
+      const images = message.files.flatMap((file) => object3(file)?.image ? [object3(file).image] : []);
+      return [
+        ...text.length ? [
+          {
+            ...message,
+            role: "user",
+            attribution: "user",
+            content: [{ type: "text", text: "File mention context" }],
+            [DEVELOPER_ORIGIN]: true,
+            [PI_HISTORY_ORIGIN]: { ...message, files: text }
+          }
+        ] : [],
+        ...images.length ? [
+          {
+            ...message,
+            role: "user",
+            attribution: "user",
+            content: [
+              { type: "text", text: "Image file context" },
+              ...images
+            ],
+            [PI_HISTORY_ORIGIN]: {
+              ...message,
+              files: message.files.filter((file) => object3(file)?.image)
+            }
+          }
+        ] : []
+      ];
+    }
     if (message.role === "compactionSummary") {
       return [
         {
           ...message,
           role: "user",
+          [PI_HISTORY_ORIGIN]: message,
           content: message.blocks !== undefined ? [
             { type: "text", text: message.summary },
             ...Array.isArray(message.blocks) ? message.blocks : []
@@ -36066,31 +38172,32 @@ function piAgentHistory(messages, api) {
     const content = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content;
     const userInvoked = message.role === "custom" && message.attribution === "user";
     if (userInvoked && message.customType === "collab-prompt") {
-      const text = content.filter((part) => object2(part)?.type === "text").map((part) => object2(part)?.text).join(`
+      const text = content.filter((part) => object3(part)?.type === "text").map((part) => object3(part)?.text).join(`
 `);
       return [
         {
           ...message,
           role: "user",
+          [PI_HISTORY_ORIGIN]: message,
           content: [
             {
               type: "text",
               text: text.length ? "User interjection envelope" : ""
             },
-            ...content.filter((part) => object2(part)?.type === "image")
+            ...content.filter((part) => object3(part)?.type === "image")
           ]
         }
       ];
     }
     if (userInvoked && message.customType === "skill-prompt")
       return [{ ...message, role: "user", content }];
-    const images = content.filter((part) => object2(part)?.type === "image");
+    const images = content.filter((part) => object3(part)?.type === "image");
     const developerRole = api === "ollama-chat" && message.attribution !== "user" ? "developer" : "user";
     if (!images.length)
       return [
         { ...message, role: developerRole, content, [DEVELOPER_ORIGIN]: true }
       ];
-    const texts = content.filter((part) => object2(part)?.type === "text");
+    const texts = content.filter((part) => object3(part)?.type === "text");
     return [
       ...texts.length ? [
         {
@@ -36110,6 +38217,937 @@ function piAgentHistory(messages, api) {
       }
     ];
   });
+}
+
+// src/pi-dispatch-assistant-history.ts
+function piOmitsTruncatedAssistant(message) {
+  return (message.stopReason === "length" || message.stopReason === "error" || message.stopReason === "aborted") && Array.isArray(message.content) && !message.content.some((block) => block?.type === "text" || block?.type === "toolCall");
+}
+function object4(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function nonblank(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+function wellFormed(text) {
+  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�");
+}
+function piAnthropicAssistantReplay(message, model, host) {
+  if (model?.api !== "anthropic-messages" || !Array.isArray(message.content))
+    return "kept";
+  const sameModel = message.provider === model.provider && message.api === model.api && message.model === model.id;
+  let thinking = false;
+  let fallback = false;
+  for (const value of message.content) {
+    const block = object4(value);
+    if (!block)
+      return "kept";
+    if (block.type === "toolCall")
+      return "kept";
+    if (block.type === "text") {
+      if (typeof block.text !== "string" || block.text.trim())
+        return "kept";
+      continue;
+    }
+    if (block.type === "thinking") {
+      if (host === "pi") {
+        if (block.redacted === true) {
+          if (sameModel)
+            return "kept";
+          continue;
+        }
+        if (typeof block.thinking !== "string")
+          return "kept";
+        if (nonblank(block.thinking))
+          return "kept";
+        if (sameModel && nonblank(block.thinkingSignature))
+          return "kept";
+        continue;
+      }
+      if (typeof block.thinking !== "string")
+        return "kept";
+      if (message.api !== model.api) {
+        if (nonblank(block.thinking))
+          return "kept";
+        continue;
+      }
+      if (message.provider !== model.provider && (nonblank(block.thinking) || nonblank(block.thinkingSignature)))
+        return "kept";
+      if (nonblank(block.thinking) || nonblank(block.thinkingSignature))
+        thinking = true;
+      continue;
+    }
+    if (host === "omp" && block.type === "redactedThinking") {
+      if (typeof block.data !== "string")
+        return "kept";
+      if (message.api !== model.api)
+        continue;
+      if (message.provider !== model.provider && nonblank(block.data))
+        return "kept";
+      if (nonblank(block.data))
+        thinking = true;
+      continue;
+    }
+    if (host === "omp" && block.type === "anthropicServerTool") {
+      if (message.api === "anthropic-messages" && message.provider === model.provider)
+        return "kept";
+      continue;
+    }
+    if (host === "omp" && block.type === "fallback")
+      fallback = true;
+  }
+  if (thinking)
+    return "optional";
+  return fallback ? "kept" : "dropped";
+}
+function piAnthropicOptionalThinking(message) {
+  const signatures = [];
+  const redacted = [];
+  const texts = [];
+  let fallback = false;
+  for (const value of Array.isArray(message.content) ? message.content : []) {
+    const block = object4(value);
+    if (block?.type === "thinking") {
+      if (nonblank(block.thinkingSignature))
+        signatures.push(block.thinkingSignature);
+      if (nonblank(block.thinking))
+        texts.push(wellFormed(block.thinking).trim());
+    } else if (block?.type === "redactedThinking" && nonblank(block.data))
+      redacted.push(block.data);
+    else if (block?.type === "fallback")
+      fallback = true;
+  }
+  return { signatures, redacted, texts, fallback };
+}
+var THINKING_PRESENCE_PLACEHOLDER = "(no reasoning was returned for this turn)";
+function piExplainsOptionalAssistant(thinking, content) {
+  const fromThinking = (text) => typeof text === "string" && thinking.texts.some((prepared) => text.includes(prepared));
+  return Array.isArray(content) && content.length > 0 && content.every((value) => {
+    const block = object4(value);
+    if (block?.type === "thinking") {
+      if (nonblank(block.signature))
+        return thinking.signatures.includes(block.signature);
+      return block.thinking === THINKING_PRESENCE_PLACEHOLDER || fromThinking(block.thinking);
+    }
+    if (block?.type === "redacted_thinking")
+      return typeof block.data === "string" && thinking.redacted.includes(block.data);
+    if (block?.type === "text")
+      return fromThinking(block.text);
+    if (block?.type === "fallback")
+      return thinking.fallback;
+    return false;
+  });
+}
+
+// src/pi-dispatch-tool-pairing.ts
+var RESPONSES_APIS2 = new Set([
+  "openai-responses",
+  "openai-codex-responses",
+  "azure-openai-responses"
+]);
+function object5(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function piResponsesCallComponent(id) {
+  const pipe = id.indexOf("|");
+  return pipe <= 0 ? id : id.slice(0, pipe);
+}
+function piToolCallPairing(messages) {
+  const responsesComponents = new Set;
+  const opaqueCompositeIds = new Set;
+  for (const value of messages) {
+    const message = object5(value);
+    if (message?.role !== "assistant" || !Array.isArray(message.content))
+      continue;
+    const responses = RESPONSES_APIS2.has(String(message.api));
+    for (const part of message.content) {
+      const block = object5(part);
+      if (block?.type !== "toolCall" || typeof block.id !== "string")
+        continue;
+      if (responses)
+        responsesComponents.add(piResponsesCallComponent(block.id));
+      else if (block.id.includes("|"))
+        opaqueCompositeIds.add(block.id);
+    }
+  }
+  return (id) => {
+    const pipe = id.indexOf("|");
+    if (pipe <= 0 || opaqueCompositeIds.has(id))
+      return id;
+    const prefix = id.slice(0, pipe);
+    return responsesComponents.has(prefix) ? prefix : id;
+  };
+}
+
+// src/pi-dispatch-chat-history.ts
+var MAX_EXACT_UNITS = 32 * 1024 * 1024;
+var IMAGE_CAPTION = "Attached image(s) from tool result:";
+function object6(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function omitsAssistant(message, model, compat) {
+  if (!Array.isArray(message.content))
+    return false;
+  if (piOmitsTruncatedAssistant(message))
+    return true;
+  let thinking = false;
+  for (const value of message.content) {
+    const block = object6(value);
+    if (!block)
+      return false;
+    if (block.type === "text") {
+      if (typeof block.text !== "string" || block.text.trim())
+        return false;
+    } else if (block.type === "thinking") {
+      if (typeof block.thinking !== "string")
+        return false;
+      thinking ||= block.thinking.trim().length > 0;
+    } else
+      return false;
+  }
+  if (compat.requiresReasoningContentForAllAssistantTurns === true)
+    return false;
+  if (!thinking)
+    return true;
+  return message.api === model.api && message.provider === model.provider && message.model === model.id && compat.requiresThinkingAsText !== true && compat.requiresReasoningContentForToolCalls !== true && compat.replayReasoningContent !== true && compat.mistralReasoningContentParts !== true && compat.thinkingFormat !== "zai";
+}
+function piChatHistoryPlan(messages, model) {
+  if (model?.api !== "openai-completions")
+    return;
+  const compat = object6(model.compat) ?? {};
+  const pairingId = piToolCallPairing(messages);
+  const calls = new Set;
+  for (const value of messages) {
+    const message = object6(value);
+    if (message?.role !== "assistant" || !Array.isArray(message.content))
+      continue;
+    for (const value of message.content) {
+      const block = object6(value);
+      if (block?.type === "toolCall" && typeof block.id === "string")
+        calls.add(pairingId(block.id));
+    }
+  }
+  const transformed = [];
+  let pending = new Set;
+  let exactUnits = 0;
+  for (let index = 0;index < messages.length; index++) {
+    const message = object6(messages[index]);
+    if (!message)
+      return;
+    if ((message.role === "bashExecution" || message.role === "pythonExecution") && message.excludeFromContext === true)
+      continue;
+    if (message.role === "assistant" || message.role === "user" || message.role === "developer")
+      pending = new Set;
+    if (message.role === "assistant") {
+      if (omitsAssistant(message, model, compat))
+        continue;
+      if (Array.isArray(message.content))
+        for (const value of message.content) {
+          const block = object6(value);
+          if (block?.type === "toolCall" && typeof block.id === "string")
+            pending.add(pairingId(block.id));
+        }
+    }
+    if (message.role === "toolResult" && typeof message.toolCallId === "string") {
+      pending.delete(pairingId(message.toolCallId));
+      if (!calls.has(pairingId(message.toolCallId))) {
+        if (pending.size || typeof message.toolName !== "string" || !Array.isArray(message.content))
+          return;
+        const parts = [];
+        for (const value of message.content) {
+          const part = object6(value);
+          if (part?.type === "text" && typeof part.text === "string" && part.text.trim())
+            parts.push(part.text);
+        }
+        if (!parts.length)
+          return;
+        const error = message.isError ? ' is-error="true"' : "";
+        const template = `<stale-tool-result tool="${message.toolName}" id="${message.toolCallId}"${error}>
+${parts.join(`
+`)}
+</stale-tool-result>`;
+        if (exactUnits + template.length > MAX_EXACT_UNITS)
+          return;
+        const text = new TextDecoder().decode(new TextEncoder().encode(template));
+        exactUnits += text.length;
+        if (exactUnits > MAX_EXACT_UNITS)
+          return;
+        transformed.push({ kind: "note", text });
+        continue;
+      }
+    }
+    transformed.push({ kind: "source", index });
+  }
+  const steps = [];
+  let images = [];
+  const flushImages = () => {
+    if (images.length) {
+      steps.push({ kind: "images", urls: images });
+      images = [];
+    }
+  };
+  const vision = model.input?.includes("image") === true && compat.stripImageInput !== true;
+  for (const step of transformed) {
+    const message = step.kind === "source" ? object6(messages[step.index]) : undefined;
+    if (message?.role !== "toolResult")
+      flushImages();
+    steps.push(step);
+    if (message?.role !== "toolResult" || !vision || !Array.isArray(message.content))
+      continue;
+    for (const value of message.content) {
+      const block = object6(value);
+      if (block?.type !== "image")
+        continue;
+      if (compat.requiresAssistantAfterToolResult === true)
+        return;
+      let url;
+      if (typeof block.url === "string")
+        url = block.url;
+      else if (typeof block.data === "string" && typeof block.mimeType === "string")
+        url = `data:${block.mimeType};base64,${block.data}`;
+      else
+        return;
+      exactUnits += url.length;
+      if (exactUnits > MAX_EXACT_UNITS)
+        return;
+      images.push(url);
+    }
+  }
+  flushImages();
+  return steps;
+}
+function piMatchesChatImages(content, urls) {
+  if (!Array.isArray(content) || content.length !== urls.length + 1)
+    return false;
+  const caption = object6(content[0]);
+  if (caption?.type !== "text" || caption.text !== IMAGE_CAPTION || Object.keys(caption).length !== 2)
+    return false;
+  for (let i = 0;i < urls.length; i++) {
+    const block = object6(content[i + 1]);
+    const image = object6(block?.image_url);
+    if (block?.type !== "image_url" || Object.keys(block).length !== 2 || !image || Object.keys(image).length !== 1 || image.url !== urls[i])
+      return false;
+  }
+  return true;
+}
+
+// src/pi-dispatch-image-budget.ts
+function object7(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function piImageBudgetPlan(model) {
+  if (!model?.input?.includes("image") || object7(model.compat)?.stripImageInput === true)
+    return;
+  return {
+    count: 0,
+    api: model.api,
+    rows: new Map,
+    hoistToolImages: model.api?.startsWith("google-") === true && object7(model.compat)?.multimodalFunctionResponse !== true || model.api === "bedrock-converse-stream" && model.requiresToolResultImageHoisting === true,
+    hoistErrorImages: model.api === "anthropic-messages" || model.api === "bedrock-converse-stream"
+  };
+}
+function inputImage(block, api) {
+  const file = object7(block.providerFile);
+  if (api === "ollama-chat")
+    return { kind: "bytes", value: String(block.data ?? "") };
+  if ((api?.endsWith("responses") && file?.provider === "openai" || api === "anthropic-messages" && file?.provider === "anthropic") && typeof file?.id === "string")
+    return { kind: "file", value: file.id };
+  if (api?.startsWith("google-") && file?.provider === "google" && typeof file.uri === "string")
+    return { kind: "url", value: file.uri };
+  if (api !== "bedrock-converse-stream" && typeof block.url === "string")
+    return { kind: "url", value: block.url };
+  return {
+    kind: "data",
+    value: typeof block.data === "string" ? block.data : "",
+    mime: typeof block.mimeType === "string" ? block.mimeType : ""
+  };
+}
+function piRecordImages(plan, row, source) {
+  if (!plan || !source || !["user", "developer", "toolResult"].includes(String(source.role)) || !Array.isArray(source.content))
+    return;
+  const images = [];
+  for (const value of source.content) {
+    const block = object7(value);
+    if (block?.type === "image")
+      images.push(inputImage(block, plan.api));
+  }
+  if (!images.length)
+    return;
+  plan.rows.set(row, {
+    first: plan.count,
+    images,
+    hoisted: source.role === "toolResult" && (plan.hoistToolImages || source.isError === true && plan.hoistErrorImages)
+  });
+  plan.count += images.length;
+}
+function piRemainingImages(run, drops) {
+  return run.images.slice(Math.max(0, Math.min(run.images.length, drops - run.first)));
+}
+function piWireImages(content, ollamaImages) {
+  if (Array.isArray(ollamaImages))
+    return ollamaImages.map((value) => ({
+      kind: "bytes",
+      value: String(value)
+    }));
+  if (!Array.isArray(content))
+    return [];
+  const images = [];
+  for (const value of content) {
+    const block = object7(value);
+    if (!block)
+      continue;
+    const source = object7(block.source);
+    const inline = object7(block.inlineData);
+    const file = object7(block.fileData);
+    const bedrock = object7(block.image);
+    if (block.type === "image_url" || block.type === "input_image") {
+      if (typeof block.file_id === "string")
+        images.push({ kind: "file", value: block.file_id });
+      else
+        images.push({
+          kind: "url",
+          value: String(typeof block.image_url === "string" ? block.image_url : object7(block.image_url)?.url)
+        });
+    } else if (block.type === "image") {
+      if (source?.type === "file")
+        images.push({ kind: "file", value: String(source.file_id) });
+      else if (source?.type === "url")
+        images.push({ kind: "url", value: String(source.url) });
+      else
+        images.push({
+          kind: "data",
+          value: String(source?.data),
+          mime: String(source?.media_type)
+        });
+    } else if (inline)
+      images.push({
+        kind: "data",
+        value: String(inline.data),
+        mime: String(inline.mimeType)
+      });
+    else if (file)
+      images.push({ kind: "url", value: String(file.fileUri) });
+    else if (bedrock)
+      images.push({
+        kind: "data",
+        value: String(object7(bedrock.source)?.bytes),
+        mime: `image/${bedrock.format}`
+      });
+  }
+  return images;
+}
+function piMatchesImages(actual, expected) {
+  if (actual.length !== expected.length)
+    return false;
+  for (let index = 0;index < expected.length; index++) {
+    const a = actual[index];
+    const e = expected[index];
+    if (e.kind === "data" && a.kind === "url") {
+      const prefix = `data:${e.mime};base64,`;
+      if (a.value.length !== prefix.length + e.value.length || !a.value.startsWith(prefix) || !a.value.endsWith(e.value))
+        return false;
+    } else if (a.kind !== e.kind || a.value !== e.value || a.mime?.replace("image/jpg", "image/jpeg") !== e.mime?.replace("image/jpg", "image/jpeg"))
+      return false;
+  }
+  return true;
+}
+function piWireImageCount(payload) {
+  const body = object7(payload);
+  const visit = (value) => {
+    if (Array.isArray(value))
+      return value.reduce((n, item) => n + visit(item), 0);
+    const block = object7(value);
+    if (!block)
+      return 0;
+    if (["image", "image_url", "input_image"].includes(String(block.type)) || block.inlineData || block.fileData || block.image)
+      return 1;
+    return [
+      block.content,
+      block.output,
+      block.parts,
+      block.toolResult,
+      block.functionResponse,
+      block.response
+    ].reduce((n, item) => n + visit(item), Array.isArray(block.images) ? block.images.length : 0);
+  };
+  return visit(body?.messages ?? body?.input ?? body?.contents ?? object7(body?.request)?.contents);
+}
+
+// src/pi-dispatch-responses-history.ts
+var MAX_TEXT_UNITS = 32 * 1024 * 1024;
+function object8(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function wellFormed2(text) {
+  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�");
+}
+function textIdentity2(text, phase) {
+  return JSON.stringify([
+    text,
+    phase === "commentary" || phase === "final_answer" ? phase : null
+  ]);
+}
+function signaturePhase(block) {
+  try {
+    if (typeof block.textSignature === "string") {
+      const signature = object8(JSON.parse(block.textSignature));
+      if (signature?.v === 1 && typeof signature.id === "string")
+        return signature.phase;
+    }
+  } catch {}
+  return;
+}
+function demotedThinking(text, model) {
+  const id = model.id?.toLowerCase() ?? "";
+  if (/^(?:[^/]+\/)?muse-spark-1\.3(?:-|$)/u.test(id))
+    return `<thinking>
+${wellFormed2(text)}
+</thinking>`;
+  if (/^(?:[^/]+\/)?(?:gpt-|o[134](?:-|$)|chatgpt-|codex-)/u.test(id))
+    return `<think>
+${wellFormed2(text)}
+</think>`;
+  return;
+}
+function piResponsesColdReplayable(items) {
+  let reasoning = false;
+  for (const value of items) {
+    const item = object8(value);
+    if (typeof item?.encrypted_content === "string")
+      return false;
+    if (item?.type !== "reasoning")
+      continue;
+    if (!Array.isArray(item.content) || !item.content.some((part) => object8(part)?.type === "reasoning_text"))
+      return false;
+    reasoning = true;
+  }
+  return reasoning;
+}
+function piResponsesAssistantTexts(value, model, host, alternatives) {
+  const message = object8(value);
+  if (!message || !Array.isArray(message.content))
+    return;
+  if (piOmitsTruncatedAssistant(message))
+    return [];
+  const texts = [];
+  const blocks = [];
+  const sameModel = model !== undefined && typeof model.api === "string" && typeof model.id === "string" && typeof model.provider === "string" && message.api === model.api && message.model === model.id && message.provider === model.provider;
+  let units = 0;
+  for (const value of message.content) {
+    const block = object8(value);
+    if (block?.type === "toolCall")
+      continue;
+    if (block?.type === "thinking") {
+      if (sameModel)
+        continue;
+      if (typeof block.thinking !== "string" || !model)
+        return;
+      if (!block.thinking.trim())
+        continue;
+      const compat = object8(model.compat);
+      if (block.summary === false && (compat?.requiresReasoningContentForToolCalls === true || compat?.requiresReasoningContentForAllAssistantTurns === true))
+        return;
+      const text = demotedThinking(block.thinking, model);
+      if (text === undefined)
+        return;
+      units += text.length;
+      if (units > MAX_TEXT_UNITS)
+        return;
+      texts.push(textIdentity2(text, undefined));
+      continue;
+    }
+    if (host === "omp" && (block?.type === "image" || block?.type === "anthropicServerTool" || block?.type === "fallback" || block?.type === "redactedThinking" && !sameModel))
+      continue;
+    if (block?.type !== "text" || typeof block.text !== "string")
+      return;
+    units += block.text.length;
+    if (units > MAX_TEXT_UNITS)
+      return;
+    texts.push(textIdentity2(wellFormed2(block.text), sameModel ? signaturePhase(block) : undefined));
+    blocks.push(block);
+  }
+  const payload = object8(message.providerPayload);
+  if (message.api !== model?.api || typeof model?.id !== "string" || typeof model?.provider !== "string" || message.model !== model?.id || (payload?.provider ?? message.provider) !== model?.provider || payload?.type !== "openaiResponsesHistory" || payload.dt !== true || !Array.isArray(payload.items))
+    return texts;
+  if (host === "omp" && model.api === "openai-codex-responses" && texts.every((text) => !/\S/u.test(JSON.parse(text)[0])) && payload.items.every((value) => {
+    const item = object8(value);
+    return item?.type === "reasoning" || item?.type === "message" && item.role === "assistant" && Array.isArray(item.content) && item.content.every((value) => {
+      const part = object8(value);
+      return part?.type === "output_text" && typeof part.text === "string" && !/\S/u.test(part.text);
+    });
+  }))
+    return [];
+  const replay = [];
+  let bound = 0;
+  let output = false;
+  const allowUnsigned = host === "omp" && message.role === "assistant" && [
+    "openai-responses",
+    "azure-openai-responses",
+    "openai-codex-responses"
+  ].includes(model?.api ?? "");
+  let unsigned = false;
+  for (const value of payload.items) {
+    const item = object8(value);
+    if (item?.type === "reasoning")
+      continue;
+    if (item?.type === "function_call" || item?.type === "custom_tool_call") {
+      output = true;
+      continue;
+    }
+    if (item?.type !== "message")
+      return;
+    if (item.role !== "assistant" || !Array.isArray(item.content))
+      return texts;
+    const itemTexts = [];
+    for (const value of item.content) {
+      const part = object8(value);
+      const block = blocks[bound];
+      if (!block || part?.type !== "output_text" || typeof part.text !== "string")
+        return texts;
+      let signature;
+      try {
+        if (typeof block.textSignature === "string")
+          signature = object8(JSON.parse(block.textSignature));
+      } catch {
+        return texts;
+      }
+      const signed = signature?.v === 1 && typeof signature.id === "string" && item.id === signature.id && item.phase === signature.phase && nativeTextMatchesBlock(part.text, block.text);
+      if (!signed) {
+        const droppedPlaceholder = isPiDropPlaceholder(block.text) && part.text === block.text;
+        if (!allowUnsigned || "textSignature" in block || !droppedPlaceholder && !hookCleanedTextMatchesBlock(part.text, block.text))
+          return texts;
+        unsigned = true;
+      }
+      bound++;
+      itemTexts.push(part.text);
+    }
+    if (!itemTexts.some((text) => /\S/u.test(text)))
+      continue;
+    output = true;
+    for (const text of itemTexts)
+      replay.push(textIdentity2(wellFormed2(text), item.phase));
+  }
+  if (!output || bound !== blocks.length)
+    return texts;
+  if (unsigned && alternatives) {
+    alternatives.fallback = texts;
+    alternatives.cold = piResponsesColdReplayable(payload.items) ? replay : texts;
+  }
+  return replay;
+}
+function piResponsesWireTexts(value, phase) {
+  if (phase !== undefined && phase !== null && phase !== "commentary" && phase !== "final_answer")
+    return;
+  if (typeof value === "string")
+    return [textIdentity2(value, phase)];
+  if (!Array.isArray(value))
+    return;
+  const texts = [];
+  let units = 0;
+  for (const partValue of value) {
+    const part = object8(partValue);
+    if (part?.type !== "output_text" || typeof part.text !== "string")
+      return;
+    units += part.text.length;
+    if (units > MAX_TEXT_UNITS)
+      return;
+    texts.push(textIdentity2(part.text, phase));
+  }
+  return texts;
+}
+
+// src/pi-dispatch-responses-replay.ts
+function object9(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+var RESPONSES_APIS3 = ["openai-responses", "azure-openai-responses"];
+function callBase(id) {
+  const separator = id.search(/[\n|]/);
+  return separator > 0 ? id.slice(0, separator) : separator === 0 ? id.slice(1) : id;
+}
+function piResponsesReplayedCalls(value, calls, wireCalls, model) {
+  const message = object9(value);
+  if (message?.role !== "assistant" || !model?.api)
+    return;
+  if (!RESPONSES_APIS3.includes(model.api))
+    return;
+  if (message.api !== model.api || message.model !== model.id || typeof model.provider !== "string")
+    return;
+  const payload = object9(message.providerPayload);
+  if (payload?.type !== "openaiResponsesHistory" || payload.dt !== true || !Array.isArray(payload.items) || (payload.provider ?? message.provider ?? model.provider) !== model.provider)
+    return;
+  const stored = [];
+  const order = [];
+  let output = false;
+  for (const value of payload.items) {
+    const item = object9(value);
+    if (item?.type === "reasoning")
+      continue;
+    if (item?.type === "function_call" || item?.type === "custom_tool_call") {
+      if (typeof item.call_id !== "string" || !item.call_id.trim())
+        return;
+      stored.push(item.call_id);
+      order.push("call");
+      output = true;
+      continue;
+    }
+    if (item?.type !== "message" || item.role !== "assistant" || !Array.isArray(item.content))
+      return;
+    const texts = [];
+    for (const value of item.content) {
+      const part = object9(value);
+      if (part?.type !== "output_text" || typeof part.text !== "string")
+        return;
+      texts.push(part.text);
+    }
+    if (!texts.some((text) => /\S/u.test(text)))
+      continue;
+    output = true;
+    for (const _text of texts)
+      order.push("text");
+  }
+  if (!output)
+    return;
+  const recorded = new Set(stored.map(callBase));
+  const replayed = [...stored];
+  const wires = [...stored];
+  for (let index = 0;index < calls.length; index++) {
+    if (recorded.has(callBase(calls[index])))
+      continue;
+    const wire = wireCalls?.[index];
+    if (wire === undefined)
+      return;
+    replayed.push(calls[index]);
+    wires.push(wire);
+    order.push("call");
+  }
+  if (wireCalls && wires.length === wireCalls.length && wires.every((id, index) => id === wireCalls[index]))
+    return;
+  return {
+    calls: replayed,
+    wireCalls: wires,
+    stored: stored.length,
+    order,
+    cold: piResponsesColdReplayable(payload.items)
+  };
+}
+function batchKind(item) {
+  return item.kind === "text" ? "assistant-message" : item.kind === "call" || item.kind === "output" ? item.kind : "other";
+}
+function batchCallId(item) {
+  return item.kind === "call" ? item.wire : item.kind === "output" ? item.id : undefined;
+}
+function hoistBatchMessages(items) {
+  const hasEarlierBatchCall = (index, callId) => {
+    for (let probe = index - 1;probe >= 0; probe--) {
+      const kind = batchKind(items[probe]);
+      if (kind === "other")
+        return false;
+      if (kind === "call" && batchCallId(items[probe]) === callId)
+        return true;
+    }
+    return false;
+  };
+  const bucketOf = new Map;
+  const insertBefore = new Map;
+  for (let index = 0;index < items.length; index++) {
+    if (batchKind(items[index]) !== "output")
+      continue;
+    if (index > 0 && batchKind(items[index - 1]) === "output")
+      continue;
+    const pending = new Set;
+    for (let probe = index;probe < items.length; probe++) {
+      if (batchKind(items[probe]) !== "output")
+        break;
+      const callId = batchCallId(items[probe]);
+      if (callId)
+        pending.add(callId);
+    }
+    let start = index;
+    let sawCall = false;
+    const messageIndexes = [];
+    while (start > 0) {
+      const item = items[start - 1];
+      const kind = batchKind(item);
+      if (kind === "call") {
+        sawCall = true;
+        const callId = batchCallId(item);
+        if (callId)
+          pending.delete(callId);
+      } else if (kind === "output") {
+        const callId = batchCallId(item);
+        if (!callId || !hasEarlierBatchCall(start - 1, callId))
+          break;
+        let ownsEarlierCall = false;
+        for (const owned of pending) {
+          if (hasEarlierBatchCall(start - 1, owned)) {
+            ownsEarlierCall = true;
+            break;
+          }
+        }
+        if (!ownsEarlierCall)
+          break;
+        pending.add(callId);
+      } else if (kind === "assistant-message") {
+        messageIndexes.push(start - 1);
+      } else {
+        break;
+      }
+      start -= 1;
+    }
+    if (!sawCall || messageIndexes.length === 0)
+      continue;
+    messageIndexes.reverse();
+    const target = insertBefore.get(start) ?? [];
+    for (const messageIndex of messageIndexes) {
+      const previousStart = bucketOf.get(messageIndex);
+      if (previousStart !== undefined) {
+        const previous = insertBefore.get(previousStart);
+        const slot = previous?.indexOf(messageIndex) ?? -1;
+        if (previous && slot >= 0)
+          previous.splice(slot, 1);
+      }
+      bucketOf.set(messageIndex, start);
+      target.push(messageIndex);
+    }
+    insertBefore.set(start, target);
+  }
+  if (bucketOf.size === 0)
+    return items.slice();
+  const result = [];
+  for (let index = 0;index < items.length; index++) {
+    const pending = insertBefore.get(index);
+    if (pending)
+      for (const messageIndex of pending)
+        result.push(items[messageIndex]);
+    if (bucketOf.has(index))
+      continue;
+    result.push(items[index]);
+  }
+  return result;
+}
+function piResponsesReplayRows(entries, placeholder, assistant) {
+  const items = [];
+  for (const entry of entries) {
+    const row = entry.row;
+    if (entry.texts === undefined) {
+      if (row.role !== "toolResult") {
+        items.push({ kind: "other", row });
+        continue;
+      }
+      const wire = row.wireResults?.[0];
+      if (row.results.length !== 1 || wire === undefined)
+        return;
+      items.push({ kind: "output", id: wire, row });
+      continue;
+    }
+    const { texts, replayed } = entry;
+    if (replayed) {
+      const textSlots = replayed.order.filter((kind) => kind === "text");
+      if (textSlots.length !== texts.length)
+        return;
+      let text = 0;
+      let call = 0;
+      for (const kind of replayed.order) {
+        if (kind === "text")
+          items.push({ kind: "text", text: texts[text++], source: row });
+        else {
+          items.push({
+            kind: "call",
+            id: replayed.calls[call],
+            wire: replayed.wireCalls[call],
+            source: row
+          });
+          call++;
+        }
+      }
+      continue;
+    }
+    for (const text of texts)
+      items.push({ kind: "text", text, source: row });
+    for (let index = 0;index < row.calls.length; index++) {
+      const wire = row.wireCalls?.[index];
+      if (wire === undefined)
+        return;
+      items.push({ kind: "call", id: row.calls[index], wire, source: row });
+    }
+  }
+  const preceding = new Set;
+  for (const item of items) {
+    if (item.kind === "call")
+      preceding.add(item.wire);
+    else if (item.kind === "output" && !preceding.has(item.id))
+      return;
+  }
+  const later = new Set;
+  const orphans = new Set;
+  for (let index = items.length - 1;index >= 0; index--) {
+    const item = items[index];
+    if (item.kind === "output")
+      later.add(item.id);
+    else if (item.kind === "call" && !later.has(item.wire))
+      orphans.add(index);
+  }
+  const repaired = items.flatMap((item, index) => item.kind === "call" && orphans.has(index) ? [item, { kind: "output", id: item.wire }] : [item]);
+  const rows = [];
+  let open;
+  for (const item of hoistBatchMessages(repaired)) {
+    if (item.kind === "other" || item.kind === "output") {
+      rows.push(item.kind === "other" ? item.row : item.row ?? placeholder(item.id));
+      open = undefined;
+      continue;
+    }
+    if (!open) {
+      open = assistant(item.source);
+      rows.push(open);
+    }
+    if (item.kind === "text")
+      open.responseTexts?.push(item.text);
+    else {
+      open.calls.push(item.id);
+      open.wireCalls?.push(item.wire);
+    }
+  }
+  return rows;
+}
+
+// src/pi-dispatch-row-diagnostic.ts
+var object10 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+function piDispatchRowDiagnostic(role, content) {
+  const parts = typeof content === "string" ? [content] : Array.isArray(content) ? content : [];
+  let kinds = 0;
+  let chars = 0;
+  let onlyText;
+  for (const part of parts) {
+    const block = object10(part);
+    const text = typeof part === "string" ? part : block?.text;
+    if (typeof text === "string") {
+      kinds |= block?.thought === true ? 16 : 1;
+      chars += text.length;
+      onlyText = parts.length === 1 ? text : undefined;
+    } else if (["image", "image_url", "input_image"].includes(String(block?.type)) || block?.inlineData || block?.fileData || block?.image)
+      kinds |= 2;
+    else if (["toolCall", "tool_use", "function_call"].includes(String(block?.type)) || block?.functionCall || block?.toolUse)
+      kinds |= 4;
+    else if (["tool_result", "function_call_output"].includes(String(block?.type)) || block?.functionResponse || block?.toolResult)
+      kinds |= 8;
+    else if (["thinking", "redacted_thinking", "reasoning"].includes(String(block?.type))) {
+      kinds |= 16;
+      if (typeof block?.thinking === "string")
+        chars += block.thinking.length;
+    } else
+      kinds |= 32;
+  }
+  const bootstrap = onlyText?.replace(/^<system-reminder>\nToday: [^\n]+\n<\/system-reminder>\n{0,2}/u, "");
+  return {
+    role: role === "toolResult" ? "tool-result" : role,
+    parts: parts.length,
+    kinds,
+    chars,
+    injector: piDateReminderText(onlyText) ? "date-cwd" : bootstrap?.startsWith(`<EXTREMELY_IMPORTANT>
+superpowers:using-superpowers bootstrap for pi
+`) && bootstrap.endsWith("</EXTREMELY_IMPORTANT>") ? "superpowers-bootstrap" : role === "user" && onlyText === "Continue." ? "anthropic-continue" : "none"
+  };
 }
 
 // src/pi-dispatch-tool-ids.ts
@@ -36182,1083 +39220,14 @@ function piToolCallWireId(id, model, source) {
   }
 }
 
-// src/pi-dispatch-chain-tail.ts
-function object3(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
-}
-var OMITTED_IMAGE = "[image omitted: model does not support vision]";
-function piEncodeChainTail(messages, assistant, responseItems, model) {
-  const harmony = object3(model.identity)?.class === "gpt-oss";
-  const text = (value) => {
-    const wellFormed = value.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�");
-    return harmony ? wellFormed.replace(/<\|(start|end|message|channel|constrain|return|call)\|>/g, "<\\|$1\\|>") : wellFormed;
-  };
-  const supportsImages = model.input?.includes("image") === true;
-  const image = (block) => {
-    const detail = block.detail === "original" && object3(model.compat)?.supportsImageDetailOriginal !== true ? "auto" : block.detail ?? "auto";
-    const file = object3(block.providerFile);
-    if (file?.provider === "openai" && typeof file.id === "string" && file.id)
-      return { type: "input_image", detail, file_id: file.id };
-    if (typeof block.url !== "string" && (typeof block.mimeType !== "string" || typeof block.data !== "string"))
-      return;
-    return {
-      type: "input_image",
-      detail,
-      image_url: block.url ?? `data:${block.mimeType};base64,${block.data}`
-    };
-  };
-  const items = [];
-  for (const value of messages) {
-    let message = object3(value);
-    if (!message || message.providerPayload !== undefined)
-      return;
-    message = piOmpUserHistory(message);
-    if (message.role === "custom" || message.role === "hookMessage") {
-      if (typeof message.customType !== "string" || message.attribution === "user")
-        return;
-      const converted = piAgentHistory([message], model.api);
-      const developer = object3(converted[0]);
-      if (converted.length !== 1 || !developer || !piIsDeveloperHistory(developer))
-        return;
-      message = {
-        ...developer,
-        role: model.api === "openai-codex-responses" ? "developer" : "user"
-      };
-    }
-    const user = message.role === "user" || message.role === "developer";
-    if (!user && message.role !== "toolResult")
-      return;
-    const content = typeof message.content === "string" && user ? [{ type: "text", text: message.content }] : message.content;
-    if (!Array.isArray(content))
-      return;
-    const texts = [];
-    const images = [];
-    const ordered = [];
-    for (const value of content) {
-      const block = object3(value);
-      if (block?.type === "text" && typeof block.text === "string") {
-        texts.push(block.text);
-        if (!user || block.text.trim())
-          ordered.push({ type: "input_text", text: text(block.text) });
-      } else if (block?.type === "image") {
-        const encoded = image(block);
-        if (!encoded)
-          return;
-        images.push(encoded);
-        if (supportsImages)
-          ordered.push(encoded);
-      } else
-        return;
-    }
-    if (user) {
-      const input = texts.filter((value) => value.trim()).map((value) => ({ type: "input_text", text: text(value) }));
-      if (supportsImages)
-        input.push(...images);
-      else if (images.length)
-        input.push({ type: "input_text", text: OMITTED_IMAGE });
-      if (input.length)
-        items.push({ role: message.role, content: input });
-      continue;
-    }
-    if (typeof message.toolCallId !== "string" || message.providerMetadata !== undefined)
-      return;
-    const id = piToolCallWireId(message.toolCallId, model, assistant);
-    const call = responseItems.map(object3).find((item) => item?.call_id === id);
-    if (!id || call?.type !== "function_call" && call?.type !== "custom_tool_call")
-      return;
-    const joined = texts.join(`
-`);
-    const output = images.length && supportsImages ? ordered : text(images.length && !supportsImages ? joined ? `${joined}
-${OMITTED_IMAGE}` : OMITTED_IMAGE : joined);
-    items.push({
-      type: call.type === "custom_tool_call" ? "custom_tool_call_output" : "function_call_output",
-      call_id: id,
-      output
-    });
-  }
-  return items;
-}
-
-// src/pi-dispatch-chain.ts
-function object4(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
-}
-function piChainCapableApi(api) {
-  return api === "openai-codex-responses" || api === "openai-responses" || api === "azure-openai-responses";
-}
-function injectedHeadIndex(messages) {
-  let index = 0;
-  while (object4(messages[index])?.role === "system")
-    index++;
-  const m0 = object4(messages[index]);
-  const m1 = object4(messages[index + 1]);
-  const syntheticUser = (message) => message?.role === "user" && Object.keys(message).every((key) => ["role", "content", "timestamp"].includes(key));
-  if (!syntheticUser(m0) || !syntheticUser(m1))
-    return -1;
-  const m0Content = m0?.content;
-  const m1Content = m1?.content;
-  if (!Array.isArray(m0Content) || !Array.isArray(m1Content))
-    return -1;
-  const m0Text = object4(m0Content[0]);
-  const m1Text = object4(m1Content[0]);
-  return m0Content.length >= 1 && m0Content.length <= 2 && (m0Content.length === 1 || object4(m0Content[1])?.type === "image") && m1Content.length === 1 && m0Text?.type === "text" && typeof m0Text.text === "string" && /^(<project-docs>|<user-profile>|<covered-system-messages>|<session-history>)/.test(m0Text.text) && m0Text.text.includes("</session-history>") && m1Text?.type === "text" && typeof m1Text.text === "string" && /^(<session-history-since>|<knowledge-updates>)/.test(m1Text.text) ? index : -1;
-}
-function piPreparedHistory(messages, model) {
-  const snapshots = [];
-  const responseIds = [];
-  const head = injectedHeadIndex(messages);
-  for (const [index, message] of messages.entries()) {
-    const source = object4(message);
-    const identity = head >= 0 && (index === head || index === head + 1) ? Object.fromEntries(Object.entries(source ?? {}).filter(([key]) => key !== "timestamp")) : message;
-    const fields = lkgContentFields(identity);
-    if (!fields)
-      return;
-    snapshots.push({ id: "", fields });
-    responseIds.push(source?.role === "assistant" && typeof source.responseId === "string" && source.responseId.length > 0 ? source.responseId : undefined);
-  }
-  const prepared = { snapshots, responseIds };
-  let index = responseIds.length - 1;
-  while (index >= 0 && responseIds[index] === undefined)
-    index--;
-  const assistant = object4(messages[index]);
-  const response = piChainResponse(assistant);
-  if (model && assistant && response) {
-    const delta = piEncodeChainTail(messages.slice(index + 1), assistant, response.responseItems, model);
-    if (delta)
-      prepared.continuation = { index, ...response, delta };
-  }
-  return prepared;
-}
-function piChainedRequest(payload) {
-  const body = object4(payload);
-  if (!body || body.previous_response_id === undefined)
-    return;
-  const id = body.previous_response_id;
-  if (body.messages !== undefined || !Array.isArray(body.input) || typeof id !== "string" || !id)
-    throw new Error("invalid chained continuation frame");
-  return { previousResponseId: id, delta: body.input };
-}
-function piChainResponse(message) {
-  const source = object4(message);
-  if (source?.role !== "assistant")
-    return;
-  if (source.stopReason !== "stop" && source.stopReason !== "toolUse")
-    return;
-  if (typeof source.responseId !== "string" || !source.responseId)
-    return;
-  const payload = object4(source.providerPayload);
-  if (payload?.type !== "openaiResponsesHistory" || payload.dt !== true || !Array.isArray(payload.items))
-    return;
-  return {
-    responseId: source.responseId,
-    responseItems: structuredClone(payload.items)
-  };
-}
-function piExpandChainedRequest(payload, chained, anchor, prepared, pass) {
-  if (!anchor)
-    return {
-      refusal: "no completed managed response is recorded for this continuation"
-    };
-  if (anchor.supersededBy !== undefined && (anchor.supersededBy !== pass.current || !pass.resend))
-    return {
-      refusal: "the last managed request has no completed response"
-    };
-  if (chained.previousResponseId !== anchor.responseId)
-    return {
-      refusal: "continuation does not follow the last managed request's response"
-    };
-  if (!prepared)
-    return { refusal: "this pass's prepared history was not recorded" };
-  const carried = anchor.prepared.snapshots.length;
-  if (exactReusablePrefix(prepared.snapshots, anchor.prepared.snapshots) !== carried)
-    return {
-      refusal: "prepared history does not extend the previous managed request"
-    };
-  if (prepared.responseIds[carried] !== anchor.responseId)
-    return {
-      refusal: "prepared history does not continue from the previous managed response"
-    };
-  const continuation = prepared.continuation;
-  if (!continuation || continuation.index !== carried || !isDeepStrictEqual(continuation.responseItems, anchor.responseItems))
-    return {
-      refusal: "prepared response or tail encoding cannot continue the recorded response"
-    };
-  if (!isDeepStrictEqual(continuation.delta, chained.delta))
-    return { refusal: "delta differs from the prepared provider input tail" };
-  const input = [...anchor.input, ...anchor.responseItems, ...chained.delta];
-  const { previous_response_id: _previous, ...rest } = payload;
-  return { payload: { ...rest, input }, input };
-}
-
-// src/pi-dispatch-google.ts
-function piGoogleConversation(payload) {
-  if (!payload || typeof payload !== "object")
-    return;
-  const body = payload;
-  if (body.messages !== undefined || body.input !== undefined)
-    return;
-  if (Array.isArray(body.contents))
-    return body;
-  const request = body.request;
-  if (!request || typeof request !== "object")
-    return;
-  const conversation = request;
-  return Array.isArray(conversation.contents) ? conversation : undefined;
-}
-
-// src/pi-dispatch-identity.ts
-var MAX_NODES = 1e5;
-var MAX_STRING_UNITS = 32 * 1024 * 1024;
-var MAX_DEPTH = 128;
-function piConversationFields(payload) {
-  try {
-    if (!payload || typeof payload !== "object")
-      return;
-    const body = payload;
-    let conversation;
-    let anthropic = false;
-    if (Array.isArray(body.messages) && body.input === undefined) {
-      conversation = { messages: body.messages, system: body.system };
-      anthropic = typeof body.system === "string" || Array.isArray(body.system);
-    } else if ((Array.isArray(body.input) || typeof body.input === "string") && body.messages === undefined) {
-      conversation = {
-        input: body.input,
-        instructions: body.instructions,
-        previous_response_id: body.previous_response_id,
-        conversation: body.conversation,
-        prompt: body.prompt
-      };
-    } else {
-      const google = piGoogleConversation(payload);
-      if (!google)
-        return;
-      conversation = {
-        contents: google.contents,
-        systemInstruction: google.systemInstruction,
-        configSystemInstruction: google.config?.systemInstruction
-      };
-    }
-    const fields = [];
-    const seen = new WeakSet;
-    let nodes = 0;
-    let strings = 0;
-    const visit = (value, position, depth) => {
-      if (++nodes > MAX_NODES || depth > MAX_DEPTH)
-        throw new Error("conversation structure limit");
-      if (typeof value === "string") {
-        strings += value.length;
-        if (strings > MAX_STRING_UNITS)
-          throw new Error("conversation string limit");
-        fields.push(LKG_SNAPSHOT_STRING, value);
-      } else if (value === null)
-        fields.push(LKG_SNAPSHOT_NULL);
-      else if (typeof value === "number")
-        fields.push(LKG_SNAPSHOT_NUMBER, value);
-      else if (typeof value === "boolean")
-        fields.push(LKG_SNAPSHOT_BOOLEAN, value);
-      else if (!value || typeof value !== "object")
-        fields.push(LKG_SNAPSHOT_UNDEFINED);
-      else {
-        if (seen.has(value))
-          throw new Error("cyclic conversation");
-        seen.add(value);
-        if (Array.isArray(value)) {
-          if (anthropic && (position === "content" || position === "system") && value.length === 1) {
-            const block = value[0];
-            if (block && typeof block === "object" && block.type === "text" && typeof block.text === "string" && Object.keys(block).every((key) => key === "type" || key === "text" || key === "cache_control")) {
-              visit(block.text, "other", depth + 1);
-              seen.delete(value);
-              return;
-            }
-          }
-          fields.push(LKG_SNAPSHOT_ARRAY, value.length);
-          for (const item of value)
-            visit(item, position === "messages" ? "message" : anthropic && (position === "content" || position === "system") ? "block" : "other", depth + 1);
-        } else {
-          const entries = Object.entries(value).filter(([key, child]) => child !== undefined && typeof child !== "function" && typeof child !== "symbol" && !(anthropic && position === "block" && key === "cache_control"));
-          for (const [key] of entries)
-            strings += key.length;
-          if (strings > MAX_STRING_UNITS)
-            throw new Error("conversation key limit");
-          entries.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
-          fields.push(LKG_SNAPSHOT_OBJECT, entries.length);
-          for (const [key, child] of entries) {
-            fields.push(LKG_SNAPSHOT_KEY, key);
-            visit(child, position === "root" && key === "messages" ? "messages" : position === "root" && key === "system" ? "system" : position === "message" && key === "content" ? "content" : "other", depth + 1);
-          }
-        }
-        seen.delete(value);
-      }
-    };
-    visit(conversation, "root", 0);
-    return fields;
-  } catch {
-    return;
-  }
-}
-function piManagedSignature(messages) {
-  for (const message of messages.slice(0, 8)) {
-    if (!message || typeof message !== "object")
-      continue;
-    const content = message.content;
-    const text = typeof content === "string" ? content : Array.isArray(content) ? content.find((part) => part?.type === "text" && typeof part.text === "string")?.text : undefined;
-    if (!text)
-      continue;
-    const marker = /^(<project-docs>|<user-profile>|<covered-system-messages>|<session-history>|<project-memory>|<memory-mural>|<session-history-since>|<knowledge-updates>|<memory>|§\d+§)/.exec(text)?.[0];
-    return marker ?? text.slice(0, 128);
-  }
-  return;
-}
-function piHasManagedSignature(payload, signature) {
-  if (!signature || !payload || typeof payload !== "object")
-    return false;
-  const body = payload;
-  const google = piGoogleConversation(payload);
-  const nativeText = !!google || body.inferenceConfig !== undefined;
-  if (typeof body.input === "string" && body.messages === undefined)
-    return body.input.slice(0, 4096).includes(signature);
-  const messages = Array.isArray(body.messages) ? body.messages : Array.isArray(body.input) ? body.input : google?.contents;
-  if (!messages)
-    return false;
-  for (const message of messages.slice(0, 8)) {
-    if (!message || typeof message !== "object")
-      continue;
-    const content = google ? message.parts : message.content;
-    if (typeof content === "string" && content.slice(0, 4096).includes(signature))
-      return true;
-    if (!Array.isArray(content))
-      continue;
-    for (const block of content.slice(0, 32)) {
-      if (block && (["text", "input_text", "output_text"].includes(block.type) || nativeText && block.type === undefined) && typeof block.text === "string" && block.text.slice(0, 4096).includes(signature))
-        return true;
-    }
-  }
-  return false;
-}
-
-// src/pi-dispatch-assistant-history.ts
-function piOmitsTruncatedAssistant(message) {
-  return (message.stopReason === "length" || message.stopReason === "error" || message.stopReason === "aborted") && Array.isArray(message.content) && !message.content.some((block) => block?.type === "text" || block?.type === "toolCall");
-}
-function object5(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
-}
-function nonblank(value) {
-  return typeof value === "string" && value.trim().length > 0;
-}
-function wellFormed(text) {
-  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�");
-}
-function piAnthropicAssistantReplay(message, model, host) {
-  if (model?.api !== "anthropic-messages" || !Array.isArray(message.content))
-    return "kept";
-  const sameModel = message.provider === model.provider && message.api === model.api && message.model === model.id;
-  let thinking = false;
-  let fallback = false;
-  for (const value of message.content) {
-    const block = object5(value);
-    if (!block)
-      return "kept";
-    if (block.type === "toolCall")
-      return "kept";
-    if (block.type === "text") {
-      if (typeof block.text !== "string" || block.text.trim())
-        return "kept";
-      continue;
-    }
-    if (block.type === "thinking") {
-      if (host === "pi") {
-        if (block.redacted === true) {
-          if (sameModel)
-            return "kept";
-          continue;
-        }
-        if (typeof block.thinking !== "string")
-          return "kept";
-        if (nonblank(block.thinking))
-          return "kept";
-        if (sameModel && nonblank(block.thinkingSignature))
-          return "kept";
-        continue;
-      }
-      if (typeof block.thinking !== "string")
-        return "kept";
-      if (message.api !== model.api) {
-        if (nonblank(block.thinking))
-          return "kept";
-        continue;
-      }
-      if (message.provider !== model.provider && (nonblank(block.thinking) || nonblank(block.thinkingSignature)))
-        return "kept";
-      if (nonblank(block.thinking) || nonblank(block.thinkingSignature))
-        thinking = true;
-      continue;
-    }
-    if (host === "omp" && block.type === "redactedThinking") {
-      if (typeof block.data !== "string")
-        return "kept";
-      if (message.api !== model.api)
-        continue;
-      if (message.provider !== model.provider && nonblank(block.data))
-        return "kept";
-      if (nonblank(block.data))
-        thinking = true;
-      continue;
-    }
-    if (host === "omp" && block.type === "anthropicServerTool") {
-      if (message.api === "anthropic-messages" && message.provider === model.provider)
-        return "kept";
-      continue;
-    }
-    if (host === "omp" && block.type === "fallback")
-      fallback = true;
-  }
-  if (thinking)
-    return "optional";
-  return fallback ? "kept" : "dropped";
-}
-function piAnthropicOptionalThinking(message) {
-  const signatures = [];
-  const redacted = [];
-  const texts = [];
-  let fallback = false;
-  for (const value of Array.isArray(message.content) ? message.content : []) {
-    const block = object5(value);
-    if (block?.type === "thinking") {
-      if (nonblank(block.thinkingSignature))
-        signatures.push(block.thinkingSignature);
-      if (nonblank(block.thinking))
-        texts.push(wellFormed(block.thinking).trim());
-    } else if (block?.type === "redactedThinking" && nonblank(block.data))
-      redacted.push(block.data);
-    else if (block?.type === "fallback")
-      fallback = true;
-  }
-  return { signatures, redacted, texts, fallback };
-}
-var THINKING_PRESENCE_PLACEHOLDER = "(no reasoning was returned for this turn)";
-function piExplainsOptionalAssistant(thinking, content) {
-  const fromThinking = (text) => typeof text === "string" && thinking.texts.some((prepared) => text.includes(prepared));
-  return Array.isArray(content) && content.length > 0 && content.every((value) => {
-    const block = object5(value);
-    if (block?.type === "thinking") {
-      if (nonblank(block.signature))
-        return thinking.signatures.includes(block.signature);
-      return block.thinking === THINKING_PRESENCE_PLACEHOLDER || fromThinking(block.thinking);
-    }
-    if (block?.type === "redacted_thinking")
-      return typeof block.data === "string" && thinking.redacted.includes(block.data);
-    if (block?.type === "text")
-      return fromThinking(block.text);
-    if (block?.type === "fallback")
-      return thinking.fallback;
-    return false;
-  });
-}
-
-// src/pi-dispatch-tool-pairing.ts
-var RESPONSES_APIS = new Set([
-  "openai-responses",
-  "openai-codex-responses",
-  "azure-openai-responses"
-]);
-function object6(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
-}
-function piResponsesCallComponent(id) {
-  const pipe = id.indexOf("|");
-  return pipe <= 0 ? id : id.slice(0, pipe);
-}
-function piToolCallPairing(messages) {
-  const responsesComponents = new Set;
-  const opaqueCompositeIds = new Set;
-  for (const value of messages) {
-    const message = object6(value);
-    if (message?.role !== "assistant" || !Array.isArray(message.content))
-      continue;
-    const responses = RESPONSES_APIS.has(String(message.api));
-    for (const part of message.content) {
-      const block = object6(part);
-      if (block?.type !== "toolCall" || typeof block.id !== "string")
-        continue;
-      if (responses)
-        responsesComponents.add(piResponsesCallComponent(block.id));
-      else if (block.id.includes("|"))
-        opaqueCompositeIds.add(block.id);
-    }
-  }
-  return (id) => {
-    const pipe = id.indexOf("|");
-    if (pipe <= 0 || opaqueCompositeIds.has(id))
-      return id;
-    const prefix = id.slice(0, pipe);
-    return responsesComponents.has(prefix) ? prefix : id;
-  };
-}
-
-// src/pi-dispatch-chat-history.ts
-var MAX_EXACT_UNITS = 32 * 1024 * 1024;
-var IMAGE_CAPTION = "Attached image(s) from tool result:";
-function object7(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
-}
-function omitsAssistant(message, model, compat) {
-  if (!Array.isArray(message.content))
-    return false;
-  if (piOmitsTruncatedAssistant(message))
-    return true;
-  let thinking = false;
-  for (const value of message.content) {
-    const block = object7(value);
-    if (!block)
-      return false;
-    if (block.type === "text") {
-      if (typeof block.text !== "string" || block.text.trim())
-        return false;
-    } else if (block.type === "thinking") {
-      if (typeof block.thinking !== "string")
-        return false;
-      thinking ||= block.thinking.trim().length > 0;
-    } else
-      return false;
-  }
-  if (compat.requiresReasoningContentForAllAssistantTurns === true)
-    return false;
-  if (!thinking)
-    return true;
-  return message.api === model.api && message.provider === model.provider && message.model === model.id && compat.requiresThinkingAsText !== true && compat.requiresReasoningContentForToolCalls !== true && compat.replayReasoningContent !== true && compat.mistralReasoningContentParts !== true && compat.thinkingFormat !== "zai";
-}
-function piChatHistoryPlan(messages, model) {
-  if (model?.api !== "openai-completions")
-    return;
-  const compat = object7(model.compat) ?? {};
-  const pairingId = piToolCallPairing(messages);
-  const calls = new Set;
-  for (const value of messages) {
-    const message = object7(value);
-    if (message?.role !== "assistant" || !Array.isArray(message.content))
-      continue;
-    for (const value of message.content) {
-      const block = object7(value);
-      if (block?.type === "toolCall" && typeof block.id === "string")
-        calls.add(pairingId(block.id));
-    }
-  }
-  const transformed = [];
-  let pending = new Set;
-  let exactUnits = 0;
-  for (let index = 0;index < messages.length; index++) {
-    const message = object7(messages[index]);
-    if (!message)
-      return;
-    if ((message.role === "bashExecution" || message.role === "pythonExecution") && message.excludeFromContext === true)
-      continue;
-    if (message.role === "assistant" || message.role === "user" || message.role === "developer")
-      pending = new Set;
-    if (message.role === "assistant") {
-      if (omitsAssistant(message, model, compat))
-        continue;
-      if (Array.isArray(message.content))
-        for (const value of message.content) {
-          const block = object7(value);
-          if (block?.type === "toolCall" && typeof block.id === "string")
-            pending.add(pairingId(block.id));
-        }
-    }
-    if (message.role === "toolResult" && typeof message.toolCallId === "string") {
-      pending.delete(pairingId(message.toolCallId));
-      if (!calls.has(pairingId(message.toolCallId))) {
-        if (pending.size || typeof message.toolName !== "string" || !Array.isArray(message.content))
-          return;
-        const parts = [];
-        for (const value of message.content) {
-          const part = object7(value);
-          if (part?.type === "text" && typeof part.text === "string" && part.text.trim())
-            parts.push(part.text);
-        }
-        if (!parts.length)
-          return;
-        const error = message.isError ? ' is-error="true"' : "";
-        const template = `<stale-tool-result tool="${message.toolName}" id="${message.toolCallId}"${error}>
-${parts.join(`
-`)}
-</stale-tool-result>`;
-        if (exactUnits + template.length > MAX_EXACT_UNITS)
-          return;
-        const text = new TextDecoder().decode(new TextEncoder().encode(template));
-        exactUnits += text.length;
-        if (exactUnits > MAX_EXACT_UNITS)
-          return;
-        transformed.push({ kind: "note", text });
-        continue;
-      }
-    }
-    transformed.push({ kind: "source", index });
-  }
-  const steps = [];
-  let images = [];
-  const flushImages = () => {
-    if (images.length) {
-      steps.push({ kind: "images", urls: images });
-      images = [];
-    }
-  };
-  const vision = model.input?.includes("image") === true && compat.stripImageInput !== true;
-  for (const step of transformed) {
-    const message = step.kind === "source" ? object7(messages[step.index]) : undefined;
-    if (message?.role !== "toolResult")
-      flushImages();
-    steps.push(step);
-    if (message?.role !== "toolResult" || !vision || !Array.isArray(message.content))
-      continue;
-    for (const value of message.content) {
-      const block = object7(value);
-      if (block?.type !== "image")
-        continue;
-      if (compat.requiresAssistantAfterToolResult === true)
-        return;
-      let url;
-      if (typeof block.url === "string")
-        url = block.url;
-      else if (typeof block.data === "string" && typeof block.mimeType === "string")
-        url = `data:${block.mimeType};base64,${block.data}`;
-      else
-        return;
-      exactUnits += url.length;
-      if (exactUnits > MAX_EXACT_UNITS)
-        return;
-      images.push(url);
-    }
-  }
-  flushImages();
-  return steps;
-}
-function piMatchesChatImages(content, urls) {
-  if (!Array.isArray(content) || content.length !== urls.length + 1)
-    return false;
-  const caption = object7(content[0]);
-  if (caption?.type !== "text" || caption.text !== IMAGE_CAPTION || Object.keys(caption).length !== 2)
-    return false;
-  for (let i = 0;i < urls.length; i++) {
-    const block = object7(content[i + 1]);
-    const image = object7(block?.image_url);
-    if (block?.type !== "image_url" || Object.keys(block).length !== 2 || !image || Object.keys(image).length !== 1 || image.url !== urls[i])
-      return false;
-  }
-  return true;
-}
-
-// src/pi-dispatch-date-reminder.ts
-function object8(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
-}
-function piDateReminderText(value, cwd) {
-  if (typeof value !== "string")
-    return false;
-  const match = /^<system-reminder>\nToday: (\d{4}-\d{2}-\d{2}); current working directory: '([^\r\n<>§]+)'\. Do not repeat this information in your reply\.\n<\/system-reminder>$/u.exec(value);
-  if (!match)
-    return false;
-  const [, date, path] = match;
-  if ([...path].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))
-    return false;
-  const parsed = new Date(`${date}T00:00:00Z`);
-  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date)
-    return false;
-  if (!/^(?:\/|[A-Za-z]:\/)/u.test(path) || path.includes("\\"))
-    return false;
-  return cwd === undefined || path === cwd.replace(/\\/gu, "/");
-}
-function piDateReminderWireText(content, cwd) {
-  if (typeof content === "string")
-    return piDateReminderText(content, cwd) ? content : undefined;
-  if (!Array.isArray(content) || content.length !== 1)
-    return;
-  const block = object8(content[0]);
-  const cache = object8(block?.cache_control);
-  if (block?.type !== "text" || !cache || cache.type !== "ephemeral" || Object.keys(block).some((key) => !["type", "text", "cache_control"].includes(key)) || Object.keys(cache).some((key) => !["type", "ttl", "scope"].includes(key)) || cache.ttl !== undefined && cache.ttl !== "5m" && cache.ttl !== "1h" || cache.scope !== undefined && cache.scope !== "global")
-    return;
-  return piDateReminderText(block.text, cwd) ? block.text : undefined;
-}
-var PI_DATE_REMINDER_APIS = new Set([
-  "anthropic-messages",
-  "openai-completions",
-  "openai-responses",
-  "azure-openai-responses",
-  "openai-codex-responses",
-  "bedrock-converse-stream",
-  "google-generative-ai",
-  "google-vertex",
-  "google-gemini-cli",
-  "ollama-chat"
-]);
-function singleText(value, type) {
-  if (!Array.isArray(value) || value.length !== 1)
-    return;
-  const part = object8(value[0]);
-  return part && (type === undefined ? Object.keys(part).length === 1 : part.type === type && Object.keys(part).length === 2) ? part.text : undefined;
-}
-function piWithoutDateReminders(payload, api, cwd, developerRole, includesPreparedFirstUser) {
-  const body = object8(payload);
-  if (!body)
-    return;
-  const google = api.startsWith("google-");
-  const envelope = google ? object8(body.request) ?? body : body;
-  const field = google ? "contents" : api.endsWith("responses") ? "input" : "messages";
-  const messages = envelope[field];
-  if (!Array.isArray(messages))
-    return;
-  let firstUser = false;
-  let removed = false;
-  const kept = [];
-  for (const value of messages) {
-    const row = object8(value);
-    if (!row)
-      return;
-    const text = google ? singleText(row.parts) : api === "bedrock-converse-stream" ? singleText(row.content) : api.endsWith("responses") ? singleText(row.content, "input_text") ?? (api === "openai-codex-responses" ? row.content : undefined) : row.content;
-    if (piDateReminderText(text, cwd)) {
-      const keys = google ? ["role", "parts"] : api.endsWith("responses") ? ["role", "content", "type"] : ["role", "content"];
-      const role = api === "ollama-chat" ? "system" : api === "openai-completions" && developerRole ? "developer" : "user";
-      if (!firstUser || row.role !== role || Object.keys(row).some((key) => !keys.includes(key)) || row.type !== undefined && row.type !== "message")
-        return;
-      if (!removed) {
-        const prefix = { ...envelope, [field]: kept };
-        if (!includesPreparedFirstUser(google && body.request !== undefined ? { ...body, request: prefix } : prefix))
-          return;
-      }
-      removed = true;
-      continue;
-    }
-    if (row.role === "user" && (typeof row.content === "string" || Array.isArray(row.content) && row.content.some((part) => object8(part)?.type === "input_text" || object8(part)?.type === "text" || typeof object8(part)?.text === "string") || Array.isArray(row.parts) && row.parts.some((part) => typeof object8(part)?.text === "string")))
-      firstUser = true;
-    kept.push(value);
-  }
-  if (!removed)
-    return;
-  const filtered = { ...envelope, [field]: kept };
-  return google && body.request !== undefined ? { ...body, request: filtered } : filtered;
-}
-
-// src/pi-dispatch-image-budget.ts
-function object9(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
-}
-function piImageBudgetPlan(model) {
-  if (!model?.input?.includes("image") || object9(model.compat)?.stripImageInput === true)
-    return;
-  return {
-    count: 0,
-    api: model.api,
-    rows: new Map,
-    hoistToolImages: model.api?.startsWith("google-") === true && object9(model.compat)?.multimodalFunctionResponse !== true || model.api === "bedrock-converse-stream" && model.requiresToolResultImageHoisting === true,
-    hoistErrorImages: model.api === "anthropic-messages" || model.api === "bedrock-converse-stream"
-  };
-}
-function inputImage(block, api) {
-  const file = object9(block.providerFile);
-  if (api === "ollama-chat")
-    return { kind: "bytes", value: String(block.data ?? "") };
-  if ((api?.endsWith("responses") && file?.provider === "openai" || api === "anthropic-messages" && file?.provider === "anthropic") && typeof file?.id === "string")
-    return { kind: "file", value: file.id };
-  if (api?.startsWith("google-") && file?.provider === "google" && typeof file.uri === "string")
-    return { kind: "url", value: file.uri };
-  if (api !== "bedrock-converse-stream" && typeof block.url === "string")
-    return { kind: "url", value: block.url };
-  return {
-    kind: "data",
-    value: typeof block.data === "string" ? block.data : "",
-    mime: typeof block.mimeType === "string" ? block.mimeType : ""
-  };
-}
-function piRecordImages(plan, row, source) {
-  if (!plan || !source || !["user", "developer", "toolResult"].includes(String(source.role)) || !Array.isArray(source.content))
-    return;
-  const images = [];
-  for (const value of source.content) {
-    const block = object9(value);
-    if (block?.type === "image")
-      images.push(inputImage(block, plan.api));
-  }
-  if (!images.length)
-    return;
-  plan.rows.set(row, {
-    first: plan.count,
-    images,
-    hoisted: source.role === "toolResult" && (plan.hoistToolImages || source.isError === true && plan.hoistErrorImages)
-  });
-  plan.count += images.length;
-}
-function piRemainingImages(run, drops) {
-  return run.images.slice(Math.max(0, Math.min(run.images.length, drops - run.first)));
-}
-function piWireImages(content, ollamaImages) {
-  if (Array.isArray(ollamaImages))
-    return ollamaImages.map((value) => ({
-      kind: "bytes",
-      value: String(value)
-    }));
-  if (!Array.isArray(content))
-    return [];
-  const images = [];
-  for (const value of content) {
-    const block = object9(value);
-    if (!block)
-      continue;
-    const source = object9(block.source);
-    const inline = object9(block.inlineData);
-    const file = object9(block.fileData);
-    const bedrock = object9(block.image);
-    if (block.type === "image_url" || block.type === "input_image") {
-      if (typeof block.file_id === "string")
-        images.push({ kind: "file", value: block.file_id });
-      else
-        images.push({
-          kind: "url",
-          value: String(typeof block.image_url === "string" ? block.image_url : object9(block.image_url)?.url)
-        });
-    } else if (block.type === "image") {
-      if (source?.type === "file")
-        images.push({ kind: "file", value: String(source.file_id) });
-      else if (source?.type === "url")
-        images.push({ kind: "url", value: String(source.url) });
-      else
-        images.push({
-          kind: "data",
-          value: String(source?.data),
-          mime: String(source?.media_type)
-        });
-    } else if (inline)
-      images.push({
-        kind: "data",
-        value: String(inline.data),
-        mime: String(inline.mimeType)
-      });
-    else if (file)
-      images.push({ kind: "url", value: String(file.fileUri) });
-    else if (bedrock)
-      images.push({
-        kind: "data",
-        value: String(object9(bedrock.source)?.bytes),
-        mime: `image/${bedrock.format}`
-      });
-  }
-  return images;
-}
-function piMatchesImages(actual, expected) {
-  if (actual.length !== expected.length)
-    return false;
-  for (let index = 0;index < expected.length; index++) {
-    const a = actual[index];
-    const e = expected[index];
-    if (e.kind === "data" && a.kind === "url") {
-      const prefix = `data:${e.mime};base64,`;
-      if (a.value.length !== prefix.length + e.value.length || !a.value.startsWith(prefix) || !a.value.endsWith(e.value))
-        return false;
-    } else if (a.kind !== e.kind || a.value !== e.value || a.mime?.replace("image/jpg", "image/jpeg") !== e.mime?.replace("image/jpg", "image/jpeg"))
-      return false;
-  }
-  return true;
-}
-function piWireImageCount(payload) {
-  const body = object9(payload);
-  const visit = (value) => {
-    if (Array.isArray(value))
-      return value.reduce((n, item) => n + visit(item), 0);
-    const block = object9(value);
-    if (!block)
-      return 0;
-    if (["image", "image_url", "input_image"].includes(String(block.type)) || block.inlineData || block.fileData || block.image)
-      return 1;
-    return [
-      block.content,
-      block.output,
-      block.parts,
-      block.toolResult,
-      block.functionResponse,
-      block.response
-    ].reduce((n, item) => n + visit(item), Array.isArray(block.images) ? block.images.length : 0);
-  };
-  return visit(body?.messages ?? body?.input ?? body?.contents ?? object9(body?.request)?.contents);
-}
-
-// src/pi-dispatch-responses-history.ts
-var MAX_TEXT_UNITS = 32 * 1024 * 1024;
-function object10(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
-}
-function wellFormed2(text) {
-  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�");
-}
-function textIdentity2(text, phase) {
-  return JSON.stringify([
-    text,
-    phase === "commentary" || phase === "final_answer" ? phase : null
-  ]);
-}
-function signaturePhase(block) {
-  try {
-    if (typeof block.textSignature === "string") {
-      const signature = object10(JSON.parse(block.textSignature));
-      if (signature?.v === 1 && typeof signature.id === "string")
-        return signature.phase;
-    }
-  } catch {}
-  return;
-}
-function demotedThinking(text, model) {
-  const id = model.id?.toLowerCase() ?? "";
-  if (/^(?:[^/]+\/)?muse-spark-1\.3(?:-|$)/u.test(id))
-    return `<thinking>
-${wellFormed2(text)}
-</thinking>`;
-  if (/^(?:[^/]+\/)?(?:gpt-|o[134](?:-|$)|chatgpt-|codex-)/u.test(id))
-    return `<think>
-${wellFormed2(text)}
-</think>`;
-  return;
-}
-function coldReplayable(items) {
-  let reasoning = false;
-  for (const value of items) {
-    const item = object10(value);
-    if (typeof item?.encrypted_content === "string")
-      return false;
-    if (item?.type !== "reasoning")
-      continue;
-    if (!Array.isArray(item.content) || !item.content.some((part) => object10(part)?.type === "reasoning_text"))
-      return false;
-    reasoning = true;
-  }
-  return reasoning;
-}
-function piResponsesAssistantTexts(value, model, host, alternatives, frozenTagStrips) {
-  const message = object10(value);
-  if (!message || !Array.isArray(message.content))
-    return;
-  if (piOmitsTruncatedAssistant(message))
-    return [];
-  const texts = [];
-  const blocks = [];
-  const sameModel = model !== undefined && typeof model.api === "string" && typeof model.id === "string" && typeof model.provider === "string" && message.api === model.api && message.model === model.id && message.provider === model.provider;
-  let units = 0;
-  for (const value of message.content) {
-    const block = object10(value);
-    if (block?.type === "toolCall")
-      continue;
-    if (block?.type === "thinking") {
-      if (sameModel)
-        continue;
-      if (typeof block.thinking !== "string" || !model)
-        return;
-      if (!block.thinking.trim())
-        continue;
-      const compat = object10(model.compat);
-      if (block.summary === false && (compat?.requiresReasoningContentForToolCalls === true || compat?.requiresReasoningContentForAllAssistantTurns === true))
-        return;
-      const text = demotedThinking(block.thinking, model);
-      if (text === undefined)
-        return;
-      units += text.length;
-      if (units > MAX_TEXT_UNITS)
-        return;
-      texts.push(textIdentity2(text, undefined));
-      continue;
-    }
-    if (block?.type !== "text" || typeof block.text !== "string")
-      return;
-    units += block.text.length;
-    if (units > MAX_TEXT_UNITS)
-      return;
-    texts.push(textIdentity2(wellFormed2(block.text), sameModel ? signaturePhase(block) : undefined));
-    blocks.push(block);
-  }
-  const payload = object10(message.providerPayload);
-  if (message.api !== model?.api || typeof model?.id !== "string" || typeof model?.provider !== "string" || message.model !== model?.id || (payload?.provider ?? message.provider) !== model?.provider || payload?.type !== "openaiResponsesHistory" || payload.dt !== true || !Array.isArray(payload.items))
-    return texts;
-  const replay = [];
-  let bound = 0;
-  let output = false;
-  const allowUnsigned = host === "omp" && message.role === "assistant" && [
-    "openai-responses",
-    "azure-openai-responses",
-    "openai-codex-responses"
-  ].includes(model?.api ?? "");
-  let unsigned = false;
-  let rewrittenText = false;
-  let allUnsignedFrozen = true;
-  for (const value of payload.items) {
-    const item = object10(value);
-    if (item?.type === "reasoning")
-      continue;
-    if (item?.type === "function_call" || item?.type === "custom_tool_call") {
-      output = true;
-      continue;
-    }
-    if (item?.type !== "message" || item.role !== "assistant" || !Array.isArray(item.content))
-      return texts;
-    const itemTexts = [];
-    for (const value of item.content) {
-      const part = object10(value);
-      const block = blocks[bound];
-      if (!block || part?.type !== "output_text" || typeof part.text !== "string")
-        return texts;
-      let signature;
-      try {
-        if (typeof block.textSignature === "string")
-          signature = object10(JSON.parse(block.textSignature));
-      } catch {
-        return texts;
-      }
-      const signed = signature?.v === 1 && typeof signature.id === "string" && item.id === signature.id && item.phase === signature.phase && part.text === block.text.replace(/^§\d+§ /u, "");
-      if (!signed) {
-        const stripped = stripPersistedAssistantText(part.text);
-        if (!allowUnsigned || "textSignature" in block || stripped !== block.text.replace(/^§\d+§ /u, ""))
-          return texts;
-        unsigned = true;
-        allUnsignedFrozen &&= part.text === block.text && ownsNativeResponseTagStrip(frozenTagStrips, item.id, item.phase, part.text);
-        rewrittenText ||= part.text !== stripped;
-      }
-      bound++;
-      itemTexts.push(part.text);
-    }
-    if (!itemTexts.some((text) => /\S/u.test(text)))
-      continue;
-    output = true;
-    for (const text of itemTexts)
-      replay.push(textIdentity2(wellFormed2(text), item.phase));
-  }
-  if (!output || bound !== blocks.length || unsigned && !rewrittenText && !allUnsignedFrozen)
-    return texts;
-  if (unsigned && alternatives) {
-    alternatives.fallback = texts;
-    alternatives.cold = coldReplayable(payload.items) ? replay : texts;
-  }
-  return replay;
-}
-function piResponsesWireTexts(value, phase) {
-  if (phase !== undefined && phase !== null && phase !== "commentary" && phase !== "final_answer")
-    return;
-  if (typeof value === "string")
-    return [textIdentity2(value, phase)];
-  if (!Array.isArray(value))
-    return;
-  const texts = [];
-  let units = 0;
-  for (const partValue of value) {
-    const part = object10(partValue);
-    if (part?.type !== "output_text" || typeof part.text !== "string")
-      return;
-    units += part.text.length;
-    if (units > MAX_TEXT_UNITS)
-      return;
-    texts.push(textIdentity2(part.text, phase));
-  }
-  return texts;
-}
-
 // src/pi-dispatch-structure.ts
 var dateReminderPlans = new WeakMap;
 var MAX_MESSAGES = 1e5;
 var ORPHAN_NOTE = Symbol("prepared orphan tool result");
+var ORPHAN_NOTE_ALTERNATIVES = Symbol("prepared orphan tool result variants");
+var OMP_PROVIDER_ERROR_REPLAY_TEXT = "Tool call was not executed because the provider stream ended with an error before the tool could run.";
+var rowDiagnostics = new WeakMap;
+var preparedSources = new WeakMap;
 var ANTHROPIC_CONTINUE_PAD_TEXT = "Continue.";
 var ANTHROPIC_CONTINUE_PAD_APIS = new Set(["anthropic-messages"]);
 function piModelsAnthropicContinuePad(api, host) {
@@ -37302,10 +39271,14 @@ function messageStructure(value) {
   if (role !== "user" && role !== "assistant" && role !== "toolResult" && role !== "system")
     return;
   const row = { role, calls: [], results: [] };
+  rowDiagnostics.set(row, piDispatchRowDiagnostic(role, message.content));
   if (ORPHAN_NOTE in message && typeof message.content === "string") {
     if (message.content.length > 32 * 1024 * 1024)
       return;
     row.exactText = message.content;
+    const alternatives = Reflect.get(message, ORPHAN_NOTE_ALTERNATIVES);
+    if (Array.isArray(alternatives))
+      row.exactTextAlternatives = alternatives;
   }
   if (typeof message.timestamp === "number")
     row.timestamp = message.timestamp;
@@ -37357,17 +39330,7 @@ function appendDuplicateSuffix(id, suffix, max) {
   const segment = (part) => part.length + suffix.length <= max ? `${part}${suffix}` : `${part.slice(0, Math.max(0, max - suffix.length))}${suffix}`;
   return id.includes("|") ? id.split("|").map(segment).join("|") : segment(id);
 }
-function projectMissingToolResults(messages, model, host = "omp") {
-  const input = messages.filter((value) => {
-    const message = object11(value);
-    return !((message?.role === "bashExecution" || message?.role === "pythonExecution") && message.excludeFromContext === true);
-  });
-  if (host === "pi")
-    return projectPiToolResults(input);
-  const api = model?.api;
-  if (!TRANSFORM_MESSAGES_APIS.has(api ?? ""))
-    return projectUnmodeledToolResults(messages);
-  const pairingId = piToolCallPairing(input);
+function deduplicateToolCallIds(input, pairingId, model) {
   const { prefix, max } = duplicateSuffix(model);
   const seen = new Map;
   const renames = new Map;
@@ -37433,6 +39396,25 @@ function projectMissingToolResults(messages, model, host = "omp") {
       validToolUseIds.add(pairingId(call.id));
     return changed ? { ...message, content } : value;
   });
+  return { deduplicated, realResults, validToolUseIds };
+}
+function piDeduplicatedToolCallIds(messages, model) {
+  if (!TRANSFORM_MESSAGES_APIS.has(model?.api ?? ""))
+    return [...messages];
+  return deduplicateToolCallIds(messages, piToolCallPairing(messages), model).deduplicated;
+}
+function projectMissingToolResults(messages, model, host = "omp") {
+  const input = messages.filter((value) => {
+    const message = object11(value);
+    return !((message?.role === "bashExecution" || message?.role === "pythonExecution") && message.excludeFromContext === true);
+  });
+  if (host === "pi")
+    return projectPiToolResults(input);
+  const api = model?.api;
+  if (!TRANSFORM_MESSAGES_APIS.has(api ?? ""))
+    return projectUnmodeledToolResults(messages);
+  const pairingId = piToolCallPairing(input);
+  const { deduplicated, realResults, validToolUseIds } = deduplicateToolCallIds(input, pairingId, model);
   const takeRealResult = (id, afterIndex) => {
     for (const entry of realResults.get(pairingId(id)) ?? []) {
       if (entry.consumed || entry.index <= afterIndex)
@@ -37527,15 +39509,19 @@ function projectMissingToolResults(messages, model, host = "omp") {
     if (!parts.length)
       continue;
     const error = message.isError ? ' is-error="true"' : "";
-    const note = `<stale-tool-result tool="${message.toolName}" id="${message.toolCallId}"${error}>
-${parts.join(`
-`)}
+    const staleNote = (text) => `<stale-tool-result tool="${message.toolName}" id="${message.toolCallId}"${error}>
+${text}
 </stale-tool-result>`;
+    const note = staleNote(parts.join(`
+`));
+    const details = object11(message.details);
+    const replayNote = details?.__synthetic === true && details.source === "assistant_stop_error" ? staleNote(OMP_PROVIDER_ERROR_REPLAY_TEXT) : undefined;
     projected.push({
       role: "user",
       content: api === "ollama-chat" ? note : new TextDecoder().decode(new TextEncoder().encode(note)),
       timestamp: message.timestamp,
-      [ORPHAN_NOTE]: true
+      [ORPHAN_NOTE]: true,
+      ...replayNote !== undefined && replayNote !== note ? { [ORPHAN_NOTE_ALTERNATIVES]: [replayNote] } : {}
     });
   }
   flush();
@@ -37683,7 +39669,12 @@ function preparePiDispatch(messages, model, omp, cwd) {
   const reminders = structure && dateReminderPlans.get(structure);
   if (reminders)
     reminders.cwd = cwd;
-  return { messages: output, structure };
+  const nativeDrops = omp ? piNativeDropExpectations(output, model) : [];
+  return {
+    messages: output,
+    structure,
+    ...nativeDrops.length ? { nativeDrops } : {}
+  };
 }
 function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
   if (!messages.length || messages.length > MAX_MESSAGES)
@@ -37816,6 +39807,7 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
   const fallbackMessages = [];
   const coldMessages = [];
   let unsignedAlternatives = false;
+  const planRows = [];
   const appendResponse = (output, row, texts) => {
     if (!texts.length && !row.calls.length)
       return;
@@ -37838,10 +39830,11 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
         responsesMessages.push(row);
         fallbackMessages.push(row);
         coldMessages.push(row);
+        planRows.push({ row });
         continue;
       }
       const alternatives = {};
-      const texts = piResponsesAssistantTexts(projectedMessages[index], model, host, alternatives, object11(projectedMessages[index])?.[PI_NATIVE_TAG_STRIP_PROVENANCE]);
+      const texts = piResponsesAssistantTexts(projectedMessages[index], model, host, alternatives);
       if (!texts) {
         responsesMessages = undefined;
         break;
@@ -37850,8 +39843,42 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
       appendResponse(responsesMessages, row, texts);
       appendResponse(fallbackMessages, row, alternatives.fallback ?? texts);
       appendResponse(coldMessages, row, alternatives.cold ?? texts);
+      planRows.push({
+        row,
+        texts: {
+          warm: texts,
+          fallback: alternatives.fallback ?? texts,
+          cold: alternatives.cold ?? texts
+        },
+        replayed: host === "omp" ? piResponsesReplayedCalls(projectedMessages[index], row.calls, row.wireCalls, model) : undefined
+      });
     }
   }
+  const replays = planRows.some((entry) => entry.replayed);
+  const replayPlan = (rows, plan) => {
+    if (!replays)
+      return rows;
+    const replayedIn = (entry) => plan === "warm" || plan === "cold" && entry.replayed?.cold ? entry.replayed : undefined;
+    if (!planRows.some(replayedIn))
+      return rows;
+    return piResponsesReplayRows(planRows.map((entry) => entry.texts ? {
+      row: entry.row,
+      texts: entry.texts[plan],
+      replayed: replayedIn(entry)
+    } : { row: entry.row }), (callId) => ({
+      role: "toolResult",
+      calls: [],
+      results: [callId],
+      wireResults: [callId]
+    }), (source) => ({
+      ...source,
+      calls: [],
+      wireCalls: [],
+      responseTexts: []
+    })) ?? rows;
+  };
+  if (responsesMessages)
+    responsesMessages = replayPlan(responsesMessages, "warm");
   const plan = piChatHistoryPlan(projectedMessages, model);
   let pendingToolImages = [];
   const chatMessages = plan?.flatMap((step) => {
@@ -37884,7 +39911,12 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
     ...responsesApi && !responsesMessages ? { structuralSkipReason: "Responses history transform is not modeled" } : model?.api === "openai-completions" && !chatMessages ? { structuralSkipReason: "Chat history transform is not modeled" } : {},
     ...chatMessages ? { chatMessages } : {},
     ...responsesMessages ? { responsesMessages } : {},
-    ...responsesMessages && unsignedAlternatives ? { responsesAlternatives: [fallbackMessages, coldMessages] } : {},
+    ...responsesMessages && (unsignedAlternatives || replays) ? {
+      responsesAlternatives: [
+        replayPlan(fallbackMessages, "fallback"),
+        replayPlan(coldMessages, "cold")
+      ]
+    } : {},
     ...model?.api ? { api: model.api } : {},
     ...modelsContinuePad ? { anthropicContinuePad: true } : {},
     ...modelsContinuePad && baseRows.some((row) => row.optionalThinking) ? { anthropicOptional: { rows: baseRows, promotable } } : {},
@@ -37892,6 +39924,7 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
       googleFunctionIds: object11(model.compat)?.supportsFunctionPartId === true
     } : {}
   };
+  preparedSources.set(prepared, { messages: projectedMessages, rows: byIndex });
   if (host === "omp" && PI_DATE_REMINDER_APIS.has(model?.api ?? ""))
     dateReminderPlans.set(prepared, {
       ...modelsContinuePad ? { plan: { rows: baseRows, promotable } } : {},
@@ -37901,6 +39934,14 @@ function buildPiPreparedStructure(messages, model, prepareUser, host = "omp") {
     });
   return prepared;
 }
+function* piPreparedUserSources(prepared) {
+  const source = prepared && preparedSources.get(prepared);
+  if (!source)
+    return;
+  for (const [index, row] of source.rows)
+    if (row.role === "user")
+      yield source.messages[index];
+}
 function responsesLane(api) {
   return [
     "openai-responses",
@@ -37908,13 +39949,13 @@ function responsesLane(api) {
     "openai-codex-responses"
   ].includes(api ?? "");
 }
-function payloadStructure(payload, ollama = false, responsesItems = false, imageProjection = false) {
+function payloadStructure(payload, ollama = false, responsesItems = false, imageProjection = false, trackRows = false) {
   const body = object11(payload);
   if (!body)
     return;
   const google = piGoogleConversation(payload);
   if (google)
-    return googleStructure(google.contents, imageProjection);
+    return googleStructure(google.contents, imageProjection, trackRows);
   const bedrock = body.inferenceConfig !== undefined;
   if (body.messages === undefined && typeof body.input === "string")
     return [{ role: "user", calls: [], results: [] }];
@@ -37947,6 +39988,18 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
         rows.push(assistant);
       }
       assistant.calls.push(message.call_id);
+      if (trackRows) {
+        assistant.wireRows ??= [];
+        assistant.wireRows.push(value);
+      }
+      const diagnostic = rowDiagnostics.get(assistant);
+      rowDiagnostics.set(assistant, {
+        role: "assistant",
+        parts: (diagnostic?.parts ?? 0) + 1,
+        kinds: (diagnostic?.kinds ?? 0) | 4,
+        chars: diagnostic?.chars ?? 0,
+        injector: "none"
+      });
       continue;
     }
     if (responses && [
@@ -37956,7 +40009,13 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
     ].includes(String(message.type))) {
       if (typeof message.call_id !== "string")
         return;
-      rows.push({ role: "toolResult", calls: [], results: [message.call_id] });
+      rows.push({
+        role: "toolResult",
+        calls: [],
+        results: [message.call_id],
+        ...trackRows ? { wireRows: [value] } : {}
+      });
+      rowDiagnostics.set(rows[rows.length - 1], piDispatchRowDiagnostic("toolResult", message.output));
       if (imageProjection)
         rows[rows.length - 1].images = piWireImages(message.output);
       continue;
@@ -37969,6 +40028,7 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
           results: [""],
           resultNames: [message.tool_name],
           idlessResults: [true],
+          ...trackRows ? { wireRows: [value] } : {},
           ...imageProjection ? { images: piWireImages(message.content, message.images) } : {}
         });
         continue;
@@ -37979,6 +40039,7 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
         role: "toolResult",
         calls: [],
         results: [message.tool_call_id],
+        ...trackRows ? { wireRows: [value] } : {},
         ...imageProjection ? {
           images: piWireImages(message.content, ollama ? message.images : undefined)
         } : {}
@@ -37996,15 +40057,23 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
             role: "toolResult",
             calls: [],
             results: [id],
+            ...trackRows ? { wireRows: [value] } : {},
             ...imageProjection ? {
               images: piWireImages(bedrock ? block.toolResult?.content : block.content)
             } : {}
           });
+          rowDiagnostics.set(rows[rows.length - 1], piDispatchRowDiagnostic("toolResult", bedrock ? block.toolResult?.content : block.content));
         }
         if (imageProjection) {
           const images = piWireImages(message.content.filter((block) => !results.includes(block)));
           if (images.length)
-            rows.push({ role: "user", calls: [], results: [], images });
+            rows.push({
+              role: "user",
+              calls: [],
+              results: [],
+              images,
+              ...trackRows ? { wireRows: [value] } : {}
+            });
         }
         continue;
       }
@@ -38013,6 +40082,8 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
     if (!row)
       return;
     row.wireContent = message.content;
+    if (trackRows)
+      row.wireRows = [value];
     if (imageProjection)
       row.images = piWireImages(message.content, ollama ? message.images : undefined);
     if (responses && responsesItems && row.role === "assistant") {
@@ -38061,6 +40132,10 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
     if (responses && row.role === "assistant" && rows.at(-1)?.role === "assistant") {
       const previous = rows[rows.length - 1];
       previous.calls.push(...row.calls);
+      if (trackRows) {
+        previous.wireRows ??= [];
+        previous.wireRows.push(value);
+      }
       if (responsesItems)
         previous.responseTexts?.push(...row.responseTexts ?? []);
     } else
@@ -38068,7 +40143,7 @@ function payloadStructure(payload, ollama = false, responsesItems = false, image
   }
   return rows;
 }
-function googleStructure(contents, imageProjection = false) {
+function googleStructure(contents, imageProjection = false, trackRows = false) {
   if (contents.length > MAX_MESSAGES)
     return;
   const rows = [];
@@ -38084,7 +40159,8 @@ function googleStructure(contents, imageProjection = false) {
       results: [],
       ...imageProjection ? { images: piWireImages(message.parts) } : {},
       wireRole: message.role,
-      wireContent: message.parts
+      wireContent: message.parts,
+      ...trackRows ? { wireRows: [value] } : {}
     };
     const results = [];
     for (const value of message.parts) {
@@ -38108,18 +40184,36 @@ function googleStructure(contents, imageProjection = false) {
           calls: [],
           results: [result.id ?? ""],
           resultNames: [result.name],
+          ...trackRows ? { wireRows: [value] } : {},
           ...imageProjection ? { images: piWireImages(result.parts) } : {}
+        });
+        rowDiagnostics.set(results[results.length - 1], {
+          role: "tool-result",
+          parts: 1,
+          kinds: 8,
+          chars: typeof result.response === "string" ? result.response.length : Object.values(object11(result.response) ?? {}).reduce((count, value) => count + (typeof value === "string" ? value.length : 0), 0),
+          injector: "none"
         });
       }
     }
     if (results.length) {
       rows.push(...results);
       if (imageProjection && row.images?.length)
-        rows.push({ role: "user", calls: [], results: [], images: row.images });
+        rows.push({
+          role: "user",
+          calls: [],
+          results: [],
+          images: row.images,
+          ...trackRows ? { wireRows: [value] } : {}
+        });
     } else
       rows.push(row);
   }
   return rows;
+}
+function sameResponsesIds(expected, actual) {
+  const same = (ids, wire) => ids.length === wire.length && ids.every((id, index) => id === wire[index]);
+  return expected.every((row, index) => !!actual[index] && same(row.wireCalls ?? row.calls.map((id) => wireId(id, false, true)), actual[index].calls) && same(row.wireResults ?? row.results.map((id) => wireId(id, false, true)), actual[index].results));
 }
 function wireId(id, anthropic, responses) {
   if (anthropic)
@@ -38191,7 +40285,9 @@ function trimPreparedImageRows(rows, budget, drops) {
   flush();
   return projected;
 }
-function countAnthropicOptionalAlignments(plan, base, wire, compare, reminders, firstUser = -1) {
+function countAnthropicOptionalAlignments(plan, base, wire, compare, reminders, firstUser = -1, onAlignment) {
+  const paths = onAlignment ? new Map : undefined;
+  let completePath;
   const pad = {
     role: "user",
     calls: [],
@@ -38209,7 +40305,7 @@ function countAnthropicOptionalAlignments(plan, base, wire, compare, reminders, 
   };
   const matches = (expected, at) => at < wire.length && compare(expected, wire[at]) === undefined;
   const states = new Map;
-  const add = (index, previous, at, count) => {
+  const add = (index, previous, at, count, path) => {
     let bucket = states.get(index);
     if (!bucket) {
       bucket = new Map;
@@ -38217,10 +40313,21 @@ function countAnthropicOptionalAlignments(plan, base, wire, compare, reminders, 
     }
     const key = `${previous ?? ""}|${at}`;
     bucket.set(key, Math.min(2, (bucket.get(key) ?? 0) + count));
+    if (paths) {
+      let traces = paths.get(index);
+      if (!traces) {
+        traces = new Map;
+        paths.set(index, traces);
+      }
+      if (!traces.has(key))
+        traces.set(key, path);
+    }
   };
   let complete = 0;
-  const advance = (current, previous, at, count) => {
+  const advance = (current, previous, at, count, path) => {
+    let placedPath = path;
     const place = (next) => {
+      placedPath = path;
       if (current < 0)
         return at;
       let after = at + 1;
@@ -38230,11 +40337,20 @@ function countAnthropicOptionalAlignments(plan, base, wire, compare, reminders, 
       if (controls && (firstUser < 0 || current < firstUser))
         return;
       const nextRole = controls ? wire[at + 1].role : next === undefined ? undefined : role(next);
-      if (!matches(final(current, previous, nextRole), at))
+      const expected = final(current, previous, nextRole);
+      if (!matches(expected, at))
         return;
+      if (onAlignment)
+        placedPath = { expected, actual: wire[at], previous: placedPath };
       if (!controls && role(current) === "assistant" && nextRole === "assistant") {
         if (!matches(pad, after))
           return;
+        if (onAlignment)
+          placedPath = {
+            expected: pad,
+            actual: wire[after],
+            previous: placedPath
+          };
         after++;
       }
       return after;
@@ -38242,7 +40358,7 @@ function countAnthropicOptionalAlignments(plan, base, wire, compare, reminders, 
     for (let next = current + 1;next < base.length; next++) {
       const after = place(next);
       if (after !== undefined)
-        add(next, current < 0 ? undefined : wire[after - 1]?.role, after, count);
+        add(next, current < 0 ? undefined : wire[after - 1]?.role, after, count, placedPath);
       if (!base[next].optionalThinking)
         return;
     }
@@ -38252,8 +40368,16 @@ function countAnthropicOptionalAlignments(plan, base, wire, compare, reminders, 
       return;
     }
     const after = place(undefined);
-    if (after === wire.length || after === wire.length - 1 && wire[after - 1]?.role === "assistant" && isAnthropicContinuePadRow(wire[after]))
+    if (after === wire.length || after === wire.length - 1 && wire[after - 1]?.role === "assistant" && isAnthropicContinuePadRow(wire[after])) {
       complete = Math.min(2, complete + count);
+      completePath = placedPath;
+      if (onAlignment && after === wire.length - 1)
+        completePath = {
+          expected: pad,
+          actual: wire[after],
+          previous: completePath
+        };
+    }
   };
   advance(-1, undefined, 0, 1);
   for (let index = 0;index < base.length && complete < 2; index++) {
@@ -38264,26 +40388,51 @@ function countAnthropicOptionalAlignments(plan, base, wire, compare, reminders, 
     for (const [key, count] of bucket) {
       const split = key.lastIndexOf("|");
       const previous = key.slice(0, split) || undefined;
-      advance(index, previous, Number(key.slice(split + 1)), count);
+      advance(index, previous, Number(key.slice(split + 1)), count, paths?.get(index)?.get(key));
     }
+    paths?.delete(index);
+  }
+  if (complete === 1 && onAlignment) {
+    const trace = [];
+    for (let path = completePath;path; path = path.previous)
+      trace.push({ expected: path.expected, actual: path.actual });
+    onAlignment(trace.reverse());
   }
   return complete;
 }
-function piPreparedStructureMismatch(payload, prepared, onImageTrim) {
+function piPreparedStructureMismatch(payload, prepared, onImageTrim, onAlignment) {
+  const receipt = prepared && preparedSources.get(prepared);
+  const sourceByCalls = onAlignment && receipt ? new Map([...receipt.rows].map(([index, row]) => [
+    row.calls,
+    receipt.messages[index]
+  ])) : undefined;
+  const aligned = onAlignment ? (pairs) => onAlignment(pairs.map(({ expected, actual }) => ({
+    role: expected.role,
+    calls: expected.calls,
+    results: expected.results,
+    source: sourceByCalls?.get(expected.calls),
+    exactText: expected.exactText,
+    systemText: expected.systemText,
+    wire: actual.wireRows ?? [],
+    hasImages: !!expected.exactImages?.length || !!expected.images?.length
+  }))) : undefined;
   const plan = prepared && dateReminderPlans.get(prepared);
   try {
-    const messages = plan ? object11(payload)?.messages : undefined;
+    const body = plan ? object11(payload) : undefined;
+    const messages = body?.messages ?? body?.input;
     if (Array.isArray(messages)) {
       for (const value of messages) {
         const message = object11(value);
         if (message?.role !== "system" && message?.role !== "developer")
           break;
-        if (piDateReminderWireText(message.content, plan?.cwd) !== undefined)
+        const content = message.content;
+        const inputText = Array.isArray(content) && content.length === 1 && object11(content[0])?.type === "input_text" ? object11(content[0])?.text : undefined;
+        if (piDateReminderWireText(content, plan?.cwd) !== undefined || piDateReminderText(inputText, plan?.cwd))
           return "comparison=role";
       }
     }
   } catch {}
-  const mismatch = preparedStructureMismatch(payload, prepared, onImageTrim);
+  const mismatch = preparedStructureMismatch(payload, prepared, onImageTrim, undefined, undefined, undefined, aligned);
   if (!mismatch)
     return mismatch;
   try {
@@ -38302,7 +40451,7 @@ function piPreparedStructureMismatch(payload, prepared, onImageTrim) {
         const rows = payloadStructure(prefix, prepared.api === "ollama-chat", !!prepared.responsesMessages);
         return !!rows && rows.length > firstUser;
       });
-      return filtered === undefined ? mismatch : preparedStructureMismatch(filtered, prepared, onImageTrim);
+      return filtered === undefined ? mismatch : preparedStructureMismatch(filtered, prepared, onImageTrim, undefined, undefined, undefined, aligned);
     }
     const messages = object11(payload)?.messages;
     if (!Array.isArray(messages))
@@ -38312,7 +40461,7 @@ function piPreparedStructureMismatch(payload, prepared, onImageTrim) {
       if (piDateReminderWireText(message?.content, plan.cwd) !== undefined && Object.keys(message ?? {}).some((key) => !["role", "content"].includes(key)))
         return mismatch;
     }
-    const wire = payloadStructure(payload, false, false, !!prepared.imageBudget && piWireImageCount(payload) < prepared.imageBudget.count);
+    const wire = payloadStructure(payload, false, false, !!prepared.imageBudget && piWireImageCount(payload) < prepared.imageBudget.count, !!aligned);
     if (!wire)
       return mismatch;
     const reminders = new Set(wire.filter((row) => piDateReminderWireText(row.wireContent, plan.cwd) !== undefined));
@@ -38328,12 +40477,12 @@ function piPreparedStructureMismatch(payload, prepared, onImageTrim) {
       if (row.wireRole !== (promoted ? "system" : "user") || row.calls.length || row.results.length)
         return mismatch;
     }
-    return preparedStructureMismatch(payload, { ...prepared, anthropicOptional: plan.plan }, onImageTrim, reminders, wire, plan.firstUser);
+    return preparedStructureMismatch(payload, { ...prepared, anthropicOptional: plan.plan }, onImageTrim, reminders, wire, plan.firstUser, aligned);
   } catch {
     return mismatch;
   }
 }
-function preparedStructureMismatch(payload, prepared, onImageTrim, reminders, reminderWire, firstUser) {
+function preparedStructureMismatch(payload, prepared, onImageTrim, reminders, reminderWire, firstUser, onAlignment) {
   let stage = "image count";
   let row = 0;
   let expectedRows;
@@ -38351,13 +40500,18 @@ function preparedStructureMismatch(payload, prepared, onImageTrim, reminders, re
     const body = object11(payload);
     const ollama = prepared?.api === "ollama-chat" && !!body && Array.isArray(body.messages) && body.input === undefined && body.system === undefined && body.inferenceConfig === undefined;
     const responses = body?.messages === undefined && Array.isArray(body?.input);
-    rows = reminderWire ?? payloadStructure(payload, ollama, responses && !!prepared?.responsesMessages, imageProjection);
+    rows = reminderWire ?? payloadStructure(payload, ollama, responses && !!prepared?.responsesMessages, imageProjection, !!onAlignment);
     const chat = !!body && Array.isArray(body.messages) && (prepared?.api === "openai-completions" || body.system === undefined) && body.input === undefined && body.inferenceConfig === undefined;
     stage = "prepared rows";
     expectedRows = responses && prepared?.responsesMessages ? prepared.responsesMessages : chat && prepared?.chatMessages ? prepared.chatMessages : prepared?.messages;
     if (responses && rows && prepared?.responsesAlternatives) {
       const actual = rows;
-      expectedRows = [prepared.responsesMessages, ...prepared.responsesAlternatives].find((candidate) => candidate?.length === actual.length && candidate.every((expected, index) => JSON.stringify(expected.responseTexts) === JSON.stringify(actual[index].responseTexts))) ?? expectedRows;
+      const candidates = [
+        prepared.responsesMessages,
+        ...prepared.responsesAlternatives
+      ];
+      const sameTexts = (candidate) => candidate?.length === actual.length && candidate.every((expected, index) => JSON.stringify(expected.responseTexts) === JSON.stringify(actual[index].responseTexts));
+      expectedRows = candidates.find((candidate) => sameTexts(candidate) && !!candidate && sameResponsesIds(candidate, actual)) ?? candidates.find(sameTexts) ?? expectedRows;
     }
     const optionalPlan = expectedRows === prepared?.messages ? prepared?.anthropicOptional : undefined;
     if (expectedRows && imageProjection && imageBudget)
@@ -38387,7 +40541,7 @@ function preparedStructureMismatch(payload, prepared, onImageTrim, reminders, re
       if (expected.exactText !== undefined || expected.exactImages !== undefined) {
         if (actual.wireRole !== "user")
           return "role";
-        if (expected.exactText !== undefined && !matchesUserText(actual.wireContent, expected.exactText, prepared?.api, responses, google || body.inferenceConfig !== undefined) || expected.exactImages !== undefined && !piMatchesChatImages(actual.wireContent, expected.exactImages))
+        if (expected.exactText !== undefined && !matchesUserText(actual.wireContent, expected.exactText, prepared?.api, responses, google || body.inferenceConfig !== undefined) && !expected.exactTextAlternatives?.some((text) => matchesUserText(actual.wireContent, text, prepared?.api, responses, google || body.inferenceConfig !== undefined)) || expected.exactImages !== undefined && !piMatchesChatImages(actual.wireContent, expected.exactImages))
           return "content";
       }
       if (actual.calls.length !== expected.calls.length || actual.results.length !== expected.results.length)
@@ -38406,7 +40560,7 @@ function preparedStructureMismatch(payload, prepared, onImageTrim, reminders, re
     };
     if (optionalPlan) {
       stage = "optional assistants";
-      const alignments = countAnthropicOptionalAlignments(optionalPlan, imageProjection && imageBudget ? trimPreparedImageRows(optionalPlan.rows, imageBudget, trimmed) : optionalPlan.rows, rows, compareRow, reminders, firstUser);
+      const alignments = countAnthropicOptionalAlignments(optionalPlan, imageProjection && imageBudget ? trimPreparedImageRows(optionalPlan.rows, imageBudget, trimmed) : optionalPlan.rows, rows, compareRow, reminders, firstUser, onAlignment);
       if (alignments > 1)
         return structureDetail(0, expectedRows, rows, "alignment");
       if (alignments === 1) {
@@ -38434,6 +40588,24 @@ function preparedStructureMismatch(payload, prepared, onImageTrim, reminders, re
     }
     if (optionalPlan)
       return structureDetail(0, expectedRows, rows, "alignment");
+    if (onAlignment) {
+      const actual = rows;
+      const pairs = expectedRows.map((expected, index) => ({
+        expected,
+        actual: actual[index]
+      }));
+      if (rows.length > expectedRows.length)
+        pairs.push({
+          expected: {
+            role: "user",
+            calls: [],
+            results: [],
+            exactText: ANTHROPIC_CONTINUE_PAD_TEXT
+          },
+          actual: rows[rows.length - 1]
+        });
+      onAlignment(pairs);
+    }
     if (imageProjection && imageBudget)
       onImageTrim?.({
         planned: imageBudget.count,
@@ -38451,6 +40623,2101 @@ function preparedStructureMismatch(payload, prepared, onImageTrim, reminders, re
     ].includes(error.constructor.name) ? error.constructor.name : "unknown";
     return `${structureDetail(row, expectedRows, rows, "exception")} stage=${stage} error=${name}`;
   }
+}
+function piDispatchRowCount(payload, prepared) {
+  try {
+    const body = object11(payload);
+    return payloadStructure(payload, prepared?.api === "ollama-chat", body?.messages === undefined && Array.isArray(body?.input) && !!prepared?.responsesMessages)?.length;
+  } catch {
+    return;
+  }
+}
+function piPreparedDispatchRowLimit(prepared) {
+  if (!prepared || prepared.structuralSkipReason)
+    return;
+  return Math.max(prepared.messages.length, prepared.chatMessages?.length ?? 0, prepared.responsesMessages?.length ?? 0, ...(prepared.responsesAlternatives ?? []).map((rows) => rows.length), prepared.anthropicOptional ? prepared.anthropicOptional.rows.length * 2 + 1 : 0);
+}
+function piDispatchMismatchDiagnostic(payload, prepared, mismatch) {
+  const row = Number(/^row=(\d+) /u.exec(mismatch)?.[1] ?? 0);
+  const summarize = (rows, index) => {
+    const value = rows?.[index];
+    if (!value)
+      return piDispatchRowDiagnostic(rows ? "missing" : "unknown", undefined);
+    return rowDiagnostics.get(value) ?? piDispatchRowDiagnostic(value.role, value.wireContent ?? value.exactText);
+  };
+  let expected = prepared?.messages;
+  let actual;
+  try {
+    const body = object11(payload);
+    const responses = body?.messages === undefined && Array.isArray(body?.input);
+    if (responses)
+      expected = prepared?.responsesMessages ?? expected;
+    else if (Array.isArray(body?.messages) && prepared?.chatMessages && body?.system === undefined && body?.inferenceConfig === undefined)
+      expected = prepared.chatMessages;
+    actual = payloadStructure(payload, prepared?.api === "ollama-chat", responses && !!prepared?.responsesMessages);
+  } catch {}
+  const indices = [row - 1, row, row + 1];
+  const firstInjectorRow = actual?.findIndex((_, index) => summarize(actual, index).injector !== "none") ?? -1;
+  return {
+    row,
+    expected: indices.map((index) => summarize(expected, index)),
+    actual: indices.map((index) => summarize(actual, index)),
+    firstInjectorRow,
+    firstInjectorKind: firstInjectorRow < 0 ? "none" : summarize(actual, firstInjectorRow).injector
+  };
+}
+
+// src/pi-foreign-session-index.ts
+import { createHash as createHash15 } from "node:crypto";
+
+// src/pi-foreign-omp-kinds.ts
+var PI_FOREIGN_RENDERED_CONTENT_KINDS = [
+  "text",
+  "thinking",
+  "redactedThinking",
+  "image",
+  "toolCall",
+  "anthropicServerTool"
+];
+var PI_FOREIGN_NON_TEXT_CONTENT_KINDS = ["fallback"];
+var PI_FOREIGN_COMPAT_CONTENT_KINDS = [
+  "input_text",
+  "output_text",
+  "tool_use",
+  "tool_result"
+];
+var PI_FOREIGN_SERVER_TOOL_KINDS = [
+  "server_tool_use",
+  "web_search_tool_result",
+  "tool_search_tool_result"
+];
+var PI_FOREIGN_NON_TEXT_ENTRY_TYPES = [
+  "model_usage",
+  "thinking_level_change",
+  "model_change",
+  "service_tier_change",
+  "reset_boundary",
+  "custom",
+  "label",
+  "title_change",
+  "ttsr_injection",
+  "credential_pin",
+  "session_init",
+  "mode_change"
+];
+var contentKinds = new Set([
+  ...PI_FOREIGN_RENDERED_CONTENT_KINDS,
+  ...PI_FOREIGN_NON_TEXT_CONTENT_KINDS,
+  ...PI_FOREIGN_COMPAT_CONTENT_KINDS
+]);
+var piForeignKnownContentKind = (kind) => typeof kind === "string" && contentKinds.has(kind);
+function piForeignServerToolBlock(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !PI_FOREIGN_SERVER_TOOL_KINDS.some((kind) => kind === Reflect.get(value, "type")))
+    throw new Error("unreadable server-tool block");
+  return value;
+}
+function piForeignServerToolStrings(value, out, ancestors = new Set) {
+  if (typeof value === "string") {
+    out.push(value);
+    return;
+  }
+  if (value === null || typeof value === "number" || typeof value === "boolean" || value === undefined)
+    return;
+  if (typeof value !== "object" || ancestors.has(value) || ancestors.size > 100)
+    throw new Error("unreadable server-tool value");
+  if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
+    throw new Error("unreadable server-tool object");
+  ancestors.add(value);
+  for (const child of Object.values(value))
+    piForeignServerToolStrings(child, out, ancestors);
+  ancestors.delete(value);
+}
+
+// src/pi-foreign-output-notice.ts
+var bytes = (n) => n < 1024 ? `${n}B` : n < 1024 ** 2 ? `${(n / 1024).toFixed(1)}KB` : n < 1024 ** 3 ? `${(n / 1024 ** 2).toFixed(1)}MB` : `${(n / 1024 ** 3).toFixed(1)}GB`;
+var artifact = (id, missing) => missing !== undefined && missing > 0 ? `Read artifact://${id} for a head/tail sample of the output; ${bytes(missing)} from its middle was not saved` : `Read artifact://${id} for full output`;
+function truncation(t, source) {
+  const reference = t.artifactId == null ? undefined : source?.type === "report" ? `Read artifact://${t.artifactId} for full report (${source.value})` : artifact(t.artifactId, t.artifactElidedBytes);
+  let text;
+  if (t.direction === "middle") {
+    const head = t.headRange ? `lines ${t.headRange.start}-${t.headRange.end}` : "";
+    const tail = t.tailRange ? `lines ${t.tailRange.start}-${t.tailRange.end}` : "";
+    const hiddenBytes = t.elidedBytes ?? Math.max(0, t.totalBytes - t.outputBytes);
+    const hiddenLines = t.elidedLines ?? Math.max(0, t.totalLines - t.outputLines);
+    text = head && tail ? `Showing ${head} and ${tail} of ${t.totalLines}; ${hiddenLines.toLocaleString()} middle line${hiddenLines === 1 ? "" : "s"} (${bytes(hiddenBytes)}) elided` : hiddenBytes > 0 ? `Showing head and tail bytes of ${t.totalLines.toLocaleString()} line${t.totalLines === 1 ? "" : "s"}; ${bytes(hiddenBytes)} elided` : `Showing ${Math.min(t.outputLines, t.totalLines)} of ${t.totalLines} lines; middle elided`;
+  } else if (t.partialLine)
+    text = `Showing line ${t.shownRange?.start ?? 1} (partial, ${bytes(t.outputBytes)} of ${bytes(t.totalBytes)}) of ${t.totalLines}`;
+  else {
+    text = t.shownRange ? `Showing lines ${t.shownRange.start}-${t.shownRange.end} of ${t.totalLines}` : `Showing ${t.outputLines} of ${t.totalLines} lines`;
+    if (t.truncatedBy === "bytes")
+      text += ` (${bytes(t.maxBytes ?? t.outputBytes)} limit)`;
+  }
+  if (!t.partialLine && t.nextOffset != null)
+    text += `. Use :${t.nextOffset} to continue`;
+  if (reference)
+    text += `. ${reference}`;
+  return text;
+}
+function diagnosticGroups(messages) {
+  const node = () => ({ files: [], dirs: new Map });
+  const root = node();
+  const byFile = new Map;
+  const ungrouped = [];
+  for (const text of messages) {
+    const match = /^(.+?):(\d+:\d+\s+.*)$/u.exec(text);
+    if (!match) {
+      ungrouped.push(text);
+      continue;
+    }
+    const path = match[1].replace(/\\/gu, "/");
+    if (!byFile.has(path)) {
+      const parts = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//u.test(path) ? [path] : path.split("/");
+      let current = root;
+      for (const part of parts.slice(0, -1)) {
+        if (!current.dirs.has(part))
+          current.dirs.set(part, node());
+        current = current.dirs.get(part);
+      }
+      current.files.push(path);
+      byFile.set(path, []);
+    }
+    byFile.get(path).push(match[2]);
+  }
+  if (!byFile.size)
+    return ungrouped.join(`
+`);
+  const lines = [];
+  const emit = (header, depth, directory) => {
+    if (lines.length && (directory || depth === 0))
+      lines.push("");
+    lines.push(`${"#".repeat(depth + 1)} ${header}`);
+  };
+  const walk = (current, depth) => {
+    for (const path of current.files) {
+      emit(/^[A-Za-z][A-Za-z0-9+.-]*:\/\//u.test(path) ? path : path.slice(path.lastIndexOf("/") + 1), depth, false);
+      lines.push(...byFile.get(path).map((text) => `  ${text}`));
+    }
+    for (const [name, child] of current.dirs) {
+      let next = child;
+      const parts = [name];
+      while (!next.files.length && next.dirs.size === 1) {
+        const [name, child] = next.dirs.entries().next().value;
+        parts.push(name);
+        next = child;
+      }
+      emit(`${parts.join("/")}/`, depth, true);
+      walk(next, depth + 1);
+    }
+  };
+  walk(root, 0);
+  if (ungrouped.length)
+    lines.push("", ...ungrouped);
+  return lines.join(`
+`);
+}
+function piOmpOutputNotice(value) {
+  if (value === undefined || value === null)
+    return "";
+  if (typeof value !== "object" || Array.isArray(value))
+    throw new Error("unreadable output metadata");
+  const meta = value;
+  const parts = [];
+  if (meta.truncation)
+    parts.push(truncation(meta.truncation, meta.source));
+  if (meta.artifactError)
+    parts.push(`Full output was not saved completely (artifact ${meta.artifactError} failed)`);
+  if (meta.limits?.matchLimit) {
+    const limit = meta.limits.matchLimit;
+    parts.push(`${limit.reached} matches limit reached. Use limit=${limit.suggestion} for more`);
+  }
+  if (meta.limits?.resultLimit) {
+    const limit = meta.limits.resultLimit;
+    parts.push(limit.suggestion === undefined ? `${limit.reached} results limit reached` : `${limit.reached} results limit reached. Use limit=${limit.suggestion} for more`);
+  }
+  if (meta.limits?.headLimit) {
+    const limit = meta.limits.headLimit;
+    parts.push(`${limit.reached} results limit reached. Use limit=${limit.suggestion} for more`);
+  }
+  if (meta.limits?.columnTruncated) {
+    const limit = meta.limits.columnTruncated;
+    let text = `Some lines truncated to ${limit.maxColumn} ${limit.unit ?? "chars"}`;
+    const base = limit.selectorBase ?? (limit.artifactId != null && !limit.artifactElidedBytes ? `artifact://${limit.artifactId}` : undefined);
+    if (limit.lines && base !== undefined) {
+      const { first, last } = limit.lines;
+      text += limit.rawByteCap === undefined ? `. Use ${base}:raw:${first}-${first} to read line ${first} whole` : `. Use ${base}:raw:${first}-${first} to read line ${first} uncut, byte-capped at ${bytes(limit.rawByteCap)}`;
+      if (last > first)
+        text += `; cut lines run to line ${last}, each read the same way`;
+    } else if (limit.artifactId != null)
+      text += `. ${artifact(limit.artifactId, limit.artifactElidedBytes)}`;
+    parts.push(text);
+  }
+  const diagnostics = meta.diagnostics?.messages.length ? `
+
+LSP Diagnostics (${meta.diagnostics.summary}):
+${diagnosticGroups(meta.diagnostics.messages)}` : "";
+  return (parts.length ? `
+
+[${parts.join(". ")}]` : "") + diagnostics;
+}
+
+// src/pi-foreign-native-text.ts
+var record5 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+var string = (value) => {
+  if (typeof value !== "string")
+    throw new Error("unreadable native text");
+  return value;
+};
+function summaryFormat(text) {
+  const lines = text.split(`
+`);
+  const out = [];
+  let code = false;
+  for (let i = 0;i < lines.length; i++) {
+    let line = lines[i].trimEnd();
+    let indent = 0;
+    while (line.charCodeAt(indent) === 32 || line.charCodeAt(indent) === 9)
+      indent++;
+    if (line.charCodeAt(indent) >= 128)
+      indent = line.length - line.trimStart().length;
+    const trimmed = line.slice(indent);
+    if (/^(?:```|~~~)/u.test(trimmed)) {
+      code = !code;
+      out.push(line);
+      continue;
+    }
+    if (code) {
+      out.push(line);
+      continue;
+    }
+    if (/^\|[-:\s|]+\|$/u.test(trimmed)) {
+      line = line.slice(0, line.length - trimmed.length) + "|" + trimmed.split("|").filter((cell) => cell.trim()).map((cell) => `${cell.trim().startsWith(":") ? ":" : ""}---${cell.trim().endsWith(":") ? ":" : ""}`).join("|") + "|";
+    } else if (/^\|.*\|$/u.test(trimmed))
+      line = line.slice(0, line.length - trimmed.length) + trimmed.split("|").map((cell) => cell.trim()).join("|");
+    if (!line.trim()) {
+      if (i + 1 === lines.length || !lines[i + 1].trim()) {
+        while (out.at(-1) === "")
+          out.pop();
+        while (i + 1 < lines.length && !lines[i + 1].trim())
+          i++;
+        continue;
+      }
+      if (!out.length || out.at(-1) === "")
+        continue;
+    }
+    if (/^<\/[a-z_-]+>$/u.test(trimmed))
+      while (out.at(-1) === "")
+        out.pop();
+    out.push(line);
+  }
+  while (out.at(-1) === "")
+    out.pop();
+  return out.join(`
+`);
+}
+function argumentsText(value, out, ancestors = new Set) {
+  if (typeof value === "string") {
+    if (value.length >= 64)
+      out.push(value);
+    return;
+  }
+  if (!value || typeof value !== "object")
+    return;
+  if (ancestors.has(value) || ancestors.size > 100)
+    throw new Error("unreadable arguments");
+  ancestors.add(value);
+  for (const child of Object.values(value))
+    argumentsText(child, out, ancestors);
+  ancestors.delete(value);
+}
+function contentText(content) {
+  if (typeof content === "string")
+    return [content];
+  if (!Array.isArray(content))
+    throw new Error("unreadable native content");
+  const texts = [];
+  const blocks = [];
+  for (const value of content) {
+    const part = record5(value);
+    if (!part)
+      throw new Error("unreadable native block");
+    if (!piForeignKnownContentKind(part.type))
+      throw new Error("unreadable native block kind");
+    if (part.type === "fallback")
+      continue;
+    if (part.type === "anthropicServerTool")
+      piForeignServerToolStrings(piForeignServerToolBlock(part.block), texts);
+    if (typeof part.text === "string") {
+      texts.push(part.text);
+      blocks.push(part.text);
+    }
+    if (typeof part.thinking === "string")
+      texts.push(part.thinking);
+    if (typeof part.thinkingSignature === "string")
+      texts.push(part.thinkingSignature);
+    if (part.type === "redactedThinking" && typeof part.data === "string")
+      texts.push(part.data);
+    if (part.type === "toolCall" || part.type === "tool_use") {
+      if (typeof part.name === "string")
+        texts.push(part.name);
+      argumentsText(part.arguments ?? part.input, texts);
+    }
+    if (part.type === "tool_result")
+      texts.push(...contentText(part.content));
+  }
+  if (blocks.length)
+    texts.push(blocks.join(""), blocks.join(`
+`));
+  for (const kept of [
+    blocks.filter((text) => text.length > 0),
+    blocks.filter((text) => text.trim())
+  ])
+    if (kept.length)
+      texts.push(kept.join(""), kept.join(`
+`));
+  if (content.some((value) => record5(value)?.type === "image")) {
+    for (const placeholder of [
+      "Image reading is disabled.",
+      "[image omitted: the active model does not support image input]"
+    ]) {
+      const replaced = content.flatMap((value) => {
+        const part = record5(value);
+        return part?.type === "image" ? [placeholder] : typeof part?.text === "string" ? [part.text] : [];
+      });
+      texts.push(placeholder, replaced.join(""), replaced.join(`
+`), replaced.filter((text) => text.trim()).join(`
+`));
+    }
+  }
+  return texts;
+}
+function executionText(message) {
+  const python = message.role === "pythonExecution";
+  const command = string(python ? message.code : message.command);
+  const output = string(message.output);
+  let text = python ? `Ran Python:
+\`\`\`python
+${command}
+\`\`\`
+` : `Ran \`${command}\`
+`;
+  text += output ? `${python ? `Output:
+` : ""}\`\`\`
+${output}
+\`\`\`` : "(no output)";
+  if (message.cancelled)
+    text += python ? `
+
+(execution cancelled)` : `
+
+(command cancelled)`;
+  else if (message.exitCode !== null && message.exitCode !== undefined && message.exitCode !== 0)
+    text += python ? `
+
+Execution failed with code ${message.exitCode}` : `
+
+Command exited with code ${message.exitCode}`;
+  return text + piOmpOutputNotice(message.meta);
+}
+function summaryText(message) {
+  const summary = string(message.summary);
+  const template = message.role === "branchSummary" ? `Branch-return summary:
+
+<summary>
+${summary}
+</summary>
+` : message.method === "handoff" ? `Context replaced. The <handoff> below is a handoff document a prior instance of you wrote from the full conversation. It is your own working memory, not user input.
+- First person inside it refers to you (the prior instance).
+- "Next Steps" is your own resumed plan; re-check it against the latest user message before acting.
+- The handoff already exists and is complete: NEVER write another handoff document unless the user explicitly asks.
+MUST build on prior work; NEVER duplicate prior work.
+
+<handoff>
+${summary}
+</handoff>
+` : `Prior model work/tool state available.
+MUST build on prior work; NEVER duplicate prior work.
+
+<summary>
+${summary}
+</summary>
+`;
+  return summaryFormat(template);
+}
+function piOmpRenderedContent(value) {
+  const message = record5(value);
+  if (!message)
+    throw new Error("unreadable native message");
+  const images = Array.isArray(message.images) ? message.images : [];
+  switch (message.role) {
+    case "bashExecution":
+    case "pythonExecution":
+      return [{ type: "text", text: executionText(message) }, ...images];
+    case "compactionSummary":
+      return message.blocks !== undefined ? [
+        { type: "text", text: string(message.summary) },
+        ...Array.isArray(message.blocks) ? message.blocks : []
+      ] : [{ type: "text", text: summaryText(message) }, ...images];
+    case "branchSummary":
+      return [{ type: "text", text: summaryText(message) }, ...images];
+    case "fileMention": {
+      if (!Array.isArray(message.files))
+        throw new Error("unreadable file mention");
+      const files = message.files.map((value) => {
+        const file = record5(value);
+        if (!file)
+          throw new Error("unreadable mentioned file");
+        return file;
+      });
+      const text = files.map((file) => {
+        const path = string(file.path);
+        const body = file.content === undefined ? "" : string(file.content);
+        return `<file path="${path}">${body ? `
+${body}
+` : `
+`}</file>`;
+      }).join(`
+`);
+      return [
+        { type: "text", text },
+        ...files.flatMap((file) => file.image ? [file.image] : [])
+      ];
+    }
+    case "custom":
+      if (message.attribution === "user" && message.customType === "collab-prompt") {
+        const content = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content;
+        if (!Array.isArray(content))
+          throw new Error("unreadable collaboration prompt");
+        const text = content.flatMap((value) => typeof record5(value)?.text === "string" ? [record5(value).text] : []).join(`
+`);
+        return [
+          {
+            type: "text",
+            text: text ? `<system-notice>
+User interjection during work: priority; supersedes conflicting prior instructions. Re-read; ensure current work reflects user intent.
+</system-notice>
+${text}
+` : ""
+          },
+          ...content.filter((value) => record5(value)?.type === "image")
+        ];
+      }
+  }
+  return message.content;
+}
+function piOmpRenderedTexts(value) {
+  const content = piOmpRenderedContent(value);
+  if (typeof content === "string")
+    return [content];
+  if (!Array.isArray(content))
+    throw new Error("unreadable native content");
+  const originals = content.flatMap((value) => typeof record5(value)?.text === "string" ? [record5(value).text] : []);
+  const variants = [originals];
+  if (content.some((value) => record5(value)?.type === "image")) {
+    for (const replacement of [
+      "Image reading is disabled.",
+      "[image omitted: the active model does not support image input]"
+    ])
+      variants.push(content.flatMap((value) => record5(value)?.type === "image" ? [replacement] : typeof record5(value)?.text === "string" ? [record5(value).text] : []));
+  }
+  return [
+    ...new Set(variants.flatMap((blocks) => [
+      blocks,
+      blocks.filter((text) => text.length),
+      blocks.filter((text) => text.trim())
+    ].flatMap((kept) => kept.length ? [kept.join(""), kept.join(`
+`)] : [])))
+  ];
+}
+function piOmpSessionTexts(value) {
+  const message = record5(value);
+  if (!message)
+    throw new Error("unreadable native message");
+  switch (message.role) {
+    case "toolResult": {
+      const text = contentText(message.content);
+      if (message.prunedAt !== undefined && (!Array.isArray(message.content) || !message.content.some((value) => record5(value)?.type === "text" && record5(value)?.text)))
+        text.push("[Output truncated]");
+      return text;
+    }
+    case "user":
+    case "assistant":
+    case "developer":
+    case "custom":
+    case "hookMessage": {
+      const texts = [
+        ...contentText(message.content),
+        ...contentText(piOmpRenderedContent(message))
+      ];
+      const isUserPrompt = message.role === "custom" && message.attribution === "user" && ["collab-prompt", "skill-prompt"].includes(String(message.customType));
+      if (!isUserPrompt && ["custom", "hookMessage"].includes(String(message.role)) && Array.isArray(message.content)) {
+        const images = message.content.filter((value) => record5(value)?.type === "image");
+        if (images.length)
+          texts.push(...contentText([
+            {
+              type: "text",
+              text: `Images attached to ${message.customType}.`
+            },
+            ...images
+          ]));
+      }
+      return texts;
+    }
+    case "bashExecution":
+    case "pythonExecution": {
+      const python = message.role === "pythonExecution";
+      const command = string(python ? message.code : message.command);
+      const output = string(message.output);
+      const text = executionText(message);
+      return [
+        command,
+        output,
+        text,
+        ...contentText([
+          { type: "text", text },
+          ...Array.isArray(message.images) ? message.images : []
+        ])
+      ];
+    }
+    case "fileMention": {
+      if (!Array.isArray(message.files))
+        throw new Error("unreadable file mention");
+      const texts = [];
+      const groups = [[], []];
+      for (const value of message.files) {
+        const file = record5(value);
+        if (!file)
+          throw new Error("unreadable mentioned file");
+        const path = string(file.path);
+        const content = file.content === undefined ? "" : string(file.content);
+        const wrapped = `<file path="${path}">${content ? `
+${content}
+` : `
+`}</file>`;
+        texts.push(path, content, wrapped);
+        groups[file.image ? 1 : 0].push(wrapped);
+      }
+      for (const [index, group] of groups.entries())
+        if (group.length) {
+          const text = group.join(`
+`);
+          texts.push(text);
+          if (index === 1)
+            texts.push(...contentText([
+              { type: "text", text },
+              ...message.files.flatMap((value) => record5(value)?.image ? [record5(value).image] : [])
+            ]));
+        }
+      return texts;
+    }
+    case "compactionSummary":
+    case "branchSummary": {
+      const summary = string(message.summary);
+      if (message.role === "compactionSummary" && message.blocks !== undefined)
+        return [
+          summary,
+          ...contentText(message.blocks),
+          ...contentText([
+            { type: "text", text: summary },
+            ...message.blocks
+          ])
+        ];
+      const text = summaryText(message);
+      return [
+        summary,
+        text,
+        ...contentText([
+          { type: "text", text },
+          ...Array.isArray(message.images) ? message.images : []
+        ])
+      ];
+    }
+    default:
+      throw new Error("unreadable native role");
+  }
+}
+
+// src/pi-foreign-revision.ts
+var piForeignRecord = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+function jsonValues(value, out, longStringsOnly = false, ancestors = new Set) {
+  if (value === undefined || value === null || typeof value === "number" || typeof value === "boolean") {
+    if (!longStringsOnly)
+      out.push(value);
+    return;
+  }
+  if (typeof value === "string") {
+    if (!longStringsOnly || value.length >= 64)
+      out.push(value);
+    return;
+  }
+  if (typeof value !== "object" || ancestors.has(value) || ancestors.size > 100)
+    throw new Error("unreadable revision value");
+  if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
+    throw new Error("unreadable revision object");
+  out.push(value);
+  ancestors.add(value);
+  for (const [key, child] of Object.entries(value)) {
+    if (!longStringsOnly)
+      out.push(key);
+    jsonValues(child, out, longStringsOnly, ancestors);
+  }
+  ancestors.delete(value);
+}
+function contentValues(content, out) {
+  out.push(content);
+  if (typeof content === "string")
+    return;
+  if (!Array.isArray(content))
+    throw new Error("unreadable content revision");
+  out.push(content.length);
+  for (const value of content) {
+    const block = piForeignRecord(value);
+    if (!block)
+      throw new Error("unreadable block revision");
+    if (!piForeignKnownContentKind(block.type))
+      throw new Error("unreadable block revision kind");
+    out.push(value, block.type);
+    switch (block.type) {
+      case "text":
+      case "input_text":
+      case "output_text":
+        if (typeof block.text !== "string")
+          throw new Error("unreadable text revision");
+        out.push(block.text);
+        break;
+      case "thinking":
+        if (typeof block.thinking !== "string" || block.thinkingSignature !== undefined && typeof block.thinkingSignature !== "string")
+          throw new Error("unreadable thinking revision");
+        out.push(block.thinking, block.thinkingSignature);
+        break;
+      case "redactedThinking":
+        if (typeof block.data !== "string")
+          throw new Error("unreadable redacted revision");
+        out.push(block.data);
+        break;
+      case "image":
+        jsonValues(block, out);
+        break;
+      case "anthropicServerTool":
+        jsonValues(piForeignServerToolBlock(block.block), out);
+        break;
+      case "fallback":
+        break;
+      case "toolCall":
+      case "tool_use":
+        out.push(block.name);
+        jsonValues(block.arguments ?? block.input, out, true);
+        break;
+      case "tool_result":
+        contentValues(block.content, out);
+        break;
+      default:
+        throw new Error("unreadable block revision kind");
+    }
+  }
+}
+function piForeignRevision(message, role = message.role) {
+  const out = [role];
+  switch (role) {
+    case "user":
+    case "assistant":
+    case "developer":
+    case "toolResult":
+    case "custom":
+    case "hookMessage":
+      contentValues(message.content, out);
+      out.push(message.prunedAt, message.customType, message.attribution);
+      break;
+    case "bashExecution":
+    case "pythonExecution":
+      out.push(message.command, message.code, message.output, message.cancelled, message.exitCode);
+      jsonValues(message.images, out);
+      jsonValues(message.meta, out);
+      break;
+    case "fileMention":
+      if (!Array.isArray(message.files))
+        throw new Error("unreadable files revision");
+      out.push(message.files, message.files.length);
+      for (const value of message.files) {
+        const file = piForeignRecord(value);
+        if (!file)
+          throw new Error("unreadable file revision");
+        out.push(value, file.path, file.content);
+        jsonValues(file.image, out);
+      }
+      break;
+    case "compactionSummary":
+    case "branchSummary":
+      out.push(message.summary, message.method);
+      if (message.blocks !== undefined)
+        contentValues(message.blocks, out);
+      jsonValues(message.images, out);
+      break;
+    default:
+      throw new Error("unreadable message revision role");
+  }
+  return out;
+}
+function piSameForeignRevision(a, b, stats) {
+  if (stats)
+    stats.comparisons++;
+  if (a.length !== b.length)
+    return false;
+  for (let index = 0;index < a.length; index++) {
+    if (stats)
+      stats.comparisons++;
+    if (a[index] !== b[index])
+      return false;
+  }
+  return true;
+}
+
+// src/pi-foreign-session-index.ts
+var piForeignRecord2 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+var STEERING_NOTICE = `<system-notice>
+User interjection during work: priority; supersedes conflicting prior instructions. Re-read; ensure current work reflects user intent.
+</system-notice>
+`;
+function piForeignUnwrap(text) {
+  const prefix = /^(<system-reminder>\nToday: [^\n]+\n<\/system-reminder>)\n{0,2}/u.exec(text);
+  if (prefix && piDateReminderText(prefix[1]))
+    text = text.slice(prefix[0].length);
+  if (text.startsWith(STEERING_NOTICE))
+    text = text.slice(STEERING_NOTICE.length);
+  return text;
+}
+function canonical(text) {
+  return piForeignUnwrap(text).replace(/^(?:§\d+§ ?)+/u, "").replace(/[\uD800-\uDFFF]/gu, "�");
+}
+function piForeignFirstText(content) {
+  if (typeof content === "string")
+    return content;
+  if (!Array.isArray(content))
+    return;
+  for (const part of content) {
+    const block = piForeignRecord2(part);
+    if (block && typeof block.text === "string" && (block.type === undefined || ["text", "input_text", "output_text"].includes(String(block.type)))) {
+      if (piDateReminderText(block.text))
+        continue;
+      return block.text;
+    }
+  }
+  return;
+}
+function piForeignTag(content) {
+  const text = piForeignFirstText(content);
+  return text === undefined ? undefined : /^§\d+§/u.exec(piForeignUnwrap(text))?.[0];
+}
+function createPiForeignSessionIndex() {
+  return {
+    entries: new Map,
+    seen: new WeakMap,
+    expectedTexts: new WeakMap,
+    taggedSources: new WeakMap,
+    sessionFingerprints: new Set,
+    currentTexts: new Map,
+    ids: new Set,
+    pass: 0,
+    stats: {
+      hashes: 0,
+      renders: 0,
+      comparisons: 0,
+      wireHashes: 0,
+      entries: 0,
+      reads: 0
+    }
+  };
+}
+function piForeignEvidence(source, input, index = createPiForeignSessionIndex()) {
+  return { source, input, index };
+}
+function piProtectPreparedRows(evidence, messages, prepared) {
+  evidence.messages = messages;
+  evidence.prepared = prepared;
+}
+function texts(index, value, roleOverride, trackEntry = false) {
+  const source = piForeignRecord2(value);
+  if (!source)
+    throw new Error("unreadable session message");
+  try {
+    const role = roleOverride ?? source.role;
+    const content = source.content;
+    const fastText = (role === "user" || role === "developer") && typeof content === "string" ? content : undefined;
+    const prior = index.seen.get(source);
+    if (prior) {
+      index.stats.comparisons++;
+      if (prior.role === role && fastText !== undefined) {
+        index.stats.comparisons++;
+        if (prior.fastText === fastText)
+          return prior;
+      }
+    }
+    const revision = piForeignRevision(source, role);
+    if (prior && piSameForeignRevision(prior.revision, revision, index.stats))
+      return prior;
+    const rendered = roleOverride ? { ...source, role: roleOverride } : source;
+    if (trackEntry)
+      index.stats.renders++;
+    const result = {
+      role,
+      fastText,
+      revision,
+      texts: [...new Set(piOmpSessionTexts(rendered).map(canonical))]
+    };
+    index.seen.set(source, result);
+    index.expectedTexts.delete(source);
+    index.taggedSources.delete(source);
+    return result;
+  } catch (error) {
+    index.seen.delete(source);
+    index.expectedTexts.delete(source);
+    index.taggedSources.delete(source);
+    throw error;
+  }
+}
+function piForeignPreparedTags(evidence) {
+  if (evidence.tags)
+    return evidence.tags;
+  const tags = [];
+  const untagged = [];
+  const sources = evidence.prepared ? piPreparedUserSources(evidence.prepared) : evidence.messages ?? [];
+  for (const message of sources) {
+    const row = piForeignRecord2(message);
+    const text = piForeignFirstText(row?.content);
+    const cached = row && evidence.index.taggedSources.get(row);
+    const tag = cached && cached.text === text ? cached.tag : piForeignTag(text);
+    if (row && (!cached || cached.text !== text))
+      evidence.index.taggedSources.set(row, { text, tag });
+    if (tag)
+      tags.push(tag);
+    else
+      untagged.push(message);
+  }
+  evidence.tags = tags;
+  evidence.untagged = untagged;
+  return tags;
+}
+function fingerprint(text, index, wire = false) {
+  if (wire)
+    index.stats.wireHashes++;
+  else
+    index.stats.hashes++;
+  return createHash15("sha256").update(stableStringify([{ type: "text", text }])).digest("hex");
+}
+function protectSession(index, message, roleOverride, trackEntry = false) {
+  const rendering = texts(index, message, roleOverride, trackEntry);
+  if (!rendering.hashes) {
+    rendering.hashes = rendering.texts.map((text) => {
+      const current = index.currentTexts.get(text);
+      if (current)
+        return current.hash;
+      return fingerprint(text, index);
+    });
+    for (const hash of rendering.hashes)
+      index.sessionFingerprints.add(hash);
+  }
+  return rendering;
+}
+function releaseRendering(index, rendering) {
+  for (const text of rendering?.texts ?? []) {
+    const current = index.currentTexts.get(text);
+    if (!current)
+      continue;
+    if (--current.references === 0)
+      index.currentTexts.delete(text);
+  }
+}
+function retainRendering(index, rendering) {
+  if (!rendering)
+    return;
+  const hashes = rendering.hashes;
+  if (!hashes)
+    throw new Error("unhashed session rendering");
+  for (const [at, text] of rendering.texts.entries()) {
+    const current = index.currentTexts.get(text);
+    if (current)
+      current.references++;
+    else
+      index.currentTexts.set(text, { hash: hashes[at], references: 1 });
+  }
+}
+function forgetSource(index, source) {
+  if (!source || typeof source !== "object")
+    return;
+  index.seen.delete(source);
+  index.expectedTexts.delete(source);
+  index.taggedSources.delete(source);
+}
+function piMaterializeForeignEvidence(evidence) {
+  try {
+    const { index } = evidence;
+    index.stats.reads++;
+    index.pass++;
+    evidence.wireFingerprints = undefined;
+    const source = piForeignRecord2(evidence.source);
+    const entries = Array.isArray(evidence.source) ? evidence.source : typeof source?.getEntries === "function" ? source.getEntries.call(evidence.source) : undefined;
+    if (!Array.isArray(entries))
+      return false;
+    for (const value of entries) {
+      const entry = piForeignRecord2(value);
+      if (!entry || typeof entry.id !== "string")
+        return false;
+      const body = entry.type === "message" ? entry.message : value;
+      const prior = index.entries.get(entry.id);
+      if (prior?.pass === index.pass)
+        return false;
+      let message;
+      let role;
+      if (entry.type === "message")
+        message = entry.message ?? null;
+      else if (entry.type === "custom_message") {
+        message = entry;
+        role = "custom";
+      } else if (entry.type === "branch_summary") {
+        message = entry;
+        role = "branchSummary";
+      } else if (entry.type === "compaction") {
+        message = entry;
+        role = "compactionSummary";
+      } else if (!PI_FOREIGN_NON_TEXT_ENTRY_TYPES.some((type) => type === entry.type))
+        return false;
+      let rendering;
+      try {
+        if (message !== undefined)
+          rendering = protectSession(index, message, role, true);
+      } catch (error) {
+        releaseRendering(index, prior?.rendering);
+        forgetSource(index, prior?.body);
+        index.entries.delete(entry.id);
+        throw error;
+      }
+      if (prior && prior.entry === value && prior.body === body && prior.rendering === rendering) {
+        prior.pass = index.pass;
+        continue;
+      }
+      if (prior?.rendering !== rendering) {
+        releaseRendering(index, prior?.rendering);
+        retainRendering(index, rendering);
+      }
+      if (prior && prior.body !== body)
+        forgetSource(index, prior.body);
+      index.ids.add(entry.id);
+      index.entries.set(entry.id, {
+        entry: value,
+        body,
+        rendering,
+        pass: index.pass
+      });
+      index.stats.entries++;
+    }
+    if (index.entries.size > entries.length) {
+      for (const [id, prior] of index.entries)
+        if (prior.pass !== index.pass) {
+          releaseRendering(index, prior.rendering);
+          forgetSource(index, prior.body);
+          index.entries.delete(id);
+        }
+    }
+    for (const message of evidence.input)
+      protectSession(index, message);
+    piForeignPreparedTags(evidence);
+    evidence.preparedTexts = new Set;
+    for (const message of evidence.untagged ?? [])
+      for (const text of texts(index, message).texts)
+        evidence.preparedTexts.add(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function piForeignSessionContent(evidence, text, row) {
+  if (["id", "messageId", "entryId"].some((key) => typeof row[key] === "string" && evidence.index.ids.has(row[key])))
+    return true;
+  const key = canonical(text);
+  let hash = evidence.index.currentTexts.get(key)?.hash ?? evidence.wireFingerprints?.get(key);
+  if (!hash) {
+    hash = fingerprint(key, evidence.index, true);
+    evidence.wireFingerprints ??= new Map;
+    evidence.wireFingerprints.set(key, hash);
+  }
+  return evidence.index.sessionFingerprints.has(hash);
+}
+function piForeignExpectedTexts(evidence, source) {
+  const row = piForeignRecord2(source);
+  if (!row)
+    return [];
+  const origin = Reflect.get(row, PI_HISTORY_ORIGIN) ?? row;
+  const rendering = texts(evidence.index, origin);
+  const prior = evidence.index.expectedTexts.get(row);
+  if (prior?.rendering === rendering)
+    return prior.texts;
+  const values = piOmpRenderedTexts(origin).map(piForeignWireIdentity);
+  evidence.index.expectedTexts.set(row, { rendering, texts: values });
+  return values;
+}
+function piForeignWireIdentity(text) {
+  return piForeignUnwrap(text).replace(/[\uD800-\uDFFF]/gu, "�");
+}
+function piForeignExpectedTextOnly(source, wireRole) {
+  const row = piForeignRecord2(source);
+  if (!row)
+    return true;
+  if ((wireRole === "developer" || wireRole === "system") && piIsDeveloperHistory(row))
+    return false;
+  const content = piOmpRenderedContent(Reflect.get(row, PI_HISTORY_ORIGIN) ?? row);
+  return typeof content === "string" || Array.isArray(content) && content.every((part) => piForeignRecord2(part)?.type === "text" && typeof piForeignRecord2(part)?.text === "string");
+}
+
+// src/pi-foreign-alignment.ts
+function piForeignAlignment(wire, removed, alignment, evidence, limits) {
+  const fail = (reason) => ({
+    reason,
+    count: 0,
+    chars: 0
+  });
+  const byWire = new Map;
+  for (const pair of alignment)
+    for (const value of pair.wire) {
+      let pairs = byWire.get(value);
+      if (!pairs) {
+        pairs = [];
+        byWire.set(value, pairs);
+      }
+      pairs.push(pair);
+    }
+  const slots = [];
+  const relevant = [];
+  const slotByIndex = new Map;
+  for (const info of wire) {
+    if (removed.has(info.index)) {
+      relevant.push(info);
+      continue;
+    }
+    const pairs = byWire.get(info.value);
+    if (!pairs) {
+      if (info.text !== undefined && info.text !== "Continue." && !piDateReminderText(info.text))
+        return fail("prepared-row");
+      continue;
+    }
+    slotByIndex.set(info.index, slots.length);
+    slots.push({ info, pairs });
+    relevant.push(info);
+  }
+  const tags = new Map;
+  const exact = new Map;
+  const add = (map, key, index) => {
+    let set = map.get(key);
+    if (!set) {
+      set = new Set;
+      map.set(key, set);
+    }
+    set.add(index);
+  };
+  for (const [index, slot] of slots.entries())
+    for (const pair of slot.pairs) {
+      if (pair.role !== "user" || pair.calls.length || pair.results.length)
+        continue;
+      const tag = piForeignTag(piForeignRecord2(pair.source)?.content);
+      if (tag)
+        add(tags, tag, index);
+      else {
+        for (const text of pair.exactText !== undefined ? [pair.exactText] : pair.systemText ? [pair.systemText.join(""), pair.systemText.join(`
+`)] : piForeignExpectedTexts(evidence, pair.source))
+          add(exact, piForeignWireIdentity(text), index);
+      }
+    }
+  const anchors = [{ wire: -1, slot: -1 }];
+  for (const [index, info] of relevant.entries()) {
+    const target = info.tag && tags.get(info.tag) || info.text !== undefined && exact.get(piForeignWireIdentity(info.text));
+    const slot = slotByIndex.get(info.index);
+    if (target && (slot === undefined || !target.has(slot)))
+      return fail("prepared-row");
+    if (target || info.text === undefined) {
+      if (slot === undefined)
+        return fail("not-text-user");
+      if (!target && info.text === undefined && slots[slot].pairs.every((pair) => pair.role === "user" && !pair.calls.length && !pair.results.length && !pair.hasImages && piForeignExpectedTextOnly(pair.source, piForeignRecord2(info.value)?.role)))
+        return fail("not-text-user");
+      anchors.push({ wire: index, slot });
+    }
+  }
+  anchors.push({ wire: relevant.length, slot: slots.length });
+  let count = 0, chars = 0;
+  let ambiguous;
+  for (let index = 1;index < anchors.length; index++) {
+    const previous = anchors[index - 1], next = anchors[index];
+    const p = next.slot - previous.slot - 1;
+    const w = next.wire - previous.wire - 1;
+    if (w < p || p < 0)
+      return fail("prepared-row");
+    if (w === p)
+      continue;
+    const sizes = [];
+    for (let at = previous.wire + 1;at < next.wire; at++) {
+      const row = relevant[at];
+      if (row.text === undefined)
+        return fail("not-text-user");
+      if (row.paired)
+        return fail("tool-pair");
+      sizes.push(row.text.length);
+    }
+    const added = w - p;
+    const worst = sizes.sort((a, b) => b - a).slice(0, added).reduce((sum, value) => sum + value, 0);
+    count += added;
+    chars += worst;
+    if (p)
+      ambiguous = { gapPrepared: p, gapWire: w, gapChars: worst };
+    if (count > limits.rows)
+      return { count, chars, reason: "limit" };
+    if (chars > limits.chars)
+      return {
+        count,
+        chars,
+        ...ambiguous,
+        reason: ambiguous ? "ambiguous-rewrite" : "limit"
+      };
+    for (let at = previous.wire + 1;at < next.wire; at++) {
+      const row = relevant[at];
+      const source = piForeignRecord2(row.value);
+      if (row.text === undefined || !source)
+        return fail("not-text-user");
+      if (piForeignSessionContent(evidence, row.text, source))
+        return fail("session-content");
+    }
+  }
+  if (count !== removed.size)
+    return fail("prepared-row");
+  return { count, chars };
+}
+
+// src/pi-foreign-search.ts
+function* piForeignDeletionSets(candidates, lastUser, maxRows) {
+  const byIndex = new Map(candidates.map((row) => [row.index, row]));
+  const seen = new Set;
+  function* proposal(rows) {
+    if (!rows.length || rows.length > maxRows)
+      return;
+    const key = rows.map((row) => row.index).join(",");
+    if (seen.has(key))
+      return;
+    seen.add(key);
+    yield rows;
+  }
+  if (candidates.length <= maxRows)
+    yield* proposal(candidates);
+  let run = [];
+  for (const row of candidates) {
+    if (run.length && row.index !== run[run.length - 1].index + 1) {
+      yield* proposal(run);
+      run = [];
+    }
+    run.push(row);
+  }
+  yield* proposal(run);
+  const first = candidates[0]?.index;
+  const last = candidates[candidates.length - 1]?.index;
+  for (const boundary of [first, last, lastUser - 1]) {
+    if (boundary === undefined)
+      continue;
+    for (let size = maxRows;size >= 1; size--) {
+      const start = boundary === first ? boundary : boundary - size + 1;
+      const rows = Array.from({ length: size }, (_, offset) => byIndex.get(start + offset));
+      if (rows.every((row) => row !== undefined))
+        yield* proposal(rows);
+    }
+  }
+  const selected = [];
+  function* rest(start, remaining) {
+    if (!remaining) {
+      yield* proposal([...selected]);
+      return;
+    }
+    for (let index = start;index <= candidates.length - remaining; index++) {
+      selected.push(candidates[index]);
+      yield* rest(index + 1, remaining - 1);
+      selected.pop();
+    }
+  }
+  for (let size = 1;size <= Math.min(maxRows, candidates.length); size++)
+    yield* rest(0, size);
+}
+
+// src/pi-dispatch-foreign.ts
+var PI_FOREIGN_MAX_ROWS = 4;
+var PI_FOREIGN_MAX_CHARS = 32 * 1024;
+var PI_FOREIGN_MAX_SEARCH_RUNS = 63;
+function conversation(payload) {
+  const body = piForeignRecord2(payload);
+  if (!body)
+    return;
+  const google = piGoogleConversation(body);
+  const envelope = google ?? body;
+  const field = google ? "contents" : Array.isArray(body.messages) ? "messages" : "input";
+  const rows = envelope[field];
+  if (!Array.isArray(rows))
+    return;
+  return {
+    body,
+    google: !!google,
+    field,
+    rows,
+    withRows: (rows) => {
+      const filtered = { ...envelope, [field]: rows };
+      return google && google !== body ? { ...body, request: filtered } : filtered;
+    }
+  };
+}
+function wireText(row, google, bedrock, responses) {
+  if (row.role !== "user")
+    return;
+  const allowed = [
+    "role",
+    google ? "parts" : "content",
+    "id",
+    "messageId",
+    "entryId",
+    "timestamp",
+    ...responses ? ["type"] : []
+  ];
+  if (Object.keys(row).some((key) => !allowed.includes(key)) || row.type !== undefined && row.type !== "message")
+    return;
+  if (["id", "messageId", "entryId"].some((key) => row[key] !== undefined && typeof row[key] !== "string"))
+    return;
+  if (row.timestamp !== undefined && typeof row.timestamp !== "number" && typeof row.timestamp !== "string")
+    return;
+  const content = google ? row.parts : row.content;
+  if (typeof content === "string")
+    return google || bedrock ? undefined : content;
+  if (!Array.isArray(content) || content.length === 0)
+    return;
+  const texts = [];
+  for (const [index, value] of content.entries()) {
+    const block = piForeignRecord2(value);
+    if (bedrock && block?.cachePoint !== undefined) {
+      const cache = piForeignRecord2(block.cachePoint);
+      if (index !== content.length - 1 || Object.keys(block).length !== 1 || cache?.type !== "default" || Object.keys(cache).some((key) => !["type", "ttl"].includes(key)) || cache.ttl !== undefined && cache.ttl !== "5m" && cache.ttl !== "1h")
+        return;
+      continue;
+    }
+    if (!block || typeof block.text !== "string")
+      return;
+    if (google || bedrock) {
+      if (Object.keys(block).some((key) => key !== "text"))
+        return;
+    } else {
+      if (block.type !== (responses ? "input_text" : "text") || Object.keys(block).some((key) => !["type", "text", "cache_control"].includes(key)))
+        return;
+      if (block.cache_control !== undefined) {
+        const cache = piForeignRecord2(block.cache_control);
+        if (cache?.type !== "ephemeral" || Object.keys(cache).some((key) => !["type", "ttl", "scope"].includes(key)) || cache.ttl !== undefined && cache.ttl !== "5m" && cache.ttl !== "1h" || cache.scope !== undefined && cache.scope !== "global")
+          return;
+      }
+    }
+    texts.push(block.text);
+  }
+  return texts.length ? texts.join(`
+`) : undefined;
+}
+function toolDelta(row) {
+  let calls = Array.isArray(row.tool_calls) ? row.tool_calls.length : 0;
+  let results = row.role === "tool" || row.role === "toolResult" ? 1 : 0;
+  if (["function_call", "custom_tool_call", "computer_call"].includes(String(row.type)))
+    calls++;
+  if ([
+    "function_call_output",
+    "custom_tool_call_output",
+    "computer_call_output"
+  ].includes(String(row.type)))
+    results++;
+  const parts = Array.isArray(row.parts) ? row.parts : Array.isArray(row.content) ? row.content : [];
+  for (const value of parts) {
+    const part = piForeignRecord2(value);
+    if (part?.functionCall || part?.toolUse || ["toolCall", "tool_use"].includes(String(part?.type)))
+      calls++;
+    if (part?.functionResponse || part?.toolResult || part?.type === "tool_result")
+      results++;
+  }
+  return calls - results;
+}
+function piWithoutForeignRows(payload, evidence, countRows, matches, normalizedCountHint) {
+  const empty = {
+    count: 0,
+    chars: 0,
+    positions: [],
+    before: []
+  };
+  try {
+    const view = conversation(payload);
+    if (!view || !evidence)
+      return { ...empty, reason: "unreadable-branch" };
+    const expectedTags = piForeignPreparedTags(evidence);
+    const needed = new Map;
+    for (const tag of expectedTags)
+      needed.set(tag, (needed.get(tag) ?? 0) + 1);
+    const present = new Map;
+    const preparedTexts = new Map;
+    for (const source of evidence.untagged ?? [])
+      for (const text of new Set(piForeignExpectedTexts(evidence, source)))
+        preparedTexts.set(text, (preparedTexts.get(text) ?? 0) + 1);
+    const seenControls = new Map;
+    const duplicateControls = [];
+    const wire = [];
+    const possible = [];
+    let pending = 0;
+    let paired = false;
+    let lastUser = -1;
+    for (const [index, value] of view.rows.entries()) {
+      const row = piForeignRecord2(value);
+      if (!row)
+        return { ...empty, reason: "prepared-row" };
+      if (row.role === "user")
+        lastUser = index;
+      const tag = row.role === "user" ? piForeignTag(view.google ? row.parts : row.content) : undefined;
+      if (tag)
+        present.set(tag, (present.get(tag) ?? 0) + 1);
+      const text = tag && needed.has(tag) ? undefined : wireText(row, view.google, view.body.inferenceConfig !== undefined, view.field === "input");
+      wire.push({ index, value, text, tag, paired: pending > 0 });
+      const control = text === undefined ? undefined : piForeignWireIdentity(text);
+      if (text !== undefined && control !== undefined && preparedTexts.has(control)) {
+        const seen = (seenControls.get(control) ?? 0) + 1;
+        seenControls.set(control, seen);
+        if (seen > (preparedTexts.get(control) ?? 0))
+          duplicateControls.push({ text, row });
+      }
+      if (!tag || !needed.has(tag)) {
+        if (text !== undefined && !piDateReminderText(text) && text !== "Continue." && !preparedTexts.has(control ?? "")) {
+          if (pending > 0)
+            paired = true;
+          else
+            possible.push({ index, text, row, paired: false });
+        }
+      }
+      pending = Math.max(0, pending + toolDelta(row));
+    }
+    const tagsPresent = [...needed].every(([tag, count]) => present.get(tag) === count);
+    const limit = piPreparedDispatchRowLimit(evidence.prepared);
+    const withinSurplusBound = limit !== undefined && normalizedCountHint !== undefined && Number.isSafeInteger(normalizedCountHint) && normalizedCountHint >= 0 && normalizedCountHint - limit <= PI_FOREIGN_MAX_ROWS;
+    const counted = withinSurplusBound ? normalizedCountHint : countRows(view.withRows(view.rows.filter((value) => {
+      const row = piForeignRecord2(value);
+      const text = piForeignFirstText(view.google ? row?.parts : row?.content);
+      return text !== "Continue." && !piDateReminderText(text);
+    })));
+    if (limit !== undefined && counted !== undefined && counted - limit > PI_FOREIGN_MAX_ROWS)
+      return {
+        ...empty,
+        count: possible.length,
+        chars: possible.reduce((sum, row) => sum + row.text.length, 0),
+        reason: "limit"
+      };
+    if (!possible.length && duplicateControls.length) {
+      if (!piMaterializeForeignEvidence(evidence))
+        return { ...empty, reason: "unreadable-branch" };
+      return {
+        ...empty,
+        reason: duplicateControls.some(({ text, row }) => text.length <= PI_FOREIGN_MAX_CHARS && piForeignSessionContent(evidence, text, row)) ? "session-content" : "prepared-row"
+      };
+    }
+    if (!possible.length)
+      return {
+        ...empty,
+        reason: tagsPresent ? paired ? "tool-pair" : "not-text-user" : "prepared-row"
+      };
+    if (!piMaterializeForeignEvidence(evidence))
+      return { ...empty, reason: "unreadable-branch" };
+    let session = false;
+    let oversized = false;
+    const candidates = possible.filter((row) => {
+      if (row.text.length > PI_FOREIGN_MAX_CHARS) {
+        oversized = true;
+        return false;
+      }
+      if (piForeignSessionContent(evidence, row.text, row.row)) {
+        session = true;
+        return false;
+      }
+      return true;
+    });
+    if (!tagsPresent)
+      return { ...empty, reason: session ? "session-content" : "prepared-row" };
+    let accepted;
+    let gapFailure;
+    let attempts = 0;
+    for (const selected of piForeignDeletionSets(candidates, lastUser, PI_FOREIGN_MAX_ROWS)) {
+      if (attempts++ === PI_FOREIGN_MAX_SEARCH_RUNS)
+        return {
+          ...empty,
+          count: candidates.length,
+          chars: candidates.reduce((sum, row) => sum + row.text.length, 0),
+          reason: "search-limit"
+        };
+      if (selected.reduce((sum, row) => sum + row.text.length, 0) > PI_FOREIGN_MAX_CHARS) {
+        oversized = true;
+        continue;
+      }
+      const positions = selected.map((row) => row.index).sort((a, b) => a - b);
+      const removed = new Set(positions);
+      const filtered = view.withRows(view.rows.filter((_, index) => !removed.has(index)));
+      const alignment = matches(filtered);
+      if (!alignment)
+        continue;
+      const gaps = piForeignAlignment(wire, removed, alignment, evidence, {
+        rows: PI_FOREIGN_MAX_ROWS,
+        chars: PI_FOREIGN_MAX_CHARS
+      });
+      if (gaps.reason) {
+        gapFailure = { ...empty, ...gaps };
+        continue;
+      }
+      const before = positions.map((position) => countRows(view.withRows(view.rows.slice(0, position).filter((_, index) => !removed.has(index)))));
+      if (before.some((value) => value === undefined))
+        continue;
+      accepted = {
+        payload: filtered,
+        count: gaps.count,
+        chars: gaps.chars,
+        positions,
+        before
+      };
+      return accepted;
+    }
+    if (attempts >= PI_FOREIGN_MAX_SEARCH_RUNS)
+      return {
+        ...empty,
+        count: candidates.length,
+        chars: candidates.reduce((sum, row) => sum + row.text.length, 0),
+        reason: "search-limit"
+      };
+    return gapFailure ?? {
+      ...empty,
+      count: candidates.length,
+      chars: candidates.reduce((sum, row) => sum + row.text.length, 0),
+      reason: session ? "session-content" : paired ? "tool-pair" : oversized || candidates.length > PI_FOREIGN_MAX_ROWS ? "limit" : "prepared-row"
+    };
+  } catch {
+    return { ...empty, reason: "prepared-row" };
+  }
+}
+
+// src/pi-dispatch-acceptance.ts
+function piCheckPreparedDispatch(payload, prepared, evidence, onImageTrim, onComparatorRun) {
+  onComparatorRun?.();
+  const mismatch = piPreparedStructureMismatch(payload, prepared, onImageTrim);
+  if (!mismatch)
+    return {};
+  const rowCounts = /expectedRows=(\d+) actualRows=(\d+)/u.exec(mismatch);
+  const countHint = rowCounts && mismatch.includes("comparison=count") && !prepared?.anthropicOptional && !prepared?.responsesAlternatives && !prepared?.imageBudget ? Number(rowCounts[2]) : undefined;
+  const foreign = piWithoutForeignRows(payload, evidence, (prefix) => piDispatchRowCount(prefix, prepared), (filtered) => {
+    onComparatorRun?.();
+    let alignment;
+    return piPreparedStructureMismatch(filtered, prepared, onImageTrim, (rows) => {
+      alignment = rows;
+    }) ? undefined : alignment;
+  }, countHint);
+  if (foreign.payload !== undefined && !foreign.reason)
+    return { foreign };
+  const reason = foreign.reason === "not-text-user" && rowCounts && Number(rowCounts[2]) <= Number(rowCounts[1]) ? "prepared-row" : foreign.reason ?? "prepared-row";
+  const rule = reason === "limit" || reason === "search-limit" || reason === "ambiguous-rewrite" ? 4 : reason === "session-content" || reason === "unreadable-branch" ? 3 : reason === "not-text-user" || reason === "tool-pair" ? 2 : 1;
+  return {
+    mismatch: `${mismatch}; foreign rule=${rule} reason=${reason} count=${foreign.count} chars=${foreign.chars}${reason === "ambiguous-rewrite" ? ` gapPrepared=${foreign.gapPrepared ?? 0} gapWire=${foreign.gapWire ?? 0} gapChars=${foreign.gapChars ?? 0}; another extension is adding messages beside a rewritten untagged prepared row (maximum 4 rows, 32768 characters)` : reason === "search-limit" ? "; another extension is adding messages after Magic Context's pass; bounded reconciliation search exhausted (maximum 64 comparator runs)" : reason === "limit" ? "; another extension is adding messages after Magic Context's pass (maximum 4 rows, 32768 characters)" : reason === "unreadable-branch" ? "; the host's complete session entries could not be read" : reason === "session-content" ? "; another extension added a message identical to session content" : ""}`
+  };
+}
+
+// src/pi-dispatch-chain.ts
+import { isDeepStrictEqual } from "node:util";
+
+// src/pi-dispatch-chain-tail.ts
+function object12(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+var OMITTED_IMAGE = "[image omitted: model does not support vision]";
+var ORPHAN_TOOL_CALL_PLACEHOLDER = "[No tool output recorded: the tool call was interrupted before it produced a result.]";
+function replayedTurnItems(assistant, responseItems, outputs, model) {
+  const blocks = Array.isArray(assistant.content) ? assistant.content.map(object12) : [];
+  const calls = blocks.flatMap((block) => block?.type === "toolCall" && typeof block.id === "string" ? [block] : []);
+  const replayed = piResponsesReplayedCalls(assistant, calls.map((block) => block.id), calls.map((block) => piToolCallWireId(block.id, model, assistant)), model);
+  const types = new Map;
+  if (!replayed)
+    return { items: [], calls: types };
+  const items = [];
+  const orphans = replayed.wireCalls.slice(0, replayed.stored).flatMap((id, index) => outputs.has(id) ? [] : [index]);
+  if (orphans.length) {
+    const last = object12(responseItems.at(-1));
+    const id = replayed.wireCalls[orphans[0]];
+    if (orphans.length !== 1 || orphans[0] !== replayed.stored - 1 || last?.type !== "function_call" && last?.type !== "custom_tool_call" || last.call_id !== id)
+      return;
+    items.push({
+      type: last.type === "custom_tool_call" ? "custom_tool_call_output" : "function_call_output",
+      call_id: id,
+      output: ORPHAN_TOOL_CALL_PLACEHOLDER
+    });
+  }
+  if (object12(model.compat)?.toolNamePrefix)
+    return;
+  for (let index = replayed.stored;index < replayed.calls.length; index++) {
+    const id = replayed.wireCalls[index];
+    const block = calls.find((call) => call.id === replayed.calls[index]);
+    if (!block || typeof block.name !== "string" || block.customWireName !== undefined || object12(block.providerMetadata)?.type === "computer" || !outputs.has(id))
+      return;
+    items.push({
+      type: "function_call",
+      call_id: id,
+      name: block.name,
+      ...block.namespace ? { namespace: block.namespace } : {},
+      arguments: JSON.stringify(block.arguments) ?? "null"
+    });
+    types.set(id, "function_call");
+  }
+  return { items, calls: types };
+}
+function piEncodeChainTail(messages, assistant, responseItems, model) {
+  const harmony = object12(model.identity)?.class === "gpt-oss";
+  const text = (value) => {
+    const wellFormed = value.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�");
+    return harmony ? wellFormed.replace(/<\|(start|end|message|channel|constrain|return|call)\|>/g, "<\\|$1\\|>") : wellFormed;
+  };
+  const supportsImages = model.input?.includes("image") === true;
+  const image = (block) => {
+    const detail = block.detail === "original" && object12(model.compat)?.supportsImageDetailOriginal !== true ? "auto" : block.detail ?? "auto";
+    const file = object12(block.providerFile);
+    if (file?.provider === "openai" && typeof file.id === "string" && file.id)
+      return { type: "input_image", detail, file_id: file.id };
+    if (typeof block.url !== "string" && (typeof block.mimeType !== "string" || typeof block.data !== "string"))
+      return;
+    return {
+      type: "input_image",
+      detail,
+      image_url: block.url ?? `data:${block.mimeType};base64,${block.data}`
+    };
+  };
+  const outputs = new Set;
+  for (const value of messages) {
+    const message = object12(value);
+    if (message?.role !== "toolResult" || typeof message.toolCallId !== "string")
+      continue;
+    const id = piToolCallWireId(message.toolCallId, model, assistant);
+    if (id)
+      outputs.add(id);
+  }
+  const replayed = replayedTurnItems(assistant, responseItems, outputs, model);
+  if (!replayed)
+    return;
+  const items = [...replayed.items];
+  for (const value of messages) {
+    let message = object12(value);
+    if (!message || message.providerPayload !== undefined)
+      return;
+    message = piOmpUserHistory(message);
+    if (message.role === "custom" || message.role === "hookMessage") {
+      if (typeof message.customType !== "string" || message.attribution === "user")
+        return;
+      const converted = piAgentHistory([message], model.api);
+      const developer = object12(converted[0]);
+      if (converted.length !== 1 || !developer || !piIsDeveloperHistory(developer))
+        return;
+      message = {
+        ...developer,
+        role: model.api === "openai-codex-responses" ? "developer" : "user"
+      };
+    }
+    const user = message.role === "user" || message.role === "developer";
+    if (!user && message.role !== "toolResult")
+      return;
+    const content = typeof message.content === "string" && user ? [{ type: "text", text: message.content }] : message.content;
+    if (!Array.isArray(content))
+      return;
+    const texts = [];
+    const images = [];
+    const ordered = [];
+    for (const value of content) {
+      const block = object12(value);
+      if (block?.type === "text" && typeof block.text === "string") {
+        texts.push(block.text);
+        if (!user || block.text.trim())
+          ordered.push({ type: "input_text", text: text(block.text) });
+      } else if (block?.type === "image") {
+        const encoded = image(block);
+        if (!encoded)
+          return;
+        images.push(encoded);
+        if (supportsImages)
+          ordered.push(encoded);
+      } else
+        return;
+    }
+    if (user) {
+      const input = texts.filter((value) => value.trim()).map((value) => ({ type: "input_text", text: text(value) }));
+      if (supportsImages)
+        input.push(...images);
+      else if (images.length)
+        input.push({ type: "input_text", text: OMITTED_IMAGE });
+      if (input.length)
+        items.push({ role: message.role, content: input });
+      continue;
+    }
+    if (typeof message.toolCallId !== "string" || message.providerMetadata !== undefined)
+      return;
+    const id = piToolCallWireId(message.toolCallId, model, assistant);
+    const callType = id ? replayed.calls.get(id) ?? responseItems.map(object12).find((item) => item?.call_id === id)?.type : undefined;
+    if (!id || callType !== "function_call" && callType !== "custom_tool_call")
+      return;
+    const joined = texts.join(`
+`);
+    const output = images.length && supportsImages ? ordered : text(images.length && !supportsImages ? joined ? `${joined}
+${OMITTED_IMAGE}` : OMITTED_IMAGE : joined);
+    items.push({
+      type: callType === "custom_tool_call" ? "custom_tool_call_output" : "function_call_output",
+      call_id: id,
+      output
+    });
+  }
+  return items;
+}
+
+// src/pi-provider-input.ts
+function piProviderInput(message) {
+  if (!message || typeof message !== "object" || Array.isArray(message))
+    return message;
+  const descriptors = Object.getOwnPropertyDescriptors(message);
+  delete descriptors.completedAt;
+  delete descriptors.contextSnapshot;
+  return Object.create(Object.getPrototypeOf(message), descriptors);
+}
+
+// src/pi-dispatch-chain.ts
+function object13(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function piChainCapableApi(api) {
+  return api === "openai-codex-responses" || api === "openai-responses" || api === "azure-openai-responses";
+}
+function injectedHeadIndex(messages) {
+  let index = 0;
+  while (object13(messages[index])?.role === "system")
+    index++;
+  const m0 = object13(messages[index]);
+  const m1 = object13(messages[index + 1]);
+  const syntheticUser = (message) => message?.role === "user" && Object.keys(message).every((key) => ["role", "content", "timestamp"].includes(key));
+  if (!syntheticUser(m0) || !syntheticUser(m1))
+    return -1;
+  const m0Content = m0?.content;
+  const m1Content = m1?.content;
+  if (!Array.isArray(m0Content) || !Array.isArray(m1Content))
+    return -1;
+  const m0Text = object13(m0Content[0]);
+  const m1Text = object13(m1Content[0]);
+  return m0Content.length >= 1 && m0Content.length <= 2 && (m0Content.length === 1 || object13(m0Content[1])?.type === "image") && m1Content.length === 1 && m0Text?.type === "text" && typeof m0Text.text === "string" && /^(<project-docs>|<user-profile>|<covered-system-messages>|<session-history>)/.test(m0Text.text) && m0Text.text.includes("</session-history>") && m1Text?.type === "text" && typeof m1Text.text === "string" && /^(<session-history-since>|<knowledge-updates>)/.test(m1Text.text) ? index : -1;
+}
+function piPreparedHistory(messages, model) {
+  const snapshots = [];
+  const responseIds = [];
+  const head = injectedHeadIndex(messages);
+  for (const [index, message] of messages.entries()) {
+    const source = object13(message);
+    const identity = head >= 0 && (index === head || index === head + 1) ? Object.fromEntries(Object.entries(source ?? {}).filter(([key]) => key !== "timestamp")) : message;
+    const fields = lkgContentFields(piProviderInput(identity));
+    if (!fields)
+      return;
+    snapshots.push({ id: "", fields });
+    responseIds.push(source?.role === "assistant" && typeof source.responseId === "string" && source.responseId.length > 0 ? source.responseId : undefined);
+  }
+  const prepared = { snapshots, responseIds };
+  let index = responseIds.length - 1;
+  while (index >= 0 && responseIds[index] === undefined)
+    index--;
+  const assistant = object13(messages[index]);
+  const response = piChainResponse(assistant);
+  if (model && assistant && response) {
+    const renamed = piDeduplicatedToolCallIds(messages, model);
+    const delta = piEncodeChainTail(renamed.slice(index + 1), object13(renamed[index]) ?? assistant, response.responseItems, model);
+    if (delta)
+      prepared.continuation = { index, ...response, delta };
+  }
+  return prepared;
+}
+function piChainedRequest(payload) {
+  const body = object13(payload);
+  if (!body || body.previous_response_id === undefined)
+    return;
+  const id = body.previous_response_id;
+  if (body.messages !== undefined || !Array.isArray(body.input) || typeof id !== "string" || !id)
+    throw new Error("invalid chained continuation frame");
+  return { previousResponseId: id, delta: body.input };
+}
+function piChainResponse(message) {
+  const source = object13(message);
+  if (source?.role !== "assistant")
+    return;
+  if (source.stopReason !== "stop" && source.stopReason !== "toolUse")
+    return;
+  if (typeof source.responseId !== "string" || !source.responseId)
+    return;
+  const payload = object13(source.providerPayload);
+  if (payload?.type !== "openaiResponsesHistory" || payload.dt !== true || !Array.isArray(payload.items))
+    return;
+  return {
+    responseId: source.responseId,
+    responseItems: structuredClone(payload.items)
+  };
+}
+function piExpandChainedRequest(payload, chained, anchor, prepared, pass) {
+  if (!anchor)
+    return {
+      refusal: "no completed managed response is recorded for this continuation"
+    };
+  if (anchor.supersededBy !== undefined && (anchor.supersededBy !== pass.current || !pass.resend))
+    return {
+      refusal: "the last managed request has no completed response"
+    };
+  if (chained.previousResponseId !== anchor.responseId)
+    return {
+      refusal: "continuation does not follow the last managed request's response"
+    };
+  if (!prepared)
+    return { refusal: "this pass's prepared history was not recorded" };
+  const carried = anchor.prepared.snapshots.length;
+  if (exactReusablePrefix(prepared.snapshots, anchor.prepared.snapshots) !== carried)
+    return {
+      refusal: "prepared history does not extend the previous managed request"
+    };
+  if (prepared.responseIds[carried] !== anchor.responseId)
+    return {
+      refusal: "prepared history does not continue from the previous managed response"
+    };
+  const continuation = prepared.continuation;
+  if (!continuation || continuation.index !== carried || !isDeepStrictEqual(continuation.responseItems, anchor.responseItems))
+    return {
+      refusal: "prepared response or tail encoding cannot continue the recorded response"
+    };
+  if (!isDeepStrictEqual(continuation.delta, chained.delta))
+    return { refusal: "delta differs from the prepared provider input tail" };
+  const input = [...anchor.input, ...anchor.responseItems, ...chained.delta];
+  const { previous_response_id: _previous, ...rest } = payload;
+  return { payload: { ...rest, input }, input };
+}
+
+// src/pi-dispatch-cursor.ts
+import { createHash as createHash16 } from "node:crypto";
+var MAX_BYTES = 32 * 1024 * 1024;
+var MAX_ENTRIES = 1e5;
+function object14(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+function piCursorConversation(payload) {
+  const body = object14(payload);
+  if (body?.messages !== undefined || body?.input !== undefined || body?.contents !== undefined || body?.request !== undefined)
+    return;
+  const state = object14(body?.conversationState);
+  if (!state || !Array.isArray(state.rootPromptMessagesJson) || !Array.isArray(state.turns))
+    return;
+  let bytes = 0;
+  let nodes = 0;
+  const messages = [];
+  const rootIds = [];
+  const decode = (value, depth = 0) => {
+    if (++nodes > MAX_ENTRIES || depth > 128)
+      throw new Error("Cursor structure limit");
+    if (value instanceof Uint8Array) {
+      bytes += value.byteLength;
+      if (bytes > MAX_BYTES)
+        throw new Error("Cursor bytes limit");
+      if (value.byteLength === 32)
+        return { blobId: Buffer.from(value).toString("hex") };
+      return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(value));
+    }
+    if (Array.isArray(value))
+      return value.map((entry) => decode(entry, depth + 1));
+    const record = object14(value);
+    if (record)
+      return Object.fromEntries(Object.entries(record).map(([key, child]) => [
+        key,
+        decode(child, depth + 1)
+      ]));
+    return value;
+  };
+  try {
+    const decoded = decode(state);
+    for (const root of decoded.rootPromptMessagesJson) {
+      const record = object14(root);
+      if (typeof record?.blobId === "string")
+        rootIds.push(record.blobId);
+      else if (record && typeof record.role === "string")
+        messages.push(record);
+      else
+        return;
+    }
+    for (const value of decoded.turns.slice(0, 8)) {
+      const turn = object14(value);
+      const agent = object14(object14(turn?.turn)?.value) ?? turn;
+      const user = object14(agent?.userMessage);
+      if (typeof user?.text === "string")
+        messages.push({ role: "user", content: user.text });
+    }
+    const action = object14(object14(body?.action)?.action);
+    if (!action || !["userMessageAction", "resumeAction"].includes(String(action.case)))
+      return;
+    let active = decode(body?.action);
+    let activeText;
+    if (action.case === "userMessageAction") {
+      const user = object14(object14(action.value)?.userMessage);
+      if (!user || typeof user.text !== "string")
+        return;
+      messages.push({ role: "user", content: user.text });
+      activeText = user.text;
+      const { messageId: _messageId, ...content } = user;
+      active = decode({
+        action: {
+          case: action.case,
+          value: { ...object14(action.value), userMessage: content }
+        }
+      });
+    }
+    return {
+      conversation: {
+        conversationState: decoded,
+        action: active,
+        customSystemPrompt: body?.customSystemPrompt
+      },
+      messages,
+      rootIds,
+      activeText
+    };
+  } catch {
+    return;
+  }
+}
+function piCursorManagedRoots(messages, signature, cwd) {
+  if (!signature)
+    return [];
+  const roots = new Set;
+  const date = new Date;
+  const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const reminder = cwd && `<system-reminder>
+Today: ${day}; current working directory: '${cwd.replace(/\\/gu, "/")}'. Do not repeat this information in your reply.
+</system-reminder>`;
+  for (const value of messages.slice(0, 8)) {
+    const source = object14(value);
+    if (!source || !["user", "developer"].includes(String(source.role)))
+      continue;
+    const message = piOmpUserHistory(source);
+    const raw = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content;
+    if (!Array.isArray(raw))
+      continue;
+    const parts = [];
+    let managed = false;
+    for (const part of raw) {
+      if (part?.type === "text" && typeof part.text === "string") {
+        const text = part.text.trim();
+        managed ||= text.slice(0, 4096).includes(signature);
+        if (text)
+          parts.push({ type: "text", text });
+      } else if (part?.type === "image" && typeof part.data === "string") {
+        parts.push({
+          type: "image",
+          image: `data:${part.mimeType};base64,${part.data}`,
+          mediaType: part.mimeType
+        });
+      }
+    }
+    if (!managed)
+      continue;
+    const hash = (content) => {
+      const json = JSON.stringify({ role: "user", content });
+      if (json.length <= MAX_BYTES)
+        roots.add(createHash16("sha256").update(json).digest("hex"));
+    };
+    hash(parts);
+    if (reminder) {
+      if (typeof message.content === "string")
+        hash([
+          { type: "text", text: `${reminder}
+
+${message.content}`.trim() }
+        ]);
+      else
+        hash([{ type: "text", text: reminder }, ...parts]);
+    }
+  }
+  return [...roots];
+}
+
+// src/pi-dispatch-diagnostic.ts
+function logPiDispatchMismatch(payload, prepared, mismatch, log = log2) {
+  try {
+    const foreign = /foreign rule=([1-4]) reason=(prepared-row|not-text-user|tool-pair|session-content|unreadable-branch|ambiguous-rewrite|search-limit|limit) count=(\d+) chars=(\d+)(?: gapPrepared=(\d+) gapWire=(\d+) gapChars=(\d+))?/u.exec(mismatch);
+    const rule = Number(foreign?.[1] ?? 0);
+    const reason = foreign?.[2] ?? "none";
+    const count = Number(foreign?.[3] ?? 0);
+    const chars = Number(foreign?.[4] ?? 0);
+    const gapPrepared = Number(foreign?.[5] ?? 0);
+    const gapWire = Number(foreign?.[6] ?? 0);
+    const gapChars = Number(foreign?.[7] ?? 0);
+    const {
+      row,
+      firstInjectorRow,
+      firstInjectorKind,
+      expected: [e0, e1, e2],
+      actual: [a0, a1, a2]
+    } = piDispatchMismatchDiagnostic(payload, prepared, mismatch);
+    log(`[magic-context][pi] ERROR dispatch structure refused: row=${row} firstInjectorRow=${firstInjectorRow} firstInjectorKind=${firstInjectorKind} foreignRule=${rule} foreignReason=${reason} foreignCount=${count} foreignChars=${chars} foreignGapPrepared=${gapPrepared} foreignGapWire=${gapWire} foreignGapChars=${gapChars} kinds[text=1,image=2,call=4,result=8,thinking=16,other=32] expectedPrevious role=${e0.role} parts=${e0.parts} kinds=${e0.kinds} chars=${e0.chars} injector=${e0.injector}; expectedCurrent role=${e1.role} parts=${e1.parts} kinds=${e1.kinds} chars=${e1.chars} injector=${e1.injector}; expectedNext role=${e2.role} parts=${e2.parts} kinds=${e2.kinds} chars=${e2.chars} injector=${e2.injector}; actualPrevious role=${a0.role} parts=${a0.parts} kinds=${a0.kinds} chars=${a0.chars} injector=${a0.injector}; actualCurrent role=${a1.role} parts=${a1.parts} kinds=${a1.kinds} chars=${a1.chars} injector=${a1.injector}; actualNext role=${a2.role} parts=${a2.parts} kinds=${a2.kinds} chars=${a2.chars} injector=${a2.injector}`);
+  } catch {}
+}
+
+// src/pi-dispatch-identity.ts
+var MAX_NODES = 1e5;
+var MAX_STRING_UNITS = 32 * 1024 * 1024;
+var MAX_DEPTH = 128;
+function piConversationFields(payload) {
+  try {
+    if (!payload || typeof payload !== "object")
+      return;
+    const body = payload;
+    let conversation;
+    let anthropic = false;
+    if (Array.isArray(body.messages) && body.input === undefined) {
+      conversation = { messages: body.messages, system: body.system };
+      anthropic = typeof body.system === "string" || Array.isArray(body.system);
+    } else if ((Array.isArray(body.input) || typeof body.input === "string") && body.messages === undefined) {
+      conversation = {
+        input: body.input,
+        instructions: body.instructions,
+        previous_response_id: body.previous_response_id,
+        conversation: body.conversation,
+        prompt: body.prompt
+      };
+    } else {
+      const google = piGoogleConversation(payload);
+      const cursor = google ? undefined : piCursorConversation(payload);
+      if (!google && !cursor)
+        return;
+      conversation = cursor?.conversation ?? {
+        contents: google?.contents,
+        systemInstruction: google?.systemInstruction,
+        configSystemInstruction: google?.config?.systemInstruction
+      };
+    }
+    const fields = [];
+    const seen = new WeakSet;
+    let nodes = 0;
+    let strings = 0;
+    const visit = (value, position, depth) => {
+      if (++nodes > MAX_NODES || depth > MAX_DEPTH)
+        throw new Error("conversation structure limit");
+      if (typeof value === "string") {
+        strings += value.length;
+        if (strings > MAX_STRING_UNITS)
+          throw new Error("conversation string limit");
+        fields.push(LKG_SNAPSHOT_STRING, value);
+      } else if (value === null)
+        fields.push(LKG_SNAPSHOT_NULL);
+      else if (typeof value === "number")
+        fields.push(LKG_SNAPSHOT_NUMBER, value);
+      else if (typeof value === "boolean")
+        fields.push(LKG_SNAPSHOT_BOOLEAN, value);
+      else if (!value || typeof value !== "object")
+        fields.push(LKG_SNAPSHOT_UNDEFINED);
+      else {
+        if (seen.has(value))
+          throw new Error("cyclic conversation");
+        seen.add(value);
+        if (Array.isArray(value)) {
+          if (anthropic && (position === "content" || position === "system") && value.length === 1) {
+            const block = value[0];
+            if (block && typeof block === "object" && block.type === "text" && typeof block.text === "string" && Object.keys(block).every((key) => key === "type" || key === "text" || key === "cache_control")) {
+              visit(block.text, "other", depth + 1);
+              seen.delete(value);
+              return;
+            }
+          }
+          fields.push(LKG_SNAPSHOT_ARRAY, value.length);
+          for (const item of value)
+            visit(item, position === "messages" ? "message" : anthropic && (position === "content" || position === "system") ? "block" : "other", depth + 1);
+        } else {
+          const entries = Object.entries(value).filter(([key, child]) => child !== undefined && typeof child !== "function" && typeof child !== "symbol" && !(anthropic && position === "block" && key === "cache_control"));
+          for (const [key] of entries)
+            strings += key.length;
+          if (strings > MAX_STRING_UNITS)
+            throw new Error("conversation key limit");
+          entries.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+          fields.push(LKG_SNAPSHOT_OBJECT, entries.length);
+          for (const [key, child] of entries) {
+            fields.push(LKG_SNAPSHOT_KEY, key);
+            visit(child, position === "root" && key === "messages" ? "messages" : position === "root" && key === "system" ? "system" : position === "message" && key === "content" ? "content" : "other", depth + 1);
+          }
+        }
+        seen.delete(value);
+      }
+    };
+    visit(conversation, "root", 0);
+    return fields;
+  } catch {
+    return;
+  }
+}
+function piManagedSignature(messages) {
+  for (const message of messages.slice(0, 8)) {
+    if (!message || typeof message !== "object")
+      continue;
+    const content = message.content;
+    const text = typeof content === "string" ? content : Array.isArray(content) ? content.find((part) => part?.type === "text" && typeof part.text === "string")?.text : undefined;
+    if (!text)
+      continue;
+    const marker = /^(<project-docs>|<user-profile>|<covered-system-messages>|<session-history>|<project-memory>|<memory-mural>|<session-history-since>|<knowledge-updates>|<memory>|§\d+§)/.exec(text)?.[0];
+    return marker ?? text.slice(0, 128);
+  }
+  return;
+}
+function piHasManagedSignature(payload, signature, cursorRoots) {
+  if (!signature || !payload || typeof payload !== "object")
+    return false;
+  const body = payload;
+  const google = piGoogleConversation(payload);
+  const cursor = body.messages === undefined && body.input === undefined && !google ? piCursorConversation(payload) : undefined;
+  if (cursor?.activeText?.slice(0, 4096).includes(signature))
+    return true;
+  if (cursorRoots?.length && cursor?.rootIds.some((id) => cursorRoots.includes(id)))
+    return true;
+  const nativeText = !!google || body.inferenceConfig !== undefined;
+  if (typeof body.input === "string" && body.messages === undefined)
+    return body.input.slice(0, 4096).includes(signature);
+  const messages = Array.isArray(body.messages) ? body.messages : Array.isArray(body.input) ? body.input : google?.contents ?? cursor?.messages;
+  if (!messages)
+    return false;
+  for (const message of messages.slice(0, 8)) {
+    if (!message || typeof message !== "object")
+      continue;
+    const content = google ? message.parts : message.content;
+    if (typeof content === "string" && content.slice(0, 4096).includes(signature))
+      return true;
+    if (!Array.isArray(content))
+      continue;
+    for (const block of content.slice(0, 32)) {
+      if (block && (["text", "input_text", "output_text"].includes(block.type) || nativeText && block.type === undefined) && typeof block.text === "string" && block.text.slice(0, 4096).includes(signature))
+        return true;
+    }
+  }
+  return false;
+}
+function piDispatchShape(payload, api) {
+  let keys;
+  try {
+    keys = payload && typeof payload === "object" ? Object.keys(payload).sort().slice(0, 12).join(",") : typeof payload;
+  } catch {
+    keys = "unreadable object";
+  }
+  return `provider API=${api ?? "unknown"} shape=${keys || "empty object"}`;
+}
+
+// src/pi-dispatch-refused.ts
+function piRefusedPayload(message) {
+  const fail = () => {
+    throw new Error(message);
+  };
+  return new Proxy(Object.create(null), {
+    get: (_target, key) => key === "then" ? undefined : fail(),
+    ownKeys: fail,
+    getOwnPropertyDescriptor: fail,
+    set: fail,
+    has: fail,
+    getPrototypeOf: fail
+  });
 }
 
 // src/pi-lkg.ts
@@ -38702,14 +42969,6 @@ function omitsRootBookkeeping(args) {
       api = [...apis][0];
   }
   return typeof api === "string" && bookkeepingOmittingApis.has(api);
-}
-function piProviderInput(message) {
-  if (!message || typeof message !== "object" || Array.isArray(message))
-    return message;
-  const descriptors = Object.getOwnPropertyDescriptors(message);
-  delete descriptors.completedAt;
-  delete descriptors.contextSnapshot;
-  return Object.create(Object.getPrototypeOf(message), descriptors);
 }
 function restorePiLkgInputForFit(snapshot, branchEntries) {
   if (!snapshot || snapshot.preparationFailure || !branchEntries || !snapshot.inputs.length)
@@ -39378,7 +43637,7 @@ function tokenizePiMessages(messages, options) {
       }
     }
   }
-  if (options && liveIds) {
+  if (options && liveIds && options.prune !== false) {
     const cachePruneStart = options.onTiming ? performance.now() : 0;
     for (const id of options.cache.keys()) {
       if (!liveIds.has(id))
@@ -39475,6 +43734,20 @@ function piFitMessageBytes(raw) {
   const bytes = Buffer.byteLength(JSON.stringify(content ? { ...message, content } : raw));
   return bytes + (opaque ? 4 * opaqueThinkingCost(message.usage?.reasoning, message.usage?.output).tokens : 0);
 }
+function piFitMessageBytesPricingImages(raw, bytesPerImage = PI_IMAGE_TOKENS) {
+  const message = raw;
+  if (!Array.isArray(message?.content) || !message.content.some((part) => part && typeof part === "object" && part.type === "image"))
+    return piFitMessageBytes(raw);
+  let images = 0;
+  const content = message.content.map((part) => {
+    if (!part || typeof part !== "object" || part.type !== "image")
+      return part;
+    images += 1;
+    const { data: _data, ...rest } = part;
+    return rest;
+  });
+  return piFitMessageBytes({ ...message, content }) + images * bytesPerImage;
+}
 function tokenCacheFingerprintsEqual(left, right) {
   if (left.length !== right.length)
     return false;
@@ -39540,6 +43813,160 @@ function safeJsonStringify2(value) {
   }
 }
 
+// src/strip-processed-images-pi.ts
+var STRIPPED_IMAGE_MARKER = "[image stripped]";
+function isLargeImagePart(value) {
+  if (!value || typeof value !== "object")
+    return false;
+  const part = value;
+  return part.type === "image" && typeof part.mimeType === "string" && part.mimeType.startsWith("image/") && typeof part.data === "string" && part.data.length > 200;
+}
+var PI_NON_VISION_TOOL_IMAGE_PLACEHOLDER = "(tool image omitted: model does not support images)";
+var PI_NON_VISION_USER_IMAGE_PLACEHOLDER = "(image omitted: model does not support images)";
+function piModelAcceptsImages(model) {
+  const input = model?.input;
+  return !Array.isArray(input) || input.includes("image");
+}
+function piImageWirePlaceholder(args) {
+  if (args.block?.type !== "image")
+    return;
+  if (args.stripped && isLargeImagePart(args.block))
+    return STRIPPED_IMAGE_MARKER;
+  if (!args.modelAcceptsImages)
+    return args.role === "toolResult" ? PI_NON_VISION_TOOL_IMAGE_PLACEHOLDER : PI_NON_VISION_USER_IMAGE_PLACEHOLDER;
+  return;
+}
+function piToolImageWireTokens(args) {
+  const placeholder = piImageWirePlaceholder({ ...args, role: "toolResult" });
+  return placeholder === undefined ? PI_IMAGE_TOKENS : estimateTokens(placeholder);
+}
+function piMessagesWithWireImages(messages, args) {
+  if (args.modelAcceptsImages && !args.strippedMessage)
+    return messages;
+  let changed = false;
+  const sent = messages.map((raw, index) => {
+    const message = raw;
+    if (!message || typeof message !== "object")
+      return raw;
+    const content = message.content;
+    if (!Array.isArray(content))
+      return raw;
+    let stripped;
+    let replaced;
+    for (let partIndex = 0;partIndex < content.length; partIndex++) {
+      const block = content[partIndex];
+      if (block?.type !== "image")
+        continue;
+      stripped ??= args.strippedMessage?.(raw, index) ?? false;
+      const placeholder = piImageWirePlaceholder({
+        block,
+        role: message.role,
+        stripped,
+        modelAcceptsImages: args.modelAcceptsImages
+      });
+      if (placeholder === undefined)
+        continue;
+      replaced ??= content.slice();
+      replaced[partIndex] = { type: "text", text: placeholder };
+    }
+    if (!replaced)
+      return raw;
+    changed = true;
+    return { ...message, content: replaced };
+  });
+  return changed ? sent : messages;
+}
+function planPiProcessedImageIds(args, frozenIds) {
+  if (!args.detect || args.watermark <= 0)
+    return [];
+  const ids = args.messages.map(args.stableId);
+  const ownTags = ids.map((id) => id ? args.messageIdToMaxTag.get(id) ?? 0 : 0);
+  const completeToolResults = new Set;
+  const openCalls = new Map;
+  for (let i = 0;i < args.messages.length; i++) {
+    const message = args.messages[i];
+    if (!message || typeof message !== "object")
+      continue;
+    if (message.role === "assistant" && Array.isArray(message.content)) {
+      for (const part of message.content) {
+        if (part?.type === "toolCall" && typeof part.id === "string") {
+          openCalls.set(part.id, `${ids[i] ?? ""}\x00${part.id}`);
+        }
+      }
+    } else if (message.role === "toolResult" && message.toolCallId) {
+      const key = openCalls.get(message.toolCallId);
+      if (key !== undefined && !args.protectedToolKeys?.has(key) && !args.protectedToolKeys?.has(message.toolCallId)) {
+        completeToolResults.add(i);
+      }
+      openCalls.delete(message.toolCallId);
+    }
+  }
+  const selected = [];
+  let hasAssistantResponse = false;
+  let nextTag;
+  for (let i = args.messages.length - 1;i >= 0; i--) {
+    const ownTag = ownTags[i];
+    const positionTag = ownTag > 0 ? ownTag : nextTag;
+    if (ownTag > 0)
+      nextTag = ownTag;
+    const raw = args.messages[i];
+    if (!raw || typeof raw !== "object")
+      continue;
+    const message = raw;
+    if (message.role === "assistant") {
+      hasAssistantResponse = true;
+      continue;
+    }
+    if (message.role !== "user" && message.role !== "toolResult" || message.role === "toolResult" && !completeToolResults.has(i) || !hasAssistantResponse || !Array.isArray(message.content) || !message.content.some(isLargeImagePart))
+      continue;
+    const id = ids[i];
+    if (!id || frozenIds.has(id) || positionTag === undefined || positionTag > args.watermark)
+      continue;
+    if ((args.usagePercentage ?? 0) < 95 && positionTag >= (args.protectedCutoff ?? Infinity))
+      continue;
+    selected.push(id);
+  }
+  return selected;
+}
+function stripPiProcessedImages(args) {
+  const frozenIds = getProcessedImageStrippedIds(args.db, args.sessionId);
+  const newlyStrippedIds = planPiProcessedImageIds(args, frozenIds);
+  if (newlyStrippedIds.length > 0) {
+    const persisted = (args.addIds ?? addProcessedImageStrippedIds)(args.db, args.sessionId, newlyStrippedIds);
+    if (persisted) {
+      for (const id of newlyStrippedIds)
+        frozenIds.add(id);
+    } else {
+      newlyStrippedIds.length = 0;
+      sessionLog2(args.sessionId, "processed-image strip: persistence failed; leaving newly detected images intact");
+    }
+  }
+  let stripped = 0;
+  for (let i = 0;i < args.messages.length; i++) {
+    const raw = args.messages[i];
+    if (!raw || typeof raw !== "object")
+      continue;
+    const id = args.stableId(raw, i);
+    if (!id || !frozenIds.has(id))
+      continue;
+    const message = raw;
+    if (!Array.isArray(message.content))
+      continue;
+    for (let partIndex = 0;partIndex < message.content.length; partIndex++) {
+      if (!isLargeImagePart(message.content[partIndex]))
+        continue;
+      if (newlyStrippedIds.includes(id))
+        args.onFirstApplication?.(raw, i, partIndex);
+      message.content[partIndex] = {
+        type: "text",
+        text: STRIPPED_IMAGE_MARKER
+      };
+      stripped++;
+    }
+  }
+  return { stripped, newlyStrippedIds };
+}
+
 // src/pi-raw-fallback.ts
 class PiStorageBusyError extends Error {
   code = "PI_STORAGE_BUSY";
@@ -39555,7 +43982,7 @@ class PiDegradedPassError extends Error {
   code = "PI_DEGRADED_PASS";
   recoverable = true;
   constructor(site, options) {
-    super(describeDegradedPassFailure(site, options?.cause), options);
+    super(options?.message ?? describeDegradedPassFailure(site, options?.cause), options);
     this.site = site;
     this.name = "PiDegradedPassError";
   }
@@ -39571,9 +43998,24 @@ function piFallbackRefusal(site, cause) {
   }
   return cause instanceof PiDegradedPassError ? cause : new PiDegradedPassError(site, { cause });
 }
-function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, contextLimit) {
+function piSentMessages(messages, observed) {
+  return piMessagesWithWireImages(messages, {
+    modelAcceptsImages: observed?.modelAcceptsImages !== false
+  });
+}
+function piSentMeasuredPrefix(measuredPrefix, observed) {
+  if (!measuredPrefix || observed?.modelAcceptsImages !== false)
+    return measuredPrefix;
+  return {
+    ...measuredPrefix,
+    appendedMessages: piSentMessages(measuredPrefix.appendedMessages, observed)
+  };
+}
+function estimatePiOutgoingInputTokens(servedMessages, observed, servedMeasuredPrefix, contextLimit, tokenCounts) {
   if (!observed || !Number.isFinite(observed.systemTokens) || observed.systemTokens <= 0 || !Number.isFinite(observed.toolDefinitionTokens) || observed.toolDefinitionTokens < 0 || !hasTokenizerForFit())
     return { tokens: 0, trusted: false };
+  const messages = piSentMessages(servedMessages, observed);
+  const measuredPrefix = piSentMeasuredPrefix(servedMeasuredPrefix, observed);
   const knownRole = (message) => {
     if (!message || typeof message !== "object")
       return false;
@@ -39583,9 +44025,19 @@ function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, conte
     if (!knownRole(message))
       return false;
     const m = message;
-    return typeof m.content === "string" || Array.isArray(m.content) && m.content.every((p) => p && typeof p === "object" && ["text", "thinking", "redacted_thinking", "toolCall"].includes(String(p.type)));
+    return typeof m.content === "string" || Array.isArray(m.content) && m.content.every((p) => p && typeof p === "object" && [
+      "text",
+      "thinking",
+      "redacted_thinking",
+      "toolCall",
+      "image"
+    ].includes(String(p.type)));
   };
   const complete = messages.every(countable);
+  const hasImages = messages.some((message) => {
+    const content = message?.content;
+    return Array.isArray(content) && content.some((part) => part && typeof part === "object" && part.type === "image");
+  });
   const measuredForBounds = measuredPrefix && measuredPrefix.modelKey === observed.modelKey && observed.envelopeSignature && measuredPrefix.envelopeSignature === observed.envelopeSignature && Number.isSafeInteger(measuredPrefix.inputTokens) && measuredPrefix.inputTokens > 0 ? measuredPrefix : undefined;
   if (contextLimit && Number.isFinite(contextLimit) && contextLimit > 0) {
     const priced = measuredForBounds?.appendedMessages ?? messages;
@@ -39626,7 +44078,7 @@ function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, conte
       tools: observed.toolDefinitionTokens
     }, observed.calibration ?? calibrationForModelKey(observed.modelKey), true);
     const fit = observed.calibration ?? calibrationForModelKey(observed.modelKey);
-    const upper = envelope + Math.max(UNKNOWN_FIT_RATIO, fit.toolsRatio, fit.proseRatio) * priced.reduce((sum, message) => sum + piFitMessageBytes(message), 0);
+    const upper = envelope + Math.max(UNKNOWN_FIT_RATIO, fit.toolsRatio, fit.proseRatio) * priced.reduce((sum, message) => sum + piFitMessageBytesPricingImages(message), 0);
     if (upper <= contextLimit)
       return {
         tokens: upper,
@@ -39639,7 +44091,7 @@ function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, conte
     return {
       tokens: providerMass({
         system: observed.systemTokens,
-        tools: observed.toolDefinitionTokens + messages.reduce((sum, message) => sum + piFitMessageBytes(message), 0)
+        tools: observed.toolDefinitionTokens + messages.reduce((sum, message) => sum + piFitMessageBytesPricingImages(message), 0)
       }, observed.calibration ?? calibrationForModelKey(observed.modelKey), true),
       trusted: true,
       refusalGrade: false
@@ -39660,13 +44112,13 @@ function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, conte
     return {
       tokens: providerMass({
         system: observed.systemTokens,
-        tools: observed.toolDefinitionTokens + messages.reduce((sum, message) => sum + piFitMessageBytes(message), 0)
+        tools: observed.toolDefinitionTokens + messages.reduce((sum, message) => sum + piFitMessageBytesPricingImages(message), 0)
       }, observed.calibration ?? calibrationForModelKey(observed.modelKey), true),
       trusted: true,
       refusalGrade: false,
       refusalBasis: "byte-bound"
     };
-  const raw = tokenizePiMessages([...messages]);
+  const raw = tokenizePiMessages([...messages], tokenCounts ? { ...tokenCounts, prune: false } : undefined);
   const calibration = observed.calibration ?? calibrationForModelKey(observed.modelKey);
   const refusalCalibration = calibrationForModelKey(observed.modelKey);
   const tokens = providerMass({
@@ -39674,7 +44126,7 @@ function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, conte
     tools: observed.toolDefinitionTokens + raw.toolCall,
     prose: raw.conversation
   }, calibration, true);
-  const refusalGrade = Number.isFinite(tokens) && messages.every((rawMessage) => {
+  const refusalGrade = Number.isFinite(tokens) && !hasImages && messages.every((rawMessage) => {
     const content = rawMessage.content;
     if (typeof content === "string")
       return !tokenCountUsesByteBound(content);
@@ -39700,7 +44152,9 @@ function estimatePiOutgoingInputTokens(messages, observed, measuredPrefix, conte
     refusalBasis: refusalGrade ? measured ? "provider-prefix" : "calibrated" : undefined
   };
 }
-function assertPiRawFallbackFits(messages, contextLimit, log, cause, observed, measuredPrefix) {
+function assertPiRawFallbackFits(servedMessages, contextLimit, log, cause, observed, servedMeasuredPrefix) {
+  const messages = piSentMessages(servedMessages, observed);
+  const measuredPrefix = piSentMeasuredPrefix(servedMeasuredPrefix, observed);
   if (!contextLimit || !Number.isFinite(contextLimit) || !observed || !Number.isFinite(observed.systemTokens) || observed.systemTokens <= 0 || !Number.isFinite(observed.toolDefinitionTokens) || observed.toolDefinitionTokens < 0 || observed.envelopeBytes !== undefined && (!Number.isFinite(observed.envelopeBytes) || observed.envelopeBytes < 0)) {
     log("raw_fallback_refused completeness=partial");
     throw piFallbackRefusal("fallback-metadata-incomplete", cause);
@@ -39713,7 +44167,7 @@ function assertPiRawFallbackFits(messages, contextLimit, log, cause, observed, m
   let serializationFailed = false;
   try {
     for (const message of pricedMessages) {
-      bytes += piFitMessageBytes(message) + 1;
+      bytes += piFitMessageBytesPricingImages(message, 4 * PI_IMAGE_TOKENS) + 1;
       if (baseInputTokens + Math.ceil(bytes / 4) > contextLimit)
         break;
     }
@@ -39729,7 +44183,13 @@ function assertPiRawFallbackFits(messages, contextLimit, log, cause, observed, m
     if (!message || typeof message !== "object")
       return false;
     const m = message;
-    return ["user", "assistant", "toolResult", "custom"].includes(m.role ?? "") && (typeof m.content === "string" || Array.isArray(m.content) && m.content.every((p) => p !== null && typeof p === "object" && ["text", "thinking", "redacted_thinking", "toolCall"].includes(String(p.type))));
+    return ["user", "assistant", "toolResult", "custom"].includes(m.role ?? "") && (typeof m.content === "string" || Array.isArray(m.content) && m.content.every((p) => p !== null && typeof p === "object" && [
+      "text",
+      "thinking",
+      "redacted_thinking",
+      "toolCall",
+      "image"
+    ].includes(String(p.type))));
   });
   const raw = tokenizePiMessages([...pricedMessages]);
   if (!hasTokenizerForFit()) {
@@ -39741,9 +44201,17 @@ function assertPiRawFallbackFits(messages, contextLimit, log, cause, observed, m
     tools: (measured ? 0 : observed.toolDefinitionTokens) + raw.toolCall,
     prose: raw.conversation
   }, observed.calibration ?? calibrationForModelKey(observed.modelKey), true);
-  if (!complete || !Number.isFinite(tokens) || tokens <= 0 || tokens > contextLimit || serializationFailed || proxyTokens > contextLimit) {
-    log(`raw_fallback_over_context_limit proxy_bytes=${bytes} proxy_tokens=${proxyTokens} limit=${contextLimit} early_abort=true serialization_failed=${serializationFailed}`);
-    throw piFallbackRefusal(complete ? "fallback-over-context-limit" : "fallback-messages-incomplete", cause);
+  if (!complete) {
+    log("raw_fallback_refused completeness=partial messages=unpriceable");
+    throw piFallbackRefusal("fallback-messages-incomplete", cause);
+  }
+  if (!Number.isFinite(tokens) || tokens <= 0) {
+    log(`raw_fallback_refused count=unusable tokens=${tokens}`);
+    throw piFallbackRefusal("fallback-over-context-limit", cause);
+  }
+  if (tokens > contextLimit) {
+    log(`raw_fallback_over_context_limit tokens=${Math.ceil(tokens)} limit=${contextLimit} proxy_bytes=${bytes} proxy_tokens=${proxyTokens}`);
+    throw piFallbackRefusal("fallback-over-context-limit", cause);
   }
 }
 function classifyPiOutgoingFit(estimate, limit) {
@@ -39757,6 +44225,7 @@ function classifyPiOutgoingFit(estimate, limit) {
 // src/pi-context-refusal.ts
 var ENTRY_TYPE = "magic-context-turn-refused";
 var RETRY_MESSAGE = "Magic Context could not safely prepare this turn; send your message again.";
+var PI_OMP_CAPTURE_REFUSAL = "Magic Context does not send OMP's auto-learn capture: it carries the raw, unmanaged conversation.";
 var MAX_UNSENDABLE_NONCES_PER_SESSION = 32;
 var receiptMaps = new Set;
 function clearPiContextReceipt(sessionId) {
@@ -39782,11 +44251,34 @@ function releasePiOperationPayloads(operation) {
   operation.dispatchFields = undefined;
   operation.chainDispatchFields = undefined;
   operation.managedSignature = undefined;
+  operation.cursorRoots = undefined;
   operation.preparedStructure = undefined;
+  operation.foreignEvidence = undefined;
+  operation.nativeDrops = undefined;
   operation.preparedHistory = undefined;
 }
 function operationKey(ctx) {
   return ctx.sessionManager?.getSessionId?.() ?? ctx.sessionManager ?? "no-session";
+}
+function servedSessionOf(ctx) {
+  try {
+    const id = ctx.sessionManager?.getSessionId?.();
+    return typeof id === "string" && id.length > 0 ? id : undefined;
+  } catch {
+    return;
+  }
+}
+function finishPiServedRequest(sessionId, ctx, messages, compactionOff) {
+  try {
+    commitServedRequest({
+      sessionId,
+      host: "pi",
+      messages,
+      providerID: ctx.model?.provider,
+      modelID: ctx.model?.id,
+      compactionOff: compactionOff()
+    });
+  } catch {}
 }
 function messageKey(message) {
   if (!message || typeof message !== "object")
@@ -39858,7 +44350,14 @@ function inputBranch(ctx, inputs) {
     return;
   }
 }
-function dispatchedEndBelongsToEarlierRun(operation, event, ctx) {
+function endsWithFailedAttempt(input, messages, ended) {
+  if (ended.length !== input.length + 1 || exactReusablePrefix(input, ended) !== input.length)
+    return false;
+  const last = messages.at(-1);
+  const lastKey = ended.at(-1)?.id;
+  return last?.role === "assistant" && (last.stopReason === "error" || last.stopReason === "aborted") && !!lastKey && !input.some((message) => message.id === lastKey);
+}
+function dispatchedEndBelongsToEarlierRun(operation, event, ctx, startOutstanding) {
   if (!operation.dispatched || !operation.started || !operation.ready || !operation.pass?.completed || operation.refused || operation.pass.abandoned || !operation.inputBranch)
     return false;
   try {
@@ -39868,9 +44367,16 @@ function dispatchedEndBelongsToEarlierRun(operation, event, ctx) {
     const prepared = operation.inputBranch;
     if (!current || current.entryIds[prepared.anchorIndex] !== prepared.anchorId || current.messages.length !== prepared.messages.length || exactReusablePrefix(current.messages, prepared.messages) !== prepared.messages.length)
       return false;
-    const messages = event?.messages;
+    const end = event;
+    const messages = end?.messages;
     const ended = Array.isArray(messages) ? messageSnapshots(messages) : undefined;
-    return !!(ended && ended.length <= prepared.anchorIndex && ended.length < prepared.messages.length && exactReusablePrefix(prepared.messages, ended) === ended.length);
+    if (!ended || !Array.isArray(messages))
+      return false;
+    if (end.willContinue === true && endsWithFailedAttempt(prepared.messages, messages, ended))
+      return true;
+    if (!startOutstanding)
+      return false;
+    return ended.length <= prepared.anchorIndex && ended.length < prepared.messages.length && exactReusablePrefix(prepared.messages, ended) === ended.length;
   } catch {
     return false;
   }
@@ -39920,12 +44426,18 @@ function registerPiGuardedContext(pi, handler, options = {}) {
   receiptMaps.add(structureWarnings);
   const imageTrimNotices = new Map;
   receiptMaps.add(imageTrimNotices);
+  const foreignNotices = new Map;
+  receiptMaps.add(foreignNotices);
+  const captureNotices = new Map;
+  receiptMaps.add(captureNotices);
+  const foreignIndexes = new Map;
+  receiptMaps.add(foreignIndexes);
   const chains = new Map;
   receiptMaps.add(chains);
-  const refuse = (ctx, budget, reason, isCurrent) => {
+  const refuse = (ctx, budget, reason, isCurrent, abort = true) => {
     if (!isCurrent()) {
       log2(`[magic-context][pi] DISCARDED CONTEXT RESULT ${budget.diagnostic()}`, reason);
-      return;
+      return RETRY_MESSAGE;
     }
     budget.abandoned = true;
     budget.recovery = budget.recovery === "not attempted" ? "no managed result; refused" : budget.recovery;
@@ -39942,7 +44454,7 @@ function registerPiGuardedContext(pi, handler, options = {}) {
     } catch (error) {
       log2("[magic-context][pi] refusal entry failed", error);
     } finally {
-      if (!budget.sideTurn)
+      if (abort && !budget.sideTurn)
         ctx.abort();
     }
     try {
@@ -39950,6 +44462,7 @@ function registerPiGuardedContext(pi, handler, options = {}) {
     } catch (error) {
       log2("[magic-context][pi] refusal diagnostic failed", error);
     }
+    return message;
   };
   if (fenceEnabled) {
     pi.on("agent_start", (_event, ctx) => {
@@ -39969,7 +44482,7 @@ function registerPiGuardedContext(pi, handler, options = {}) {
         log2(`[magic-context][pi] OMP context counts session=${String(key)} side_contexts=${counts.sides} context_passes=${counts.contexts} dispatch_fence=${counts.sides ? "latched off" : "on"}`);
       const operation = operations.get(key);
       if (operation) {
-        if (endBelongsToEarlierRun(operation, event) || lifecycleSeen.starts > lifecycleSeen.ends && dispatchedEndBelongsToEarlierRun(operation, event, ctx)) {
+        if (endBelongsToEarlierRun(operation, event) || dispatchedEndBelongsToEarlierRun(operation, event, ctx, lifecycleSeen.starts > lifecycleSeen.ends)) {
           if (operation.dispatched)
             operation.retainedAfterEnd = true;
           if (lifecycleSeen.starts <= lifecycleSeen.ends)
@@ -39996,30 +44509,46 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       }
     });
     pi.on("before_provider_request", (event, ctx) => {
-      const cancelledOperation = operations.get(operationKey(ctx));
+      const payload = event.payload;
+      const key = operationKey(ctx);
+      if (isOmpUnmanagedCaptureRequest(payload)) {
+        if (options.compactionOff?.(ctx) || sideSessions.get(key)?.sides)
+          return;
+        if (!captureNotices.has(key)) {
+          captureNotices.set(key, true);
+          log2(`[magic-context][pi] OMP auto-learn capture refused for session=${String(key)}: it sends the raw conversation, which Magic Context does not manage; auto-learn capture stays off while Magic Context manages this session`);
+        }
+        return piRefusedPayload(PI_OMP_CAPTURE_REFUSAL);
+      }
+      const cancelledOperation = operations.get(key);
       const signal = ctx.signal;
       if (signal ? signal.aborted : cancelledOperation?.pass?.isCancelled()) {
         cancelledOperation?.pass?.cancel();
         if (cancelledOperation)
           cancelledOperation.ready = false;
-        return;
+        return piRefusedPayload("Magic Context request cancelled before provider dispatch.");
       }
       if (options.compactionOff?.(ctx)) {
-        chains.delete(operationKey(ctx));
+        chains.delete(key);
         return;
       }
-      const payload = event.payload;
-      const key = operationKey(ctx);
       if (sideSessions.get(key)?.sides)
         return;
       const nonces = unsendableNonces.get(key);
       if (nonces?.size) {
-        const serializedPayload = JSON.stringify(payload);
+        let serializedPayload;
+        try {
+          serializedPayload = JSON.stringify(payload);
+        } catch {
+          const budget = new PiContextBudget;
+          budget.stage = "provider dispatch";
+          return piRefusedPayload(refuse(ctx, budget, `provider payload could not be inspected; ${piDispatchShape(payload, ctx.model?.api)}`, () => true, false));
+        }
         if (serializedPayload && [...nonces].some((nonce) => serializedPayload.includes(nonce))) {
           const budget = new PiContextBudget;
           budget.stage = "provider dispatch";
-          refuse(ctx, budget, "superseded context fallback is not a managed request", () => true);
-          return;
+          const message = refuse(ctx, budget, `superseded context fallback is not a managed request; ${piDispatchShape(payload, ctx.model?.api)}`, () => true, false);
+          return piRefusedPayload(message);
         }
       }
       if (isOmpAdvisorRequest(payload))
@@ -40031,16 +44560,12 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       }
       const active = operation;
       const isCurrent = () => operations.get(key) === active;
-      const capture = isOmpUnmanagedCaptureRequest(payload);
-      const budget = (capture ? undefined : active.pass) ?? new PiContextBudget;
+      const budget = active.pass ?? new PiContextBudget;
       if (active.refused && active.pass === budget) {
-        ctx.abort();
-        return;
+        return piRefusedPayload(active.refusalMessage ?? RETRY_MESSAGE);
       }
       let refusalOrigin;
       try {
-        if (capture)
-          throw new Error("no context pass ran for OMP auto-learn capture; raw conversation refused");
         if (!active.pass)
           throw new Error("no context pass ran for this operation");
         if (!budget.completed && (budget.abandoned || budget.elapsed() >= PI_CONTEXT_BUDGET.outcomeMs))
@@ -40051,11 +44576,12 @@ function registerPiGuardedContext(pi, handler, options = {}) {
         }
         if (!budget.completed || !active.ready || active.refused || budget.abandoned)
           throw new Error("context pass ran without a managed context receipt");
-        const chained = piChainedRequest(payload);
-        let checked = payload;
+        const managed = piWithoutOmpJuice(payload, ctx.model);
+        const chained = piChainedRequest(managed);
+        let checked = managed;
         let chainInput;
         if (chained) {
-          const expanded = piExpandChainedRequest(payload, chained, chains.get(key)?.anchor, active.preparedHistory, {
+          const expanded = piExpandChainedRequest(managed, chained, chains.get(key)?.anchor, active.preparedHistory, {
             current: active.pass,
             resend: active.chainDispatchFields !== undefined
           });
@@ -40064,27 +44590,37 @@ function registerPiGuardedContext(pi, handler, options = {}) {
           checked = expanded.payload;
           chainInput = expanded.input;
         }
-        if (!piHasManagedSignature(checked, active.managedSignature))
-          throw new Error("provider request does not match this pass's managed dispatch (missing current receipt signature)");
+        if (!piHasManagedSignature(checked, active.managedSignature, active.cursorRoots))
+          throw new Error(ctx.model?.api === "cursor-agent" ? "provider request does not match this pass's managed dispatch (Cursor root hash did not match and active message has no current receipt signature)" : "provider request does not match this pass's managed dispatch (missing current receipt signature)");
         const fields = piConversationFields(payload);
         if (!fields)
           throw new Error("provider conversation identity could not be established");
+        const nativeDrop = piNativeDropWireMismatch(checked, active.nativeDrops);
+        if (nativeDrop)
+          throw new Error(`provider request does not match this pass's managed dispatch (prepared turn structure); ${nativeDrop}`);
         const body = checked;
-        const skipReason = active.preparedStructure ? active.preparedStructure.structuralSkipReason ?? (active.preparedStructure.api && body?.messages === undefined && Array.isArray(body?.input) && !active.preparedStructure.responsesMessages ? "provider selected Responses items without a matching history plan" : undefined) : "prepared history representation is not modeled";
+        const skipReason = piCursorConversation(checked) ? "Cursor history blob IDs do not expose prepared turn structure" : active.preparedStructure ? active.preparedStructure.structuralSkipReason ?? (active.preparedStructure.api && body?.messages === undefined && Array.isArray(body?.input) && !active.preparedStructure.responsesMessages ? "provider selected Responses items without a matching history plan" : undefined) : "prepared history representation is not modeled";
         if (chained && skipReason)
           throw new Error("provider request does not match this pass's managed dispatch (chained continuation requires a modeled prepared history)");
         if (skipReason && !structureWarnings.has(key)) {
           structureWarnings.set(key, true);
           log2(`[magic-context][pi] OMP structural comparison skipped: ${skipReason}; stale prepared requests are not detected on this pass; session=${String(key)}`);
         }
-        const structureMismatch = skipReason ? undefined : piPreparedStructureMismatch(checked, active.preparedStructure, (counts) => {
+        const structure = skipReason ? {} : piCheckPreparedDispatch(checked, active.preparedStructure, active.foreignEvidence, (counts) => {
           if (imageTrimNotices.has(key))
             return;
           imageTrimNotices.set(key, true);
           log2(`[magic-context][pi] OMP provider images trimmed: planned=${counts.planned} actual=${counts.actual} trimmed=${counts.trimmed}`);
         });
-        if (structureMismatch)
-          throw new Error(`provider request does not match this pass's managed dispatch (prepared turn structure); ${structureMismatch}`);
+        if (structure.mismatch) {
+          logPiDispatchMismatch(checked, active.preparedStructure, structure.mismatch);
+          throw new Error(`provider request does not match this pass's managed dispatch (prepared turn structure); ${structure.mismatch}`);
+        }
+        if (structure.foreign && !foreignNotices.has(key)) {
+          foreignNotices.set(key, true);
+          const { count, chars, before } = structure.foreign;
+          log2(`[magic-context][pi] foreign context rows accepted: count=${count} chars=${chars} beforePreparedRow0=${before[0] ?? -1} beforePreparedRow1=${before[1] ?? -1} beforePreparedRow2=${before[2] ?? -1} beforePreparedRow3=${before[3] ?? -1}; inserted by another extension after Magic Context's pass, outside managed history`);
+        }
         const admittedFields = chained ? active.chainDispatchFields : active.dispatchFields;
         if (admittedFields && exactReusablePrefix([{ id: "conversation", fields }], [{ id: "conversation", fields: admittedFields }]) !== 1)
           throw new Error("provider request does not match this pass's managed dispatch");
@@ -40114,12 +44650,20 @@ function registerPiGuardedContext(pi, handler, options = {}) {
         if (signal ? signal.aborted : budget.isCancelled(error)) {
           budget.cancel();
           active.ready = false;
-          return;
+          return piRefusedPayload("Magic Context request cancelled before provider dispatch.");
         }
         active.refused = true;
         budget.stage = refusalOrigin ? `provider dispatch (origin=${refusalOrigin}; context stage=${budget.stage})` : "provider dispatch";
-        refuse(ctx, budget, error, isCurrent);
+        const reason = new Error(`${error instanceof Error ? error.message : String(error)}; ${piDispatchShape(payload, ctx.model?.api)}`);
+        active.refusalMessage = refuse(ctx, budget, reason, isCurrent, false);
+        return piRefusedPayload(active.refusalMessage);
       }
+    });
+  }
+  if (!fenceEnabled) {
+    pi.on("before_provider_request", (_event, ctx) => {
+      const operation = operations.get(operationKey(ctx));
+      return operation?.refused ? piRefusedPayload(operation.refusalMessage ?? RETRY_MESSAGE) : undefined;
     });
   }
   pi.registerEntryRenderer?.(ENTRY_TYPE, (entry) => new Text2(entry.data?.message ?? RETRY_MESSAGE, 0, 0));
@@ -40154,6 +44698,10 @@ function registerPiGuardedContext(pi, handler, options = {}) {
     active.dispatched = false;
     active.ready = false;
     active.refused = false;
+    active.refusalMessage = undefined;
+    const servedSessionId = budget.sideTurn ? undefined : servedSessionOf(ctx);
+    if (servedSessionId)
+      beginServedRequest(servedSessionId);
     const { isOwned, isCurrent, assertOwner } = createPiContextOwnershipGuards(operations, key, active, budget, owner);
     budget.assertOwner = assertOwner;
     try {
@@ -40163,6 +44711,12 @@ function registerPiGuardedContext(pi, handler, options = {}) {
         active.inputKeys = inputMessageKeys(event);
         inputs = messageSnapshots(event.messages);
         active.inputMessages = inputs;
+        let index = foreignIndexes.get(key);
+        if (!index) {
+          index = createPiForeignSessionIndex();
+          foreignIndexes.set(key, index);
+        }
+        active.foreignEvidence = piForeignEvidence(ctx.sessionManager, event.messages, index);
       }
       const result = await budget.waitMandatory(Promise.resolve(withSqliteTurnDeadline2(() => Math.max(0, budget.remainingOutcome() - PI_CONTEXT_BUDGET.completionReserveMs), () => withSqliteTransformPass2(() => handler(event, ctx, budget)))));
       if (result?.messages) {
@@ -40170,7 +44724,12 @@ function registerPiGuardedContext(pi, handler, options = {}) {
         if (prepared.messages !== result.messages)
           result.messages = prepared.messages;
         active.managedSignature = piManagedSignature(result.messages);
+        if (ctx.model?.api === "cursor-agent")
+          active.cursorRoots = piCursorManagedRoots(result.messages, active.managedSignature, ctx.cwd);
         active.preparedStructure = prepared.structure;
+        if (active.foreignEvidence)
+          piProtectPreparedRows(active.foreignEvidence, result.messages, prepared.structure);
+        active.nativeDrops = prepared.nativeDrops;
         if (fenceEnabled && !budget.sideTurn && piChainCapableApi(ctx.model?.api))
           active.preparedHistory = piPreparedHistory(result.messages, ctx.model);
         budget.completed = true;
@@ -40178,8 +44737,12 @@ function registerPiGuardedContext(pi, handler, options = {}) {
         if (inputs)
           active.inputBranch = inputBranch(ctx, inputs);
       }
+      if (servedSessionId)
+        finishPiServedRequest(servedSessionId, ctx, result?.messages ?? event.messages, () => options.compactionOff?.(ctx) === true);
       return result;
     } catch (error) {
+      if (servedSessionId)
+        countServedRefusal(servedSessionId);
       if (budget.isCancelled(error)) {
         budget.cancel();
         if (isOwned())
@@ -40221,7 +44784,7 @@ function registerPiGuardedContext(pi, handler, options = {}) {
         throw error;
       }
       active.refused = true;
-      refuse(ctx, budget, error, isOwned);
+      active.refusalMessage = refuse(ctx, budget, error, isOwned);
       return { messages: event.messages };
     } finally {
       if (!fenceEnabled || budget.sideTurn)
@@ -40345,9 +44908,9 @@ function createPiFallbackIndex() {
 }
 
 // src/pi-fit-reclaim.ts
-import { createHash as createHash13, randomUUID as randomUUID4 } from "node:crypto";
+import { createHash as createHash17, randomUUID as randomUUID4 } from "node:crypto";
 var pendingInput = new Set;
-var KEY2 = "piUpperEstimateReclaim";
+var KEY3 = "piUpperEstimateReclaim";
 function piFitOverflowPossible(args) {
   if (!args.hasUI && args.inputTokens <= 0 || args.recoveryArmed || args.forceMaterialization || args.imported || args.coldInjection || args.cacheBusting || pendingInput.has(args.sessionId))
     return true;
@@ -40381,7 +44944,7 @@ function piUpperReclaimCursor(args) {
     sessionId: args.sessionId,
     modelKey: args.modelKey,
     contextWindow: args.contextWindow ?? null,
-    head: head ? createHash13("sha256").update(JSON.stringify([
+    head: head ? createHash17("sha256").update(JSON.stringify([
       Buffer.from(head.cachedM0Bytes ?? []).toString("base64"),
       Buffer.from(head.cachedM1Bytes ?? []).toString("base64"),
       head.cachedM0MuralDataUrl ?? null
@@ -40399,18 +44962,18 @@ function canReclaim(previous, cursor) {
 function shouldReclaimPiUpperEstimate(db, cursor) {
   if (!cursor)
     return false;
-  return canReclaim(claimFrom(readReplayEnvelope(db, cursor.sessionId)[KEY2], cursor.sessionId), cursor);
+  return canReclaim(claimFrom(readReplayEnvelope(db, cursor.sessionId)[KEY3], cursor.sessionId), cursor);
 }
 function reservePiUpperEstimateReclaim(db, cursor) {
   const reservation = randomUUID4();
   return db.transaction(() => {
     let claimed = false;
     if (!updateReplayDocument(db, cursor.sessionId, (doc) => {
-      claimed = canReclaim(claimFrom(doc[KEY2], cursor.sessionId), cursor);
+      claimed = canReclaim(claimFrom(doc[KEY3], cursor.sessionId), cursor);
       if (!claimed)
         return false;
       doc.version = 2;
-      doc[KEY2] = { ...cursor, reservation };
+      doc[KEY3] = { ...cursor, reservation };
       return true;
     }))
       throw new Error("Could not reserve upper-estimate reclaim");
@@ -40422,10 +44985,10 @@ function recordPiUpperEstimateReclaim(db, cursor, reservation) {
   if (!owner)
     return;
   if (!updateReplayDocument(db, cursor.sessionId, (doc) => {
-    if (claimFrom(doc[KEY2], cursor.sessionId)?.reservation !== owner)
+    if (claimFrom(doc[KEY3], cursor.sessionId)?.reservation !== owner)
       return false;
     doc.version = 2;
-    doc[KEY2] = cursor;
+    doc[KEY3] = cursor;
     return true;
   }))
     throw new Error("Could not persist upper-estimate reclaim cursor");
@@ -40434,19 +44997,19 @@ function recordPiUpperEstimateReclaim(db, cursor, reservation) {
 function releasePiUpperEstimateReclaim(db, cursor, reservation) {
   withoutSqliteTransformPass2(() => withSqliteTurnDeadline2(() => 0, () => {
     if (!updateReplayDocument(db, cursor.sessionId, (doc) => {
-      if (claimFrom(doc[KEY2], cursor.sessionId)?.reservation !== reservation)
+      if (claimFrom(doc[KEY3], cursor.sessionId)?.reservation !== reservation)
         return false;
-      delete doc[KEY2];
+      delete doc[KEY3];
       return true;
     }))
       throw new Error("Could not release upper-estimate reclaim");
   }));
 }
 function resetPiUpperEstimateReclaim(db, sessionId) {
-  if (!claimFrom(readReplayEnvelope(db, sessionId)[KEY2], sessionId))
+  if (!claimFrom(readReplayEnvelope(db, sessionId)[KEY3], sessionId))
     return;
   if (!updateReplayDocument(db, sessionId, (doc) => {
-    delete doc[KEY2];
+    delete doc[KEY3];
     return true;
   }))
     throw new Error("Could not clear upper-estimate reclaim cursor");
@@ -40468,7 +45031,7 @@ async function waitForPiHistorianInTurn(sessionId, remainingMs, wait) {
 }
 
 // src/pi-lkg-fit-envelope.ts
-import { createHash as createHash14 } from "node:crypto";
+import { createHash as createHash18 } from "node:crypto";
 function readPiLkgFitEnvelope(ctx, pi, modelKey, frozen, wireSchema) {
   try {
     if (!modelKey || typeof pi.getAllTools !== "function")
@@ -40530,8 +45093,9 @@ function readPiLkgFitEnvelope(ctx, pi, modelKey, frozen, wireSchema) {
       refusalToolDefinitionTokens,
       toolDefinitionsMeasured: refusalToolDefinitionTokens !== undefined,
       envelopeBytes: Buffer.byteLength(envelopeJson),
-      envelopeSignature: activeNames ? createHash14("sha256").update(envelopeJson).update(JSON.stringify(activeNames)).digest("hex") : undefined,
-      calibration
+      envelopeSignature: activeNames ? createHash18("sha256").update(envelopeJson).update(JSON.stringify(activeNames)).digest("hex") : undefined,
+      calibration,
+      ...piModelAcceptsImages(ctx.model) ? {} : { modelAcceptsImages: false }
     };
   } catch {
     return;
@@ -40539,13 +45103,13 @@ function readPiLkgFitEnvelope(ctx, pi, modelKey, frozen, wireSchema) {
 }
 
 // src/pi-message-identity.ts
-import { createHash as createHash17 } from "node:crypto";
+import { createHash as createHash21 } from "node:crypto";
 
 // src/pi-tool-identity.ts
-import { createHash as createHash16 } from "node:crypto";
+import { createHash as createHash20 } from "node:crypto";
 
 // src/served-array-ledger.ts
-import { createHash as createHash15 } from "node:crypto";
+import { createHash as createHash19 } from "node:crypto";
 import {
   closeSync as closeSync2,
   fstatSync,
@@ -40555,7 +45119,7 @@ import {
   readSync as readSync2,
   statSync as statSync6
 } from "node:fs";
-import * as path12 from "node:path";
+import * as path13 from "node:path";
 
 // src/pi-served-identities.ts
 class PiServedEnvelopeUnavailable extends Error {
@@ -40823,20 +45387,20 @@ function getPiLastServedArray(sessionId) {
   return previous ? `[${previous.serializedMessages.join(",")}]` : undefined;
 }
 function sha256(value) {
-  return createHash15("sha256").update(value).digest("hex");
+  return createHash19("sha256").update(value).digest("hex");
 }
 function safeSessionFileStem(sessionId) {
   const readable = sessionId.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 96);
   return `${readable || "session"}-${sha256(sessionId).slice(0, 12)}`;
 }
 function getPiServedArrayLedgerPath(sessionId, storageDir = getMagicContextStorageDir()) {
-  return path12.join(storageDir, LEDGER_DIRECTORY, `${safeSessionFileStem(sessionId)}.jsonl`);
+  return path13.join(storageDir, LEDGER_DIRECTORY, `${safeSessionFileStem(sessionId)}.jsonl`);
 }
 function getPiServedArrayBodyPath(sessionId, storageDir = getMagicContextStorageDir()) {
-  return path12.join(storageDir, BODY_DIRECTORY, `${safeSessionFileStem(sessionId)}.jsonl`);
+  return path13.join(storageDir, BODY_DIRECTORY, `${safeSessionFileStem(sessionId)}.jsonl`);
 }
 function getPiServedTagNumbersPath(sessionId, storageDir = getMagicContextStorageDir()) {
-  return path12.join(storageDir, IDENTITY_DIRECTORY, `${safeSessionFileStem(sessionId)}.jsonl`);
+  return path13.join(storageDir, IDENTITY_DIRECTORY, `${safeSessionFileStem(sessionId)}.jsonl`);
 }
 function fullBodyCaptureEnabled() {
   const value = process.env[PI_SERVED_ARRAY_BODY_CAPTURE_ENV]?.trim().toLowerCase();
@@ -40885,7 +45449,7 @@ function recordWriteFailure(error) {
 }
 function appendPendingLines(filePath, lines) {
   try {
-    ensureStorageDirectorySync(path12.dirname(filePath));
+    ensureStorageDirectorySync(path13.dirname(filePath));
     repairZeroTail(filePath);
     writeStorageFileSync(filePath, lines.join(""), {
       encoding: "utf8",
@@ -40992,7 +45556,7 @@ function capturePiServedArray(sessionId, messages, options = {}) {
     const identityPath = getPiServedTagNumbersPath(sessionId, storageDir);
     if (newNumbers.length) {
       identityPersistenceFailed = true;
-      ensureStorageDirectorySync(path12.dirname(identityPath));
+      ensureStorageDirectorySync(path13.dirname(identityPath));
       options.assertCurrentPass?.();
       repairZeroTail(identityPath, !!options.db);
       writeStorageFileSync(identityPath, `${JSON.stringify({ version: 1, session_id: sessionId, tag_numbers: newNumbers })}
@@ -41032,17 +45596,17 @@ function capturePiServedArray(sessionId, messages, options = {}) {
 process.once("beforeExit", flushPiServedArrayLedger);
 
 // src/pi-tool-identity.ts
-function record5(value) {
+function record6(value) {
   return value !== null && typeof value === "object" ? value : undefined;
 }
 function contentParts(message) {
   return Array.isArray(message.content) ? message.content.flatMap((part) => {
-    const p = record5(part);
+    const p = record6(part);
     return p ? [p] : [];
   }) : [];
 }
 function piAssistantToolIdentity(message) {
-  const m = record5(message);
+  const m = record6(message);
   if (m?.role !== "assistant" || typeof m.timestamp !== "number" || !Number.isFinite(m.timestamp))
     return;
   const ids = contentParts(m).filter((p) => p.type === "toolCall").map((p) => p.id);
@@ -41071,7 +45635,7 @@ function piRenderedTagNumbers(messages) {
       if (part.type === "text")
         readText(part.text);
       else if (part.type === "toolCall") {
-        const args = record5(part.arguments);
+        const args = record6(part.arguments);
         const keys = args ? Object.keys(args) : [];
         const value = keys.length === 1 ? args?.dropped : undefined;
         const match = typeof value === "string" ? DROPPED_INPUT_VALUE.exec(value) : null;
@@ -41082,16 +45646,15 @@ function piRenderedTagNumbers(messages) {
   }
   return numbers;
 }
-function piCachedToolSurvivor(sessionId, callId, timestamp, rows) {
-  const cached = readPiServedCachedArray(sessionId);
+function piCachedToolSurvivor(sessionId, callId, timestamp, rows, view) {
+  const cached = view === undefined ? createPiServedCachedView(sessionId) : view;
   if (!cached)
     return;
-  const { messages } = cached;
-  const owners = messages.filter((m) => m.role === "assistant" && contentParts(m).some((p) => p.type === "toolCall" && p.id === callId));
+  const owners = cached.toolCallOwners().get(callId) ?? [];
   const owner = owners[0];
   if (!owner || owners.length !== 1 || owner.timestamp !== timestamp || contentParts(owner).filter((p) => p.type === "toolCall" && p.id === callId).length !== 1)
     return;
-  const rendered = piRenderedTagNumbers(messages);
+  const rendered = cached.rendered();
   const present = rows.filter((row) => rendered.has(row.tagNumber));
   const winner = present[0];
   if (present.length !== 1 || !winner)
@@ -41099,16 +45662,67 @@ function piCachedToolSurvivor(sessionId, callId, timestamp, rows) {
   const { tagNumber: number, status } = winner;
   if (status !== "active" && status !== "dropped")
     return;
-  const results = messages.filter((m) => m.role === "toolResult" && m.toolCallId === callId);
+  const results = cached.toolResults().get(callId) ?? [];
   if (!results.some((m) => contentParts(m).some((p) => p.type === "text" && (status === "dropped" ? p.text === `[dropped §${number}§]` : typeof p.text === "string" && p.text.startsWith(`§${number}§ `)))))
     return;
   return number;
+}
+function createPiServedCachedView(sessionId) {
+  const cached = readPiServedCachedArray(sessionId);
+  if (!cached)
+    return null;
+  const { messages } = cached;
+  const memos = new Map;
+  const memo = (key, build) => {
+    if (!memos.has(key))
+      memos.set(key, build());
+    return memos.get(key);
+  };
+  return {
+    messages,
+    rendered: () => memo("rendered", () => piRenderedTagNumbers(messages)),
+    toolCallOwners: () => memo("toolCallOwners", () => {
+      const owners = new Map;
+      for (const message of messages) {
+        if (message.role !== "assistant")
+          continue;
+        const ids = new Set;
+        for (const part of contentParts(message))
+          if (part.type === "toolCall")
+            ids.add(part.id);
+        for (const id of ids) {
+          if (typeof id !== "string")
+            continue;
+          const list = owners.get(id);
+          if (list)
+            list.push(message);
+          else
+            owners.set(id, [message]);
+        }
+      }
+      return owners;
+    }),
+    toolResults: () => memo("toolResults", () => {
+      const results = new Map;
+      for (const message of messages) {
+        if (message.role !== "toolResult" || typeof message.toolCallId !== "string")
+          continue;
+        const list = results.get(message.toolCallId);
+        if (list)
+          list.push(message);
+        else
+          results.set(message.toolCallId, [message]);
+      }
+      return results;
+    }),
+    memo
+  };
 }
 function readPiServedCachedArray(sessionId) {
   const memory = getPiLastServedArray(sessionId);
   const slot = memory === undefined ? getSlot(sessionId) : undefined;
   const jsonPrefix = memory ?? slot?.jsonPrefix;
-  if (jsonPrefix === undefined || createHash16("sha256").update(jsonPrefix).digest("hex") !== getPiLastServedDigest(sessionId))
+  if (jsonPrefix === undefined || createHash20("sha256").update(jsonPrefix).digest("hex") !== getPiLastServedDigest(sessionId))
     return;
   let parsed;
   try {
@@ -41119,7 +45733,7 @@ function readPiServedCachedArray(sessionId) {
   if (!Array.isArray(parsed))
     return;
   const messages = parsed.flatMap((m) => {
-    const r = record5(m);
+    const r = record6(m);
     return r ? [r] : [];
   });
   return { jsonPrefix, messages };
@@ -41132,7 +45746,7 @@ function piMessageEntryFingerprint(message) {
   const m = message;
   if (typeof m.role !== "string")
     return null;
-  const contentHash = createHash17("sha256").update(stableStringify(m.content)).digest("hex");
+  const contentHash = createHash21("sha256").update(stableStringify(m.content)).digest("hex");
   return JSON.stringify([
     typeof m.responseId === "string" ? m.responseId : null,
     typeof m.timestamp === "number" || typeof m.timestamp === "string" ? m.timestamp : null,
@@ -41165,14 +45779,14 @@ function textParts(message) {
     return p.type === "text" && typeof p.text === "string" ? [p.text] : [];
   }) : [];
 }
-function piCachedMessageSurvivor(sessionId, fingerprint, ordinal, rows) {
-  const cached = readPiServedCachedArray(sessionId);
+function piCachedMessageSurvivor(sessionId, fingerprint, ordinal, rows, view) {
+  const cached = view === undefined ? createPiServedCachedView(sessionId) : view;
   if (!cached)
     return;
   const header = fingerprintHeader(fingerprint);
   if (header === undefined)
     return;
-  const rendered = piRenderedTagNumbers(cached.messages);
+  const rendered = cached.rendered();
   const present = rows.filter((row) => rendered.has(row.tagNumber));
   const winner = present[0];
   if (present.length !== 1 || !winner)
@@ -41180,8 +45794,105 @@ function piCachedMessageSurvivor(sessionId, fingerprint, ordinal, rows) {
   if (winner.status !== "active" && winner.status !== "dropped")
     return;
   const shows = (text) => winner.status === "dropped" ? text === `[dropped §${winner.tagNumber}§]` : text?.startsWith(`§${winner.tagNumber}§ `) === true;
-  const carriers = cached.messages.filter((message) => messageHeader(message) === header && shows(textParts(message)[ordinal]));
+  const carriers = (cached.memo("messagesByHeader", () => {
+    const byHeader = new Map;
+    for (const message of cached.messages) {
+      const key = messageHeader(message);
+      const list = byHeader.get(key);
+      if (list)
+        list.push(message);
+      else
+        byHeader.set(key, [message]);
+    }
+    return byHeader;
+  }).get(header) ?? []).filter((message) => shows(textParts(message)[ordinal]));
   return carriers.length === 1 ? winner.tagNumber : undefined;
+}
+
+// src/pi-overflow-recovery.ts
+function piRecoveryFitCalibration(calibration) {
+  return calibration.seeded ? calibration : { toolsRatio: UNKNOWN_FIT_RATIO, proseRatio: UNKNOWN_FIT_RATIO };
+}
+function piRecoveryToolImageTokens(messages) {
+  return piToolResultImageTokens(messages, (part) => estimateTokens(JSON.stringify(part)));
+}
+function piToolImageCostTokens(messages) {
+  return piToolResultImageTokens(messages, () => PI_IMAGE_TOKENS);
+}
+function piToolResultImageTokens(messages, priceImage) {
+  const counts = new Map;
+  const seen = new Set;
+  for (const value of messages) {
+    const message = value;
+    if (message?.role !== "toolResult" || !message.toolCallId || !Array.isArray(message.content))
+      continue;
+    if (seen.has(message.toolCallId)) {
+      counts.delete(message.toolCallId);
+      continue;
+    }
+    seen.add(message.toolCallId);
+    for (const part of message.content) {
+      if (part?.type === "image")
+        counts.set(message.toolCallId, (counts.get(message.toolCallId) ?? 0) + priceImage(part));
+    }
+  }
+  return counts;
+}
+function estimatePiOverflowRecoveryInputTokens(servedMessages, envelope, options = {}) {
+  if (!envelope || !estimatePiOutgoingInputTokens([], envelope).trusted)
+    return;
+  const messages = piMessagesWithWireImages(servedMessages, {
+    modelAcceptsImages: envelope.modelAcceptsImages !== false
+  });
+  const raw = tokenizePiMessages([...messages]);
+  for (const value of messages) {
+    if (!value || typeof value !== "object")
+      return;
+    const message = value;
+    if (message.role === "system") {
+      if (typeof message.content === "string")
+        continue;
+      if (!Array.isArray(message.content) || !message.content.every((part) => part?.type === "text" && typeof part.text === "string"))
+        return;
+      continue;
+    }
+    if (!["user", "assistant", "toolResult", "custom"].includes(message.role ?? ""))
+      return;
+    if (typeof message.content === "string")
+      continue;
+    if (!Array.isArray(message.content))
+      return;
+    for (const value of message.content) {
+      if (!value || typeof value !== "object")
+        return;
+      const part = value;
+      if (part.type === "image") {
+        if (typeof part.data !== "string")
+          return;
+        const delta = estimateTokens(JSON.stringify(part)) - PI_IMAGE_TOKENS;
+        if (message.role === "toolResult")
+          raw.toolCall += delta;
+        else
+          raw.conversation += delta;
+      } else if (!["text", "thinking", "redacted_thinking", "toolCall"].includes(part.type ?? ""))
+        return;
+    }
+  }
+  return providerMass({
+    system: envelope.systemTokens,
+    tools: envelope.toolDefinitionTokens + raw.toolCall,
+    prose: raw.conversation
+  }, envelope.calibration ?? calibrationForModelKey(envelope.modelKey), options.fitEnvelope ?? true);
+}
+function resolvePiOverflowRecoveryUsage(args) {
+  if (!args.pricedPass || !args.providerOverflow || args.usage.inputTokens > 0)
+    return args.usage;
+  return resolveUnknownUsageFromWireEstimate({
+    usage: args.usage,
+    pricedPass: args.pricedPass,
+    wireEstimateTokens: estimatePiOverflowRecoveryInputTokens(args.messages, args.envelope),
+    windowTokens: args.usableHardLimit
+  });
 }
 
 // src/pi-pressure.ts
@@ -41226,6 +45937,8 @@ function extractAssistantUsage(message) {
     result.cacheWrite = u.cacheWrite;
   if (typeof u.totalTokens === "number")
     result.totalTokens = u.totalTokens;
+  if (typeof u.contextTokens === "number")
+    result.contextTokens = u.contextTokens;
   return result;
 }
 function computePiPressure(usage, contextLimit, absoluteWall) {
@@ -41244,9 +45957,12 @@ function piUsageInputTokens(usage) {
   const componentPromptTokens = input + cacheRead + cacheWrite;
   const totalPromptTokens = typeof usage.totalTokens === "number" && Number.isFinite(usage.totalTokens) && typeof usage.output === "number" && Number.isFinite(usage.output) ? Math.max(0, usage.totalTokens - usage.output) : undefined;
   const inputTokens = totalPromptTokens !== undefined && totalPromptTokens > 0 ? Math.min(componentPromptTokens, totalPromptTokens) : componentPromptTokens;
-  if (inputTokens <= 0 || !Number.isFinite(inputTokens))
-    return null;
-  return inputTokens;
+  if (inputTokens > 0 && Number.isFinite(inputTokens))
+    return inputTokens;
+  return positiveContextTokens(usage.contextTokens);
+}
+function positiveContextTokens(value) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 function resolvePiPressureSnapshot(args) {
   const persistedInputTokens = Number.isFinite(args.persistedInputTokens) && args.persistedInputTokens > 0 ? args.persistedInputTokens : 0;
@@ -41277,7 +45993,7 @@ function entryUsageTokens(usage) {
     return 0;
   const u = usage;
   const n = (value) => typeof value === "number" && Number.isFinite(value) ? value : 0;
-  return n(u.totalTokens) || n(u.input) + n(u.output) + n(u.cacheRead) + n(u.cacheWrite);
+  return n(u.totalTokens) || n(u.input) + n(u.output) + n(u.cacheRead) + n(u.cacheWrite) || (positiveContextTokens(u.contextTokens) ?? 0);
 }
 function isPiLiveUsageRawBranchEstimate(branchEntries) {
   if (!branchEntries)
@@ -41502,10 +46218,15 @@ function resolvePiProvenInputFloor(args) {
 // src/pi-tag-identity-repair.ts
 var PI_TAG_IDENTITY_REPAIR_REASON = "tag_identity_repair";
 var unreadableLedgerLogged = new Set;
+function isPiPassEndingError(error) {
+  return error instanceof PiContextDeadlineError || error instanceof PiContextSupersededError || error instanceof Error && error.name === "AbortError";
+}
 function readPiIdentityDecisions(db, sessionId) {
   try {
     return getPiContentDecisions(db, sessionId);
   } catch (error) {
+    if (isPiPassEndingError(error))
+      throw error;
     if (!unreadableLedgerLogged.has(sessionId)) {
       if (unreadableLedgerLogged.size > 1e4)
         unreadableLedgerLogged.clear();
@@ -41521,25 +46242,109 @@ function freezeIdentityDecision(db, sessionId, kind, value) {
   try {
     return freezePiContentDecision(db, sessionId, kind, value);
   } catch (error) {
+    if (isPiPassEndingError(error))
+      throw error;
     sessionLog2(sessionId, `tag identity decision ${kind} could not be written; serving duplicates unmerged: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
+var unreadableGuardsLogged = new Set;
+function readFoldGuards(db, sessionId) {
+  try {
+    return readPiIdentityFoldGuards(db, sessionId);
+  } catch (error) {
+    if (isPiPassEndingError(error))
+      throw error;
+    if (!unreadableGuardsLogged.has(sessionId)) {
+      if (unreadableGuardsLogged.size > 1e4)
+        unreadableGuardsLogged.clear();
+      unreadableGuardsLogged.add(sessionId);
+      sessionLog2(sessionId, `Pi identity fold guards unreadable: tag identity duplicates are served unmerged and the stored row is left untouched: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return null;
+  }
+}
+
+class PiIdentityRepairBatch {
+  db;
+  sessionId;
+  ledger = null;
+  guards = null;
+  pending = false;
+  refuseNewGuards = false;
+  constructor(db, sessionId) {
+    this.db = db;
+    this.sessionId = sessionId;
+  }
+  load() {
+    this.pending = false;
+    this.ledger = readPiIdentityDecisions(this.db, this.sessionId);
+    this.guards = readFoldGuards(this.db, this.sessionId);
+  }
+  decisions() {
+    return this.ledger;
+  }
+  peek(key, legacyKeys = []) {
+    const ledger = this.ledger;
+    const guards = this.guards;
+    if (ledger === null)
+      return "unpersisted";
+    const candidates = [key, ...legacyKeys];
+    if (candidates.some((candidate) => ledger.has(encodePiContentDecision("tag-identity-repair-once", candidate))))
+      return "recurring";
+    if (guards === null)
+      return "unpersisted";
+    if (candidates.some((candidate) => guards.has(candidate)))
+      return "recurring";
+    if (this.refuseNewGuards || guards.size >= PI_IDENTITY_FOLD_GUARD_LIMIT)
+      return "unpersisted";
+    return "claimed";
+  }
+  claim(key, legacyKeys = []) {
+    const claim = this.peek(key, legacyKeys);
+    if (claim !== "claimed")
+      return claim;
+    this.guards?.add(key);
+    this.pending = true;
+    return "claimed";
+  }
+  flush() {
+    if (!this.pending || !this.guards)
+      return;
+    writePiIdentityFoldGuards(this.db, this.sessionId, this.guards);
+    this.pending = false;
+  }
+  recordRecurrence(key) {
+    return recordPiIdentityRecurrence(this.db, this.sessionId, key, this.ledger);
+  }
+}
 function claimPiIdentityRepair(db, sessionId, key, legacyKeys = []) {
-  const decisions = readPiIdentityDecisions(db, sessionId);
-  if (decisions === null)
+  try {
+    return db.transaction(() => {
+      const batch = new PiIdentityRepairBatch(db, sessionId);
+      batch.load();
+      const claim = batch.claim(key, legacyKeys);
+      if (claim === "claimed")
+        batch.flush();
+      return claim;
+    }).immediate();
+  } catch (error) {
+    if (isPiPassEndingError(error))
+      throw error;
+    sessionLog2(sessionId, `tag identity fold guard could not be written; serving the duplicate unmerged: ${error instanceof Error ? error.message : String(error)}`);
     return "unpersisted";
-  if ([key, ...legacyKeys].some((candidate) => decisions.has(encodePiContentDecision("tag-identity-repair-once", candidate))))
-    return "recurring";
-  return freezeIdentityDecision(db, sessionId, "tag-identity-repair-once", key) ? "claimed" : "unpersisted";
+  }
 }
 var unrecordedRecurrenceLogged = new Set;
-function recordPiIdentityRecurrence(db, sessionId, key) {
+function recordPiIdentityRecurrence(db, sessionId, key, decisions) {
   const entry = encodePiContentDecision("tag-identity-recurring", key);
-  if (readPiIdentityDecisions(db, sessionId)?.has(entry))
+  const known = decisions === undefined ? readPiIdentityDecisions(db, sessionId) : decisions;
+  if (known?.has(entry))
     return false;
-  if (freezeIdentityDecision(db, sessionId, "tag-identity-recurring", key))
+  if (freezeIdentityDecision(db, sessionId, "tag-identity-recurring", key)) {
+    decisions?.add(entry);
     return true;
+  }
   const logKey = `${sessionId}\x00${key}`;
   if (unrecordedRecurrenceLogged.has(logKey))
     return false;
@@ -41789,6 +46594,22 @@ function reportBindingRecovery(sessionId, report, message) {
   else
     log2(`[magic-context][${sessionId}] ${message}`);
 }
+function armPiProviderOverflowRecovery(args) {
+  recordOverflowDetected(args.db, args.sessionId, args.reportedLimit, args.modelKey, "provider_overflow", args.reportedLimitProvenance, args.reportedInputTokens);
+  if (getHarness2() === "pi") {
+    try {
+      resetPiUpperEstimateReclaim(args.db, args.sessionId);
+    } catch (error) {
+      args.report?.(`upper-estimate reclaim reset deferred: ${String(error)}`);
+    }
+  }
+}
+function armPiRecoveryForHostOverflowCompaction(args) {
+  if (getOverflowState(args.db, args.sessionId).needsEmergencyRecovery)
+    return "already-armed";
+  armPiProviderOverflowRecovery(args);
+  return "armed";
+}
 function handlePiProviderFailure(args) {
   if (!args.message || typeof args.message !== "object")
     return { kind: "none" };
@@ -41800,7 +46621,7 @@ function handlePiProviderFailure(args) {
   const model = typeof message.model === "string" ? message.model : undefined;
   const binding = detectThinkingBindingMismatch(message.errorMessage);
   if (detectLatestTurnThinkingMismatch(message.errorMessage) && !args.compactionOff && isAnthropicFamilyRoute(provider, model)) {
-    armLatestThinkingRecovery(args.db, args.sessionId);
+    armLatestThinkingRecovery(args.db, args.sessionId, model);
     clearPiLkgSessionState(args.sessionId);
     dropSlot(args.sessionId, "latest-thinking-recovery-arm");
     return { kind: "thinking_binding", armed: true };
@@ -41818,19 +46639,21 @@ function handlePiProviderFailure(args) {
   if (args.compactionOff)
     return { kind: "none" };
   const overflow = detectOverflow(message.errorMessage);
-  if (!overflow.isOverflow)
+  const hostOnly = !overflow.isOverflow && args.hostOverflowCheck?.(args.message) === true;
+  if (!overflow.isOverflow && !hostOnly)
     return { kind: "none" };
-  const modelKey = provider && model ? `${provider}/${model}` : undefined;
-  recordOverflowDetected(args.db, args.sessionId, overflow.reportedLimit, modelKey, "provider_overflow", overflow.reportedLimitProvenance, overflow.reportedInputTokens);
-  if (getHarness2() === "pi") {
-    try {
-      resetPiUpperEstimateReclaim(args.db, args.sessionId);
-    } catch (error) {
-      args.report?.(`upper-estimate reclaim reset deferred: ${String(error)}`);
-    }
-  }
+  armPiProviderOverflowRecovery({
+    db: args.db,
+    sessionId: args.sessionId,
+    modelKey: provider && model ? `${provider}/${model}` : undefined,
+    reportedLimit: overflow.reportedLimit,
+    reportedLimitProvenance: overflow.reportedLimitProvenance,
+    reportedInputTokens: overflow.reportedInputTokens,
+    report: args.report
+  });
   return {
     kind: "overflow",
+    source: hostOnly ? "host" : "magic-context",
     ...overflow.reportedLimit !== undefined ? { reportedLimit: overflow.reportedLimit } : {},
     ...overflow.reportedLimitProvenance !== undefined ? { reportedLimitProvenance: overflow.reportedLimitProvenance } : {},
     ...overflow.matchedPattern !== undefined ? { matchedPattern: overflow.matchedPattern } : {}
@@ -41872,7 +46695,6 @@ class PiThinkingBindingRecoveryRefusal extends EmergencyFailClosedError {
   }
 }
 function applyPiThinkingBindingRecovery(args) {
-  const protectedMessages = latestAssistantTurnMessages(args.messages);
   const frozenEntryIds = frozenBindingEntryIds(args.db, args.sessionId);
   const flagTargetCandidate = !args.replayOnly && isPrefixBoundThinkingModel(args.provider, args.model) ? getThinkingBindingRecoveryTarget(args.db, args.sessionId) : null;
   const flagTarget = flagTargetCandidate?.startsWith(LATEST_THINKING_RESTORE) ? null : flagTargetCandidate;
@@ -41901,14 +46723,14 @@ function applyPiThinkingBindingRecovery(args) {
     } else
       throw new PiThinkingBindingRecoveryRefusal;
   }
-  const restoringActiveTurn = latestThinkingRecoveryCoversActiveTurn({
+  const restoringTurn = latestThinkingRestoringTurnMessages({
     db: args.db,
     sessionId: args.sessionId,
     messages: args.messages,
     id: (message, index) => resolvePiStableId(message, index, args.entryIds)
   });
   for (let index = 0;index < args.messages.length; index += 1) {
-    if (restoringActiveTurn && protectedMessages.has(args.messages[index]))
+    if (restoringTurn?.has(args.messages[index]))
       continue;
     const entryId = args.entryIds[index];
     if (entryId && frozenEntryIds.has(entryId))
@@ -41978,6 +46800,26 @@ function frozenBindingEntryIds(db, sessionId) {
   }
   return ids;
 }
+function persistPiLatestTurnThinkingRemoval(db, sessionId, entryIds) {
+  const endOrder = getMergedReasoningStrippedIds(db, sessionId).has(THINKING_BINDING_STRIP_ORDER_END_MARKER) || frozenBindingEntryIds(db, sessionId).size === 0;
+  const persisted = addMergedReasoningStrippedIds(db, sessionId, [
+    ...entryIds.map(thinkingBindingRecoveryFrozenId),
+    ...endOrder ? [THINKING_BINDING_STRIP_ORDER_END_MARKER] : []
+  ]);
+  return { persisted, stripNow: persisted && !endOrder };
+}
+function piBindingStripsAtStart(db, sessionId) {
+  return !getMergedReasoningStrippedIds(db, sessionId).has(THINKING_BINDING_STRIP_ORDER_END_MARKER) && frozenBindingEntryIds(db, sessionId).size > 0;
+}
+function stripPiThinkingOfIds(messages, ids, resolveId) {
+  let stripped = 0;
+  for (let index = 0;index < messages.length; index += 1) {
+    const id = resolveId(messages[index], index);
+    if (id && ids.has(id))
+      stripped += stripThinkingParts(messages[index]);
+  }
+  return stripped;
+}
 function resolvePiBindingStripOrder(args) {
   const ledger = getMergedReasoningStrippedIds(args.db, args.sessionId);
   if (ledger.has(THINKING_BINDING_STRIP_ORDER_END_MARKER))
@@ -41995,13 +46837,26 @@ function resolvePiBindingStripOrder(args) {
     if (hasThinkingPart(args.messages[index]))
       carriesThinking = true;
   }
-  const mayChangeOrder = onBranch && carriesThinking && args.bustPermittedAtStart;
-  if (mayChangeOrder && addMergedReasoningStrippedIds(args.db, args.sessionId, [
+  if (onBranch && carriesThinking && args.bustPermittedAtStart && addMergedReasoningStrippedIds(args.db, args.sessionId, [
     THINKING_BINDING_STRIP_ORDER_END_MARKER
   ])) {
     return "end";
   }
-  return "start";
+  return args.releasesAllThinking === true ? "end" : "start";
+}
+function recordPiBindingStripEndOrder(db, sessionId) {
+  try {
+    const ledger = getMergedReasoningStrippedIds(db, sessionId);
+    if (ledger.has(THINKING_BINDING_STRIP_ORDER_END_MARKER))
+      return true;
+    if (frozenBindingEntryIds(db, sessionId).size === 0)
+      return true;
+    return addMergedReasoningStrippedIds(db, sessionId, [
+      THINKING_BINDING_STRIP_ORDER_END_MARKER
+    ]);
+  } catch {
+    return false;
+  }
 }
 function shouldRunPiProactiveThinkingStrip(args) {
   return !args.compactionOff && args.bindingStripOrder === "end";
@@ -42689,105 +47544,6 @@ function stripPiDroppedPlaceholderMessages(args) {
   return { removed, discovered };
 }
 
-// src/strip-processed-images-pi.ts
-var STRIPPED_IMAGE_MARKER = "[image stripped]";
-function isLargeImagePart(value) {
-  if (!value || typeof value !== "object")
-    return false;
-  const part = value;
-  return part.type === "image" && typeof part.mimeType === "string" && part.mimeType.startsWith("image/") && typeof part.data === "string" && part.data.length > 200;
-}
-function planPiProcessedImageIds(args, frozenIds) {
-  if (!args.detect || args.watermark <= 0)
-    return [];
-  const ids = args.messages.map(args.stableId);
-  const ownTags = ids.map((id) => id ? args.messageIdToMaxTag.get(id) ?? 0 : 0);
-  const completeToolResults = new Set;
-  const openCalls = new Map;
-  for (let i = 0;i < args.messages.length; i++) {
-    const message = args.messages[i];
-    if (!message || typeof message !== "object")
-      continue;
-    if (message.role === "assistant" && Array.isArray(message.content)) {
-      for (const part of message.content) {
-        if (part?.type === "toolCall" && typeof part.id === "string") {
-          openCalls.set(part.id, `${ids[i] ?? ""}\x00${part.id}`);
-        }
-      }
-    } else if (message.role === "toolResult" && message.toolCallId) {
-      const key = openCalls.get(message.toolCallId);
-      if (key !== undefined && !args.protectedToolKeys?.has(key) && !args.protectedToolKeys?.has(message.toolCallId)) {
-        completeToolResults.add(i);
-      }
-      openCalls.delete(message.toolCallId);
-    }
-  }
-  const selected = [];
-  let hasAssistantResponse = false;
-  let nextTag;
-  for (let i = args.messages.length - 1;i >= 0; i--) {
-    const ownTag = ownTags[i];
-    const positionTag = ownTag > 0 ? ownTag : nextTag;
-    if (ownTag > 0)
-      nextTag = ownTag;
-    const raw = args.messages[i];
-    if (!raw || typeof raw !== "object")
-      continue;
-    const message = raw;
-    if (message.role === "assistant") {
-      hasAssistantResponse = true;
-      continue;
-    }
-    if (message.role !== "user" && message.role !== "toolResult" || message.role === "toolResult" && !completeToolResults.has(i) || !hasAssistantResponse || !Array.isArray(message.content) || !message.content.some(isLargeImagePart))
-      continue;
-    const id = ids[i];
-    if (!id || frozenIds.has(id) || positionTag === undefined || positionTag > args.watermark)
-      continue;
-    if ((args.usagePercentage ?? 0) < 95 && positionTag >= (args.protectedCutoff ?? Infinity))
-      continue;
-    selected.push(id);
-  }
-  return selected;
-}
-function stripPiProcessedImages(args) {
-  const frozenIds = getProcessedImageStrippedIds(args.db, args.sessionId);
-  const newlyStrippedIds = planPiProcessedImageIds(args, frozenIds);
-  if (newlyStrippedIds.length > 0) {
-    const persisted = (args.addIds ?? addProcessedImageStrippedIds)(args.db, args.sessionId, newlyStrippedIds);
-    if (persisted) {
-      for (const id of newlyStrippedIds)
-        frozenIds.add(id);
-    } else {
-      newlyStrippedIds.length = 0;
-      sessionLog2(args.sessionId, "processed-image strip: persistence failed; leaving newly detected images intact");
-    }
-  }
-  let stripped = 0;
-  for (let i = 0;i < args.messages.length; i++) {
-    const raw = args.messages[i];
-    if (!raw || typeof raw !== "object")
-      continue;
-    const id = args.stableId(raw, i);
-    if (!id || !frozenIds.has(id))
-      continue;
-    const message = raw;
-    if (!Array.isArray(message.content))
-      continue;
-    for (let partIndex = 0;partIndex < message.content.length; partIndex++) {
-      if (!isLargeImagePart(message.content[partIndex]))
-        continue;
-      if (newlyStrippedIds.includes(id))
-        args.onFirstApplication?.(raw, i, partIndex);
-      message.content[partIndex] = {
-        type: "text",
-        text: STRIPPED_IMAGE_MARKER
-      };
-      stripped++;
-    }
-  }
-  return { stripped, newlyStrippedIds };
-}
-
 // ../plugin/src/hooks/magic-context/system-prompt-dates.ts
 function replaceHostDates(prompt, replace) {
   const fields = /<(plugin-env|environment|env)>[\s\S]*?<\/\1>|Today's date: [^\r\n<]+/g;
@@ -42910,8 +47666,7 @@ function processSystemPromptForCache(args) {
   const stableCandidate = dates.stable;
   const stableCandidateHash = systemPromptFingerprint(stableCandidate, args.promptSurfacePreset);
   const contentOrPresetChanged = !isFirstHash && stableCandidateHash !== previousHash;
-  const idleCacheExpired = sessionMeta !== undefined && computeHardCacheExpired(sessionMeta.cacheTtl, sessionMeta.lastResponseTime, Date.now());
-  const dateMayAdvance = isCacheBusting || idleCacheExpired || contentOrPresetChanged;
+  const dateMayAdvance = isCacheBusting || contentOrPresetChanged;
   if (liveDate && !stickyDate) {
     stickyDateBySession.set(sessionId, liveDate);
   } else if (liveDate && stickyDate && liveDate !== stickyDate) {
@@ -42960,6 +47715,8 @@ function createPiTranscript(source, sessionId, entryIds, options = {}) {
   toolRemovals.set(working, removals);
   if (options.authorizeToolRemoval)
     toolRemovalAuthorization.set(working, options.authorizeToolRemoval);
+  if (options.toolImageTokens)
+    toolImageTokenCost.set(working, options.toolImageTokens);
   const emptyRemovedMessages = new Set;
   const toolInputChanges = new Map;
   const transcriptMessages = buildTranscriptView(working, sessionId, (messageIndex, toolCallId) => {
@@ -42978,9 +47735,10 @@ function createPiTranscript(source, sessionId, entryIds, options = {}) {
       message.requiresToolArcSkeleton = false;
   }
   let committed = false;
+  const harness = resolvePiHarnessKind();
   return {
     messages: transcriptMessages,
-    harness: resolvePiHarnessKind(),
+    harness,
     prepareToolRemovalMeasurements(callIds) {
       if (!options.authorizeToolRemovals || callIds.length === 0)
         return;
@@ -43001,7 +47759,9 @@ function createPiTranscript(source, sessionId, entryIds, options = {}) {
         return;
       committed = true;
       for (const index of dirtyMessages) {
-        rewriteNativeAssistantTexts(working[index], source[index], sessionId);
+        rewriteNativeAssistantTexts(working[index], source[index], sessionId, {
+          unsignedEdits: harness === "omp"
+        });
       }
       for (const [index, parts] of removals) {
         const message = working[index];
@@ -43430,7 +48190,10 @@ function createPiToolResultPart(working, messageIndex, partIndex, markDirty) {
     id: msg.toolCallId,
     ...tagToolName ? { tagToolName } : {},
     imageTokens() {
-      return working[messageIndex].content[partIndex]?.type === "image" ? PI_IMAGE_TOKENS : 0;
+      if (working[messageIndex].content[partIndex]?.type !== "image")
+        return 0;
+      const cost = toolImageTokenCost.get(working);
+      return cost ? cost(messageIndex, partIndex) : PI_IMAGE_TOKENS;
     },
     remove() {
       return markToolRemoval(working, messageIndex, partIndex);
@@ -43529,6 +48292,7 @@ function extractStableId(msg, index, entryIds) {
 }
 var toolRemovals = new WeakMap;
 var toolRemovalAuthorization = new WeakMap;
+var toolImageTokenCost = new WeakMap;
 function markToolRemoval(working, messageIndex, partIndex) {
   const removals = toolRemovals.get(working);
   if (!removals)
@@ -43595,6 +48359,7 @@ function logPiLkgRecovery(sessionId, message) {
 var PI_STABLE_ID_SCHEME = 1;
 var lastEmergencyNotificationAtMs = new Map;
 var EMERGENCY_NOTIFICATION_COOLDOWN_MS = 60000;
+var untrustedRecoveryCountLoggedSessions = new Set;
 var commitSeenLastPass = new Map;
 var historyRefreshSessions = new Set;
 var systemPromptRefreshSessions = new Set;
@@ -43676,13 +48441,27 @@ var piTagTextTokenCacheBySession = new Map;
 var piTagToolTokenCacheBySession = new Map;
 var piTextIdentitySourceCacheBySession = new Map;
 var piFallbackIndexesBySession = new Map;
+var PI_PRESERVE_TAG_ONLY_ASSISTANT_TEXT = true;
 function buildPiTextIdentityPlan(db, sessionId, tagger, transcript, reuseCandidates = new Set) {
   const currentSourcesByMessageId = new Map;
+  const untaggedOrdinalsByMessageId = new Map;
   for (const message of transcript.messages) {
     const messageId = message.info.id;
     if (messageId === undefined)
       continue;
-    currentSourcesByMessageId.set(messageId, message.parts.filter((part) => part.kind === "text").map((part) => withoutPiLeadingTemporalMarker(stripTagPrefix(part.getText() ?? ""))));
+    const sources = [];
+    const untagged = new Set;
+    for (const part of message.parts) {
+      if (part.kind !== "text")
+        continue;
+      const text = part.getText() ?? "";
+      if (isUntaggedAssistantText(message.info.role, text, PI_PRESERVE_TAG_ONLY_ASSISTANT_TEXT))
+        untagged.add(sources.length);
+      sources.push(withoutPiLeadingTemporalMarker(stripTagPrefix(text)));
+    }
+    currentSourcesByMessageId.set(messageId, sources);
+    if (untagged.size > 0)
+      untaggedOrdinalsByMessageId.set(messageId, untagged);
   }
   const legacyRowsByMessageId = new Map;
   const versionedMessageIds = new Set;
@@ -43730,11 +48509,12 @@ function buildPiTextIdentityPlan(db, sessionId, tagger, transcript, reuseCandida
     if (legacyRows.length === 0)
       continue;
     legacyRows.sort((left, right) => left.ordinal - right.ordinal);
-    const vectorMatches = legacyRows.length === currentSources.length && legacyRows.every((row, index) => {
-      if (row.ordinal !== index)
-        return false;
+    const untagged = untaggedOrdinalsByMessageId.get(messageId);
+    const rowOrdinals = new Set(legacyRows.map((row) => row.ordinal));
+    const vectorAligned = rowOrdinals.size === legacyRows.length && legacyRows.every((row) => row.ordinal < currentSources.length) && currentSources.every((_, ordinal) => rowOrdinals.has(ordinal) || untagged?.has(ordinal) === true);
+    const vectorMatches = vectorAligned && legacyRows.every((row) => {
       const stored = withoutPiLeadingTemporalMarker(sourceCache.get(row.tagId) ?? "");
-      const current = currentSources[index] ?? "";
+      const current = currentSources[row.ordinal] ?? "";
       if (stored === current)
         return true;
       const strippedCurrent = stripSystemInjection(current);
@@ -43814,7 +48594,8 @@ function convertLocatedPiUserEntry(branchEntries, messageId, ordinalOffset = 0) 
       const converted = convertEntriesToRawMessages(branchEntries.slice(start, index + 1)).find((message) => message.id === messageId);
       return converted ? { ...converted, ordinal: rawOrdinal } : null;
     }
-    pendingToolStart = -1;
+    if (role === "user" || role === "assistant")
+      pendingToolStart = -1;
   }
   return null;
 }
@@ -44303,14 +49084,6 @@ function addPiBranchEntryToLookup(lookup, entry) {
   else
     lookup.entryIdsByFingerprint.set(fingerprint, [row.id]);
 }
-function isPiContextEmitEligible(entry) {
-  if (!entry || typeof entry !== "object")
-    return false;
-  const row = entry;
-  if (typeof row.id !== "string")
-    return false;
-  return row.type === "message" || row.type === "custom_message" || row.type === "branch_summary" && typeof row.summary === "string" && row.summary.length > 0;
-}
 function buildPiAlignedEntryIds(entries) {
   const all = buildPiAlignedEntryIdsIncludingSystem(entries);
   return { all, visible: buildPiAlignedVisibleEntryIds(entries) };
@@ -44539,6 +49312,7 @@ function readPiBranchEntriesForContext(ctx, sessionId) {
       };
       piBranchProjectionBySession.set(sessionId, projection);
       piBranchLookupByProjection.set(entries, cached.lookup);
+      inheritPiOrdinalAlignment(sessionId, cached.entries, entries);
       return entries;
     }
     const entries = cached && cachedAncestorIndex !== undefined ? [...cached.entries.slice(0, cachedAncestorIndex + 1), ...suffix] : suffix;
@@ -44814,6 +49588,13 @@ function settlePiFallbackOccurrences(db, sessionId, ids) {
 
 class PiIdentityRebuildUnrecorded extends Error {
 }
+var PI_ADOPTION_RESERVE_MS = 1e4;
+var piAdoptionReserveMs = PI_ADOPTION_RESERVE_MS;
+var PI_ADOPTION_CHUNK_ROWS = 256;
+var PI_ADOPTION_CHUNK_MS = 250;
+
+class PiIdentityGuardsUnwritten extends Error {
+}
 function readPiAdoptionRevision(db) {
   return {
     external: db.prepare("PRAGMA data_version").get(),
@@ -44921,8 +49702,17 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
   };
   const claimed = new Set;
   const repairing = new Set;
+  const unguardedKeys = new Set;
   let servedNumbers;
   const readServedNumbers = () => servedNumbers ??= getPiServedTagNumbers(sessionId, undefined, db);
+  let servedView;
+  const readServedView = () => {
+    if (servedView === undefined)
+      servedView = createPiServedCachedView(sessionId);
+    return servedView;
+  };
+  const batch = new PiIdentityRepairBatch(db, sessionId);
+  let afterCommit = [];
   const newRebuilds = [];
   const recurrences = [];
   const plan = (rows, key, legacyKeys, served, cached) => {
@@ -44930,24 +49720,26 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
     if (!proven && options.deferUnprovenRebuild)
       return null;
     if (proven && options.allowUnprovenRebuild) {
-      const decisions = readPiIdentityDecisions(db, sessionId);
-      let unmerged = decisions === null || decisions.has(encodePiContentDecision("tag-identity-recurring", key));
-      if (!unmerged && !claimed.has(key)) {
-        unmerged = claimPiIdentityRepair(db, sessionId, key, legacyKeys) === "unpersisted";
-        claimed.add(key);
+      const decisions = batch.decisions();
+      if (decisions?.has(encodePiContentDecision("tag-identity-recurring", key)))
+        return null;
+      if (decisions === null || unguardedKeys.has(key)) {
+        unguardedKeys.add(key);
+        return null;
       }
-      if (!unmerged)
-        return { rebuilding: undefined };
-      recurrences.push({
-        key,
-        numbers: rows.map((row) => row.tagNumber).sort((x, y) => x - y),
-        fresh: recordPiIdentityRecurrence(db, sessionId, key)
-      });
-      return null;
+      if (!claimed.has(key)) {
+        const claim = batch.claim(key, legacyKeys);
+        claimed.add(key);
+        if (claim === "unpersisted") {
+          unguardedKeys.add(key);
+          return null;
+        }
+      }
+      return { rebuilding: undefined };
     }
     if (proven || !options.allowUnprovenRebuild) {
       if (!claimed.has(key)) {
-        claimPiIdentityRepair(db, sessionId, key, legacyKeys);
+        batch.claim(key, legacyKeys);
         claimed.add(key);
       }
       return { rebuilding: undefined };
@@ -44955,16 +49747,22 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
     const newest = Math.max(...rows.map((row) => row.tagNumber));
     if (repairing.has(key))
       return { rebuilding: newest };
-    const claim = claimed.has(key) ? "recurring" : claimPiIdentityRepair(db, sessionId, key, legacyKeys);
+    if (unguardedKeys.has(key))
+      return null;
+    const claim = claimed.has(key) ? "recurring" : batch.claim(key, legacyKeys);
     claimed.add(key);
     if (claim === "claimed") {
       repairing.add(key);
       return { rebuilding: newest };
     }
+    if (claim === "unpersisted") {
+      unguardedKeys.add(key);
+      return null;
+    }
     recurrences.push({
       key,
       numbers: rows.map((row) => row.tagNumber).sort((x, y) => x - y),
-      fresh: recordPiIdentityRecurrence(db, sessionId, key)
+      fresh: batch.recordRecurrence(key)
     });
     return null;
   };
@@ -44988,6 +49786,8 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
         return result;
       }).immediate();
     } catch (error) {
+      if (isPiPassEndingError(error))
+        throw error;
       if (!(error instanceof PiIdentityRebuildUnrecorded) && !options.allowUnprovenRebuild)
         throw error;
       if (!(error instanceof PiIdentityRebuildUnrecorded))
@@ -44995,14 +49795,18 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
       recurrences.push({
         key: guardKey,
         numbers: [],
-        fresh: recordPiIdentityRecurrence(db, sessionId, guardKey)
+        fresh: batch.recordRecurrence(guardKey)
       });
       return { action: "skipped" };
     }
     if (adoption.action === "folded") {
-      outcome.protectedTagNumbers.add(adoption.tagNumber);
-      if (repair)
-        newRebuilds.push(repair);
+      const folded = adoption;
+      const declared = repair;
+      afterCommit.push(() => {
+        outcome.protectedTagNumbers.add(folded.tagNumber);
+        if (declared)
+          newRebuilds.push(declared);
+      });
     }
     return adoption;
   };
@@ -45018,43 +49822,130 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
   const targetsFor = (fingerprints) => [...fingerprints].flatMap((fingerprint) => (realIdsByFingerprint.get(fingerprint) ?? []).map((id) => [id, fingerprint]));
   const fallbackTargetsFor = (fingerprints) => [...fingerprints].flatMap((fingerprint) => (fallbackIdsByFingerprint.get(fingerprint) ?? []).map((id) => [id, fingerprint]));
   const discoveredTargets = targetsFor(discovered);
-  const adoptMessageCandidates = (targetId, fingerprint, candidates) => {
-    for (const c of candidates) {
-      const ordinalMatch = /:p(\d+)$/.exec(c.messageId);
-      if (!ordinalMatch)
-        continue;
-      const realContentId = `${targetId}:p${ordinalMatch[1]}`;
-      const served = readServedNumbers();
-      const canonical = getPiMessageTagCandidates2(db, sessionId, realContentId);
-      const collisionRows = [
-        ...getTagsByNumbers2(db, sessionId, [c.tagNumber]),
-        ...canonical
-      ];
-      const cachedSurvivor = canonical.length ? piCachedMessageSurvivor(sessionId, fingerprint, Number(ordinalMatch[1]), collisionRows) : undefined;
-      const repairKey = JSON.stringify(["message", realContentId]);
-      const guardKey = JSON.stringify([
-        "message",
-        fingerprint,
-        Number(ordinalMatch[1])
-      ]);
-      const decision = canonical.length ? plan(collisionRows, guardKey, [repairKey], served, cachedSurvivor) : { rebuilding: undefined };
-      if (decision === null)
-        continue;
-      const rebuilding = decision.rebuilding;
-      if (canonical.length && !collisionRows.some((row) => served.has(row.tagNumber)) && cachedSurvivor === undefined && rebuilding === undefined) {
-        throw new PiTagIdentityConflictError2("duplicate message identities have no proven served-byte survivor", "message");
-      }
-      const adoption = fold(() => adoptPiFallbackMessageTag2(db, sessionId, c.tagNumber, c.messageId, realContentId, served, cachedSurvivor, rebuilding), repairKey, guardKey, "message", rebuilding);
-      if (adoption.action !== "skipped") {
-        tagger.unbindTag(sessionId, c.messageId);
-        if (adoption.action === "folded") {
-          tagger.unbindTag(sessionId, realContentId);
-        }
-        tagger.bindTag(sessionId, realContentId, adoption.tagNumber);
-      }
+  let messageItems = [];
+  let toolRows = [];
+  let prepared = false;
+  let next = 0;
+  let pausedDuplicates = 0;
+  let chunkRows = 0;
+  const passBudgetSpent = () => options.remainingMs !== undefined && options.remainingMs() <= piAdoptionReserveMs;
+  const awaitsFold = (rows, key, legacyKeys, served, cached) => {
+    const proven = cached !== undefined || rows.filter((row) => served.has(row.tagNumber)).length === 1;
+    if (!proven && options.deferUnprovenRebuild)
+      return false;
+    if (unguardedKeys.has(key))
+      return false;
+    const decisions = batch.decisions();
+    if (proven && options.allowUnprovenRebuild) {
+      if (decisions === null || decisions.has(encodePiContentDecision("tag-identity-recurring", key)))
+        return false;
+      return claimed.has(key) || batch.peek(key, legacyKeys) !== "unpersisted";
     }
+    if (proven || !options.allowUnprovenRebuild)
+      return true;
+    if (repairing.has(key))
+      return true;
+    return !claimed.has(key) && batch.peek(key, legacyKeys) === "claimed";
   };
-  runImmediateTransaction(db, () => {
+  const adoptMessageCandidate = ({
+    targetId,
+    fingerprint,
+    candidate: c
+  }) => {
+    const ordinalMatch = /:p(\d+)$/.exec(c.messageId);
+    if (!ordinalMatch)
+      return;
+    const realContentId = `${targetId}:p${ordinalMatch[1]}`;
+    const served = readServedNumbers();
+    const canonical = getPiMessageTagCandidates2(db, sessionId, realContentId);
+    if (canonical.length)
+      chunkRows++;
+    const collisionRows = [
+      ...getTagsByNumbers2(db, sessionId, [c.tagNumber]),
+      ...canonical
+    ];
+    const cachedSurvivor = canonical.length ? piCachedMessageSurvivor(sessionId, fingerprint, Number(ordinalMatch[1]), collisionRows, readServedView()) : undefined;
+    const repairKey = JSON.stringify(["message", realContentId]);
+    const guardKey = JSON.stringify([
+      "message",
+      fingerprint,
+      Number(ordinalMatch[1])
+    ]);
+    if (canonical.length && passBudgetSpent()) {
+      if (awaitsFold(collisionRows, guardKey, [repairKey], served, cachedSurvivor))
+        pausedDuplicates++;
+      return;
+    }
+    const decision = canonical.length ? plan(collisionRows, guardKey, [repairKey], served, cachedSurvivor) : { rebuilding: undefined };
+    if (decision === null)
+      return;
+    const rebuilding = decision.rebuilding;
+    if (canonical.length && !collisionRows.some((row) => served.has(row.tagNumber)) && cachedSurvivor === undefined && rebuilding === undefined) {
+      throw new PiTagIdentityConflictError2("duplicate message identities have no proven served-byte survivor", "message");
+    }
+    const adoption = fold(() => adoptPiFallbackMessageTag2(db, sessionId, c.tagNumber, c.messageId, realContentId, served, cachedSurvivor, rebuilding), repairKey, guardKey, "message", rebuilding);
+    if (adoption.action === "skipped")
+      return;
+    const { action, tagNumber } = adoption;
+    afterCommit.push(() => {
+      tagger.unbindTag(sessionId, c.messageId);
+      if (action === "folded")
+        tagger.unbindTag(sessionId, realContentId);
+      tagger.bindTag(sessionId, realContentId, tagNumber);
+    });
+  };
+  const adoptToolRow = (row) => {
+    if (!ownerMap)
+      return;
+    const parsed = parsePiFallbackToolOwnerId(row.toolOwnerMessageId);
+    if (parsed?.role !== "assistant")
+      return;
+    const owners = ownerMap.get(piToolOwnerMapKey(parsed.timestamp, row.callId));
+    if (owners?.size !== 1)
+      return;
+    const [realOwnerId] = owners;
+    if (!realOwnerId || realOwnerId === row.toolOwnerMessageId)
+      return;
+    const existingNumber = getToolTagNumberByOwner2(db, sessionId, row.callId, realOwnerId);
+    if (existingNumber !== null)
+      chunkRows++;
+    const served = readServedNumbers();
+    const cachedSurvivor = existingNumber === null ? undefined : piCachedToolSurvivor(sessionId, row.callId, parsed.timestamp, getTagsByNumbers2(db, sessionId, [row.tagNumber, existingNumber]), readServedView());
+    const repairKey = JSON.stringify(["tool", parsed.timestamp, row.callId]);
+    const legacyKeys = [JSON.stringify(["tool", realOwnerId, row.callId])];
+    const rows = [
+      { tagNumber: row.tagNumber },
+      { tagNumber: existingNumber ?? row.tagNumber }
+    ];
+    if (existingNumber !== null && passBudgetSpent()) {
+      if (awaitsFold(rows, repairKey, legacyKeys, served, cachedSurvivor))
+        pausedDuplicates++;
+      return;
+    }
+    const decision = existingNumber === null ? { rebuilding: undefined } : plan(rows, repairKey, legacyKeys, served, cachedSurvivor);
+    if (decision === null)
+      return;
+    const rebuilding = decision.rebuilding;
+    if (existingNumber !== null && !served.has(existingNumber) && !served.has(row.tagNumber) && cachedSurvivor === undefined && rebuilding === undefined) {
+      throw new PiTagIdentityConflictError2("duplicate tool identities have no proven served-byte survivor");
+    }
+    const adoption = fold(() => adoptPiFallbackToolOwnerTag2(db, sessionId, row.tagNumber, row.callId, row.toolOwnerMessageId, realOwnerId, served.size === 0 && cachedSurvivor !== undefined ? new Set([cachedSurvivor]) : served, cachedSurvivor, rebuilding), repairKey, repairKey, "tool", rebuilding);
+    if (adoption.action === "skipped")
+      return;
+    const { action, tagNumber } = adoption;
+    const accounting = getPersistedToolTagAccounting2(db, sessionId, tagNumber);
+    afterCommit.push(() => {
+      tagger.unbindToolTag(sessionId, row.toolOwnerMessageId, row.callId);
+      if (action === "folded")
+        tagger.unbindToolTag(sessionId, realOwnerId, row.callId);
+      tagger.bindToolTag(sessionId, row.callId, realOwnerId, tagNumber);
+      if (accounting)
+        tagger.setToolTagAccounting(sessionId, tagNumber, accounting);
+    });
+  };
+  const prepare = () => {
+    messageItems = [];
+    toolRows = [];
     const admitted = revision();
     const unchangedSinceDiscovery = beforeDiscovery.external.data_version === admitted.external.data_version && beforeDiscovery.local.changes === admitted.local.changes;
     const preflight = options.preflightRevision;
@@ -45110,7 +50001,13 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
         }
         if (base === undefined)
           continue;
-        adoptMessageCandidates(realMessageId, fingerprint, candidates.filter((c) => piFallbackBaseId(c.messageId) === base));
+        for (const candidate of candidates)
+          if (piFallbackBaseId(candidate.messageId) === base)
+            messageItems.push({
+              targetId: realMessageId,
+              fingerprint,
+              candidate
+            });
       }
       for (const [fallbackId, fingerprint] of fallbackTargetsFor(adoptable)) {
         if (realIdsByFingerprint.has(fingerprint))
@@ -45120,54 +50017,90 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
         const legacy = findAdoptableFallbackTags2(db, sessionId, fingerprint).filter((c) => isPiIndexFallbackId(piFallbackBaseId(c.messageId)));
         legacy.sort((left, right) => left.tagNumber - right.tagNumber);
         for (const base of new Set(legacy.map((c) => piFallbackBaseId(c.messageId))))
-          adoptMessageCandidates(fallbackId, fingerprint, legacy.filter((c) => piFallbackBaseId(c.messageId) === base));
+          for (const candidate of legacy)
+            if (piFallbackBaseId(candidate.messageId) === base)
+              messageItems.push({
+                targetId: fallbackId,
+                fingerprint,
+                candidate
+              });
       }
     }
-    if (ownerMap && (unchangedSinceDiscovery ? discoveredToolOwnerFallback : hasPiFallbackToolOwnerTags2(db, sessionId))) {
-      for (const row of findPiFallbackToolOwnerTags2(db, sessionId)) {
-        const parsed = parsePiFallbackToolOwnerId(row.toolOwnerMessageId);
-        if (parsed?.role !== "assistant")
-          continue;
-        const owners = ownerMap.get(piToolOwnerMapKey(parsed.timestamp, row.callId));
-        if (owners?.size !== 1)
-          continue;
-        const [realOwnerId] = owners;
-        if (!realOwnerId || realOwnerId === row.toolOwnerMessageId)
-          continue;
-        const existingNumber = getToolTagNumberByOwner2(db, sessionId, row.callId, realOwnerId);
-        const served = readServedNumbers();
-        const cachedSurvivor = existingNumber === null ? undefined : piCachedToolSurvivor(sessionId, row.callId, parsed.timestamp, getTagsByNumbers2(db, sessionId, [
-          row.tagNumber,
-          existingNumber
-        ]));
-        const repairKey = JSON.stringify([
-          "tool",
-          parsed.timestamp,
-          row.callId
-        ]);
-        const legacyKeys = [JSON.stringify(["tool", realOwnerId, row.callId])];
-        const decision = existingNumber === null ? { rebuilding: undefined } : plan([{ tagNumber: row.tagNumber }, { tagNumber: existingNumber }], repairKey, legacyKeys, served, cachedSurvivor);
-        if (decision === null)
-          continue;
-        const rebuilding = decision.rebuilding;
-        if (existingNumber !== null && !served.has(existingNumber) && !served.has(row.tagNumber) && cachedSurvivor === undefined && rebuilding === undefined) {
-          throw new PiTagIdentityConflictError2("duplicate tool identities have no proven served-byte survivor");
-        }
-        const adoption = fold(() => adoptPiFallbackToolOwnerTag2(db, sessionId, row.tagNumber, row.callId, row.toolOwnerMessageId, realOwnerId, served.size === 0 && cachedSurvivor !== undefined ? new Set([cachedSurvivor]) : served, cachedSurvivor, rebuilding), repairKey, repairKey, "tool", rebuilding);
-        if (adoption.action !== "skipped") {
-          tagger.unbindToolTag(sessionId, row.toolOwnerMessageId, row.callId);
-          if (adoption.action === "folded") {
-            tagger.unbindToolTag(sessionId, realOwnerId, row.callId);
-          }
-          tagger.bindToolTag(sessionId, row.callId, realOwnerId, adoption.tagNumber);
-          const accounting = getPersistedToolTagAccounting2(db, sessionId, adoption.tagNumber);
-          if (accounting) {
-            tagger.setToolTagAccounting(sessionId, adoption.tagNumber, accounting);
-          }
-        }
+    if (ownerMap && (unchangedSinceDiscovery ? discoveredToolOwnerFallback : hasPiFallbackToolOwnerTags2(db, sessionId)))
+      toolRows = findPiFallbackToolOwnerTags2(db, sessionId);
+  };
+  const runSlice = () => {
+    if (!prepared) {
+      prepare();
+      prepared = true;
+    }
+    const started = performance.now();
+    chunkRows = 0;
+    while (next < messageItems.length + toolRows.length && chunkRows < PI_ADOPTION_CHUNK_ROWS && performance.now() - started < PI_ADOPTION_CHUNK_MS) {
+      const index = next++;
+      chunkRows++;
+      const message = messageItems[index];
+      if (message)
+        adoptMessageCandidate(message);
+      else {
+        const row = toolRows[index - messageItems.length];
+        if (row)
+          adoptToolRow(row);
       }
     }
-  });
+  };
+  const runChunk = () => {
+    const start = {
+      next,
+      prepared,
+      pausedDuplicates,
+      recurrences: recurrences.length
+    };
+    for (let attempt = 0;; attempt++) {
+      afterCommit = [];
+      try {
+        runImmediateTransaction(db, () => {
+          batch.load();
+          runSlice();
+          try {
+            batch.flush();
+          } catch (error) {
+            if (isPiPassEndingError(error))
+              throw error;
+            throw new PiIdentityGuardsUnwritten(error instanceof Error ? error.message : String(error));
+          }
+        });
+      } catch (error) {
+        afterCommit = [];
+        if (!(error instanceof PiIdentityGuardsUnwritten))
+          throw error;
+        next = start.next;
+        prepared = start.prepared;
+        pausedDuplicates = start.pausedDuplicates;
+        recurrences.length = start.recurrences;
+        if (attempt > 0)
+          return false;
+        sessionLog2(sessionId, `tag identity fold guards could not be written; duplicates that need one are served unmerged this pass: ${error.message}`);
+        batch.refuseNewGuards = true;
+        claimed.clear();
+        repairing.clear();
+        continue;
+      }
+      const committed = afterCommit;
+      afterCommit = [];
+      for (const effect of committed)
+        effect();
+      return true;
+    }
+  };
+  do {
+    if (!runChunk())
+      break;
+  } while (next < messageItems.length + toolRows.length);
+  if (pausedDuplicates > 0)
+    sessionLog2(sessionId, `tag identity adoption reached the pass budget: session=${sessionId} ${pausedDuplicates} duplicated identities stay unmerged until the next pass`);
+  if (unguardedKeys.size > 0)
+    sessionLog2(sessionId, `tag identity repairs without a stored guard: ${unguardedKeys.size} duplicated identities served unmerged this pass (guard store full or unreadable)`);
   for (const recurrence of recurrences) {
     if (!recurrence.fresh)
       continue;
@@ -45182,16 +50115,18 @@ function adoptPiFallbackTags(db, sessionId, tagger, fingerprintById, options = {
 var EMPTY_PI_HISTORIAN_STATE_SNAPSHOT = {
   detectedContextLimit: 0,
   needsEmergencyRecovery: false,
+  emergencyRecoveryOrigin: null,
   historianFailureCount: 0
 };
 function loadPiHistorianStateSnapshot(db, sessionId) {
-  const row = db.prepare(`SELECT detected_context_limit, needs_emergency_recovery,
+  const row = db.prepare(`SELECT detected_context_limit, needs_emergency_recovery, emergency_recovery_origin,
 			        historian_failure_count
 			   FROM session_meta
 			  WHERE session_id = ?`).get(sessionId);
   return {
     detectedContextLimit: typeof row?.detected_context_limit === "number" && row.detected_context_limit > 0 ? row.detected_context_limit : 0,
     needsEmergencyRecovery: typeof row?.needs_emergency_recovery === "number" && row.needs_emergency_recovery > 0,
+    emergencyRecoveryOrigin: row?.emergency_recovery_origin === "provider_overflow" || row?.emergency_recovery_origin === "proactive_model_shrink" ? row.emergency_recovery_origin : null,
     historianFailureCount: typeof row?.historian_failure_count === "number" && row.historian_failure_count >= 0 ? row.historian_failure_count : 0
   };
 }
@@ -45214,6 +50149,13 @@ function registerPiContextHandler(pi, baseOptions) {
     }
     return s;
   };
+  pi.on("tool_call", (event, ctx) => {
+    if (event.toolName !== "ctx_reduce")
+      return;
+    const sessionId = resolveSessionId2(ctx);
+    if (sessionId)
+      trackPiDropLeaf(baseOptions.db, sessionId, ctx.sessionManager.getLeafId());
+  });
   pi.on("session_tree", (event, ctx) => {
     if (event.oldLeafId === event.newLeafId)
       return;
@@ -45298,6 +50240,16 @@ function registerPiContextHandler(pi, baseOptions) {
         return;
       }
     };
+    const afterCapture = (sessionId, statement, run) => {
+      try {
+        return run();
+      } catch (error) {
+        if (budget.isCancelled(error) || error instanceof PiContextDeadlineError || error instanceof PiContextSupersededError)
+          throw error;
+        sessionLog2(sessionId, `${statement} failed after the request was decided; serving the pass:`, error);
+        return;
+      }
+    };
     try {
       const tFindSession = performance.now();
       const sessionId = resolveSessionId2(ctx);
@@ -45306,6 +50258,7 @@ function registerPiContextHandler(pi, baseOptions) {
         return;
       }
       sessionIdForError = sessionId;
+      resetPiUnplacedCutLog(sessionId);
       try {
         const effectiveSystem = readHostSystemPrompt(ctx);
         if (effectiveSystem !== undefined)
@@ -45355,7 +50308,8 @@ function registerPiContextHandler(pi, baseOptions) {
           db: options.db,
           sessionId,
           branchEntries,
-          assertCurrentPass
+          assertCurrentPass,
+          assertQueuedWrite: budget.assertDecisionPublication
         });
       let rawOrdinalCount;
       let passOrdinalAlignment;
@@ -45437,16 +50391,39 @@ function registerPiContextHandler(pi, baseOptions) {
         }
       }));
       assertCurrentPass();
+      const historyHead = sessionMetaForUsage.isSubagent ? undefined : options.injection;
       updateSessionProjectTracking(sessionId, projectIdentity, options.db, projectDirectory);
       const lkgInputIdByRef = new Map;
       for (const input of lkgPassSnapshot.inputs)
         lkgInputIdByRef.set(event.messages[input.messageIndex], input.id);
+      const requestToolsRelease = isPrefixBoundThinkingModel(ctx.model?.provider, ctx.model?.id) ? (() => {
+        const fingerprint = readPiRequestToolsFingerprint(pi, toolWireSchema, event.messages, {
+          host: getHarness2() === "omp" ? "omp" : "pi",
+          model: ctx.model,
+          oauth: (() => {
+            try {
+              const registry = ctx.modelRegistry;
+              return ctx.model && typeof registry?.isUsingOAuth === "function" ? registry.isUsingOAuth(ctx.model) === true : false;
+            } catch {
+              return false;
+            }
+          })()
+        });
+        return fingerprint ? evaluateRequestToolsRelease({
+          db: options.db,
+          sessionId,
+          modelKey: `${ctx.model?.provider}/${ctx.model?.id}`,
+          fingerprint
+        }) : undefined;
+      })() : undefined;
+      const requestToolsChange = requestToolsRelease?.change ?? null;
       const bindingStripOrder = resolvePiBindingStripOrder({
         db: options.db,
         sessionId,
         messages: event.messages,
         entryIds: lkgEntryIds ?? [],
-        bustPermittedAtStart: hasPendingMaterialization(sessionId)
+        bustPermittedAtStart: hasPendingMaterialization(sessionId),
+        releasesAllThinking: requestToolsChange !== null
       });
       const startOfPassBindingRecovery = bindingStripOrder === "start" ? applyPiThinkingBindingRecovery({
         db: options.db,
@@ -45465,25 +50442,17 @@ function registerPiContextHandler(pi, baseOptions) {
         }
       }
       const tMeta = performance.now();
-      const historianStateForPass = options.compactionOff ? EMPTY_PI_HISTORIAN_STATE_SNAPSHOT : (() => {
-        try {
-          return loadPiHistorianStateSnapshot(options.db, sessionId);
-        } catch (error) {
-          sessionLog2(sessionId, `historian state snapshot failed; using safe defaults: ${error instanceof Error ? error.message : String(error)}`);
-          return EMPTY_PI_HISTORIAN_STATE_SNAPSHOT;
-        }
-      })();
-      let piM0M1PassSnapshot = options.injection ? createPiM0M1PassSnapshot({
+      let piM0M1PassSnapshot = historyHead ? createPiM0M1PassSnapshot({
         db: options.db,
         sessionId,
         compactionOff: options.compactionOff === true,
         sessionMeta: sessionMetaForUsage
       }) : undefined;
       logTransformTiming(sessionId, "getOrCreateSessionMeta", tMeta);
-      if (strictEntryIds && branchEntries && options.injection && !options.compactionOff && stripMcOwnedPiCompactionSummary(event.messages, strictEntryIds, branchEntries)) {
+      if (strictEntryIds && branchEntries && historyHead && !options.compactionOff && stripMcOwnedPiCompactionSummary(event.messages, strictEntryIds, branchEntries)) {
         logTransformTiming(sessionId, "mcCompactionSummarySuppression", tEntryBranch);
       }
-      if (strictEntryIds && options.injection && !options.compactionOff) {
+      if (strictEntryIds && historyHead && !options.compactionOff) {
         const removed = trimPiMessagesToCachedBoundary(options.db, sessionId, event.messages, strictEntryIds, piM0M1PassSnapshot);
         if (removed > 0) {
           logTransformTiming(sessionId, "cachedBoundaryEarlyTrim", tEntryBranch, `removed=${removed}`);
@@ -45545,7 +50514,7 @@ function registerPiContextHandler(pi, baseOptions) {
           clearPiInjectionTokenCountCache(sessionId);
           sessionMetaForUsage.cachedM0Bytes = null;
           sessionMetaForUsage.cachedM1Bytes = null;
-          piM0M1PassSnapshot = options.injection ? createPiM0M1PassSnapshot({
+          piM0M1PassSnapshot = historyHead ? createPiM0M1PassSnapshot({
             db: options.db,
             sessionId,
             compactionOff: options.compactionOff === true,
@@ -45562,6 +50531,7 @@ function registerPiContextHandler(pi, baseOptions) {
           commitPiCompactionModeRecord(options.db, sessionId, compactionTransition.recordToWrite);
         }
       }
+      const usageResetAfterRefusal = shouldResetRefusedUsage(options.db, sessionId, sessionMetaForUsage);
       const usageReset = {
         lastContextPercentage: 0,
         lastInputTokens: 0,
@@ -45584,8 +50554,8 @@ function registerPiContextHandler(pi, baseOptions) {
         sessionMetaForUsage.lastInputTokens = 0;
         sessionMetaForUsage.observedSafeInputTokens = 0;
         sessionMetaForUsage.cacheAlertSent = false;
-      } else if (isFirstContextPassForSession && sessionMetaForUsage.lastContextPercentage > 0) {
-        sessionLog2(sessionId, `transform: first pass reset — percentage=${sessionMetaForUsage.lastContextPercentage.toFixed(1)}% tokens=${sessionMetaForUsage.lastInputTokens} — clearing stale usage state`);
+      } else if ((isFirstContextPassForSession || usageResetAfterRefusal) && sessionMetaForUsage.lastContextPercentage > 0) {
+        sessionLog2(sessionId, `transform: ${isFirstContextPassForSession ? "first pass" : "refused turn recovery"} reset — percentage=${sessionMetaForUsage.lastContextPercentage.toFixed(1)}% tokens=${sessionMetaForUsage.lastInputTokens} — clearing stale usage state`);
         updateSessionMeta(options.db, sessionId, {
           lastContextPercentage: 0,
           lastInputTokens: 0
@@ -45593,6 +50563,14 @@ function registerPiContextHandler(pi, baseOptions) {
         sessionMetaForUsage.lastContextPercentage = 0;
         sessionMetaForUsage.lastInputTokens = 0;
       }
+      const historianStateForPass = options.compactionOff ? EMPTY_PI_HISTORIAN_STATE_SNAPSHOT : (() => {
+        try {
+          return loadPiHistorianStateSnapshot(options.db, sessionId);
+        } catch (error) {
+          sessionLog2(sessionId, `historian state snapshot failed; using safe defaults: ${error instanceof Error ? error.message : String(error)}`);
+          return EMPTY_PI_HISTORIAN_STATE_SNAPSHOT;
+        }
+      })();
       let usagePercentage = 0;
       let usageInputTokens = 0;
       let usedPersistedUsage = false;
@@ -45600,7 +50578,7 @@ function registerPiContextHandler(pi, baseOptions) {
         usagePercentage = sessionMetaForUsage.lastContextPercentage;
         usageInputTokens = sessionMetaForUsage.lastInputTokens;
         usedPersistedUsage = true;
-      } else {
+      } else if (!usageResetAfterRefusal) {
         usagePercentage = typeof piUsage?.percent === "number" ? piUsage.percent : 0;
         usageInputTokens = typeof piUsage?.tokens === "number" ? piUsage.tokens : 0;
       }
@@ -45668,7 +50646,7 @@ function registerPiContextHandler(pi, baseOptions) {
       }
       let fallbackInputTokens;
       const suspectReading = Math.max(usageInputTokens, piUsage?.tokens ?? 0);
-      if (suspectReading > providerInputLimit || piProviderUsageWasRejected(sessionId)) {
+      if (usageResetAfterRefusal || suspectReading > providerInputLimit || piProviderUsageWasRejected(sessionId)) {
         if (suspectReading > providerInputLimit)
           noteRejectedPiUsage(sessionId, suspectReading, providerInputLimit, "transform");
         const replay = !lkgCompactionOff && lkgPassSnapshot ? lkgCoordinator.replay(lkgPassSnapshot, (id) => ctx.sessionManager.getEntry?.(id)?.parentId) : undefined;
@@ -45685,7 +50663,7 @@ function registerPiContextHandler(pi, baseOptions) {
         persistedFromLive: !usedPersistedUsage,
         persistedPercentage: usagePercentage,
         persistedInputTokens: usageInputTokens,
-        liveInputTokens: piUsage?.tokens,
+        liveInputTokens: usageResetAfterRefusal ? undefined : piUsage?.tokens,
         usableContextLimit: usageContextLimit
       }));
       const realUsagePercentageBeforeEmergencyBump = usagePercentage;
@@ -45745,10 +50723,22 @@ function registerPiContextHandler(pi, baseOptions) {
         const hasToolReclaim = event.messages.some((message) => message.role === "assistant" && message.content.some((part) => part.type === "toolCall" && visibleToolResults.has(part.id) && (!knownTools.has(part.id) || activeTools.has(part.id))));
         if (historian && !hasToolReclaim && getPendingOps(options.db, sessionId).length === 0 && !historyRefreshSessions.has(sessionId) && !deferredHistoryRefreshSessions.has(sessionId)) {
           budget.stage = "emergency historian";
-          await budget.wait(historian);
+          const historianProgress = inFlightHistorianProgress.get(sessionId);
+          const historianWaitMs = budget.remainingWork();
+          try {
+            await budget.wait(historian);
+          } catch (error) {
+            throw describeHistorianJoinDeadline(error, {
+              db: options.db,
+              sessionId,
+              waitedMs: historianWaitMs,
+              usagePercentage,
+              run: historianProgress
+            });
+          }
           assertCurrentPass();
           sessionMeta = getOrCreateSessionMeta(options.db, sessionId);
-          piM0M1PassSnapshot = options.injection ? createPiM0M1PassSnapshot({
+          piM0M1PassSnapshot = historyHead ? createPiM0M1PassSnapshot({
             db: options.db,
             sessionId,
             compactionOff: false,
@@ -45792,7 +50782,7 @@ function registerPiContextHandler(pi, baseOptions) {
         recoveryArmed: emergencyRecoveryArmed || !!recovery.rebuildReason,
         forceMaterialization,
         imported: looksLikeImportedSession || usageInputTokens <= 0 && (isFirstContextPassForSession || lkgPassSnapshot?.replayFailure !== null),
-        coldInjection: !!options.injection && !sessionMeta.cachedM0Bytes,
+        coldInjection: !!historyHead && !sessionMeta.cachedM0Bytes,
         cacheBusting: isCacheBusting,
         sessionId,
         appendedMessages: lkgPassSnapshot?.pristineTail ?? event.messages.slice(-1),
@@ -45814,10 +50804,19 @@ function registerPiContextHandler(pi, baseOptions) {
         }
         maintainExecuteFloorMark(options.db, sessionId, promptId, usagePercentage < effectiveExecuteThresholdPercentage);
       }
+      const ctxReduceCallable = piCtxReduceCallable(pi, options.compactionOff === true, { db: options.db, sessionId });
+      const servedCtxReduceCallable = options.compactionOff || budget.sideTurn ? ctxReduceCallable : readServedPiCtxReduceCallable(options.db, sessionId);
+      if (!ctxReduceCallable && !budget.sideTurn)
+        clearPiChannel1State(sessionId);
       const pipelineArgs = {
+        ctxReduceCallable,
+        servedCtxReduceCallable,
+        providerOverflowRecovery: emergencyRecoveryArmed && historianStateForPass.emergencyRecoveryOrigin === "provider_overflow",
+        dropBranchEntries: branchEntries ?? undefined,
         recoveryPrefix: recovery.prefix,
         recoveryRebuildReason: recovery.rebuildReason,
         assertCurrentPass,
+        remainingPassMs: budget.remainingOutcome,
         db: options.db,
         tagger,
         sessionId,
@@ -45836,9 +50835,9 @@ function registerPiContextHandler(pi, baseOptions) {
         reclaimUsableWindow: windowGeometry?.usableSoft ?? usageContextLimit ?? 0,
         heuristics: options.heuristics,
         emergencyCeilingTokens,
-        injection: options.injection ? {
-          ...options.injection,
-          memoryEnabled: options.injection.memoryEnabled,
+        injection: historyHead ? {
+          ...historyHead,
+          memoryEnabled: historyHead.memoryEnabled,
           historyBudgetPolicyIdentity: historyBudgetPolicyIdentity(options.historian?.historyBudgetPercentage, options.historian?.executeThresholdPercentage, liveModelBySession.get(sessionId), options.historian?.executeThresholdTokens),
           historyBudgetTokens: resolveHistoryBudgetTokensForPi({
             historyBudgetPercentage: options.historian?.historyBudgetPercentage,
@@ -45859,14 +50858,20 @@ function registerPiContextHandler(pi, baseOptions) {
         schedulerDeferReason,
         forceMaterialization: forceMaterialization || isEmergency,
         forceMaterializationPercentage,
-        signedThinkingHold: resolvePiSignedThinkingHold({
+        signedThinkingHold: requestToolsChange === null && ctxReduceCallable === servedCtxReduceCallable && resolvePiSignedThinkingHold({
           sessionId,
           db: options.db,
           messages: event.messages,
           prefixBound: isPrefixBoundThinkingModel(ctx.model?.provider, ctx.model?.id),
           usagePercentage,
-          executeThresholdPercentage: effectiveExecuteThresholdPercentage
+          executeThresholdPercentage: effectiveExecuteThresholdPercentage,
+          forceBandPressure: !options.compactionOff && piForceBandPressure({
+            forceMaterialization: forceMaterialization || isEmergency,
+            percentage: usagePercentage,
+            forceMaterializationPercentage
+          })
         }),
+        requestToolsChange,
         contextUsage: {
           percentage: usagePercentage,
           inputTokens: usageInputTokens
@@ -45882,6 +50887,7 @@ function registerPiContextHandler(pi, baseOptions) {
         resolvedProviderID: ctx.model?.provider,
         resolvedModelID: ctx.model?.id,
         providerApi: ctx.model?.api,
+        modelAcceptsImages: piModelAcceptsImages(ctx.model),
         canUseEmptySentinels,
         temporalAwareness: options.injection?.temporalAwareness === true,
         appendCompaction: guardedPiAppendCompaction(ctx, assertCurrentPass),
@@ -45916,7 +50922,7 @@ function registerPiContextHandler(pi, baseOptions) {
       if (!options.compactionOff)
         assertPiTagSnapshotReady(options.db, sessionId);
       let historianEvaluatedThisPass = false;
-      const historian = options.historian;
+      const historian = sessionMeta.isSubagent ? undefined : options.historian;
       const scheduleHistorian = (result) => {
         if (historianEvaluatedThisPass)
           return;
@@ -46002,13 +51008,13 @@ function registerPiContextHandler(pi, baseOptions) {
         assertCurrentPass();
         recordSuccessfulTaggedMessageIds(sessionId, taggedInputEntryIds ?? strictEntryIds, branchEntries);
       }
-      const piDecisionSnapshotNewestAssistant = result.bustedThisPass || hasPendingPiSystemPromptHashChange(sessionId) ? findNewestPiAssistantEntryId(branchEntries) : undefined;
+      const piDecisionSnapshotNewestAssistant = result.bustedThisPass || result.latestTurnThinkingRemoved === true || hasPendingPiSystemPromptHashChange(sessionId) ? findNewestPiAssistantEntryId(branchEntries) : undefined;
       const publishTransformDecision = !budget.sideTurn && piDecisionSnapshotNewestAssistant !== undefined ? () => {
         recordPendingPiTransformDecision(sessionId, {
           tsMs: Date.now(),
           decision: schedulerDecision,
           materialized: result.materialized,
-          materializeReason: normalizeMaterializeReason("pi", result.materializeReason, result.materialized),
+          materializeReason: normalizeMaterializeReason("pi", result.materializeReason ?? (result.latestTurnThinkingRemoved ? LATEST_TURN_THINKING_REMOVED_REASON : null), result.materialized),
           systemHashPrev: result.materialized ? result.injectionResult?.systemHashPrev ?? null : null,
           systemHashNew: result.materialized ? result.injectionResult?.systemHashNew ?? null : null,
           m0ModelKeyPrev: result.materialized ? result.injectionResult?.m0ModelKeyPrev ?? null : null,
@@ -46039,7 +51045,7 @@ function registerPiContextHandler(pi, baseOptions) {
       const todoAnchorBefore = JSON.stringify(getPersistedTodoSyntheticAnchor(options.db, sessionId));
       const tNoteNudges = performance.now();
       try {
-        if (!options.compactionOff && !reduced) {
+        if (!options.compactionOff && !sessionMeta.isSubagent && !reduced) {
           outputMessages = applyNoteNudges({
             sessionId,
             db: options.db,
@@ -46058,7 +51064,7 @@ function registerPiContextHandler(pi, baseOptions) {
       logTransformTiming(sessionId, "noteNudges", tNoteNudges);
       const tAutoSearch = performance.now();
       budget.stage = "auto-search";
-      if (options.autoSearch?.enabled && !options.compactionOff && result.prefixMutationAllowed && !reduced && budget.remainingWork() > PI_CONTEXT_BUDGET.searchMs) {
+      if (options.autoSearch?.enabled && !options.compactionOff && !sessionMeta.isSubagent && result.prefixMutationAllowed && !reduced && budget.remainingWork() > PI_CONTEXT_BUDGET.searchMs) {
         guardSqliteTransformPass2({
           assert: budget.assert,
           remainingMs: budget.remainingWork
@@ -46191,100 +51197,102 @@ function registerPiContextHandler(pi, baseOptions) {
         if (result.syntheticLeadingCount < 0)
           result.syntheticLeadingCount = prefix.length;
       }
-      const tChannelAccounting = performance.now();
-      try {
-        const sessionMetaForCh1 = sessionMeta;
-        if (!options.compactionOff && !sessionMetaForCh1.isSubagent) {
-          const { tags, protectedTagNumbers, pendingDropTagNumbers } = result.channelBaselineSnapshot;
-          const stableId = (message) => message && typeof message === "object" ? result.postCommitEntryIdByRef.get(message) : undefined;
-          const hygieneCalibration = sessionDecisionCalibration(options.db, sessionId);
-          const hygieneUnitsVersion = transitionSessionHygieneUnits(options.db, sessionId, result.bustedThisPass, hygieneCalibration);
-          const previousBaseline = getPiChannel1Baseline(sessionId);
-          const baseline = refreshPiTailHygieneBaseline({
-            messages: outputMessages,
-            providerApi: ctx.model?.api,
-            tags,
-            tagCacheKey: result.channelBaselineSnapshot.tagCacheKey,
-            protectedTagNumbers,
-            protectedTools: options.protectedTools,
-            pendingDropTagNumbers,
-            stableId,
-            protectedToolTags: protectedToolTagNumbers(result.channelBaselineSnapshot.activeTags, options.protectedTools),
-            syntheticLeadingCount: result.syntheticLeadingCount,
-            cacheBusting: result.bustedThisPass,
-            previous: previousBaseline,
-            calibration: hygieneUnitsVersion >= HYGIENE_PROVIDER_UNITS_VERSION ? hygieneCalibration : undefined,
-            hygieneUnitsVersion
-          });
-          const effective = effectivePiTailHygiene(baseline);
-          if (baseline.lastPrefixMismatch) {
-            sessionLog2(sessionId, formatTailHygienePrefixMismatch(baseline.lastPrefixMismatch, baseline.baselineGeneration));
-          }
-          const durableGrace = baseline.evaluable && !baseline.generationInvalidated ? captureChannel1PostReduceGraceBaseline(options.db, sessionId, effective.u) : getChannel1NudgeState(options.db, sessionId);
-          baseline.channel1PostReduceGrace = durableGrace.postReduceGracePending || durableGrace.postReduceGraceBaselineU !== undefined ? {
-            pending: durableGrace.postReduceGracePending === true,
-            baselineU: durableGrace.postReduceGraceBaselineU,
-            preReduceLevel: durableGrace.postReduceGracePreLevel ?? durableGrace.level
-          } : undefined;
-          const oldestReclaimableToolTags = getOldestActiveUnprotectedToolTags2(options.db, sessionId, protectedTagNumbers);
-          const channelState = {
-            ...baseline,
-            usableWindow: usageContextLimit ?? 0,
-            realUserTurnCount: baseline.realUserTurnCount,
-            reducedSinceRefresh: false,
-            agentDropsAppliedThisPass: result.agentDropsAppliedThisPass,
-            oldestReclaimableToolTags
-          };
-          setPiChannel1Baseline(sessionId, channelState);
-          const channel2Evaluation = evaluateChannel2(channelState);
-          if (channel2Evaluation.evaluable) {
-            try {
-              rearmChannel2AfterMeasuredCollapse({
-                db: options.db,
-                sessionId,
-                baseline: channelState,
-                rebuilding: result.bustedThisPass,
-                previous: previousBaseline
-              });
-            } catch (error) {
-              sessionLog2(sessionId, `pi channel2 U-collapse reset failed: ${error instanceof Error ? error.message : String(error)}`);
+      const publishFinalRequestAccounting = () => {
+        const tChannelAccounting = performance.now();
+        try {
+          const sessionMetaForCh1 = sessionMeta;
+          if (ctxReduceCallable) {
+            const { tags, protectedTagNumbers, pendingDropTagNumbers } = result.channelBaselineSnapshot;
+            const stableId = (message) => message && typeof message === "object" ? result.postCommitEntryIdByRef.get(message) : undefined;
+            const hygieneCalibration = sessionDecisionCalibration(options.db, sessionId);
+            const hygieneUnitsVersion = transitionSessionHygieneUnits(options.db, sessionId, result.bustedThisPass, hygieneCalibration);
+            const previousBaseline = getPiChannel1Baseline(sessionId);
+            const baseline = refreshPiTailHygieneBaseline({
+              messages: outputMessages,
+              providerApi: ctx.model?.api,
+              tags,
+              tagCacheKey: result.channelBaselineSnapshot.tagCacheKey,
+              protectedTagNumbers,
+              protectedTools: options.protectedTools,
+              pendingDropTagNumbers,
+              stableId,
+              protectedToolTags: protectedToolTagNumbers(result.channelBaselineSnapshot.activeTags, options.protectedTools),
+              syntheticLeadingCount: result.syntheticLeadingCount,
+              cacheBusting: result.bustedThisPass,
+              previous: previousBaseline,
+              calibration: hygieneUnitsVersion >= HYGIENE_PROVIDER_UNITS_VERSION ? hygieneCalibration : undefined,
+              hygieneUnitsVersion
+            });
+            const effective = effectivePiTailHygiene(baseline);
+            if (baseline.lastPrefixMismatch) {
+              sessionLog2(sessionId, formatTailHygienePrefixMismatch(baseline.lastPrefixMismatch, baseline.baselineGeneration));
             }
-            if (channel2Evaluation.shouldTrigger) {
-              casChannel2NudgeState(options.db, sessionId, "", "pending");
-            } else {
-              casChannel2NudgeState(options.db, sessionId, "pending", "");
+            const durableGrace = baseline.evaluable && !baseline.generationInvalidated ? captureChannel1PostReduceGraceBaseline(options.db, sessionId, effective.u) : getChannel1NudgeState(options.db, sessionId);
+            baseline.channel1PostReduceGrace = durableGrace.postReduceGracePending || durableGrace.postReduceGraceBaselineU !== undefined ? {
+              pending: durableGrace.postReduceGracePending === true,
+              baselineU: durableGrace.postReduceGraceBaselineU,
+              preReduceLevel: durableGrace.postReduceGracePreLevel ?? durableGrace.level
+            } : undefined;
+            const oldestReclaimableToolTags = getOldestActiveUnprotectedToolTags2(options.db, sessionId, protectedTagNumbers);
+            const channelState = {
+              ...baseline,
+              usableWindow: usageContextLimit ?? 0,
+              realUserTurnCount: baseline.realUserTurnCount,
+              reducedSinceRefresh: false,
+              agentDropsAppliedThisPass: result.agentDropsAppliedThisPass,
+              oldestReclaimableToolTags
+            };
+            setPiChannel1Baseline(sessionId, channelState);
+            const channel2Evaluation = evaluateChannel2(channelState);
+            if (channel2Evaluation.evaluable) {
+              try {
+                rearmChannel2AfterMeasuredCollapse({
+                  db: options.db,
+                  sessionId,
+                  baseline: channelState,
+                  rebuilding: result.bustedThisPass,
+                  previous: previousBaseline
+                });
+              } catch (error) {
+                sessionLog2(sessionId, `pi channel2 U-collapse reset failed: ${error instanceof Error ? error.message : String(error)}`);
+              }
+              if (channel2Evaluation.shouldTrigger) {
+                casChannel2NudgeState(options.db, sessionId, "", "pending");
+              } else {
+                casChannel2NudgeState(options.db, sessionId, "pending", "");
+              }
             }
+            assertTailHygieneLastWriter = () => assertPiTailHygieneContentUnchanged({
+              messages: outputMessages,
+              tags,
+              protectedTagNumbers,
+              pendingDropTagNumbers,
+              stableId,
+              syntheticLeadingCount: result.syntheticLeadingCount,
+              expectedSignature: baseline.contentSignature
+            });
+          } else {
+            clearPiChannel1State(sessionId);
           }
-          assertTailHygieneLastWriter = () => assertPiTailHygieneContentUnchanged({
-            messages: outputMessages,
-            tags,
-            protectedTagNumbers,
-            pendingDropTagNumbers,
-            stableId,
-            syntheticLeadingCount: result.syntheticLeadingCount,
-            expectedSignature: baseline.contentSignature
-          });
-        } else {
-          clearPiChannel1State(sessionId);
+        } catch (err) {
+          const stale = getPiChannel1Baseline(sessionId);
+          if (stale) {
+            stale.evaluable = false;
+            stale.generationInvalidated = true;
+          }
+          sessionLog2(sessionId, `channel1 baseline / channel2 trigger failed: ${err instanceof Error ? err.message : String(err)}`);
         }
-      } catch (err) {
-        const stale = getPiChannel1Baseline(sessionId);
-        if (stale) {
-          stale.evaluable = false;
-          stale.generationInvalidated = true;
+        logTransformTiming(sessionId, "channelNudgeAccounting", tChannelAccounting);
+        const tWorkMetrics = performance.now();
+        budget.stage = "bookkeeping";
+        try {
+          const metrics = computePiWorkMetrics(outputMessages);
+          setSessionWorkMetrics(options.db, sessionId, metrics.newWorkTokens, metrics.totalInputTokens);
+        } catch (err) {
+          sessionLog2(sessionId, `work-metrics update failed: ${err instanceof Error ? err.message : String(err)}`);
         }
-        sessionLog2(sessionId, `channel1 baseline / channel2 trigger failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
-      logTransformTiming(sessionId, "channelNudgeAccounting", tChannelAccounting);
-      const tWorkMetrics = performance.now();
-      budget.stage = "bookkeeping";
-      try {
-        const metrics = computePiWorkMetrics(outputMessages);
-        setSessionWorkMetrics(options.db, sessionId, metrics.newWorkTokens, metrics.totalInputTokens);
-      } catch (err) {
-        sessionLog2(sessionId, `work-metrics update failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
-      logTransformTiming(sessionId, "workMetrics", tWorkMetrics);
+        logTransformTiming(sessionId, "workMetrics", tWorkMetrics);
+      };
       const tStableIdSchemePersist = performance.now();
       if (stableIdSchemeCutover && !options.compactionOff) {
         persistStableIdSchemeForRun(options.db, sessionId, {
@@ -46322,7 +51330,14 @@ function registerPiContextHandler(pi, baseOptions) {
         const envelope = readPiLkgFitEnvelope(ctx, pi, resolvePiContextModelKey(ctx), sessionDecisionCalibration(options.db, sessionId), toolWireSchema);
         const measuredPrefix = lkgPassSnapshot ? lkgCoordinator.measureOutgoingPrefix(lkgPassSnapshot, outputMessages, (id) => ctx.sessionManager.getEntry?.(id)?.parentId) : undefined;
         const outgoingFitLimit = getHarness2() === "pi" && baseWindowGeometry ? baseWindowGeometry.derivation.absoluteWall : rawFallbackLimit;
-        let estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, measuredPrefix, outgoingFitLimit);
+        const fitTokenCounts = () => {
+          const cache = piMessageTokenCacheBySession.get(sessionId);
+          return cache ? {
+            cache,
+            stableId: (message) => result.postCommitEntryIdByRef.get(message)
+          } : undefined;
+        };
+        let estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, measuredPrefix, outgoingFitLimit, fitTokenCounts());
         let fitReclaimedThisPass = false;
         if (!inputForThinkingFit && result.strictThinkingKept && rawFallbackLimit && estimate.refusalGrade && (estimate.refusalTokens ?? estimate.tokens) > rawFallbackLimit) {
           const restored = restorePiLkgInputForFit(lkgPassSnapshot, branchEntries);
@@ -46352,7 +51367,7 @@ function registerPiContextHandler(pi, baseOptions) {
             cacheBustingPass: result.prefixBustPermitted,
             stripActiveTurn: true
           });
-          estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, undefined, rawFallbackLimit);
+          estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, undefined, rawFallbackLimit, fitTokenCounts());
         }
         const opaqueFallbackSteps = piOpaqueThinkingFallbackSteps(outputMessages);
         if (opaqueFallbackSteps > 0)
@@ -46368,6 +51383,18 @@ function registerPiContextHandler(pi, baseOptions) {
           throw contextRefusalError("The request remains over the model window after stripping signed thinking and reclaiming context");
         if (getHarness2() === "pi") {
           const fitCase = classifyPiOutgoingFit(estimate, outgoingFitLimit);
+          const recoverUnknownUsage = usageInputTokens <= 0 && result.prefixBustPermitted && emergencyRecoveryArmed && historianStateForPass.emergencyRecoveryOrigin === "provider_overflow";
+          let unknownUsageRecovered = false;
+          const recoveryUsage = resolvePiOverflowRecoveryUsage({
+            usage: pipelineArgs.contextUsage,
+            pricedPass: result.prefixBustPermitted,
+            providerOverflow: recoverUnknownUsage,
+            messages: outputMessages,
+            envelope,
+            usableHardLimit: outgoingFitLimit
+          });
+          if (recoverUnknownUsage && (!(recoveryUsage.inputTokens > 0) || !((emergencyCeilingTokens ?? 0) > 0) || !Number.isFinite(outgoingFitLimit) || !((outgoingFitLimit ?? 0) > 0)))
+            throw contextRefusalError("Provider overflow recovery has unknown-usage: a complete outgoing request estimate and context limit are required before retrying");
           const currentUpperCursor = () => piUpperReclaimCursor({
             sessionId,
             modelKey: resolvePiContextModelKey(ctx) ?? null,
@@ -46377,24 +51404,25 @@ function registerPiContextHandler(pi, baseOptions) {
             snapshot: lkgPassSnapshot,
             input: inputForFitReclaim ?? event.messages
           });
-          const upperCursor = fitCase === "upper-estimate-pressure" ? currentUpperCursor() : undefined;
+          const upperCursor = fitCase === "upper-estimate-pressure" && !recoverUnknownUsage ? currentUpperCursor() : undefined;
           if (fitCase === "over-window-proof") {
             requestPiFitReclaimInput(sessionId);
           }
           if (fitCase === "fits-or-unknown")
             clearPiFitReclaimInput(sessionId);
           const upperPassEligible = schedulerDecision === "execute" || result.bustedThisPass || result.prefixRebuildAlreadyPriced || isCacheBusting || forceMaterialization || isEmergency;
-          const reclaimHeld = fitCase === "upper-estimate-pressure" && (result.strictThinkingKept || !upperPassEligible || !shouldReclaimPiUpperEstimate(options.db, upperCursor));
+          const reclaimHeld = !recoverUnknownUsage && fitCase === "upper-estimate-pressure" && (result.strictThinkingKept || !upperPassEligible || !shouldReclaimPiUpperEstimate(options.db, upperCursor));
           if (reclaimHeld)
             sessionLog2(sessionId, "outgoing fit: upper-estimate-pressure; reclaim held by signed prefix, deferred pass or used session latch");
           if (fitCase === "upper-estimate-pressure" && !reclaimHeld && !inputForFitReclaim)
             requestPiFitReclaimInput(sessionId);
-          if (fitCase !== "fits-or-unknown" && !reclaimHeld && !fitReclaimedThisPass && !inputForFitReclaim)
+          if ((fitCase !== "fits-or-unknown" || recoverUnknownUsage) && !reclaimHeld && !fitReclaimedThisPass && !inputForFitReclaim)
             inputForFitReclaim = restorePiLkgInputForFit(lkgPassSnapshot, branchEntries);
-          if (fitCase !== "fits-or-unknown" && !reclaimHeld && !fitReclaimedThisPass && inputForFitReclaim) {
+          if ((fitCase !== "fits-or-unknown" || recoverUnknownUsage) && !reclaimHeld && !fitReclaimedThisPass && inputForFitReclaim) {
             const reservation = upperCursor ? reservePiUpperEstimateReclaim(options.db, upperCursor) : undefined;
             if (!upperCursor || reservation) {
               let reclaimCompleted = false;
+              const recoveryRetryStart = performance.now();
               try {
                 sessionLog2(sessionId, `outgoing fit: ${fitCase}; attempting emergency reclaim`);
                 if (fitCase === "over-window-proof" && !ctx.hasUI && historian) {
@@ -46437,22 +51465,22 @@ function registerPiContextHandler(pi, baseOptions) {
                   schedulerDecision: "execute",
                   schedulerDeferReason: null,
                   forceMaterialization: true,
-                  upperEstimateOnly: fitCase === "upper-estimate-pressure",
+                  upperEstimateOnly: !recoverUnknownUsage && fitCase === "upper-estimate-pressure",
                   forceSignedRebuildForFit: fitCase === "over-window-proof",
                   isCacheBusting: historyRefreshSessions.has(sessionId) || deferredHistoryRefreshSessions.has(sessionId),
-                  injectionPassSnapshot: options.injection ? createPiM0M1PassSnapshot({
+                  injectionPassSnapshot: historyHead ? createPiM0M1PassSnapshot({
                     db: options.db,
                     sessionId,
                     compactionOff: false,
                     sessionMeta: freshMeta
                   }) : undefined,
-                  contextUsage: {
-                    percentage: usagePercentage,
-                    inputTokens: usageInputTokens
-                  }
+                  contextUsage: recoverUnknownUsage ? recoveryUsage : pipelineArgs.contextUsage
                 }));
                 outputMessages = result.messages;
                 observePipelineResultForTests(sessionId, result);
+                unknownUsageRecovered = recoverUnknownUsage;
+                if (recoverUnknownUsage)
+                  sessionLog2(sessionId, `overflow unknown-usage recovery: inputTokens=${recoveryUsage.inputTokens} retryMs=${(performance.now() - recoveryRetryStart).toFixed(1)}`);
                 injectTodo();
                 if (upperCursor)
                   recordPiUpperEstimateReclaim(options.db, currentUpperCursor() ?? upperCursor, reservation);
@@ -46467,13 +51495,15 @@ function registerPiContextHandler(pi, baseOptions) {
                   cacheBustingPass: result.prefixBustPermitted,
                   stripActiveTurn: result.signedPrefixRewritten
                 });
-                estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, undefined, outgoingFitLimit);
+                estimate = estimatePiOutgoingInputTokens(outputMessages, envelope, undefined, outgoingFitLimit, fitTokenCounts());
               } finally {
                 if (!reclaimCompleted && upperCursor && reservation)
                   releasePiUpperEstimateReclaim(options.db, upperCursor, reservation);
               }
             }
           }
+          if (recoverUnknownUsage && !unknownUsageRecovered)
+            throw contextRefusalError("Provider overflow recovery has unknown-usage: a pristine request is required for emergency reclaim");
         }
         const refusal = outgoingContextRefusal(estimate, rawFallbackLimit, protectedToolTokenCount(getActiveTagsBySession2(options.db, sessionId), options.protectedTools, envelope ? calibrationForModelKey(envelope.modelKey) : undefined));
         if (refusal)
@@ -46481,6 +51511,29 @@ function registerPiContextHandler(pi, baseOptions) {
         if (getHarness2() === "pi" && classifyPiOutgoingFit(estimate, outgoingFitLimit) === "over-window-proof")
           throw new PiDegradedPassError("outgoing-over-window");
       }
+      const recoveryWindow = windowGeometry?.usableHard;
+      const recoveryLatch = !options.compactionOff && isEmergency && emergencyRecoveryArmed && typeof recoveryWindow === "number" && recoveryWindow > 0 ? getOverflowState(options.db, sessionId) : undefined;
+      if (recoveryLatch?.needsEmergencyRecovery === true && recoveryLatch.emergencyRecoveryOrigin !== null && typeof recoveryWindow === "number") {
+        const served = estimatePiOverflowRecoveryInputTokens(outputMessages, readPiLkgFitEnvelope(ctx, pi, resolvePiContextModelKey(ctx), sessionDecisionCalibration(options.db, sessionId), toolWireSchema), { fitEnvelope: false });
+        const historyRemains = inFlightHistorian.has(sessionId);
+        const limit = recoveryAdmissionLimitTokens(recoveryWindow, historyRemains);
+        if (served !== undefined && served > limit) {
+          sessionLog2(sessionId, historyRemains ? `transform: recovery request still over the window: about ${served} tokens against the 95% line ${limit} of ${recoveryWindow}; not sending it, recovery stays armed for the next turn` : `transform: recovery request still over the window: about ${served} tokens against the whole window ${limit}, with no older history left to summarize; not sending it`);
+          throw contextRefusalError(recoveryRefusalNotice(historyRemains));
+        }
+        if (served === undefined) {
+          if (!untrustedRecoveryCountLoggedSessions.has(sessionId)) {
+            untrustedRecoveryCountLoggedSessions.add(sessionId);
+            sessionLog2(sessionId, "transform: recovery request not counted: the fit envelope is untrusted (system prompt or tool definitions not measured yet), so only the byte-count check above applies");
+          }
+        } else {
+          clearEmergencyRecovery(options.db, sessionId);
+          sessionLog2(sessionId, `transform: recovery request admitted: about ${served} tokens, within ${limit} of ${recoveryWindow}; ${recoveryLatch.emergencyRecoveryOrigin} recovery ends`);
+        }
+      }
+      publishFinalRequestAccounting();
+      if (!budget.sideTurn && (result.strictThinkingKept && !result.signedPrefixRewritten || result.heldHeadReleasedForSystemChange === true) && !result.materialized)
+        recordPiHeldSystemHead(sessionId, (ownsHistory) => deferPiDeliveredSystemRefresh(sessionId, ownsHistory));
       let serializedOutput;
       let numbersCommitted = false;
       budget.stage = "LKG/served publication";
@@ -46555,7 +51608,7 @@ function registerPiContextHandler(pi, baseOptions) {
       if (!budget.sideTurn && result.identityRebuilt && (numbersCommitted || lkgCompactionOff))
         acknowledgePiIdentityRebuilds(options.db, sessionId);
       if (!budget.sideTurn)
-        captureOpencodeReasoningBudgetStatus(sessionId, piReasoningStatusMessages(outputMessages), resolveKeepReasoningTokens(options.heuristics?.keepReasoningTokens, resolvePiContextModelKey(ctx)), isPrefixBoundThinkingModel(ctx.model?.provider, ctx.model?.id), sessionDecisionCalibration(options.db, sessionId).proseRatio);
+        afterCapture(sessionId, "reasoning budget status", () => captureOpencodeReasoningBudgetStatus(sessionId, piReasoningStatusMessages(outputMessages), resolveKeepReasoningTokens(options.heuristics?.keepReasoningTokens, resolvePiContextModelKey(ctx)), isPrefixBoundThinkingModel(ctx.model?.provider, ctx.model?.id), sessionDecisionCalibration(options.db, sessionId).proseRatio));
       if (thinkingBindingRecoveryApplied) {
         try {
           clearThinkingBindingRecoveryIf(options.db, sessionId, thinkingBindingRecoveryApplied.flagTarget);
@@ -46564,10 +51617,16 @@ function registerPiContextHandler(pi, baseOptions) {
         }
       }
       budget.assertOutcome();
-      publishTransformDecision?.();
-      if (!budget.sideTurn && result.strictThinkingKept && !result.signedPrefixRewritten && !result.materialized)
-        recordPiHeldSystemHead(sessionId, (ownsHistory) => deferPiDeliveredSystemRefresh(sessionId, ownsHistory));
-      recordServedSystemHash();
+      afterCapture(sessionId, "transform decision record", () => publishTransformDecision?.());
+      afterCapture(sessionId, "request tools release record", () => {
+        if (requestToolsChange === null || recordPiBindingStripEndOrder(options.db, sessionId))
+          requestToolsRelease?.commit();
+        else
+          sessionLog2(sessionId, "request tools release not recorded: the end strip order could not be written");
+      });
+      afterCapture(sessionId, "served system hash record", recordServedSystemHash);
+      if (!budget.sideTurn && !options.compactionOff)
+        afterCapture(sessionId, "ctx_reduce served record", () => recordServedPiCtxReduceCallable(options.db, sessionId, ctxReduceCallable));
       return { messages: outputMessages };
     } catch (err) {
       if (budget.isCancelled(err))
@@ -46601,6 +51660,7 @@ function registerPiContextHandler(pi, baseOptions) {
         budget.assertOutcome();
         budget.recovery = err.recovery;
         recordServedSystemHash();
+        noteServedReplay(sessionIdForError);
         return { messages: err.messages };
       }
       if ((isFailClosedBlockingError(err) || err instanceof EmergencyFailClosedError) && !baseOptions.compactionOff)
@@ -46669,6 +51729,7 @@ function registerPiContextHandler(pi, baseOptions) {
             budget.assertOutcome();
             budget.recovery = "fitting LKG replay";
             recordServedSystemHash();
+            noteServedReplay(sessionIdForError);
             return { messages: replay.messages };
           }
           logPiLkgRecovery(sessionIdForError, `${failureLabel} ${piStorageErrorReason(err)}: LKG unavailable (${replay.reason}); refusing unreduced ${rawMessageCount}-message input`);
@@ -46691,6 +51752,12 @@ function registerPiContextHandler(pi, baseOptions) {
       if (err instanceof PiDegradedPassError && err.site === "outgoing-over-window")
         throw contextRefusalError("The request exceeds the model's context window after reclaim, and no fitting saved request is available; this turn was not sent.");
       if (!lkgCompactionOff && sessionIdForError) {
+        const historianJoin = findPiHistorianJoinDeadline(err);
+        if (historianJoin)
+          throw new PiDegradedPassError("emergency-historian-join", {
+            cause: err,
+            message: `${historianJoin.refusal} (${historianJoin.message})`
+          });
         throw piFallbackRefusal("context-handler-failed", err);
       }
       log2(`[magic-context][pi] context handler failed (continuing without mutation): ${message}`, stack);
@@ -46704,6 +51771,8 @@ function registerPiContextHandler(pi, baseOptions) {
       const sessionId = resolveSessionId2(ctx);
       if (!sessionId)
         return;
+      if (!budget.sideTurn)
+        recordUsageRefusal(baseOptions.db, sessionId);
       withoutSqliteTransformPass2(() => setImmediate(() => {
         if (!isCurrent())
           return;
@@ -46724,6 +51793,7 @@ function registerPiContextHandler(pi, baseOptions) {
   return { runContextPass };
 }
 var inFlightHistorian = new Map;
+var inFlightHistorianProgress = new Map;
 var historianAbortControllers = new Map;
 function abortInFlightHistorians(sessionId) {
   historianAbortControllers.get(sessionId)?.abort();
@@ -46796,6 +51866,7 @@ function ensureRunnablePiBoundaryForTests(snapshot) {
     protectedTailStart: endOrdinal,
     eligibleEndOrdinal: endOrdinal,
     trueRawEligibleTokens: Math.max(1, snapshot.trueRawEligibleTokens),
+    summaryRemovedEligibleTokens: Math.max(1, snapshot.summaryRemovedEligibleTokens),
     rawRangeFingerprint: ""
   };
 }
@@ -46811,6 +51882,32 @@ function hasEligiblePiCompartmentHistory(db, sessionId, boundarySnapshot) {
     sessionLog2(sessionId, `historian recovery eligibility failed: ${err instanceof Error ? err.message : String(err)}`);
     return false;
   }
+}
+function describeHistorianJoinDeadline(error, facts) {
+  if (!(error instanceof PiContextDeadlineError))
+    return error;
+  try {
+    return new PiHistorianJoinDeadlineError(error.message, describeHistorianJoinRefusal({
+      waitedMs: facts.waitedMs,
+      usagePercentage: facts.usagePercentage,
+      run: facts.run,
+      failures: readHistorianFailureStreak(facts.db, facts.sessionId)
+    }));
+  } catch (readError) {
+    sessionLog2(facts.sessionId, `historian join refusal could not read the failure record: ${readError instanceof Error ? readError.message : String(readError)}`);
+    return error;
+  }
+}
+function findPiHistorianJoinDeadline(error) {
+  const seen = new Set;
+  let current = error;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    if (current instanceof PiHistorianJoinDeadlineError)
+      return current;
+    seen.add(current);
+    current = current.cause;
+  }
+  return;
 }
 function sendPiIgnoredNotification(ctx, message) {
   const uiNotify = ctx.ui?.notify;
@@ -46843,6 +51940,7 @@ function spawnPiHistorianRun(args) {
   const holderId = crypto3.randomUUID();
   const controller = new AbortController;
   historianAbortControllers.set(sessionId, controller);
+  const progress = { startedAt: Date.now() };
   const runPromise = inPiHistorianRootContext(sessionId, () => (async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     if (controller.signal.aborted)
@@ -46901,12 +51999,17 @@ function spawnPiHistorianRun(args) {
         expandTools: historian.expandTools,
         thinkingLevel: historian.thinkingLevel,
         memoryEnabled: historian.memoryEnabled,
+        memoryInjectionBudgetTokens: historian.memoryInjectionBudgetTokens,
+        recoveryTriggerReason: args.recoveryTriggerReason,
         allowHomeProject: historian.allowHomeProject,
         autoPromote: historian.autoPromote,
         userMemoriesEnabled: historian.userMemoriesEnabled,
         userObservationsRequested: historian.userObservationsRequested,
         language: historian.language,
         compartmentLeaseHolderId: holderId,
+        onChunkSelected: (chunk) => {
+          progress.chunk = chunk;
+        },
         notifyIssue: (text) => {
           if (!isContextHandlerSessionActive(sessionId)) {
             sessionLog2(sessionId, "historian failure notice skipped after session context cleared");
@@ -46941,8 +52044,11 @@ function spawnPiHistorianRun(args) {
   })().catch((error) => {
     sessionLog2(sessionId, `pi historian run failed: ${error instanceof Error ? error.message : String(error)}`);
   }).finally(() => {
+    progress.endedAt = Date.now();
     try {
       inFlightHistorian.delete(sessionId);
+      if (inFlightHistorianProgress.get(sessionId) === progress)
+        inFlightHistorianProgress.delete(sessionId);
       if (historianAbortControllers.get(sessionId) === controller)
         historianAbortControllers.delete(sessionId);
       unregister();
@@ -46954,6 +52060,7 @@ function spawnPiHistorianRun(args) {
     }
   }));
   inFlightHistorian.set(sessionId, runPromise);
+  inFlightHistorianProgress.set(sessionId, progress);
   historian.onStatusChange?.(ctx, sessionId);
 }
 function resolvePiAppendCompaction(ctx) {
@@ -47113,6 +52220,7 @@ function maybeFireHistorian(args) {
     providerShapeVersion: "pi-folded-v1",
     cacheNamespace: `pi:${sessionId}`,
     emergencyTailScale,
+    recovery: historianStateSnapshot.needsEmergencyRecovery,
     liftLivePromptFloor
   }));
   const resolveRunnablePiBoundarySnapshot = (stale) => {
@@ -47150,6 +52258,7 @@ function maybeFireHistorian(args) {
         provider,
         unregister,
         boundarySnapshot: snapshot,
+        recoveryTriggerReason: "history_retirement",
         refreshBoundarySnapshot: resolveRunnablePiBoundarySnapshot,
         currentContextLimit: boundaryContextLimit,
         fallbackModelId: modelKey
@@ -47180,6 +52289,7 @@ Historian previously failed ${failureCount} time(s), so Magic Context is retryin
           provider,
           unregister,
           boundarySnapshot: prepareRecoveryBoundary,
+          recoveryTriggerReason: "startup_recovery",
           refreshBoundarySnapshot: resolveRunnablePiBoundarySnapshot,
           currentContextLimit: boundaryContextLimit,
           fallbackModelId: modelKey
@@ -47195,7 +52305,6 @@ Historian previously failed ${failureCount} time(s), so Magic Context is retryin
       permission: {
         signedThinkingHold: args.signedThinkingHeld === true,
         firstRender: false,
-        idleExpiry: false,
         emergency: usage.percentage >= historianForceMaterializationPercentage
       }
     }, args.eligiblePendingDropTagIds, args.primaryExecute === true);
@@ -47295,9 +52404,31 @@ function captureReasoningMutationRollback(messages) {
     }
   };
 }
+function piServedHeadMatches(served, index, head) {
+  const contentOf = (message) => isRecord(message) && message.role === "user" && Array.isArray(message.content) ? message.content : null;
+  const isText = (part, text) => isRecord(part) && part.type === "text" && part.text === text;
+  const m0 = contentOf(served?.[index]);
+  const m1 = contentOf(served?.[index + 1]);
+  if (!m0 || !m1 || m1.length !== 1 || !isText(m1[0], head.m1Text))
+    return false;
+  if (m0.length !== (head.muralDataUrl ? 2 : 1) || !isText(m0[0], head.m0Text))
+    return false;
+  if (!head.muralDataUrl)
+    return true;
+  const image = m0[1];
+  if (!isRecord(image) || image.type !== "image" || typeof image.mimeType !== "string" || typeof image.data !== "string")
+    return false;
+  const prefix = `data:${image.mimeType};base64,`;
+  return head.muralDataUrl.length === prefix.length + image.data.length && head.muralDataUrl.startsWith(prefix) && head.muralDataUrl.endsWith(image.data);
+}
 async function runCompactionOffPipeline(args) {
   let injectionResult = null;
   const transcript = [...args.messages];
+  let stripEntryIdsMemo;
+  const stripEntryIds = () => {
+    stripEntryIdsMemo ??= transcript.map((message, index) => resolvePiRealStableId(message, index, args.entryIds, args.entryIdByRef ?? undefined));
+    return stripEntryIdsMemo;
+  };
   let headChangedUnderSignedThinking = false;
   if (args.injection) {
     const state = {
@@ -47312,29 +52443,60 @@ async function runCompactionOffPipeline(args) {
       muralEnabled: args.injection.muralEnabled === true,
       compactionOff: true
     };
-    const signedTurnHoldsHead = args.reasoningClearing?.prefixBound === true && hasActiveAnthropicThinkingTurn(args.messages, args.resolvedProviderID, args.resolvedModelID);
+    const signedTurnHoldsHead = !args.requestToolsChange && args.reasoningClearing?.prefixBound === true && hasActiveAnthropicThinkingTurn(args.messages, args.resolvedProviderID, args.resolvedModelID);
     if (signedTurnHoldsHead)
       state.preparedPrefix = prepareCachedM0M1PiReplay(state, args.db, args.injectionPassSnapshot?.cachedRow);
     const servedBeforeFirstRender = signedTurnHoldsHead && !state.preparedPrefix ? args.readLastServedMessages?.() ?? null : undefined;
+    let lastServed;
+    const readLastServed = () => {
+      if (lastServed === undefined)
+        lastServed = args.readLastServedMessages?.() ?? null;
+      return lastServed;
+    };
+    if (!signedTurnHoldsHead && args.reasoningClearing?.prefixBound === true) {
+      state.onFoldPrepare = () => {
+        const served = readLastServed();
+        const headIndex = placePiInitialSystemAtHead([
+          ...args.messages
+        ]);
+        return (db, head) => {
+          if (piServedHeadMatches(served, headIndex, head))
+            return;
+          applyPiProactiveThinkingStrip({
+            db,
+            sessionId: args.sessionId,
+            messages: transcript,
+            entryIds: stripEntryIds(),
+            provider: args.resolvedProviderID,
+            model: args.resolvedModelID,
+            cacheBustingPass: true,
+            stripActiveTurn: true,
+            persistOnly: true,
+            requirePersistence: true,
+            report: (line) => sessionLog2(args.sessionId, line)
+          });
+        };
+      };
+    }
     injectionResult = injectM0M1Pi(state, args.db, args.messages, args.entryIds, false, args.injectionPassSnapshot);
     if (servedBeforeFirstRender !== undefined) {
       const headCount = injectionResult?.syntheticLeadingCount ?? 0;
       const head = JSON.stringify(args.messages.slice(0, headCount));
       headChangedUnderSignedThinking = servedBeforeFirstRender === null || JSON.stringify(servedBeforeFirstRender.slice(0, headCount)) !== head;
     } else if (!signedTurnHoldsHead && args.reasoningClearing?.prefixBound === true && (injectionResult?.m0Materialized === true || injectionResult?.m1RenderedCoverage != null)) {
-      const served = args.readLastServedMessages?.() ?? null;
+      const served = readLastServed();
       const headCount = injectionResult?.syntheticLeadingCount ?? 0;
       headChangedUnderSignedThinking = served === null || JSON.stringify(served.slice(0, headCount)) !== JSON.stringify(args.messages.slice(0, headCount));
       if (headChangedUnderSignedThinking)
         sessionLog2(args.sessionId, "compaction-off fold changed the head: stripping signed thinking");
     }
   }
-  if (headChangedUnderSignedThinking)
+  if (headChangedUnderSignedThinking || args.requestToolsChange)
     applyPiProactiveThinkingStrip({
       db: args.db,
       sessionId: args.sessionId,
       messages: transcript,
-      entryIds: transcript.map((message, index) => resolvePiRealStableId(message, index, args.entryIds, args.entryIdByRef ?? undefined)),
+      entryIds: stripEntryIds(),
       provider: args.resolvedProviderID,
       model: args.resolvedModelID,
       cacheBustingPass: true,
@@ -47377,6 +52539,9 @@ async function runCompactionOffPipeline(args) {
   };
 }
 var signedThinkingHoldLogKeys = new Map;
+function piForceBandPressure(args) {
+  return args.forceMaterialization === true || args.percentage >= args.forceMaterializationPercentage;
+}
 function resolvePiSignedThinkingHold(args) {
   if (!args.prefixBound)
     return false;
@@ -47385,6 +52550,7 @@ function resolvePiSignedThinkingHold(args) {
     messages: args.messages,
     usagePercentage: args.usagePercentage,
     executeThresholdPercentage: args.executeThresholdPercentage,
+    forceBandPressure: args.forceBandPressure,
     estimateTextTokens: (text) => {
       proseRatio ??= sessionDecisionCalibration(args.db, args.sessionId).proseRatio;
       return estimateTokens(text) * proseRatio;
@@ -47401,13 +52567,30 @@ async function runPipeline(args) {
   args.assertCurrentPass?.();
   if (args.compactionOff)
     return runCompactionOffPipeline(args);
+  const dropBranchEntries = args.dropBranchEntries;
+  const dropBranchIds = dropBranchEntries ? piDropBranchIds(dropBranchEntries) : null;
+  trackPiDropLeaf(args.db, args.sessionId, dropBranchIds ? [...dropBranchIds].at(-1) ?? null : null);
+  cancelPiAbandonedPendingDrops(args.db, args.sessionId, dropBranchIds);
+  const piStableId = (message, index) => resolvePiStableId(message, index, args.entryIds, args.entryIdByRef ?? undefined);
+  let stripRemovedTurnNow = false;
   const thinkingRecovery = prepareLatestThinkingRecovery({
     db: args.db,
     sessionId: args.sessionId,
     messages: args.messages,
-    id: (message, index) => resolvePiStableId(message, index, args.entryIds, args.entryIdByRef ?? undefined),
-    parts: (message) => Array.isArray(message?.content) ? message.content : []
+    id: piStableId,
+    parts: (message) => Array.isArray(message?.content) ? message.content : [],
+    modelID: args.resolvedModelID,
+    providerID: args.resolvedProviderID,
+    persistRemoval: (ids) => {
+      const outcome = persistPiLatestTurnThinkingRemoval(args.db, args.sessionId, ids);
+      stripRemovedTurnNow = outcome.stripNow;
+      return outcome.persisted;
+    }
   });
+  const removedTurnIds = new Set(thinkingRecovery.removedIds ?? []);
+  const removedTurnAtStart = removedTurnIds.size > 0 && (stripRemovedTurnNow || piBindingStripsAtStart(args.db, args.sessionId));
+  if (removedTurnAtStart)
+    stripPiThinkingOfIds(args.messages, removedTurnIds, piStableId);
   if (thinkingRecovery.ended)
     signalPiPendingMaterialization(args.sessionId, "thinking_hold");
   let restoreOriginals;
@@ -47436,7 +52619,7 @@ async function runPipeline(args) {
       cacheBustingPass: isCacheBustingPass,
       stripActiveTurn: true,
       persistOnly: true,
-      requirePersistence: !!args.recoveryRebuildReason
+      requirePersistence: !!args.recoveryRebuildReason || !!args.requestToolsChange
     });
     if (activeThinkingTurn && isCacheBustingPass && !result)
       throw new Error("Cannot persist signed thinking omission before prefix rewrite");
@@ -47446,6 +52629,8 @@ async function runPipeline(args) {
   };
   if (args.recoveryRebuildReason || args.forceSignedRebuildForFit && signedTurnOnPrefixBoundModel)
     stripForPrefixRewrite(isCacheBustingPass);
+  if (args.requestToolsChange && !rewritingSignedPrefix)
+    stripForPrefixRewrite();
   const stripUnheldSignedTurnOnBust = () => {
     if (isCacheBustingPass && signedTurnOnPrefixBoundModel && !protectedSignedPrefix && !rewritingSignedPrefix)
       stripForPrefixRewrite();
@@ -47536,7 +52721,11 @@ async function runPipeline(args) {
       lastResponseTime: hardMeta.lastResponseTime
     };
   })() : undefined;
-  const emergencyDropEligible = args.forceMaterialization === true || args.contextUsage.percentage >= forceMaterializationPercentage;
+  const emergencyDropEligible = piForceBandPressure({
+    forceMaterialization: args.forceMaterialization,
+    percentage: args.contextUsage.percentage,
+    forceMaterializationPercentage
+  });
   const piM0State = args.injection && piHardSignals ? {
     sessionId: args.sessionId,
     projectIdentity: args.projectIdentity,
@@ -47623,6 +52812,12 @@ async function runPipeline(args) {
     const mismatch = foldDueDecision.mismatch ? ` mismatch=${JSON.stringify(foldDueDecision.mismatch)}` : "";
     sessionLog2(args.sessionId, `pi m[0] HARD fold decision: reason=${preFoldInjectionResult?.m0Reason ?? foldDueDecision.reason ?? "soft_refresh"}${mismatch} executed=${foldExecutedThisPass} bustsServedPrefix=${foldBustsServedPrefixThisPass}`);
   }
+  let heldHeadReleasedForSystemChange = false;
+  if (effectiveSystemChangedThisPass && protectedSignedPrefix) {
+    sessionLog2(args.sessionId, "system prompt changed under a held signed turn: releasing signed thinking");
+    heldHeadReleasedForSystemChange = !firstRenderBust && piM0State !== undefined;
+    stripForPrefixRewrite();
+  }
   const temporalCandidates = args.temporalAwareness ? collectPiTemporalCandidates(args.messages, args.entryIds ?? []) : new Map;
   for (const entry of readPiIdentityDecisions(args.db, args.sessionId) ?? []) {
     const decision = decodePiContentDecision(entry);
@@ -47663,6 +52858,12 @@ async function runPipeline(args) {
     }
   };
   const tTranscriptBuild = performance.now();
+  let frozenImageMessageIds;
+  const imageStrippedMessage = (message, index) => {
+    const id = stableIdResolver(message, index);
+    frozenImageMessageIds ??= getProcessedImageStrippedIds(args.db, args.sessionId);
+    return id !== undefined && frozenImageMessageIds.has(id);
+  };
   const transcript = createPiTranscript(args.messages, args.sessionId, args.messages.map(stableIdResolver), {
     preserveReasoningToolArcs: args.reasoningClearing?.preserveReasoningToolArcs,
     authorizeToolRemoval: (callId) => authorizePiToolRemoval({
@@ -47678,7 +52879,15 @@ async function runPipeline(args) {
       callIds,
       saved: nativeRemovalInputs,
       canApply: isCacheBustingPass
-    })
+    }),
+    toolImageTokens: (messageIndex, partIndex) => {
+      const message = args.messages[messageIndex];
+      return piToolImageWireTokens({
+        block: Array.isArray(message?.content) ? message.content[partIndex] : undefined,
+        stripped: imageStrippedMessage(message, messageIndex),
+        modelAcceptsImages: args.modelAcceptsImages !== false
+      });
+    }
   });
   logTransformTiming(args.sessionId, "transcriptBuild", tTranscriptBuild);
   const workingMessages = transcript.getWorkingMessages();
@@ -47688,7 +52897,10 @@ async function runPipeline(args) {
     return findLatestUserMessageIdPi(args.messages, ids)?.messageId ?? null;
   })();
   const alreadyRanHeuristicsThisTurn = currentTurnId !== null && lastHeuristicsTurnIdBySession.get(args.sessionId) === currentTurnId;
-  const ctxReduceCallable = !args.sessionMeta.isSubagent;
+  const ctxReduceCallable = args.ctxReduceCallable;
+  const requestToolListChanged = args.ctxReduceCallable !== args.servedCtxReduceCallable;
+  if (requestToolListChanged)
+    sessionLog2(args.sessionId, `request tool list changed: ctx_reduce ${args.ctxReduceCallable ? "added; tag prefixes return" : "removed; tag prefixes stop"} on this rebuild`);
   const canConsumeDeferredLate = args.schedulerDecision === "execute" || args.forceMaterialization === true || args.contextUsage.percentage >= forceMaterializationPercentage;
   let deferredMaterializeEligible = canConsumeDeferredLate && deferredMaterializationSessions.has(args.sessionId) && !protectedSignedPrefix;
   const executePressureEligible = args.schedulerDecision === "execute" || emergencyDropEligible;
@@ -47699,12 +52911,11 @@ async function runPipeline(args) {
   }
   const routinePressureAlreadyApplied = !args.sessionMeta.isSubagent && executePressureEligible && routinePressureAppliedBySession.get(args.sessionId) === true;
   let hasPendingMaterializeSignal = !protectedSignedPrefix && hasPendingMaterialization(args.sessionId);
-  const heldIdleExpiryRebuild = protectedSignedPrefix && piHardSignals?.cacheExpired === true;
   const systemPrefixChangedThisPass = !prefixPreflightContended && effectiveSystemChangedThisPass;
   const rideSignals = {
     executeReclaim: false,
     subagentExecute: args.sessionMeta.isSubagent && args.schedulerDecision === "execute",
-    hardFold: foldBustsServedPrefixThisPass || systemPrefixChangedThisPass || firstRenderBust || heldIdleExpiryRebuild || isCacheBustingPass,
+    hardFold: foldBustsServedPrefixThisPass || systemPrefixChangedThisPass || requestToolListChanged || firstRenderBust || isCacheBustingPass,
     force: (args.forceMaterialization === true || emergencyDropEligible) && (args.contextUsage.percentage >= 95 || getEmergencyInputSample(args.db, args.sessionId) === 0),
     explicitFlush: !protectedSignedPrefix && (args.userFlushOrigin === true || hasPendingMaterializationOrigin(pendingMaterializationSessions, args.sessionId, "user_flush")),
     publishedHistory: !prefixPreflightContended && publishedM1RefreshedThisPass
@@ -47712,12 +52923,21 @@ async function runPipeline(args) {
   const ridePermissionGate = {
     signedThinkingHold: protectedSignedPrefix,
     firstRender: firstRenderBust,
-    idleExpiry: heldIdleExpiryRebuild,
     emergency: emergencyDropEligible
   };
   let prefixMutationAllowed = prefixMutationPermitted(ridePermissionGate);
   isCacheBustingPass = reclaimRidePermitted(rideSignals, ridePermissionGate);
   let publishedWorkDrainAllowed = isCacheBustingPass;
+  const noteServedPermission = () => noteServedPassPermission(args.sessionId, {
+    permitted: isCacheBustingPass,
+    rides: reclaimRideLabel(rideSignals),
+    signedThinkingHold: protectedSignedPrefix,
+    firstRender: firstRenderBust,
+    hostCheckpointHead: false,
+    emergency: emergencyDropEligible,
+    schedulerDecision: args.schedulerDecision
+  });
+  noteServedPermission();
   stripUnheldSignedTurnOnBust();
   const usesTokenProtection = args.protectedTokenTierOverrides !== undefined || args.protectedTokens !== undefined;
   const resolveProtectionFloor = () => resolveEpochFloorForPass(args.db, args.sessionId, {
@@ -47728,7 +52948,7 @@ async function runPipeline(args) {
     onRejectedProjectOverride: (warning) => sessionLog2(args.sessionId, warning)
   });
   let protectionFloorResolution = resolveProtectionFloor();
-  let shouldRunHeuristics = args.heuristics !== undefined && isCacheBustingPass && (rideSignals.publishedHistory || systemPrefixChangedThisPass || rideSignals.explicitFlush || args.forceMaterialization === true || hasPendingMaterializeSignal || deferredMaterializeEligible || foldBustsServedPrefixThisPass || firstRenderBust || heldIdleExpiryRebuild || args.recoveryRebuildReason !== undefined && isCacheBustingPass || rideSignals.subagentExecute || args.schedulerDecision === "execute" && !alreadyRanHeuristicsThisTurn);
+  let shouldRunHeuristics = args.heuristics !== undefined && isCacheBustingPass && (rideSignals.publishedHistory || systemPrefixChangedThisPass || requestToolListChanged || rideSignals.explicitFlush || args.forceMaterialization === true || hasPendingMaterializeSignal || deferredMaterializeEligible || foldBustsServedPrefixThisPass || firstRenderBust || args.recoveryRebuildReason !== undefined && isCacheBustingPass || rideSignals.subagentExecute || args.schedulerDecision === "execute" && !alreadyRanHeuristicsThisTurn);
   let unavoidableCarriedIdentityRebuild = false;
   if (protectedSignedPrefix && readPiIdentityRebuilds(args.db, args.sessionId).length > 0) {
     args.tryReplayHeldIdentityRebuild?.();
@@ -47769,6 +52989,7 @@ async function runPipeline(args) {
     realIdPositions: fallbackIndex.positions,
     hasFallbackMessageTags,
     preflightRevision,
+    remainingMs: args.remainingPassMs,
     rebuildFingerprints: args.reusableMessageIds?.size ? () => {
       args.assertCurrentPass?.();
       const full = fallbackIndex.fingerprints(readPiFallbackFingerprintHeaders(args.db, args.sessionId));
@@ -47793,6 +53014,7 @@ async function runPipeline(args) {
     deferredMaterializeEligible = canConsumeDeferredLate && deferredMaterializationSessions.has(args.sessionId);
     isCacheBustingPass = prefixMutationAllowed;
     publishedWorkDrainAllowed = isCacheBustingPass;
+    noteServedPermission();
     stripUnheldSignedTurnOnBust();
     shouldRunHeuristics = args.heuristics !== undefined;
     if (piM0State && prefixMutationAllowed) {
@@ -47853,7 +53075,7 @@ async function runPipeline(args) {
     args.assertCurrentPass?.();
     return tagTranscript(args.sessionId, { ...transcript, messages: taggingView }, args.tagger, args.db, {
       skipPrefixInjection: !ctxReduceCallable,
-      preserveTagOnlyAssistantText: true,
+      preserveTagOnlyAssistantText: PI_PRESERVE_TAG_ONLY_ASSISTANT_TEXT,
       entryFingerprintByMessageId,
       reuseMessageIds: textIdentityPlan.reusableMessageIds,
       reuseTextMessageIds: textIdentityPlan.reusableTextMessageIds,
@@ -47895,22 +53117,10 @@ async function runPipeline(args) {
       }
     }
   }
-  let newTargets = new Map(protectNewTagMutations(mutationView.map((message) => ({
+  const newTargets = new Map(protectNewTagMutations(mutationView.map((message) => ({
     info: message.info,
     parts: message.parts
   })), targets, protectedThinkingProxies, args.reasoningClearing?.prefixBound === true));
-  if (protectedSignedPrefix && args.contextUsage.percentage >= 95 && !args.upperEstimateOnly) {
-    const candidates = getActiveTagsBySession2(args.db, args.sessionId).filter((tag) => tag.type === "tool" && targets.get(tag.tagNumber)?.canDrop?.());
-    if (candidates.length > 0 && candidates.every((tag) => newTargets.get(tag.tagNumber)?.thinkingRewriteProtected === true)) {
-      stripForPrefixRewrite();
-      newTargets = targets;
-      prefixMutationAllowed = true;
-      isCacheBustingPass = true;
-      publishedWorkDrainAllowed = true;
-      shouldRunHeuristics = args.heuristics !== undefined;
-      hasPendingMaterializeSignal = hasPendingMaterialization(args.sessionId);
-    }
-  }
   for (const number of identityAdoption.protectedTagNumbers) {
     if (rewritingSignedPrefix)
       break;
@@ -47937,65 +53147,67 @@ async function runPipeline(args) {
       message.content = content;
     });
   }
-  const tLegacyToolConversion = performance.now();
-  if (foldBustsServedPrefixThisPass) {
-    const savedRemovalInputs = nativeRemovalInputs;
-    try {
-      nativeRemovalInputs = savedRemovalInputs && new Map(savedRemovalInputs);
-      let converted = 0;
-      args.db.transaction(() => removalBatch((flush) => {
-        converted = convertLegacyToolSkeletons(args.db, args.sessionId, targets, {
-          prepareRemovals: (rows) => preparePiToolRemovalChecks({
-            db: args.db,
-            rows,
-            targets,
-            messages: args.messages,
-            prepare: transcript.prepareToolRemovalMeasurements
-          }),
-          keepFullDrop: (callId) => nativeRemovalInputs === undefined || callId !== null && authorizePiToolRemoval({
-            db: args.db,
-            sessionId: args.sessionId,
-            callId,
-            saved: nativeRemovalInputs,
-            canApply: false
-          }) === true
-        }).size;
-        flush();
-      })).immediate();
-      if (converted > 0) {
-        sessionLog2(args.sessionId, `pi HARD fold converted ${converted} legacy dropped-tool skeleton(s) to real-or-absent`);
+  const applyExistingToolConversions = () => {
+    const tLegacyToolConversion = performance.now();
+    if (foldBustsServedPrefixThisPass) {
+      const savedRemovalInputs = nativeRemovalInputs;
+      try {
+        nativeRemovalInputs = savedRemovalInputs && new Map(savedRemovalInputs);
+        let converted = 0;
+        args.db.transaction(() => removalBatch((flush) => {
+          converted = convertLegacyToolSkeletons(args.db, args.sessionId, targets, {
+            prepareRemovals: (rows) => preparePiToolRemovalChecks({
+              db: args.db,
+              rows,
+              targets,
+              messages: args.messages,
+              prepare: transcript.prepareToolRemovalMeasurements
+            }),
+            keepFullDrop: (callId) => nativeRemovalInputs === undefined || callId !== null && authorizePiToolRemoval({
+              db: args.db,
+              sessionId: args.sessionId,
+              callId,
+              saved: nativeRemovalInputs,
+              canApply: false
+            }) === true
+          }).size;
+          flush();
+        })).immediate();
+        if (converted > 0) {
+          sessionLog2(args.sessionId, `pi HARD fold converted ${converted} legacy dropped-tool skeleton(s) to real-or-absent`);
+        }
+      } catch (error) {
+        nativeRemovalInputs = savedRemovalInputs;
+        sessionLog2(args.sessionId, `pi legacy dropped-tool skeleton conversion failed (kept legacy bytes): ${error instanceof Error ? error.message : String(error)}`);
       }
-    } catch (error) {
-      nativeRemovalInputs = savedRemovalInputs;
-      sessionLog2(args.sessionId, `pi legacy dropped-tool skeleton conversion failed (kept legacy bytes): ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-  logTransformTiming(args.sessionId, "convertLegacyToolSkeletons", tLegacyToolConversion);
-  if (args.sessionMeta.isSubagent && isCacheBustingPass && !protectedSignedPrefix && !args.compactionOff) {
-    const savedRemovalInputs = nativeRemovalInputs;
-    try {
-      nativeRemovalInputs = savedRemovalInputs && new Map(savedRemovalInputs);
-      const converted = args.db.transaction(() => removalBatch((flush) => {
-        const conversions = prepareAgedToolSkeletonConversions(args.db, args.sessionId, newTargets, {
-          prepareRemovals: (rows) => preparePiToolRemovalChecks({
-            db: args.db,
-            rows,
-            targets: newTargets,
-            messages: args.messages,
-            prepare: transcript.prepareToolRemovalMeasurements
-          })
-        });
-        conversions.persist(args.db);
-        flush();
-        return conversions.converted.size;
-      })).immediate();
-      if (converted > 0)
-        recordFirstApplicationWireEdit(true);
-    } catch (error) {
-      nativeRemovalInputs = savedRemovalInputs;
-      throw error;
+    logTransformTiming(args.sessionId, "convertLegacyToolSkeletons", tLegacyToolConversion);
+    if (args.sessionMeta.isSubagent && isCacheBustingPass && !protectedSignedPrefix && !args.compactionOff) {
+      const savedRemovalInputs = nativeRemovalInputs;
+      try {
+        nativeRemovalInputs = savedRemovalInputs && new Map(savedRemovalInputs);
+        const converted = args.db.transaction(() => removalBatch((flush) => {
+          const conversions = prepareAgedToolSkeletonConversions(args.db, args.sessionId, newTargets, {
+            prepareRemovals: (rows) => preparePiToolRemovalChecks({
+              db: args.db,
+              rows,
+              targets: newTargets,
+              messages: args.messages,
+              prepare: transcript.prepareToolRemovalMeasurements
+            })
+          });
+          conversions.persist(args.db);
+          flush();
+          return conversions.converted.size;
+        })).immediate();
+        if (converted > 0)
+          recordFirstApplicationWireEdit(true);
+      } catch (error) {
+        nativeRemovalInputs = savedRemovalInputs;
+        throw error;
+      }
     }
-  }
+  };
   try {
     if (!args.sessionMeta.isSubagent) {
       const hasRecentCommit = detectRecentCommit(args.messages);
@@ -48012,16 +53224,23 @@ async function runPipeline(args) {
   const deferredMaterializationWasPending = deferredMaterializationSessions.has(args.sessionId);
   const deferredHistoryRefreshWasPending = deferredHistoryWasPendingAtPassStart;
   const shouldReadPendingOps = !args.compactionOff && (publishedWorkDrainAllowed || args.schedulerDecision === "execute" || args.forceMaterialization || hasPendingMaterializeSignal || foldExecutedThisPass || firstRenderBust);
-  const pendingOps = shouldReadPendingOps ? getPendingOps(args.db, args.sessionId) : [];
-  const tReclaimDistance = performance.now();
-  const reclaimDistance = isCacheBustingPass ? toolReclaimDistanceEntries(mutationView, targets) : [];
-  logTransformTiming(args.sessionId, "toolReclaimDistanceEntries", tReclaimDistance);
-  const protectedToolTags = protectedToolTagNumbers(getActiveTagsBySession2(args.db, args.sessionId), args.protectedTools);
-  for (const number of identityAdoption.protectedTagNumbers)
-    protectedToolTags.add(number);
-  const protectionWindowForPass = getProtectionWindowForSession(args.db, args.sessionId, protectionFloorResolution.floor);
-  const protectedTagNumbersForPass = usesTokenProtection ? protectionWindowForPass.protectedTagNumbers : newestActiveTagNumbersByCount(getActiveTagsBySession2(args.db, args.sessionId), args.protectedTags);
-  const pendingOperationTags = pendingOps.length > 0 ? getTagsForPendingOperations2(args.db, args.sessionId, pendingOps.map((operation) => operation.tagId), usesTokenProtection ? 0 : args.protectedTags, RECENT_TOOL_SKELETON_WINDOW) : [];
+  const readPendingDropState = () => {
+    const pendingOps = shouldReadPendingOps ? getPendingOps(args.db, args.sessionId) : [];
+    const protectedToolTags = protectedToolTagNumbers(getActiveTagsBySession2(args.db, args.sessionId), args.protectedTools);
+    for (const number of identityAdoption.protectedTagNumbers)
+      protectedToolTags.add(number);
+    const protectionWindowForPass = getProtectionWindowForSession(args.db, args.sessionId, protectionFloorResolution.floor);
+    const protectedTagNumbersForPass = usesTokenProtection ? protectionWindowForPass.protectedTagNumbers : newestActiveTagNumbersByCount(getActiveTagsBySession2(args.db, args.sessionId), args.protectedTags);
+    const pendingOperationTags = pendingOps.length > 0 ? getTagsForPendingOperations2(args.db, args.sessionId, pendingOps.map((operation) => operation.tagId), usesTokenProtection ? 0 : args.protectedTags, RECENT_TOOL_SKELETON_WINDOW) : [];
+    return {
+      pendingOps,
+      protectedToolTags,
+      protectionWindowForPass,
+      protectedTagNumbersForPass,
+      pendingOperationTags
+    };
+  };
+  const executeReclaimSnapshot = readPendingDropState();
   if (!args.sessionMeta.isSubagent && args.schedulerDecision === "execute") {
     args.evaluateHistorianBeforeReclaim?.({
       activeTags: getActiveTagsBySession2(args.db, args.sessionId),
@@ -48038,12 +53257,12 @@ async function runPipeline(args) {
     reclaimableTokens: estimateExecuteReclaimTokens({
       db: args.db,
       sessionId: args.sessionId,
-      pendingOps,
-      tags: pendingOperationTags,
+      pendingOps: executeReclaimSnapshot.pendingOps,
+      tags: executeReclaimSnapshot.pendingOperationTags,
       targets: newTargets,
       protectedTagIds: new Set([
-        ...protectedTagNumbersForPass,
-        ...protectedToolTags
+        ...executeReclaimSnapshot.protectedTagNumbersForPass,
+        ...executeReclaimSnapshot.protectedToolTags
       ]),
       probePreparation: (targets) => {
         const saved = nativeRemovalInputs;
@@ -48075,13 +53294,42 @@ async function runPipeline(args) {
   if (rideSignals.executeReclaim) {
     isCacheBustingPass = reclaimRidePermitted(rideSignals, ridePermissionGate);
     publishedWorkDrainAllowed = isCacheBustingPass;
+    noteServedPermission();
     shouldRunHeuristics ||= isCacheBustingPass && args.heuristics !== undefined;
     stripUnheldSignedTurnOnBust();
     applyTemporalOnRide();
   }
+  if (reconcilePiDropBranches(args.db, args.sessionId, dropBranchIds, isCacheBustingPass && !protectedSignedPrefix)) {
+    args.tagger.cleanup(args.sessionId);
+    args.tagger.initFromDb(args.sessionId, args.db);
+    nativeRemovalInputs = getNativeReplayState(args.db, args.sessionId).toolInputs;
+    recordFirstApplicationWireEdit(true);
+  }
+  applyExistingToolConversions();
+  const {
+    pendingOps,
+    protectedToolTags,
+    protectionWindowForPass,
+    protectedTagNumbersForPass,
+    pendingOperationTags
+  } = readPendingDropState();
+  const tReclaimDistance = performance.now();
+  const reclaimDistance = isCacheBustingPass ? toolReclaimDistanceEntries(mutationView, targets) : [];
+  logTransformTiming(args.sessionId, "toolReclaimDistanceEntries", tReclaimDistance);
   const deferredMaterialize = canConsumeDeferredLate && deferredMaterializationWasPending;
   const deferredHistoryRefresh = canConsumeDeferredLate && deferredHistoryRefreshWasPending;
   const shouldApplyPendingOps = publishedWorkDrainAllowed;
+  const emergencyPlannerMayRun = shouldRunHeuristics && args.heuristics !== undefined && args.forceMaterialization === true && args.emergencyCeilingTokens !== undefined && args.emergencyCeilingTokens > 0;
+  const tagsNewerThanReading = emergencyPlannerMayRun ? tagsSinceReading(transcript.messages, newTargets) : undefined;
+  const queuedDropTags = new Set(pendingOps.map((op) => op.tagId));
+  const emergencyToolImageTokens = () => {
+    const sent = piMessagesWithWireImages(workingMessages, {
+      modelAcceptsImages: args.modelAcceptsImages !== false,
+      strippedMessage: imageStrippedMessage
+    });
+    return args.providerOverflowRecovery === true ? piRecoveryToolImageTokens(sent) : piToolImageCostTokens(sent);
+  };
+  const emergencyServedBeforeDrain = emergencyPlannerMayRun && shouldApplyPendingOps && queuedDropTags.size > 0 ? snapshotPiEmergencyServedMass(getPiActiveTagSnapshotView(args.db, args.sessionId).filter((tag) => queuedDropTags.has(tag.tagNumber) && !tagsNewerThanReading?.has(tag.tagNumber)), newTargets, emergencyToolImageTokens()) : undefined;
   mutationGateObserverForTests?.({
     foldDue: foldDueDecision.value,
     foldExecuted: foldExecutedThisPass,
@@ -48219,7 +53467,9 @@ async function runPipeline(args) {
   if (shouldRunHeuristics && args.heuristics) {
     try {
       const tHeuristic = performance.now();
-      const independentMutationBeforeHeuristics = pendingOpsDidMutate || systemPrefixChangedThisPass || foldBustsServedPrefixThisPass || identityRebuild || firstRenderBust || heldIdleExpiryRebuild;
+      const providerOverflow = args.providerOverflowRecovery === true;
+      const recoveryCalibration = sessionDecisionCalibration(args.db, args.sessionId);
+      const independentMutationBeforeHeuristics = pendingOpsDidMutate || systemPrefixChangedThisPass || requestToolListChanged || foldBustsServedPrefixThisPass || identityRebuild || firstRenderBust;
       if (args.forceMaterialization === true && independentMutationBeforeHeuristics && getEmergencyInputSample(args.db, args.sessionId) > 0) {
         clearEmergencyDropSample(args.db, args.sessionId);
       }
@@ -48236,7 +53486,11 @@ async function runPipeline(args) {
           currentTotalInputTokens: args.contextUsage.inputTokens,
           ceilingTokens: args.emergencyCeilingTokens,
           usagePercentage: args.contextUsage.percentage,
-          passAlreadyPriced: independentMutationBeforeHeuristics
+          passAlreadyPriced: independentMutationBeforeHeuristics,
+          toolImageTokens: emergencyToolImageTokens(),
+          fitCalibration: providerOverflow ? piRecoveryFitCalibration(recoveryCalibration) : undefined,
+          servedBeforePass: emergencyServedBeforeDrain,
+          sinceReading: tagsNewerThanReading
         } : undefined,
         caveman: args.isSubagent ? undefined : args.heuristics?.caveman
       }, activeTags, stableIdResolver));
@@ -48606,17 +53860,24 @@ async function runPipeline(args) {
           stripPiLeadingTemporalMarker(message);
         }
       }
-      if (args.isCacheBusting && prefixMutationAllowed) {
-        historyRefreshSessions.delete(args.sessionId);
-        historyWasConsumedThisPass = true;
-      }
-      if (deferredHistoryRefresh && prefixMutationAllowed) {
-        historyWasConsumedThisPass = true;
+      if (!heldHeadReleasedForSystemChange) {
+        if (args.isCacheBusting && prefixMutationAllowed) {
+          historyRefreshSessions.delete(args.sessionId);
+          historyWasConsumedThisPass = true;
+        }
+        if (deferredHistoryRefresh && prefixMutationAllowed) {
+          historyWasConsumedThisPass = true;
+        }
       }
       logTransformTiming(args.sessionId, "prepareCompartmentInjection", tInjection);
       logTransformTiming(args.sessionId, "compartmentPhase", tInjection);
     } catch (err) {
-      sessionLog2(args.sessionId, `compartment injection failed (continuing): ${err instanceof Error ? err.message : String(err)}`);
+      sessionLog2(args.sessionId, `compartment injection failed; replaying the last good request or refusing the turn: ${err instanceof Error ? err.message : String(err)}`);
+      if (isTransientPiStorageError(err))
+        throw err;
+      throw new PiDegradedPassError("m0-m1-injection-degradation", {
+        cause: err
+      });
     }
   }
   transcript.finalizeToolRemovals();
@@ -48852,6 +54113,8 @@ async function runPipeline(args) {
   }
   if (bustedThisPass)
     clearExecuteReclaimState(args.db, args.sessionId);
+  if (removedTurnIds.size > 0 && !removedTurnAtStart)
+    stripPiThinkingOfIds(outputMessages, removedTurnIds, (message) => message && typeof message === "object" ? postCommitStableIdByRef.get(message) : undefined);
   return {
     messages: outputMessages,
     recoveryNormalized,
@@ -48859,8 +54122,9 @@ async function runPipeline(args) {
     prefixBustPermitted: isCacheBustingPass,
     prefixMutationAllowed,
     strictThinkingKept: protectedSignedPrefix,
+    heldHeadReleasedForSystemChange,
     signedPrefixRewritten: rewritingSignedPrefix,
-    prefixRebuildAlreadyPriced: firstRenderBust || heldIdleExpiryRebuild || !!args.recoveryRebuildReason && isCacheBustingPass,
+    prefixRebuildAlreadyPriced: firstRenderBust || !!args.recoveryRebuildReason && isCacheBustingPass,
     identityRebuilt: identityRebuild,
     servedTagNumbers,
     heuristicsExecuted,
@@ -48871,6 +54135,7 @@ async function runPipeline(args) {
     injectionResult,
     materialized,
     materializeReason,
+    latestTurnThinkingRemoved: thinkingRecovery.removedThisPass === true,
     droppedTokens,
     droppedCount,
     emergency,
@@ -49109,8 +54374,10 @@ function clearPiCompactionOffInMemoryState(sessionId) {
   clearPiChannel1State(sessionId);
 }
 function clearContextHandlerSession(sessionId) {
+  dropServedRecord(sessionId, "session_cleared");
   cancelPiTagSnapshotSession(sessionId);
   lastServedSystemHashBySession.delete(sessionId);
+  clearPiCtxReduceCallableSession(sessionId);
   clearPiHistoryBoundaryRepairSession(sessionId);
   clearPiUpperReclaimSession(sessionId);
   invalidateTrueRawTokenCache({ sessionId, reason: "pi.branch.changed" });
@@ -49120,6 +54387,7 @@ function clearContextHandlerSession(sessionId) {
   activeContextHandlerSessions.delete(sessionId);
   clearAutoSearchForPiSession(sessionId);
   lastEmergencyNotificationAtMs.delete(sessionId);
+  untrustedRecoveryCountLoggedSessions.delete(sessionId);
   historyRefreshSessions.delete(sessionId);
   clearPendingMaterialization(pendingMaterializationSessions, sessionId);
   systemPromptRefreshSessions.delete(sessionId);
@@ -49149,6 +54417,7 @@ function clearContextHandlerSession(sessionId) {
   clearPiCompactionMarkerDrainLogState(sessionId);
   clearPiInjectionTokenCountCache(sessionId);
   clearPiMuralProcessCache(sessionId);
+  resetPiUnplacedCutLog(sessionId);
   clearPiTailHygieneContentMemo();
   clearPiChannel1State(sessionId);
   lastHeuristicsTurnIdBySession.delete(sessionId);
@@ -49333,25 +54602,20 @@ function makeMessage2(role, text) {
 }
 
 // src/pi-recomp-marker.ts
-function placeFirstKeptEntryId(db, sessionId, branchEntries, lastCompactedOrdinal) {
-  const alignment = resolvePiOrdinalAlignment(db, sessionId, branchEntries);
-  if (isPiOrdinalAlignmentUnanchored(alignment))
-    return null;
-  return findFirstKeptEntryId(branchEntries, lastCompactedOrdinal, alignment.offset);
+function placeFirstKeptEntryId(db, sessionId, branchEntries, last) {
+  return placePiMarkerKeptEntry(db, sessionId, branchEntries, last.endMessageId, last.endMessage);
 }
 function stagePiRecompMarker(args) {
   const compartments = getCompartments(args.db, args.sessionId);
   const last = compartments[compartments.length - 1];
-  if (!last)
+  if (!last || last.endMessageId.length === 0)
     return;
   let firstKeptEntryId = null;
   try {
-    firstKeptEntryId = placeFirstKeptEntryId(args.db, args.sessionId, args.branchEntries, last.endMessage);
+    firstKeptEntryId = placeFirstKeptEntryId(args.db, args.sessionId, args.branchEntries, last);
   } catch {
     firstKeptEntryId = null;
   }
-  if (!firstKeptEntryId || last.endMessageId.length === 0)
-    return;
   setPendingPiCompactionMarkerState(args.db, args.sessionId, {
     firstKeptEntryId,
     endMessageId: last.endMessageId,
@@ -50060,6 +55324,8 @@ function renderUserStatusSummary(summary, style) {
     values.push(["Dreamer skipped", skipped]);
   for (const quota of summary.dreamerQuotas ?? [])
     values.push(["Dreamer quota", quota]);
+  for (const quota of summary.hiddenModelSkips ?? [])
+    values.push(["Hidden model quota", quota]);
   if (summary.historianRefusal) {
     values.push([
       "Historian refusal",
@@ -50248,6 +55514,7 @@ function checkStatusViewSource(candidate) {
     lastDreamerRunAt: optional.read("lastDreamerRunAt", isNullableNumber),
     dreamerUnsupportedTasks: optional.readArray("dreamerUnsupportedTasks", isString),
     dreamerSkipped: optional.readArray("dreamerSkipped", isString),
+    hiddenModelSkips: optional.readArray("hiddenModelSkips", isString),
     dreamerFailures: optional.readArray("dreamerFailures", (value) => isRecord6(value) && isString(value.task) && isString(value.error)),
     dreamerTickFailure: optional.read("dreamerTickFailure", (value) => value === null || isTickFailure(value)),
     sessionNoteCount: optional.read("sessionNoteCount", isNumber),
@@ -50530,7 +55797,7 @@ function cacheRows(source, now) {
   }
   rows.push({
     label: "Auto-execute",
-    value: source.cacheExpired ? "yes (expired)" : neverExpires ? `at ≥${threshold}` : `at TTL or ≥${threshold}`,
+    value: `at ≥${threshold}`,
     tone: "muted"
   });
   return rows;
@@ -50586,6 +55853,11 @@ function dreamerTickFailureRows(source, now) {
       return quota ? [quota] : [];
     }))
   ].map((value) => ({ label: "Dreamer quota", value, tone: "warning" }));
+  quotas.push(...(source.hiddenModelSkips ?? []).map((value) => ({
+    label: "Hidden model quota",
+    value,
+    tone: "warning"
+  })));
   const failure = source.dreamerTickFailure;
   if (!failure)
     return quotas;
@@ -51958,6 +57230,7 @@ Chunk ${chunkIndex}: wrapping messages ${plan.snapshot.offset}-${plan.snapshot.e
             maxOutputTokens: deps.historianMaxOutputTokens,
             thinkingLevel: deps.historianThinkingLevel,
             memoryEnabled: deps.memoryEnabled,
+            memoryInjectionBudgetTokens: deps.memoryInjectionBudgetTokens,
             autoPromote: deps.autoPromote,
             userMemoriesEnabled: deps.userMemoriesEnabled,
             userObservationsRequested: deps.userObservationsRequested,
@@ -52201,6 +57474,38 @@ function registerPiFailClosedSurface(pi, args) {
   };
 }
 
+// src/host-overflow-check-pi.ts
+var HOST_PI_AI_MODULE = "@earendil-works/pi-ai";
+var importHostModule = () => import("@earendil-works/pi-ai");
+var loadHostModule = importHostModule;
+var hostCheck;
+function loadPiHostOverflowCheck() {
+  hostCheck ??= resolveHostOverflowCheck();
+  return hostCheck;
+}
+async function resolveHostOverflowCheck() {
+  let module;
+  try {
+    module = await loadHostModule();
+  } catch (error) {
+    log2(`[magic-context] host overflow check unavailable: ${HOST_PI_AI_MODULE} did not load (${error instanceof Error ? error.message : String(error)}); using Magic Context's overflow patterns only`);
+    return;
+  }
+  const check = module?.isContextOverflow;
+  if (typeof check !== "function") {
+    log2(`[magic-context] host overflow check unavailable: ${HOST_PI_AI_MODULE} has no isContextOverflow export; using Magic Context's overflow patterns only`);
+    return;
+  }
+  log2(`[magic-context] host overflow check: using isContextOverflow from ${HOST_PI_AI_MODULE}`);
+  return (message) => {
+    try {
+      return check(message) === true;
+    } catch {
+      return false;
+    }
+  };
+}
+
 // src/message-end-index-pi.ts
 var unpersistedMessageSeq = 0;
 function findEntryIdForMessage(branch, message) {
@@ -52231,6 +57536,34 @@ function schedulePiAssistantIndexOnMessageEnd(db, sessionId, endedMessage, sessi
       return null;
     return convertPiAssistantEntryById(branch, entryId, alignment.offset);
   });
+}
+
+// src/pi-agent-identity.ts
+var checkedSessions = new BoundedSessionMap(1000);
+function readAgentKind(ctx) {
+  try {
+    return ctx?.agent?.kind;
+  } catch {
+    return;
+  }
+}
+function recordPiSpawnedSession(db, sessionId, ctx) {
+  if (checkedSessions.has(sessionId))
+    return;
+  checkedSessions.set(sessionId, true);
+  if (readAgentKind(ctx) !== "sub")
+    return;
+  if (getOrCreateSessionMeta(db, sessionId).isSubagent)
+    return;
+  if (hasCompartments(db, sessionId)) {
+    sessionLog2(sessionId, "Oh My Pi spawned session (agent kind sub) has compartments from its source session: kept primary");
+    return;
+  }
+  updateSessionMeta(db, sessionId, { isSubagent: true });
+  sessionLog2(sessionId, "Oh My Pi spawned session (agent kind sub): recorded as a subagent");
+}
+function hasCompartments(db, sessionId) {
+  return db.prepare("SELECT 1 AS present FROM compartments WHERE session_id = ? LIMIT 1").get(sessionId) != null;
 }
 
 // ../plugin/src/plugin/boot-deadline.ts
@@ -52636,7 +57969,7 @@ function strippedAssistantContent(content, provider = "anthropic") {
     if (part === null || typeof part !== "object" || part.type !== "text") {
       continue;
     }
-    if (typeof part.text !== "string")
+    if (typeof part.text !== "string" || !part.text.includes("§"))
       continue;
     const stripped = stripPersistedAssistantText(part.text, provider === "anthropic");
     if (stripped === part.text)
@@ -52714,9 +58047,9 @@ var PI_STARTUP_MAINTENANCE_SCHEDULED = Symbol.for("magic-context.pi.startup-main
 function getPiChildInitContext() {
   const globals = globalThis;
   const existing = globals[PI_CHILD_INIT_CONTEXT];
-  if (existing instanceof AsyncLocalStorage3)
+  if (existing instanceof AsyncLocalStorage2)
     return existing;
-  const context = new AsyncLocalStorage3;
+  const context = new AsyncLocalStorage2;
   globals[PI_CHILD_INIT_CONTEXT] = context;
   return context;
 }
@@ -52756,6 +58089,23 @@ function signalPiDeferredCompactionMarkerDrain(sessionId) {
 }
 async function handlePiSessionBeforeCompact(args) {
   if (!args.compactionOff) {
+    if (args.event?.reason === "overflow" && args.event.willRetry === true) {
+      try {
+        const sessionId = args.ctx.sessionManager?.getSessionId?.();
+        if (typeof sessionId === "string" && sessionId.length > 0) {
+          const provider = args.ctx.model?.provider;
+          const model = args.ctx.model?.id;
+          const outcome = armPiRecoveryForHostOverflowCompaction({
+            db: args.db,
+            sessionId,
+            modelKey: typeof provider === "string" && typeof model === "string" ? `${provider}/${model}` : undefined
+          });
+          info(`session_before_compact: host compacting for overflow; provider-overflow recovery ${outcome}`);
+        }
+      } catch (err) {
+        warn("session_before_compact: overflow recovery arm failed:", err);
+      }
+    }
     info("session_before_compact: cancelling — magic-context owns compaction");
     return { cancel: true };
   }
@@ -52790,6 +58140,8 @@ function persistPiMessageEndModelMeta(args) {
 function getCompatiblePiTodoCapture(todos) {
   if (!Array.isArray(todos))
     return null;
+  if (!todos.every(hasPiTodowriteEnumValues))
+    return null;
   const normalized = normalizeTodoStateJson(todos);
   if (normalized === null)
     return null;
@@ -52797,6 +58149,12 @@ function getCompatiblePiTodoCapture(todos) {
   if (parsed === null)
     return null;
   return { normalized, todos: parsed };
+}
+function hasPiTodowriteEnumValues(todo) {
+  if (todo === null || typeof todo !== "object")
+    return false;
+  const { status, priority } = todo;
+  return TODO_STATUSES.includes(status) && (priority === undefined || TODO_PRIORITIES.includes(priority));
 }
 function applyCompatiblePiTodoCapture(args) {
   noteTodoWrite(args.sessionId);
@@ -53050,6 +58408,27 @@ async function persistPiPressureFromMessageEnd(args) {
   const activeModel = args.piModel ?? { provider, id: model };
   const modelKey = activeModel.provider && activeModel.id ? piModelRefToCanonical(`${activeModel.provider}/${activeModel.id}`) : undefined;
   const usage = extractAssistantUsage(args.message);
+  const msg = args.message && typeof args.message === "object" ? args.message : undefined;
+  const messageHadOverflowError = typeof msg?.errorMessage === "string" && detectOverflow(msg.errorMessage).isOverflow;
+  const requestAccepted = !messageHadOverflowError && !providerResponseFailed({
+    finish: args.message?.stopReason,
+    error: msg?.errorMessage
+  });
+  if (requestAccepted) {
+    const rawOverflow = getOverflowState(args.db, args.sessionId);
+    const detectedLimitMatchesModel = rawOverflow.detectedContextLimitModelKey === null || modelKey !== undefined && rawOverflow.detectedContextLimitModelKey === modelKey;
+    if (rawOverflow.detectedContextLimit > 0 && detectedLimitMatchesModel) {
+      const uncappedPressure = computePiPressure(usage, args.piContextWindow, piPressureEvidenceLimit(resolvePiWindowGeometry({
+        rawContextWindow: args.piContextWindow,
+        rawContextWindowSource: args.piContextWindowSource,
+        model: activeModel
+      })));
+      if (uncappedPressure && uncappedPressure.inputTokens > rawOverflow.detectedContextLimit) {
+        clearDetectedContextLimit(args.db, args.sessionId);
+        info(`message_end: detected limit ${rawOverflow.detectedContextLimit} invalidated by a successful ${uncappedPressure.inputTokens}-token request; using Pi contextWindow`);
+      }
+    }
+  }
   const detectedContextLimit = getOverflowState(args.db, args.sessionId, modelKey).detectedContextLimit;
   const reportedGeometry = resolvePiWindowGeometry({
     rawContextWindow: args.piContextWindow,
@@ -53066,21 +58445,7 @@ async function persistPiPressureFromMessageEnd(args) {
   if (rejectedUsage) {
     noteRejectedPiUsage(args.sessionId, reportedInput, providerInputLimit, "message_end");
   }
-  const msg = args.message && typeof args.message === "object" ? args.message : undefined;
-  const messageHadOverflowError = typeof msg?.errorMessage === "string" && detectOverflow(msg.errorMessage).isOverflow;
-  const requestAccepted = !messageHadOverflowError && !providerResponseFailed({
-    finish: args.message?.stopReason,
-    error: msg?.errorMessage
-  });
   const requestSucceeded = requestAccepted && !rejectedUsage;
-  if (requestAccepted && unboundedPressure) {
-    const rawOverflow = getOverflowState(args.db, args.sessionId);
-    const detectedLimitMatchesModel = rawOverflow.detectedContextLimitModelKey === null || modelKey !== undefined && rawOverflow.detectedContextLimitModelKey === modelKey;
-    if (rawOverflow.detectedContextLimit > 0 && detectedLimitMatchesModel && unboundedPressure.inputTokens > rawOverflow.detectedContextLimit) {
-      clearDetectedContextLimit(args.db, args.sessionId);
-      info(`message_end: detected limit ${rawOverflow.detectedContextLimit} invalidated by a successful ${unboundedPressure.inputTokens}-token request; using Pi contextWindow`);
-    }
-  }
   const floorModelKey = piProvenFloorModelKey(activeModel);
   const observedSafeInputTokens = resolvePiProvenInputFloor({
     db: args.db,
@@ -53227,6 +58592,7 @@ function resolveHistorianFromConfig(config, harness = PI_HARNESS_KIND, modelRegi
     keepReasoningTokens: config.keep_reasoning_tokens,
     historyBudgetPercentage: config.history_budget_percentage,
     memoryEnabled: config.memory.enabled,
+    memoryInjectionBudgetTokens: config.memory.injection_budget_tokens,
     autoPromote: config.memory.auto_promote,
     userMemoriesEnabled: userObservationCollectionEnabled(config.dreamer),
     userObservationsRequested: userObservationsRequested(config.dreamer),
@@ -53741,6 +59107,8 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
       onInherited: (sessionId) => prewarmPiTagSnapshot(db, sessionId, "pass")
     });
     const sessionId = resolveSessionId(ctx);
+    if (sessionId)
+      recordPiSpawnedSession(db, sessionId, ctx);
     if (!piMarkerRehydrationLogged && pendingPiMarkerSessions.length > 0 && sessionId) {
       log2(formatPiMarkerRehydrationLine(pendingPiMarkerSessions, sessionId));
       piMarkerRehydrationLogged = true;
@@ -53943,6 +59311,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
     ...buildPiHistorianCommandOptions(bootProjectDeps.historianConfig, bootProjectDeps.config),
     language: bootProjectDeps.config.language,
     memoryEnabled: bootProjectDeps.config.memory.enabled,
+    memoryInjectionBudgetTokens: bootProjectDeps.config.memory.injection_budget_tokens,
     autoPromote: bootProjectDeps.config.memory.auto_promote,
     compactionOff,
     userMemoriesEnabled: userObservationCollectionEnabled(bootProjectDeps.config.dreamer),
@@ -53959,6 +59328,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
         ...buildPiHistorianCommandOptions(historian, current.config),
         language: current.config.language,
         memoryEnabled: current.config.memory.enabled,
+        memoryInjectionBudgetTokens: current.config.memory.injection_budget_tokens,
         autoPromote: fresh.memory.auto_promote,
         compactionOff,
         userMemoriesEnabled: userObservationCollectionEnabled(current.config.dreamer),
@@ -54057,6 +59427,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
         }
       }
       if (sessionId) {
+        recordPiSpawnedSession(db, sessionId, ctx);
         trackSessionForProject(currentProject.projectIdentity, sessionId);
         try {
           const smForDrain = sm;
@@ -54084,7 +59455,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
         memoryEnabled: effectiveConfig.memory.enabled,
         includeGuidance: true,
         protectedTags: effectiveConfig.protected_tags,
-        ctxReduceCallable: !compactionOff,
+        ctxReduceCallable: piCtxReduceCallable(pi, compactionOff, sessionId ? { db, sessionId } : undefined),
         todoListCallable: isTodoListDisciplineNeeded({
           todowriteEnabled,
           activeTools: pi.getActiveTools()
@@ -54143,8 +59514,12 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
       const lastAssistant = Array.isArray(msgs) ? [...msgs].reverse().find((m) => m?.role === "assistant") : undefined;
       if (lastAssistant?.stopReason === "stop") {
         const sessionId = ctx.sessionManager?.getSessionId?.();
-        if (sessionId && db && !compactionOff)
-          maybeDeliverChannel2Pi(pi, db, sessionId);
+        if (sessionId && db) {
+          if (piCtxReduceCallable(pi, compactionOff, { db, sessionId }))
+            maybeDeliverChannel2Pi(pi, db, sessionId);
+          else
+            clearPiChannel1State(sessionId);
+        }
       }
     } catch (err) {
       log2(`agent_end: channel2 delivery skipped: ${String(err)}`);
@@ -54188,8 +59563,10 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
       const sessionId = ctx.sessionManager.getSessionId();
       if (typeof sessionId !== "string" || sessionId.length === 0)
         return;
-      if (compactionOff)
+      if (!piCtxReduceCallable(pi, compactionOff, db ? { db, sessionId } : undefined)) {
+        clearPiChannel1State(sessionId);
         return;
+      }
       const block = maybeChannel1ReminderForToolResult({
         db,
         sessionId,
@@ -54205,7 +59582,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
       log2(`tool_result hook failed (continuing): ${err instanceof Error ? err.message : String(err)}`);
     }
   });
-  pi.on("session_before_compact", async (_event, ctx) => handlePiSessionBeforeCompact({ db, compactionOff, ctx }));
+  pi.on("session_before_compact", async (event, ctx) => handlePiSessionBeforeCompact({ db, compactionOff, ctx, event }));
   if (PI_HARNESS_KIND !== "omp") {
     registerStreamTagPrefixStrip(pi, () => !compactionOff);
   } else {
@@ -54302,14 +59679,17 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
       const sessionId = sm?.getSessionId?.();
       if (typeof sessionId !== "string" || sessionId.length === 0)
         return;
+      const failed = event.message;
+      const hostOverflowCheck = !compactionOff && failed?.role === "assistant" && typeof failed.errorMessage === "string" && failed.errorMessage.length > 0 ? await loadPiHostOverflowCheck() : undefined;
       const recovery = handlePiProviderFailure({
         db,
         sessionId,
         message: event.message,
-        compactionOff
+        compactionOff,
+        hostOverflowCheck
       });
       if (recovery.kind === "overflow") {
-        log2(`[magic-context][${sessionId}] overflow detected: reportedLimit=${recovery.reportedLimit ?? "?"} provenance=${recovery.reportedLimitProvenance ?? "?"} pattern=${recovery.matchedPattern ?? "?"}`);
+        log2(`[magic-context][${sessionId}] overflow detected: source=${recovery.source} reportedLimit=${recovery.reportedLimit ?? "?"} provenance=${recovery.reportedLimitProvenance ?? "?"} pattern=${recovery.matchedPattern ?? "?"}`);
       }
     } catch (err) {
       warn("message_end: provider failure classification failed:", err);
