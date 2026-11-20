@@ -40,7 +40,7 @@
       "name": "pi-code-mode",
       "version": "0.0.1",
       "dependencies": {
-        "@pydantic/monty": "1.4.0",
+        "@pydantic/monty": "1.6.0",
       },
       "devDependencies": {
         "@types/node": "^24.0.0",
@@ -66,7 +66,7 @@
     },
     "packages/magic-context": {
       "name": "pi-magic-context-prebuilt",
-      "version": "0.49.35",
+      "version": "0.49.67",
       "dependencies": {
         "@cortexkit/subc-client": "0.4.1",
         "@jitl/quickjs-singlefile-cjs-release-asyncify": "0.32.0",
@@ -133,7 +133,7 @@
       "name": "@rlm/pi-python-kernel",
       "version": "0.0.1",
       "devDependencies": {
-        "@pydantic/monty": "1.4.0",
+        "@pydantic/monty": "1.6.0",
         "@types/node": "^24.0.0",
         "typescript": "^5.8.0",
       },
@@ -157,7 +157,7 @@
       "name": "pi-skill-bridge",
       "version": "0.1.0",
       "devDependencies": {
-        "@pydantic/monty": "1.4.0",
+        "@pydantic/monty": "1.6.0",
         "@types/node": "^22.20.0",
         "typescript": "^5.8.0",
       },
@@ -383,17 +383,17 @@
 
     "@protobufjs/utf8": ["@protobufjs/utf8@1.1.2", "", {}, "sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug=="],
 
-    "@pydantic/monty": ["@pydantic/monty@1.4.0", "", { "dependencies": { "@bytecodealliance/preview2-shim": "^0.19.0", "@opentelemetry/api": "^1.9.1", "@opentelemetry/api-logs": "^0.222.0" }, "optionalDependencies": { "@pydantic/monty-darwin-arm64": "1.4.0", "@pydantic/monty-darwin-x64": "1.4.0", "@pydantic/monty-linux-arm64-gnu": "1.4.0", "@pydantic/monty-linux-x64-gnu": "1.4.0", "@pydantic/monty-win32-x64-msvc": "1.4.0" } }, "sha512-SUcPEKgRtOnlHea6QGYK8lYGkWqsgmeakwB+OfHcrINMWKMMWlje+yw/CTtTacr5ddPgTZFg+7lEvjsCCa/e+g=="],
+    "@pydantic/monty": ["@pydantic/monty@1.6.0", "", { "dependencies": { "@bytecodealliance/preview2-shim": "^0.19.0", "@opentelemetry/api": "^1.9.1", "@opentelemetry/api-logs": "^0.222.0" }, "optionalDependencies": { "@pydantic/monty-darwin-arm64": "1.6.0", "@pydantic/monty-darwin-x64": "1.6.0", "@pydantic/monty-linux-arm64-gnu": "1.6.0", "@pydantic/monty-linux-x64-gnu": "1.6.0", "@pydantic/monty-win32-x64-msvc": "1.6.0" } }, "sha512-i8MkLKs0rumMzn8rhQJMCOugvEgkD67ktZznbdKnX27cH4V0hw2RXII530Z9R1PijoaiWDsb3CdB6oT6tzJK0w=="],
 
-    "@pydantic/monty-darwin-arm64": ["@pydantic/monty-darwin-arm64@1.4.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-dLfxiQbxVMGbxL1y+NzzJAwkyIUiQLd9rpsmWM0UQIaZqYkC9PK9X/+n818VOTW8+Nr4QUjXMRf21g0vZZpOiA=="],
+    "@pydantic/monty-darwin-arm64": ["@pydantic/monty-darwin-arm64@1.6.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-uNuF8a/NY4YGZth/3No9UrF/T+Az31z+NOsb9MPNdVod/3TP6u9v8enLRF5C3ICAcnLkEVWy9znmj+iZF+WlNw=="],
 
-    "@pydantic/monty-darwin-x64": ["@pydantic/monty-darwin-x64@1.4.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-LJEchCJn2d2v5cFHnd6zdxgmpzAWdn8wT1Hr6+JvfvmtECH7L8RbZ/XgLAnXA2azqDTAQ41GdDXFy/H9mfqOQg=="],
+    "@pydantic/monty-darwin-x64": ["@pydantic/monty-darwin-x64@1.6.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-LUOIJff4ENipiDBSbHPaEB9aeBM41uhJwgSqCF0FYOkGS1HxRROZt488ZIQT8pf2d9SdU1ABIoJDQFs3H6tCiA=="],
 
-    "@pydantic/monty-linux-arm64-gnu": ["@pydantic/monty-linux-arm64-gnu@1.4.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-2HErdP7t+RGE5gl8Cdli4ut2Vwc+Cw0Rkkg0s1XtIFs5vc37R+cXnWwgwB2snY7dk88yG6eAiJqtjPhbpRSITw=="],
+    "@pydantic/monty-linux-arm64-gnu": ["@pydantic/monty-linux-arm64-gnu@1.6.0", "", { "os": "linux", "cpu": "arm64", "libc": "glibc" }, "sha512-jDhqFFYNEwd3nmyXaFlYPaTDC5kxszKohDA/4jC4svDRRklUBr4IZBjKHv+YmVgZLqqlzcS7UySm/H3x8oFouQ=="],
 
-    "@pydantic/monty-linux-x64-gnu": ["@pydantic/monty-linux-x64-gnu@1.4.0", "", { "os": "linux", "cpu": "x64" }, "sha512-llKnH5w6kxa0t5dR/mbsWNj2i4fc6lLi/ateGXXQcOHLq5CfPFyJx4zyxQPXP5mMDBG2raJsfawn/mHoshXhcA=="],
+    "@pydantic/monty-linux-x64-gnu": ["@pydantic/monty-linux-x64-gnu@1.6.0", "", { "os": "linux", "cpu": "x64", "libc": "glibc" }, "sha512-JH6d0t5ZePh89aRekLqOEkJ4ZhY1912RWAANFOGu4hDUC2MY9MhIX1C/GaCYH45lntm5HgGw3wMsRmwJIvOKlQ=="],
 
-    "@pydantic/monty-win32-x64-msvc": ["@pydantic/monty-win32-x64-msvc@1.4.0", "", { "os": "win32", "cpu": "x64" }, "sha512-LtQ3WfdYBGWRJyCdoWITYfbviui0pCkq8/JAhqjQG1mgMF0r7qLMgDLBrcnhQ82GqE5s4ZS9DYl2uVZwdq2gbA=="],
+    "@pydantic/monty-win32-x64-msvc": ["@pydantic/monty-win32-x64-msvc@1.6.0", "", { "os": "win32", "cpu": "x64" }, "sha512-4zb9wcQoexLa0AJh0Vv2R4nOv38kHyu1XymOKSuV6i9E8BIiNq92qYRJ8+aV25SkFJkB00uw8iI9gKbge7KN4g=="],
 
     "@rlm/pi-python-kernel": ["@rlm/pi-python-kernel@workspace:packages/rlm"],
 
