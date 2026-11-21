@@ -35,7 +35,7 @@ import"./index-453s1hj6.js";
 import {
   LATEST_SUPPORTED_VERSION,
   enforceSchemaFence
-} from "./index-bwxj48h8.js";
+} from "./index-z8pr5k0d.js";
 import"./index-3bb24eb6.js";
 import"./index-gavj3e6h.js";
 import"./index-jhmz9tgv.js";

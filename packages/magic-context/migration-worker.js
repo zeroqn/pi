@@ -17,7 +17,7 @@ import"./index-453s1hj6.js";
 import {
   setSqlitePragmaConfig,
   initializeDatabase
-} from "./index-bwxj48h8.js";
+} from "./index-z8pr5k0d.js";
 import"./index-fapenpch.js";
 import"./index-3bb24eb6.js";
 import"./index-8sqebjzk.js";

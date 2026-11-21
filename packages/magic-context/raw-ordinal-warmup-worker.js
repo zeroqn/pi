@@ -19,7 +19,7 @@ serveWorkerJobs(async (input, port) => {
   await main();
   async function main() {
     if (input.v2ArchiveReader) {
-      const { serveV2ArchiveReads } = await import("./v2-archive-reader-4sgbnhd8.js");
+      const { serveV2ArchiveReads } = await import("./v2-archive-reader-cvyrfgxj.js");
       await serveV2ArchiveReads(port, openConnections);
       return;
     }
@@ -51,7 +51,7 @@ serveWorkerJobs(async (input, port) => {
         await runMessageFtsRowidMapBackfill(db);
         reply = { kind: "fts-rowid-backfill" };
       } else if (input.searchArchive) {
-        const { renderSearchArchive } = await import("./search-archive-shn3xhsv.js");
+        const { renderSearchArchive } = await import("./search-archive-0htg319b.js");
         const { readRawSessionMessageIdOrdinalsForRangeFromDb } = await import("./read-session-raw-0tytrjye.js");
         const archive = input.searchArchive;
         let raw;
@@ -81,7 +81,7 @@ serveWorkerJobs(async (input, port) => {
         const { setHarness } = await import("./harness-9872e0ym.js");
         setHarness(input.harness ?? "opencode");
         const [{ indexMessageInShortChunks }, { configureContextDatabasePragmas }] = await Promise.all([
-          import("./message-index-bounded-53hv89kz.js"),
+          import("./message-index-bounded-fqeqp76p.js"),
           import("./sqlite-context-pragmas-gcgch6qz.js")
         ]);
         configureContextDatabasePragmas(db);
@@ -95,7 +95,7 @@ serveWorkerJobs(async (input, port) => {
           measurements: result.measurements
         };
       } else if (input.tagRatio !== undefined) {
-        const { scanTagOwnerSummary, scanTagOwnerDelta } = await import("./storage-tags-2j1zhtq7.js");
+        const { scanTagOwnerSummary, scanTagOwnerDelta } = await import("./storage-tags-wq8p5wrh.js");
         const delta = input.tagState ? scanTagOwnerDelta(db, input.sessionId, input.tagState) : null;
         if (delta)
           reply = { kind: "tag-delta", delta };

@@ -169,7 +169,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-20d9e2pt.js";
+} from "./index-3hax9tt3.js";
 import"./index-4knyh1kt.js";
 import {
   canonicalModelIdentity,
@@ -249,6 +249,7 @@ import {
   normalizeTodoStateJson,
   buildSyntheticTodoPart,
   stripChannel1ReminderSpans,
+  reclaimableTailTokens,
   compareMeasuredTailPrefix,
   formatTailHygienePrefixMismatch,
   freezeTailHygieneMeasurement,
@@ -420,7 +421,7 @@ import {
   setSessionWorkMetrics,
   getSessionWorkMetrics,
   resolveEpochFloorForPass
-} from "./index-pehdap7a.js";
+} from "./index-73fw4cd4.js";
 import {
   textMentionsRecentCommit,
   hasMeaningfulUserText2,
@@ -471,7 +472,7 @@ import {
   openCurrentDatabase,
   openDatabaseAsync,
   closeDatabase
-} from "./index-bwxj48h8.js";
+} from "./index-z8pr5k0d.js";
 import {
   LkgRecoveryFenceError,
   clearLkgFenceProcessState,
@@ -597,7 +598,7 @@ import {
   getSourceContents,
   recordSubagentInvocation,
   getLatestHistorianInvocationId
-} from "./index-6ymz4yb0.js";
+} from "./index-46x2935k.js";
 import {
   resolveOpenCodeDbPath,
   assertOpenCodeStoreGeneration,
@@ -663,7 +664,7 @@ import {
   getRawSessionTagKeysThrough2,
   getLegacyProtectedTailStartOrdinal2,
   readSessionChunk2
-} from "./index-5vqnvjb2.js";
+} from "./index-2kb65n0s.js";
 import"./index-nvh6d3bz.js";
 import {
   formatSynapseLaneDescriptor
@@ -703,7 +704,7 @@ import {
   clearCompressionDepthRange,
   cleanSearchText,
   matchedSearchSnippet
-} from "./index-pvd2xhwy.js";
+} from "./index-d7yx4ymd.js";
 import {
   rememberV1HiddenRun
 } from "./index-6x556c2q.js";
@@ -835,7 +836,7 @@ import {
   scheduleClearAndReindex,
   clearSessionTracking,
   createAutoSearchDiagnostics
-} from "./index-9ze00rza.js";
+} from "./index-qz4vjad5.js";
 import"./index-3s39a1md.js";
 import {
   DREAMER_PRIMER_INVESTIGATOR_ALLOWED_TOOLS,
@@ -864,11 +865,11 @@ import {
   drainPiTagSnapshotSession,
   assertPiTagSnapshotReady,
   ensurePiTagSnapshotReady
-} from "./index-wdeb9me3.js";
+} from "./index-51xr6g7s.js";
 import"./index-71rg8j43.js";
 import"./index-8d2z6503.js";
-import"./index-xradeq5h.js";
-import"./index-xrhj81gf.js";
+import"./index-cjhq42s7.js";
+import"./index-4dqwxb7k.js";
 import {
   __toESM
 } from "./index-22jkk6wg.js";
@@ -3620,7 +3621,7 @@ function startHostStallProfilerSwitch() {
 // package.json
 var package_default = {
   name: "@cortexkit/pi-magic-context",
-  version: "0.49.67",
+  version: "0.49.69",
   type: "module",
   description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
   main: "dist/index.js",
@@ -33152,7 +33153,13 @@ function finalizeParts(drafts, pendingDropTagNumbers, protectedTagNumbers, newes
     const protectedPart = draft.tag ? protectedNumbers.has(draft.tag.tagNumber) : false;
     const tokens = Math.max(0, draft.tokens);
     const queuedForDrop = draft.tag ? pendingDropTagNumbers.has(draft.tag.tagNumber) : false;
-    const uTokens = draft.tag?.status === "active" && !protectedPart && !queuedForDrop && draft.kind !== "excluded" ? tokens : 0;
+    const uTokens = reclaimableTailTokens({
+      kind: draft.kind,
+      tokens,
+      tagStatus: draft.tag?.status,
+      protected: protectedPart,
+      queuedForDrop
+    });
     t += tokens;
     u += uTokens;
     return {

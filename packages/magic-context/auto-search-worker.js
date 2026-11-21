@@ -31,7 +31,7 @@ serveWorkerJobs(async (initial, port) => {
     import("./embedding-cache-7rp4gqzr.js"),
     import("./storage-memory-0ndn65fm.js"),
     import("./project-embedding-registry-as9x5fgg.js"),
-    import("./search-sztthwt0.js"),
+    import("./search-gw48mfe7.js"),
     import("./compartment-chunk-embedding-avkyp2df.js"),
     import("./embedding-activity-ew6dshfd.js"),
     import("./harness-9872e0ym.js"),
