@@ -846,10 +846,11 @@ import {
   subagentStepCap,
   SubagentTelemetry,
   OMP_CHILD_TOOL_CONFIG,
+  OMP_CHILD_TOOL_ENV,
   HISTORIAN_CACHE_TAIL_ENV2,
   HISTORIAN_MAX_OUTPUT_TOKENS_ENV2,
   SUBAGENT_OUTPUT_CEILING_ENV2
-} from "./index-0b5kqg7n.js";
+} from "./index-j4mwdz3q.js";
 import {
   PI_CONTEXT_BUDGET,
   PiContextDeadlineError,
@@ -3621,7 +3622,7 @@ function startHostStallProfilerSwitch() {
 // package.json
 var package_default = {
   name: "@cortexkit/pi-magic-context",
-  version: "0.49.69",
+  version: "0.49.70",
   type: "module",
   description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
   main: "dist/index.js",
@@ -21446,6 +21447,7 @@ class PiSubagentRunner {
           cwd: options.cwd,
           env: {
             ...parentEnv,
+            ...this.invocation.targetHarness === "omp" ? OMP_CHILD_TOOL_ENV : {},
             [MAGIC_CONTEXT_PI_SUBAGENT_ENV]: "1",
             MAGIC_CONTEXT_SUBAGENT_PROMPT_FILE: systemPromptPath,
             [HISTORIAN_CACHE_TAIL_ENV2]: /^(magic-context-)?historian(?:-recomp)?$/.test(options.agent) && options.accountingSubagent !== "historian_editor" ? options.cacheTail : undefined,
