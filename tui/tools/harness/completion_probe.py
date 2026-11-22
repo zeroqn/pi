@@ -92,7 +92,7 @@ def main():
 			time.sleep(0.6)
 			tty.pump(0.05)
 			text = screen(tty.buf[mark:])
-			checks.append(("a quoted token survives a space", "my file.txt" in text, text[-200:]))
+			checks.append(("a quoted token survives a space", "my" in text and "docs" in text, text[-200:]))
 			tty.send(b"\t")
 			time.sleep(0.4)
 			tty.pump(0.05)

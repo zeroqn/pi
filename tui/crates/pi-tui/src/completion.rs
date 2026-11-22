@@ -278,7 +278,8 @@ fn fd_paths(query: &str, cwd: &Path) -> Option<Vec<Suggestion>> {
     let text = String::from_utf8_lossy(&output.stdout);
     let mut items = Vec::new();
     for line in text.lines() {
-        let path = line.trim();
+        // fd prints a directory with a trailing separator in some versions; the wrapper adds exactly one.
+        let path = line.trim().trim_end_matches('/');
         if path.is_empty() {
             continue;
         }
@@ -328,6 +329,28 @@ fn readdir_paths(query: &str, cwd: &Path) -> Vec<Suggestion> {
         out.push(Suggestion { insert, label, hint: None });
     }
     out.sort_by(|a, b| rank(query, &a.label).cmp(&rank(query, &b.label)).then(a.label.cmp(&b.label)));
+    out
+}
+
+/// Narrow a pool of completions to a longer prefix **without spawning `fd` again** (ticket 09's
+/// per-keystroke cost). The pool holds plain paths; the wrapper is applied per kept item.
+pub fn narrow(pool: &[Suggestion], prefix: &Prefix) -> Vec<Suggestion> {
+    let needle = prefix.text.to_lowercase();
+    if needle.is_empty() {
+        return pool.to_vec();
+    }
+    let mut out: Vec<Suggestion> = Vec::new();
+    for item in pool {
+        let plain = item.insert.trim_end_matches('/');
+        let is_dir = item.insert.ends_with('/');
+        let hay = plain.to_lowercase();
+        if hay.contains(&needle) || hay.rsplit('/').next().unwrap_or("").starts_with(&needle) {
+            let label = if is_dir { format!("{plain}/") } else { plain.to_string() };
+            out.push(Suggestion { insert: insert_for(plain, is_dir, prefix), label, hint: None });
+        }
+    }
+    out.sort_by(|a, b| rank(&prefix.text, &a.label).cmp(&rank(&prefix.text, &b.label)).then(a.label.cmp(&b.label)));
+    out.truncate(MAX_RESULTS);
     out
 }
 
@@ -434,6 +457,37 @@ mod tests {
         assert_eq!(dotted[0].insert, ".env");
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_directory_from_fd_is_offered_with_one_separator() {
+        // `fd` is present on this box; when it is not, the fallback is what `readdir_paths` already tests.
+        let dir = std::env::temp_dir().join(format!("pi-tui-fd-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("sub")).expect("a dir");
+        std::fs::write(dir.join("solo.txt"), "x").expect("a file");
+        let items = fd_paths("", &dir).unwrap_or_default();
+        for item in &items {
+            assert!(!item.label.contains("//"), "a directory label has one separator: {item:?}");
+            assert!(!item.insert.contains("//"), "a directory insert has one separator: {item:?}");
+        }
+        assert!(items.iter().any(|item| item.label == "sub/"), "labels: {:?}", items.iter().map(|i| &i.label).collect::<Vec<_>>());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_longer_prefix_narrows_the_pool_without_another_lookup() {
+        let pool = vec![
+            Suggestion { insert: "src/model.rs".into(), label: "src/model.rs".into(), hint: None },
+            Suggestion { insert: "src/markdown.rs".into(), label: "src/markdown.rs".into(), hint: None },
+            Suggestion { insert: "docs/".into(), label: "docs/".into(), hint: None },
+        ];
+        let narrowed = narrow(&pool, &plain("src/mo"));
+        assert_eq!(narrowed.len(), 1, "{narrowed:?}");
+        assert_eq!(narrowed[0].label, "src/model.rs");
+        // The wrapper is applied to the kept items, so an `@` mention stays a mention.
+        let at = Prefix { text: "src/mo".into(), at: true, quoted: false };
+        assert_eq!(narrow(&pool, &at)[0].insert, "@src/model.rs");
+        assert_eq!(narrow(&pool, &plain("")) .len(), 3, "an empty prefix keeps the whole pool");
     }
 
     #[test]

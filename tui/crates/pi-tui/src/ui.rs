@@ -375,6 +375,19 @@ impl UiState {
         json!({ "type": "extension_ui_response", "id": id, "cancelled": true })
     }
 
+    /// Replace the items of an open **client** list whose data arrived after it opened (the model list
+    /// reads `get_available_models`, which can answer later than the chord that opens the picker).
+    pub fn refresh_client_list(&mut self, action: &str, items: Vec<ListItem>) {
+        let Some((_, Dialog::Select { list, owner: Owner::Client(who) })) = self.dialog.as_mut() else {
+            return;
+        };
+        if *who != action || list.items.len() == items.len() {
+            return;
+        }
+        list.items = items;
+        list.cursor = list.cursor.min(list.items.len().saturating_sub(1));
+    }
+
     /// Open one of the client's own lists. Its answer comes back tagged with `action` instead of as an
     /// extension response (see `Owner`).
     pub fn open_client_list(&mut self, action: &'static str, list: ListDialog) {

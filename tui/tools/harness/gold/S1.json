@@ -1,0 +1,10 @@
+{
+  "scenario": "S1",
+  "arm": "pi",
+  "host": "1.5.0",
+  "facts": {
+    "the prompt you typed": true,
+    "a fenced code block's content": true,
+    "prose after the fence": true
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "scenario": "S5",
+  "arm": "pi",
+  "host": "1.5.0",
+  "facts": {
+    "a path under src is offered": true,
+    "the accepted path reaches the composer": true
+  }
+}

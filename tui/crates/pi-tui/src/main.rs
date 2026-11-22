@@ -285,6 +285,10 @@ struct State {
     scrollbar_until: Option<Instant>,
     /// Whether the last frame actually drew the bar, so the fade schedules its own repaint.
     scrollbar_shown: bool,
+    /// The candidates a single `fd` run found, and the query they answered: typing more characters
+    /// narrows this pool locally instead of spawning `fd` once per keystroke.
+    completion_pool: Vec<completion::Suggestion>,
+    completion_pool_query: Option<String>,
     /// `app.suspend` was pressed: the loop that owns the screen stops the process and re-enters.
     suspend_requested: bool,
     /// A paste that arrived while a dialog was open: queued, never typed into an invisible editor.
@@ -326,6 +330,8 @@ impl State {
             scrollbar_until: None,
             scrollbar_shown: false,
             suspend_requested: false,
+            completion_pool: Vec::new(),
+            completion_pool_query: None,
             queued_paste: None,
             hardware_cursor_shown: false,
             models: Vec::new(),
@@ -545,6 +551,10 @@ fn paint_frame(state: &mut State, tty: &writer::Writer, last_paint: &mut Instant
     } else {
         state.composer.render(width as usize)
     };
+    // The model picker's rows can arrive after it opens; repoint them rather than showing an empty list.
+    if state.ui.has_dialog() && !state.models.is_empty() {
+        state.ui.refresh_client_list("model", model_items(state));
+    }
     let mut composer_block = composer_rows;
     // The popup draws above the composer, in the transcript's row budget (ticket 09 D5): it must not
     // hide the text being typed, and it is never queued as a dialog.
@@ -1570,8 +1580,24 @@ fn offer_completions(state: &mut State) {
     let items = if token.starts_with('/') || (token.is_empty() && at_line_start) {
         completion::slash(&state.slash_commands, &token, at_line_start)
     } else {
-        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        completion::paths(&prefix, &cwd)
+        // `fd` is a process: one run per pool, narrowed locally while the path is still being typed.
+        // Spawning it on every keystroke blocked the event loop long enough to lose characters.
+        let reusable = match &state.completion_pool_query {
+            Some(previous) if !state.completion_pool.is_empty() && prefix.text.starts_with(previous.as_str()) => {
+                Some(completion::narrow(&state.completion_pool, &prefix))
+            }
+            _ => None,
+        };
+        match reusable {
+            Some(items) => items,
+            None => {
+                let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let fresh = completion::paths(&prefix, &cwd);
+                state.completion_pool = fresh.clone();
+                state.completion_pool_query = Some(prefix.text.clone());
+                fresh
+            }
+        }
     };
     state.completions = Completions::new(items);
 }

@@ -1,0 +1,10 @@
+{
+  "scenario": "S4",
+  "arm": "pi",
+  "host": "1.5.0",
+  "facts": {
+    "the picker lists a model": true,
+    "the picker names itself": true,
+    "the palette lists /model with its description": true
+  }
+}
