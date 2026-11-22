@@ -1,0 +1,19 @@
+[package]
+name = "pi-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The Rust terminal client: renders pi's transcript, owns the terminal and the composer"
+
+[[bin]]
+name = "pi-tui"
+path = "src/main.rs"
+
+[dependencies]
+crossterm = "0.29.0"
+pi-rpc = { path = "../pi-rpc" }
+pulldown-cmark = "0.13.6"
+serde_json = "1"
+syntect = { version = "5.3.0", default-features = false, features = ["default-onig"] }
+unicode-segmentation = "1.13.3"
+unicode-width = "0.2.3"
