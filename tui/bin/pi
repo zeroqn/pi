@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# `pi` for a machine where the Rust client owns the terminal.
+#
+# Layout: this wrapper takes the `pi` name, and the real host lives beside it as `pi-host`. The client is
+# `pi-tui`. Resolution order, so nothing here is load-bearing:
+#
+#   1. PI_TUI_CLIENT  (an explicit client binary, e.g. from a nix build)
+#   2. pi-tui next to this script
+#   3. pi-tui on PATH
+# and the host is PI_TUI_HOST, else pi-host next to this script, else pi-host on PATH, else `pi` on PATH —
+# a machine with the stock pi still works, because the client speaks `--mode rpc` to whatever answers.
+#
+# Flags that are not the client's are handed to the host unchanged (`-p`, `--version`, `auth`, subcommands),
+# because those are host concerns and the client has no opinion about them.
+set -eu
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+client=${PI_TUI_CLIENT:-}
+if [ -z "$client" ]; then
+  if [ -x "$here/pi-tui" ]; then client="$here/pi-tui"
+  elif command -v pi-tui >/dev/null 2>&1; then client=$(command -v pi-tui)
+  fi
+fi
+
+# Anything that is not an interactive turn belongs to the host: pass it straight through, untouched.
+case "${1:-}" in
+  -p|--print|--version|-v|--help|-h|auth|login|logout|update|models|mcp|extensions|config|rpc|--mode)
+    if [ -n "${PI_TUI_HOST:-}" ]; then exec "$PI_TUI_HOST" "$@"; fi
+    if [ -x "$here/pi-host" ]; then exec "$here/pi-host" "$@"; fi
+    exec pi-host "$@"
+    ;;
+esac
+
+# An interactive turn is the client's, which spawns the host itself.
+if [ -z "$client" ]; then
+  echo "pi: no pi-tui client found (set PI_TUI_CLIENT, or put pi-tui beside this script)" >&2
+  exit 127
+fi
+host=${PI_TUI_HOST:-}
+if [ -z "$host" ]; then
+  if [ -x "$here/pi-host" ]; then host="$here/pi-host"; else host=$(command -v pi-host || echo pi); fi
+fi
+exec "$client" --pi "$host --mode rpc ${PI_TUI_HOST_ARGS:-}" "$@"
