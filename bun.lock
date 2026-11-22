@@ -389,9 +389,9 @@
 
     "@pydantic/monty-darwin-x64": ["@pydantic/monty-darwin-x64@1.6.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-LUOIJff4ENipiDBSbHPaEB9aeBM41uhJwgSqCF0FYOkGS1HxRROZt488ZIQT8pf2d9SdU1ABIoJDQFs3H6tCiA=="],
 
-    "@pydantic/monty-linux-arm64-gnu": ["@pydantic/monty-linux-arm64-gnu@1.6.0", "", { "os": "linux", "cpu": "arm64", "libc": "glibc" }, "sha512-jDhqFFYNEwd3nmyXaFlYPaTDC5kxszKohDA/4jC4svDRRklUBr4IZBjKHv+YmVgZLqqlzcS7UySm/H3x8oFouQ=="],
+    "@pydantic/monty-linux-arm64-gnu": ["@pydantic/monty-linux-arm64-gnu@1.6.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-jDhqFFYNEwd3nmyXaFlYPaTDC5kxszKohDA/4jC4svDRRklUBr4IZBjKHv+YmVgZLqqlzcS7UySm/H3x8oFouQ=="],
 
-    "@pydantic/monty-linux-x64-gnu": ["@pydantic/monty-linux-x64-gnu@1.6.0", "", { "os": "linux", "cpu": "x64", "libc": "glibc" }, "sha512-JH6d0t5ZePh89aRekLqOEkJ4ZhY1912RWAANFOGu4hDUC2MY9MhIX1C/GaCYH45lntm5HgGw3wMsRmwJIvOKlQ=="],
+    "@pydantic/monty-linux-x64-gnu": ["@pydantic/monty-linux-x64-gnu@1.6.0", "", { "os": "linux", "cpu": "x64" }, "sha512-JH6d0t5ZePh89aRekLqOEkJ4ZhY1912RWAANFOGu4hDUC2MY9MhIX1C/GaCYH45lntm5HgGw3wMsRmwJIvOKlQ=="],
 
     "@pydantic/monty-win32-x64-msvc": ["@pydantic/monty-win32-x64-msvc@1.6.0", "", { "os": "win32", "cpu": "x64" }, "sha512-4zb9wcQoexLa0AJh0Vv2R4nOv38kHyu1XymOKSuV6i9E8BIiNq92qYRJ8+aV25SkFJkB00uw8iI9gKbge7KN4g=="],
 
