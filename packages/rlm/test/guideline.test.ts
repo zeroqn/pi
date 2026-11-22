@@ -39,7 +39,7 @@ describe("the guideline's calls (rlm-stop, live acceptance 2026-10-09)", () => {
 	 * the next kernel. The model was told neither, and had no reason to call `list`.
 	 */
 	it("says what a rebuild leaves, between the transcript rule and the staleness rule", () => {
-		const transcript = RLM_GUIDELINE.indexOf("read an older child's answer from its stored transcript");
+		const transcript = RLM_GUIDELINE.indexOf("lists its earlier children as `gone`");
 		const rebuilt = RLM_GUIDELINE.indexOf("After a kernel rebuild");
 		const stale = RLM_GUIDELINE.indexOf("stops making progress is reported stale");
 		expect(rebuilt).toBeGreaterThan(transcript);
@@ -47,6 +47,16 @@ describe("the guideline's calls (rlm-stop, live acceptance 2026-10-09)", () => {
 		expect(RLM_GUIDELINE).toContain("a handle you kept is a snapshot of what the host returned then");
 		expect(RLM_GUIDELINE).toContain("may have left a child whose handle never arrived");
 		expect(RLM_GUIDELINE).toContain("list before concluding that a missing handle means a missing child");
+	});
+
+	/**
+	 * The spawn record (`.scratch/child-record/`) made the old sentence false: a resumed session no
+	 * longer finds an empty list, it finds its earlier children as `gone`. The guideline said "has none",
+	 * which is exactly the claim a surface must not keep after the code moved.
+	 */
+	it("says a resumed session lists its earlier children as gone, with the transcript", () => {
+		expect(RLM_GUIDELINE).toContain("lists its earlier children as `gone`, with the transcript to read");
+		expect(RLM_GUIDELINE).not.toContain("a resumed or forked session has none");
 	});
 
 	it("keeps both sentences ticket 08 decided, in order, with nothing promised that is absent", () => {

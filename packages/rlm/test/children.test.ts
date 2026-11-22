@@ -253,8 +253,9 @@ describe("the read rule (ticket 06)", () => {
 		markNoticeReadIfFinished(running);
 		expect(running.noticeRead).toBe(false);
 
-		// Reading a finished child is reading its result, so the notice is withdrawn.
-		for (const status of ["done", "failed", "stopped"] as const) {
+		// Reading a finished child is reading its result, so the notice is withdrawn. `gone` is never
+		// running either: a child from an earlier process has no notice to leave pending.
+		for (const status of ["done", "failed", "stopped", "gone"] as const) {
 			const finished = { status, noticeRead: false };
 			markNoticeReadIfFinished(finished);
 			expect(finished.noticeRead).toBe(true);
@@ -275,8 +276,13 @@ function managerHarness(onChange?: () => void, staleAfterSeconds = 600) {
 	// authority is the asker's own position in the tree (ticket 04).
 	let childContext: any = null;
 	const contexts = new Map<string, any>();
-	/** Every custom entry the manager wrote into this session's transcript (`rlm-stop`, ticket 03 §5). */
+	/**
+	 * Every custom entry the manager wrote into this session's transcript: `rlm-spawn` at admission
+	 * (`.scratch/child-record/`) and `rlm-stop` at an ending (ticket 03 §5).
+	 */
 	const entries: Array<{ customType: string; data: any }> = [];
+	/** The ending entry alone — what the stop tests read, and what a stop still owes this transcript. */
+	const stops = () => entries.filter((entry) => entry.customType === "rlm-stop");
 	const manager = createChildManager({
 		cwd: () => "/tmp/work",
 		ownSessionFile: () => "/tmp/parent.jsonl",
@@ -305,6 +311,7 @@ function managerHarness(onChange?: () => void, staleAfterSeconds = 600) {
 		manager,
 		notices,
 		entries,
+		stops,
 		child: () => childContext,
 		/** The context of one specific child, for the authority cases (a sibling, a grandchild). */
 		contextOf: (childId: string) => contexts.get(childId),
@@ -533,7 +540,7 @@ describe("the verdict a read carries (rlm-stop ticket 06)", () => {
 		await new Promise((resolve) => setTimeout(resolve, 120));
 		const stopped = await h.manager.stop(stale.child_id);
 		expect(stopped.reason).toMatch(/^stale: no progress for \d+s$/);
-		expect(h.entries.map((entry) => entry.data.reason)).toEqual([stopped.reason]);
+		expect(h.stops().map((entry) => entry.data.reason)).toEqual([stopped.reason]);
 
 		// A child the model stopped for its own reasons keeps those words.
 		const healthy = managerHarness(undefined, 600);
@@ -1069,9 +1076,9 @@ describe("the stop verb (rlm-stop ticket 03)", () => {
 		const handle = await h.spawn();
 		await h.manager.stop(handle.child_id, "no progress for 12m");
 
-		expect(h.entries).toHaveLength(1);
-		expect(h.entries[0]!.customType).toBe("rlm-stop");
-		expect(h.entries[0]!.data).toEqual({
+		expect(h.stops()).toHaveLength(1);
+		expect(h.stops()[0]!.customType).toBe("rlm-stop");
+		expect(h.stops()[0]!.data).toEqual({
 			child_id: handle.child_id,
 			reason: "no progress for 12m",
 			stopped_ids: [handle.child_id],
@@ -1085,11 +1092,11 @@ describe("the stop verb (rlm-stop ticket 03)", () => {
 		const h = managerHarness();
 		const first = await h.spawn("one");
 		await h.manager.stop(first.child_id, `  ${"x".repeat(300)}  `);
-		expect(h.entries[0]!.data.reason).toHaveLength(200);
+		expect(h.stops()[0]!.data.reason).toHaveLength(200);
 
 		const second = await h.spawn("two");
 		await h.manager.stop(second.child_id, "   ");
-		expect(h.entries[1]!.data.reason).toBe("stopped by parent");
+		expect(h.stops()[1]!.data.reason).toBe("stopped by parent");
 
 		expect(cleanReason(undefined)).toBeUndefined();
 		expect(cleanReason("  spaced  ")).toBe("spaced");
@@ -1127,7 +1134,7 @@ describe("the stop verb (rlm-stop ticket 03)", () => {
 		const again = await h.manager.stop(handle.child_id);
 		expect(again.status).toBe("done");
 		expect(again.ended_at).toBeTruthy();
-		expect(h.entries).toHaveLength(0);
+		expect(h.stops()).toHaveLength(0);
 	});
 });
 
@@ -1151,7 +1158,7 @@ describe("the tree a stop walks (rlm-stop ticket 04)", () => {
 		expect(h.manager.poll(child.child_id).reason).toBe("no progress for 12m");
 		expect(h.manager.poll(grand.child_id).reason).toBe(`stopped with ${child.child_id} (no progress for 12m)`);
 		// Parent first, then depth-first: the order the walk stopped them in.
-		expect(h.entries[0]!.data.stopped_ids).toEqual([child.child_id, grand.child_id]);
+		expect(h.stops()[0]!.data.stopped_ids).toEqual([child.child_id, grand.child_id]);
 
 		await settle();
 		expect(disposedSessions).toEqual([child.session_file, grand.session_file]);

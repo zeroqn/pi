@@ -18,9 +18,18 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { findKernel, type KernelActivity } from "../../host-bridge/src/client";
 import { STALE_AFTER_DEFAULT_SECONDS } from "./config";
+import { appendSpawnRecord, type SpawnRecord } from "./spawn-record";
 import { sessionKey } from "../../host-bridge/src/convention";
 
-export type ChildStatus = "running" | "done" | "failed" | "stopped";
+/**
+ * `gone` is the one status no live record ever takes: it belongs to a child an **earlier pi process**
+ * spawned, rehydrated from its spawn record (`.scratch/child-record/`). Nothing can run the child
+ * again, so every verb that needs its session refuses and every read names the transcript instead.
+ */
+export type ChildStatus = "running" | "done" | "failed" | "stopped" | "gone";
+
+/** Why a rehydrated child reads `gone`, in the words the model sees on the handle. */
+export const GONE_REASON = "the pi process that ran it has ended";
 
 export interface ChildHandle {
 	child_id: string;
@@ -836,6 +845,16 @@ export function cleanReason(text: string | undefined): string | undefined {
 	return trimmed ? trimmed.slice(0, 200) : undefined;
 }
 
+/**
+ * The refusal a verb gets when its child belongs to an earlier pi process. One wording, so `stop` and
+ * `send` cannot disagree about what a `gone` child is — and the transcript is named, because reading it
+ * is the only thing left to do with one (`.scratch/child-record/`).
+ */
+function goneRefusal(verb: string, record: ChildRecord): string {
+	const where = record.session_file ? `; read its transcript at ${record.session_file}` : "";
+	return `${verb}: ${record.child_id} ("${record.name}") is gone — ${GONE_REASON}${where}`;
+}
+
 export function markNoticeReadIfFinished(record: { status: ChildStatus; noticeRead: boolean }): void {
 	if (record.status !== "running") record.noticeRead = true;
 }
@@ -934,18 +953,70 @@ export function createChildManager(deps: ChildManagerDeps) {
 		return { ...handleOf(record), ...(stallOf(record) ?? {}) };
 	}
 
+	/**
+	 * A name — or a file — can be used again after a restart, so the live candidates win: a `gone`
+	 * record stays reachable by its id, and a reused name resolves to the child that can still answer
+	 * rather than refusing as ambiguous (`.scratch/child-record/`).
+	 */
+	function preferLive(candidates: ChildRecord[]): ChildRecord[] {
+		if (candidates.length <= 1) return candidates;
+		const live = candidates.filter((record) => record.status !== "gone");
+		return live.length > 0 ? live : candidates;
+	}
+
 	function find(selector: string): ChildRecord {
 		const direct = records.get(selector);
 		if (direct && !direct.deleted) return direct;
-		const byName = [...records.values()].filter((record) => !record.deleted && record.name === selector);
+		const byName = preferLive([...records.values()].filter((record) => !record.deleted && record.name === selector));
 		if (byName.length === 1) return byName[0]!;
 		if (byName.length > 1) {
 			throw new Error(`ambiguous child name "${selector}"; candidates: ${byName.map((r) => r.child_id).join(", ")}`);
 		}
-		const byFile = [...records.values()].filter((record) => !record.deleted && record.session_file === selector);
+		const byFile = preferLive([...records.values()].filter((record) => !record.deleted && record.session_file === selector));
 		if (byFile.length === 1) return byFile[0]!;
 		const known = [...records.values()].filter((record) => !record.deleted).map((r) => `${r.child_id} (${r.name})`);
 		throw new Error(`no child matches "${selector}"${known.length ? `; known: ${known.join(", ")}` : ""}`);
+	}
+
+	/**
+	 * The children an **earlier pi process** spawned, read from this session's own spawn records
+	 * (`.scratch/child-record/`): rehydrated as `gone` records, so a restarted session can name them and
+	 * point at their transcripts instead of finding an empty list. Idempotent by child id — `session_start`
+	 * can fire again in one instance, and a second restore must not double a name.
+	 */
+	function restore(restored: SpawnRecord[]): void {
+		let added = 0;
+		for (const record of restored) {
+			if (records.has(record.child_id)) continue;
+			records.set(record.child_id, {
+				child_id: record.child_id,
+				name: record.name,
+				session_file: record.session_file,
+				model: record.model,
+				depth: record.depth,
+				status: "gone",
+				started_at: record.at,
+				// The process ended at a moment nobody recorded, so the record is stamped with the last
+				// time something about the child was certainly true instead of a guess.
+				ended_at: record.at,
+				reason: GONE_REASON,
+				parent_session_file: record.parent_session_file,
+				startedMonotonic: performance.now(),
+				noticeRead: true,
+				deleted: false,
+				// A gone child never notifies: handing it this session's dispatch would be a lie about a
+				// child that cannot speak.
+				ownerDispatch: () => {},
+				cost: { input: 0, output: 0, total: 0, entries: 0 },
+				countedIds: new Set<string>(),
+			});
+			// A restarted session starts its counter at zero, so the restored serials have to win: the
+			// next spawn must not reuse `child-3` and shadow a record the model can still read.
+			const serial = Number.parseInt(record.child_id.slice("child-".length), 10);
+			if (Number.isInteger(serial) && serial > counter) counter = serial;
+			added += 1;
+		}
+		if (added > 0) changed();
 	}
 
 	async function spawn(request: SpawnRequest): Promise<ChildHandle> {
@@ -1102,6 +1173,19 @@ export function createChildManager(deps: ChildManagerDeps) {
 		records.set(id, record);
 		changed();
 
+		// The durable half (`.scratch/child-record/`): the id, the name and the child's own transcript,
+		// written into *this* transcript at the one moment the facts exist. A restarted session reads
+		// them back as `gone` children; without it, delegation left no trace the process could outlive.
+		appendSpawnRecord(deps.appendEntry, {
+			child_id: record.child_id,
+			name: record.name,
+			session_file: record.session_file,
+			model: record.model,
+			depth: record.depth,
+			at: record.started_at,
+			parent_session_file: record.parent_session_file,
+		});
+
 		// Register this manager under its own session file so the root can total the tree.
 		const ownFile = deps.ownSessionFile?.();
 		if (ownFile && !managerChildren.has(ownFile)) registerManagerView(ownFile, directChildren);
@@ -1204,6 +1288,9 @@ export function createChildManager(deps: ChildManagerDeps) {
 	async function stop(selector: string, reason?: string, askerId?: string): Promise<ChildHandle> {
 		const record = find(selector);
 		mayStop(record, askerId, "rlm.stop");
+		// A gone child is not this session's to end: its process is already over, and a cascade reaching
+		// one skips it rather than pretending the parent stopped it (`.scratch/child-record/`).
+		if (record.status === "gone") throw new Error(goneRefusal("rlm.stop", record));
 		const toStop = subtreeOf(record).filter((member) => member.status === "running");
 		if (toStop.length === 0) return handleOf(record);
 		// A stop's own return value keeps the record's plain shape: the child ends with this call, so a
@@ -1249,6 +1336,9 @@ export function createChildManager(deps: ChildManagerDeps) {
 
 	async function send(selector: string, text: string): Promise<ChildHandle> {
 		const record = find(selector);
+		// A gone child has no session in this process and its own one ended with the last pi: the honest
+		// answer names the transcript rather than resurrecting something that cannot answer.
+		if (record.status === "gone") throw new Error(`${goneRefusal("rlm.send", record)}, so there is nothing to resume; spawn a new child instead.`);
 		// A stopped child's session has been disposed, so there is nothing to resume — and the check is
 		// on the **status**, not on the disposal: a stop returns before its teardown runs, so a flag
 		// would let a `send` arriving in that gap resurrect the child the model just killed (ticket 03 §6).
@@ -1319,6 +1409,7 @@ export function createChildManager(deps: ChildManagerDeps) {
 
 	return {
 		spawn,
+		restore,
 		poll,
 		list,
 		// The root's own verbs: no asker, so its reach is every live record in the tree (ticket 04 §3).
@@ -1369,7 +1460,10 @@ export function createChildManager(deps: ChildManagerDeps) {
 			// (`.scratch/teardown-hang/diagnosis.md`). `stopped` is excluded because its teardown
 			// already ran and a second `session_shutdown` would re-run every one of the child's
 			// extension cleanups.
-			const holding = [...records.values()].filter((record) => record.status !== "stopped");
+			// A `gone` record disposes nothing: its session ended with the process that ran it.
+			const holding = [...records.values()].filter(
+				(record) => record.status !== "stopped" && record.status !== "gone",
+			);
 			await teardown(holding);
 		},
 	};

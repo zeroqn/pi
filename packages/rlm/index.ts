@@ -38,6 +38,7 @@ import type { ChildKernelContext, Notice } from "./src/children";
 import { loadRlmConfig } from "./src/config";
 // Imported for its side effect on the seam, and for the session deps this file files with it.
 import { forgetRlmSessionDeps, setRlmSessionDeps } from "./src/registration";
+import { readSpawnRecordsFrom } from "./src/spawn-record";
 import { rsiBindChild, rsiChildExtensions, rsiStatus } from "./src/rsi-seam";
 import { errorText, str } from "./src/util";
 const MAX_DEPTH = 2;
@@ -407,6 +408,13 @@ export function createRlm(pi: any, childContext: ChildKernelContext | null) {
 			// *resumed* child loads the ambient manifest and never sees that factory.
 			rsiBindChild({ sessionFile: ctx?.sessionManager?.getSessionFile?.() });
 		}
+
+		// The spawn records this session wrote in an earlier pi process (`.scratch/child-record/`): the
+		// children themselves ended with that process, but their names and transcripts did not. A restored
+		// child is `gone` — nameable, readable, never resumeable — which is the most a process can promise.
+		// A child session has no manager of its own; its grandchildren's records are in the root's
+		// transcript, which is the limit this restore does not cross.
+		manager?.restore(readSpawnRecordsFrom(ctx?.sessionManager));
 
 		// What the environment is allowed to change here is `rlm.json`'s to say (config.ts), and the
 		// answer is announced rather than left to be found: `RLM_CHILD_PROMPT` only removes two prompt

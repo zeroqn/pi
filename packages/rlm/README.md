@@ -54,7 +54,11 @@ One `contribute()` call, at `session_start`, before the first cell:
   `AgentSession` and returns a handle **immediately** — an answer is never a return value, it
   arrives later as a message, and a handle is a snapshot of what the host returned: after a
   kernel rebuild, re-read a child's status with `rlm.poll`, and a cell that died at a host call
-  can leave a child reachable only through `rlm.list`. Also `rlm.poll`, `rlm.list`, `rlm.remove`, `rlm.send`,
+  can leave a child reachable only through `rlm.list`. **A spawn also writes one `rlm-spawn`
+  entry** into the spawner's transcript, so a session restarted on a later day lists the children
+  an earlier process spawned as `gone` — named, with the transcript to read, never resumeable
+  (`stop` and `send` refuse and name the file). A child's own session has no manager, so its
+  grandchildren's records stay in the root's transcript. Also `rlm.poll`, `rlm.list`, `rlm.remove`, `rlm.send`,
   `rlm.tree_cost`, `find_models` and `agent_message.send(text, receiver_role=)`. Children load no
   ambient extensions; a child's kernel is mounted through the registry by rlm's own factory, in the
   parent's process and module instance. Depth is capped at 2, live children at 8.
