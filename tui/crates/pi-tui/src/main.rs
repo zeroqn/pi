@@ -260,8 +260,9 @@ struct State {
     models: Vec<(String, String)>,
     /// The palette: the host's commands and pi's built-ins, with their routes (ticket 08).
     palette: Vec<pi_tui::palette::Entry>,
-    /// What `get_state` said, for the notice after a switch.
+    /// What `get_state` said, for the notice after a switch and for the picker's current mark.
     current_model: Option<String>,
+    current_provider: Option<String>,
     current_thinking: Option<String>,
 }
 
@@ -292,6 +293,7 @@ impl State {
             models: Vec::new(),
             palette: pi_tui::palette::entries(&[], &[]),
             current_model: None,
+            current_provider: None,
             current_thinking: None,
         }
     }
@@ -369,7 +371,9 @@ fn run(host: &mut Host, state: &mut State, tty: &writer::Writer, args: &Args) ->
                     }
                     // The furniture's answers (tickets 07, 08).
                     if let pi_rpc::Line::Response(response) = &line {
-                        apply_response(state, response);
+                        if apply_response(state, response) {
+                            dirty_host = true;
+                        }
                     }
                     // A prompt's disposition decides whether the text stays gone (ticket 02 D2/D5).
                     if let pi_rpc::Line::Response(response) = &line {
@@ -661,8 +665,10 @@ fn handle_mouse(event: crossterm::event::MouseEvent, state: &mut State) -> bool 
 
 
 /// A response the furniture asked for: models, commands, state, or the result of a switch.
-fn apply_response(state: &mut State, response: &Value) {
+fn apply_response(state: &mut State, response: &Value) -> bool {
     let command = response.get("command").and_then(Value::as_str).unwrap_or("");
+    // A notice or a state change that no frame paints is invisible: the caller repaints on `true`.
+    let changed = true;
     let success = response.get("success").and_then(Value::as_bool).unwrap_or(false);
     let data = response.get("data");
     match command {
@@ -701,8 +707,12 @@ fn apply_response(state: &mut State, response: &Value) {
             state.palette = pi_tui::palette::entries(&names, &descriptions);
         }
         "get_state" => {
-            if let Some(model) = data.and_then(|d| d.get("model")).and_then(Value::as_str) {
-                state.current_model = Some(model.to_string());
+            // `get_state` reports the model as an **object** (`{id, provider, …}`), not a string.
+            if let Some(model) = data.and_then(|d| d.get("model")) {
+                let id = model.get("id").and_then(Value::as_str).map(str::to_string);
+                let provider = model.get("provider").and_then(Value::as_str).map(str::to_string);
+                state.current_model = id.or_else(|| model.as_str().map(str::to_string));
+                state.current_provider = provider;
             }
             if let Some(level) = data.and_then(|d| d.get("thinkingLevel")).and_then(Value::as_str) {
                 state.current_thinking = Some(level.to_string());
@@ -738,6 +748,73 @@ fn apply_response(state: &mut State, response: &Value) {
                 state.ui.notify("Current model does not support thinking".to_string());
             }
         }
+        "get_fork_messages" => {
+            let rows = data
+                .and_then(|d| d.get("messages"))
+                .and_then(Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| {
+                            let id = item.get("entryId").and_then(Value::as_str)?.to_string();
+                            let text = item.get("text").and_then(Value::as_str).unwrap_or("");
+                            Some((id, text.lines().next().unwrap_or("").chars().take(60).collect::<String>()))
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            if rows.is_empty() {
+                state.ui.notify("no earlier messages to fork from".to_string());
+                return true;
+            }
+            let items: Vec<ui::ListItem> = rows
+                .iter()
+                .map(|(id, label)| ui::ListItem::with_value(label.clone(), id.clone()))
+                .collect();
+            let mut list = ui::ListDialog::new(items, pi_tui::filter::Mode::Fuzzy, state.settings.list_rows);
+            list.title = Some("Fork from a message".to_string());
+            list.hint = vec![("tui.select.confirm", "fork"), ("tui.select.cancel", "cancel")];
+            state.ui.open_client_list("fork-entry", list);
+        }
+        "get_tree" => {
+            let count = data
+                .and_then(|d| d.get("tree"))
+                .and_then(Value::as_array)
+                .map(|nodes| nodes.len())
+                .unwrap_or(0);
+            let leaf = data.and_then(|d| d.get("leafId")).and_then(Value::as_str).unwrap_or("");
+            // Ticket 06: the tree is display-only — there is no RPC command that moves the leaf.
+            state.ui.notify(format!("session tree: {count} node(s), leaf {leaf} (display only — branch with /fork)"));
+        }
+        "get_session_stats" => {
+            if let Some(stats) = data {
+                let messages = stats.get("totalMessages").and_then(Value::as_u64).unwrap_or(0);
+                let cost = stats.get("cost").and_then(Value::as_f64).unwrap_or(0.0);
+                let tokens = stats
+                    .pointer("/tokens/total")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0);
+                state.ui.notify(format!("{messages} messages · {tokens} tokens · ${cost:.4}"));
+            }
+        }
+        "set_session_name" => {
+            if success {
+                state.ui.notify("session renamed".to_string());
+            } else {
+                let error = response.get("error").and_then(Value::as_str).unwrap_or("could not rename");
+                state.ui.notify(format!("[!] {error}"));
+            }
+        }
+        "fork" | "switch_session" => {
+            if success {
+                // Ticket 06's central finding: a replacement is **silent** — no session_start reaches the
+                // RPC client — so the client re-syncs on the response and nothing else.
+                resync(state, response);
+            } else {
+                let error = response.get("error").and_then(Value::as_str).unwrap_or("could not switch session");
+                state.ui.notify(format!("[!] {error}"));
+            }
+        }
         "clone" | "new_session" | "compact" | "export_html" => {
             if success {
                 let detail = data
@@ -751,8 +828,9 @@ fn apply_response(state: &mut State, response: &Value) {
                 state.ui.notify(format!("[!] {error}"));
             }
         }
-        _ => {}
+        _ => return false,
     }
+    changed
 }
 
 fn thinking(state: &State) -> String {
@@ -768,7 +846,9 @@ fn model_items(state: &State) -> Vec<ui::ListItem> {
         .map(|(provider, id)| {
             let mut item = ui::ListItem::label(id.clone());
             item.right = provider.clone();
-            if state.current_model.as_deref() == Some(id.as_str()) {
+            if state.current_model.as_deref() == Some(id.as_str())
+                && state.current_provider.as_deref() == Some(provider.as_str())
+            {
                 item.right = format!("{provider}  (current)");
             }
             item
@@ -857,6 +937,26 @@ fn send_prompt(state: &mut State, host: &Host, text: String, behaviour: &'static
 }
 
 
+
+/// A session was replaced: the host sends no `session_start` over RPC (ticket 06), so the client clears
+/// what belonged to the old session and asks for the new one's transcript, state and furniture again.
+fn resync(state: &mut State, response: &Value) {
+    let command = response.get("command").and_then(Value::as_str).unwrap_or("session");
+    state.transcript.clear();
+    state.selection = None;
+    state.pending.clear();
+    state.ui.pending.clear();
+    state.last_doc = None;
+    state.viewport = pi_tui::viewport::Viewport::new();
+    // A fork hands back the forked message's text; a reader expects to edit it in the composer.
+    if command == "fork" {
+        if let Some(text) = response.pointer("/data/text").and_then(Value::as_str) {
+            state.composer.set_text(text);
+        }
+    }
+    state.ui.notify(format!("switched session ({command})"));
+}
+
 /// A list's answer: an extension's goes back over the wire, the client's own becomes its RPC command.
 fn route_dialog_answer(state: &mut State, host: &Host, answer: Value) {
     let Some(action) = answer.get("client").and_then(Value::as_str) else {
@@ -872,6 +972,12 @@ fn route_dialog_answer(state: &mut State, host: &Host, answer: Value) {
             if let Some((provider, id)) = model_by_id(state, value) {
                 host.send(json!({"id": "set-model", "type": "set_model", "provider": provider, "modelId": id}));
             }
+        }
+        "fork-entry" => {
+            host.send(json!({"id": "fork", "type": "fork", "entryId": value}));
+        }
+        "session" => {
+            host.send(json!({"id": "switch", "type": "switch_session", "sessionPath": value}));
         }
         other => state.ui.notify(format!("[ui] {other}: {value}")),
     }
@@ -921,6 +1027,31 @@ fn route_command(state: &mut State, host: &Host, text: String) -> bool {
                 state.ui.notify("ctrl+o tools · ctrl+x copy · esc abort · ctrl+d exit".to_string());
                 true
             }
+            "session" => {
+                host.send(json!({"id": "stats", "type": "get_session_stats"}));
+                true
+            }
+            "tree" => {
+                host.send(json!({"id": "tree", "type": "get_tree"}));
+                true
+            }
+            "fork" => {
+                host.send(json!({"id": "forks", "type": "get_fork_messages"}));
+                true
+            }
+            "resume" => {
+                resume_picker(state);
+                true
+            }
+            "name" => {
+                let wanted = trimmed.split_whitespace().skip(1).collect::<Vec<_>>().join(" ");
+                if wanted.is_empty() {
+                    state.ui.notify("give a name: /name <title>".to_string());
+                } else {
+                    host.send(json!({"id": "name", "type": "set_session_name", "name": wanted}));
+                }
+                true
+            }
             other => {
                 state.ui.notify(format!("/{name} is not built into this client yet ({other})"));
                 true
@@ -939,6 +1070,31 @@ fn open_model_picker(state: &mut State) {
     list.title = Some("Select model".to_string());
     list.hint = vec![("tui.select.confirm", "switch"), ("tui.select.cancel", "cancel")];
     state.ui.open_client_list("model", list);
+}
+
+
+/// The session picker (ticket 06): no RPC command lists sessions, so the client reads pi's directory.
+fn resume_picker(state: &mut State) {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let Some(agent) = pi_tui::keymap::agent_dir() else {
+        state.ui.notify("no agent directory to read sessions from".to_string());
+        return;
+    };
+    let rows = pi_tui::sessions::list(&agent, &cwd);
+    if rows.is_empty() {
+        state.ui.notify(format!("no sessions under {}", pi_tui::sessions::dir_name(&cwd)));
+        return;
+    }
+    let items: Vec<ui::ListItem> = rows
+        .iter()
+        .map(|row| {
+            ui::ListItem::with_value(row.name.clone(), row.path.to_string_lossy().to_string())
+        })
+        .collect();
+    let mut list = ui::ListDialog::new(items, pi_tui::filter::Mode::Fuzzy, state.settings.list_rows);
+    list.title = Some("Resume a session".to_string());
+    list.hint = vec![("tui.select.confirm", "open"), ("tui.select.cancel", "cancel")];
+    state.ui.open_client_list("session", list);
 }
 
 /// The slash palette's popup: the entries a typed prefix matches, with their descriptions.

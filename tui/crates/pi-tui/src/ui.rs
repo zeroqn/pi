@@ -38,11 +38,20 @@ pub struct Widget {
 pub struct ListItem {
     pub label: String,
     pub right: String,
+    /// The answer this item stands for: an entry id, a session path, an option's text. An extension
+    /// `select` answers with its option's text; the client's pickers answer with this value.
+    pub value: String,
 }
 
 impl ListItem {
     pub fn label(label: impl Into<String>) -> ListItem {
-        ListItem { label: label.into(), right: String::new() }
+        let label = label.into();
+        ListItem { value: label.clone(), label, right: String::new() }
+    }
+
+    /// A row whose label is for reading and whose answer is something else.
+    pub fn with_value(label: impl Into<String>, value: impl Into<String>) -> ListItem {
+        ListItem { label: label.into(), right: String::new(), value: value.into() }
     }
 }
 
@@ -117,10 +126,11 @@ impl ListDialog {
         self.len() == 0
     }
 
-    /// The label of the row under the cursor: what a list answers with.
+    /// What the row under the cursor answers with: an item's `value`, which is its label unless a
+    /// picker gave it something else (an entry id, a session path).
     pub fn selected(&self) -> Option<String> {
         let matching = self.matching();
-        matching.get(self.cursor).map(|index| self.items[*index].label.clone())
+        matching.get(self.cursor).map(|index| self.items[*index].value.clone())
     }
 
     pub fn move_by(&mut self, delta: isize) {

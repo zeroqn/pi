@@ -10,6 +10,7 @@ pub mod markdown;
 pub mod palette;
 pub mod render;
 pub mod selection;
+pub mod sessions;
 pub mod settings;
 pub mod theme;
 pub mod viewport;
