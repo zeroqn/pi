@@ -333,9 +333,11 @@ name = "pi-tui"
 version = "0.0.0"
 dependencies = [
  "crossterm",
+ "libc",
  "pi-rpc",
  "pulldown-cmark",
  "serde_json",
+ "signal-hook",
  "syntect",
  "unicode-segmentation",
  "unicode-width",

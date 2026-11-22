@@ -170,6 +170,8 @@ pub fn default_bindings() -> Vec<(&'static str, Vec<&'static str>)> {
         ("app.message.dequeue", vec!["alt+up"]),
         // pi's copy chord (`keybindings.ts`: `app.message.copy` ctrl+x).
         ("app.message.copy", vec!["ctrl+x"]),
+        // Ticket 10 D2: pi's suspend chord (`keybindings.ts`), unbound on Windows in pi.
+        ("app.suspend", vec!["ctrl+z"]),
         // Ticket 07: pi's picker and cycle chords (`keybindings.ts`), with pi's defaults.
         ("app.model.select", vec!["ctrl+l"]),
         ("app.model.cycleForward", vec!["ctrl+p"]),

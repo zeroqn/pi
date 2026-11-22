@@ -133,8 +133,25 @@ impl Screen {
         // 1000+1002+1003 always, so the sequence is written here instead.
         let mut out = std::io::stdout();
         write!(out, "{}", mouse_on(multiplexer()))?;
+        // Ticket 10 D1: the kitty keyboard protocol, so escape, alt+enter and shift+enter are
+        // distinguishable — ticket 02's follow-up chord needs it. Pushed on every enter and popped on
+        // every leave, so a suspend and resume keeps the terminal's own state clean.
+        execute!(
+            out,
+            event::PushKeyboardEnhancementFlags(
+                event::KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                    | event::KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+            )
+        )?;
         out.flush()?;
         Ok(Screen { active: true })
+    }
+
+    /// Re-enter after a suspend: the same sequence as `enter`, on the value the guard already holds.
+    fn re_enter(screen: &mut Screen) -> std::io::Result<()> {
+        let entered = Screen::enter()?;
+        screen.active = entered.active;
+        Ok(())
     }
 
     fn leave(&mut self) {
@@ -143,7 +160,13 @@ impl Screen {
         }
         self.active = false;
         let mut out = std::io::stdout();
-        let _ = execute!(out, cursor::Show, terminal::LeaveAlternateScreen, event::DisableBracketedPaste);
+        let _ = execute!(
+            out,
+            event::PopKeyboardEnhancementFlags,
+            cursor::Show,
+            terminal::LeaveAlternateScreen,
+            event::DisableBracketedPaste
+        );
         let _ = write!(out, "{}", mouse_off());
         let _ = out.flush();
         let _ = terminal::disable_raw_mode();
@@ -175,7 +198,13 @@ fn main() -> std::io::Result<()> {
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let mut out = std::io::stdout();
-        let _ = execute!(out, cursor::Show, terminal::LeaveAlternateScreen, event::DisableBracketedPaste);
+        let _ = execute!(
+            out,
+            event::PopKeyboardEnhancementFlags,
+            cursor::Show,
+            terminal::LeaveAlternateScreen,
+            event::DisableBracketedPaste
+        );
         let _ = write!(out, "{}", mouse_off());
         let _ = out.flush();
         let _ = terminal::disable_raw_mode();
@@ -196,7 +225,7 @@ fn main() -> std::io::Result<()> {
             state.ui.notify(format!("[ui] keybindings this client does not implement: {}", unknown.join(", ")));
         }
     }
-    let outcome = run(&mut host, &mut state, &tty, &args);
+    let outcome = run(&mut host, &mut state, &tty, &args, &mut screen);
     tty.finish();
     screen.leave();
     if let Some(path) = &args.stats {
@@ -256,6 +285,12 @@ struct State {
     scrollbar_until: Option<Instant>,
     /// Whether the last frame actually drew the bar, so the fade schedules its own repaint.
     scrollbar_shown: bool,
+    /// `app.suspend` was pressed: the loop that owns the screen stops the process and re-enters.
+    suspend_requested: bool,
+    /// A paste that arrived while a dialog was open: queued, never typed into an invisible editor.
+    queued_paste: Option<String>,
+    /// Whether the hardware cursor is currently shown, so the sequence is written only on a change.
+    hardware_cursor_shown: bool,
     /// The models the host reports as available: `(provider, id)` (ticket 07).
     models: Vec<(String, String)>,
     /// The palette: the host's commands and pi's built-ins, with their routes (ticket 08).
@@ -290,6 +325,9 @@ impl State {
             selection: None,
             scrollbar_until: None,
             scrollbar_shown: false,
+            suspend_requested: false,
+            queued_paste: None,
+            hardware_cursor_shown: false,
             models: Vec::new(),
             palette: pi_tui::palette::entries(&[], &[]),
             current_model: None,
@@ -299,7 +337,7 @@ impl State {
     }
 }
 
-fn run(host: &mut Host, state: &mut State, tty: &writer::Writer, args: &Args) -> std::io::Result<()> {
+fn run(host: &mut Host, state: &mut State, tty: &writer::Writer, args: &Args, screen: &mut Screen) -> std::io::Result<()> {
     // Paint once before any event arrives: an empty screen that never draws looks like a hang.
     let mut dirty_host = true;
     let mut dirty_input = false;
@@ -330,9 +368,15 @@ fn run(host: &mut Host, state: &mut State, tty: &writer::Writer, args: &Args) ->
                 // Bracketed paste arrives as one event with the whole text: the composer decides whether
                 // it stays inline or collapses into an atomic `[paste #N …]` segment.
                 Event::Paste(text) => {
-                    state.composer.paste(&text);
-                    dirty_input = true;
-                    pending_echo = pending_echo.or(Some(Instant::now()));
+                    if state.ui.has_dialog() {
+                        // Ticket 10 D5: a dialog owns the keys, so a paste while one is open is kept and
+                        // delivered when it closes, rather than editing an editor nobody can see.
+                        state.queued_paste = Some(text);
+                    } else {
+                        state.composer.paste(&text);
+                        dirty_input = true;
+                        pending_echo = pending_echo.or(Some(Instant::now()));
+                    }
                 }
                 Event::Mouse(mouse) => {
                     if handle_mouse(mouse, state) {
@@ -444,6 +488,22 @@ fn run(host: &mut Host, state: &mut State, tty: &writer::Writer, args: &Args) ->
             state.scrollbar_until = None;
         }
 
+        // `app.suspend` (ctrl+z): give the terminal back, stop ourselves, and re-enter on SIGCONT —
+        // pi's own sequence (`interactive-mode.ts:4677-4711`). A client that stops in raw mode leaves the
+        // shell broken until `stty sane`.
+        if state.suspend_requested {
+            state.suspend_requested = false;
+            suspend(screen);
+        }
+        if let Some(paste) = state.queued_paste.take() {
+            if !state.ui.has_dialog() {
+                state.composer.paste(&paste);
+                dirty_input = true;
+            } else {
+                state.queued_paste = Some(paste);
+            }
+        }
+
         // 3. Paint: an input event paints at once; a streaming event waits for the budget.
         let due = dirty_input || (dirty_host && last_paint.elapsed() >= TICK);
         if due {
@@ -534,6 +594,14 @@ fn paint_frame(state: &mut State, tty: &writer::Writer, last_paint: &mut Instant
     state.scrollbar_shown = bar_visible;
     let (window, cursor_row, cursor_col) =
         paint::compose(&window, &bottom, width as usize, rows.max(2) as usize);
+    // Ticket 10 D3: an IME anchors its candidate window to the **hardware** cursor, so the caret is
+    // positioned there each frame. It stays hidden unless pi's `showHardwareCursor` asks for it visible.
+    let want_cursor = state.settings.hardware_cursor;
+    if want_cursor != state.hardware_cursor_shown {
+        let sequence = if want_cursor { "\u{1b}[?25h" } else { "\u{1b}[?25l" };
+        let _ = execute!(std::io::stdout(), crossterm::style::Print(sequence));
+        state.hardware_cursor_shown = want_cursor;
+    }
     if let Some(title) = state.ui.title.take() {
         let _ = execute!(std::io::stdout(), crossterm::terminal::SetTitle(title));
     }
@@ -599,6 +667,53 @@ fn arm_scrollbar(state: &mut State) {
     if state.settings.scrollbar != pi_tui::settings::Scrollbar::Hidden {
         state.scrollbar_until = Some(Instant::now() + Duration::from_millis(1_000));
     }
+}
+
+
+/// Give the terminal back, stop the **process group**, and re-enter when the shell resumes us.
+///
+/// pi's own sequence (`interactive-mode.ts:4677-4711`): `process.kill(0, "SIGTSTP")` — the group, not this
+/// thread — with a SIGCONT handler that restores the UI, and SIGINT ignored while suspended so a ctrl+c in
+/// the terminal does not kill a backgrounded client. `raise` on the calling thread was tried first and
+/// returned at once without stopping the process.
+fn suspend(screen: &mut Screen) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static RESUMED: AtomicBool = AtomicBool::new(false);
+    RESUMED.store(false, Ordering::SeqCst);
+    // A handler, not a flag polling loop elsewhere: signal-hook's closure registration is async-signal-safe.
+    // SAFETY: the handler only stores to a static atomic, which is async-signal-safe.
+    let resumed = unsafe {
+        signal_hook::low_level::register(signal_hook::consts::SIGCONT, || {
+            RESUMED.store(true, Ordering::SeqCst);
+        })
+    }
+    .ok();
+    // A no-op SIGINT handler, removed on resume: ctrl+c must not kill a stopped client (pi does the same).
+    // SAFETY: an empty handler is async-signal-safe.
+    let ignore_int = unsafe { signal_hook::low_level::register(signal_hook::consts::SIGINT, || {}) }.ok();
+
+    screen.leave();
+    // SAFETY: `kill` needs no unwinding and touches no Rust state; pid 0 means "every process in my group".
+    let sent = unsafe { libc::kill(0, libc::SIGTSTP) };
+    if sent != 0 {
+        eprintln!("pi-tui: could not stop the process group");
+    }
+    // Wait for SIGCONT. A stop cannot be detected any other way from inside the stopped process.
+    let mut waited = 0u32;
+    while !RESUMED.load(Ordering::SeqCst) && waited < 5_000 {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        waited += 1;
+    }
+    for id in [resumed, ignore_int].into_iter().flatten() {
+        signal_hook::low_level::unregister(id);
+    }
+    if let Err(error) = Screen::re_enter(screen) {
+        eprintln!("pi-tui: could not re-enter the screen after resuming: {error}");
+        std::process::exit(1);
+    }
+    // Re-entering clears the alternate screen, so every row must be painted again: the diff's memory of
+    // what is on screen is worthless now.
+    let _ = std::io::stdout().flush();
 }
 
 /// The document row under a mouse coordinate. The alt-screen window starts at row 0, and the viewport's
@@ -1197,6 +1312,10 @@ fn handle_key(key: KeyEvent, state: &mut State, host: &Host) -> bool {
     }
     if map.matches(&key, "app.thinking.cycle") {
         host.send(json!({"id": "thinking", "type": "cycle_thinking_level"}));
+        return true;
+    }
+    if map.matches(&key, "app.suspend") {
+        state.suspend_requested = true;
         return true;
     }
     if map.matches(&key, "app.message.copy") {

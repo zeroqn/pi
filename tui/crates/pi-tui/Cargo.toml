@@ -11,6 +11,8 @@ path = "src/main.rs"
 
 [dependencies]
 crossterm = "0.29.0"
+signal-hook = "0.3.18"
+libc = "0.2"
 pi-rpc = { path = "../pi-rpc" }
 pulldown-cmark = "0.13.6"
 serde_json = "1"

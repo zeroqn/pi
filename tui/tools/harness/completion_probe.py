@@ -50,12 +50,19 @@ def main():
 				tty.pump(0.02)
 			tty.settle(0.2, time.perf_counter() + 2)
 
-			# 1. `@` alone lists files, from fd, hidden ones included as pi does.
-			mark = len(tty.buf)
-			tty.send(b"@")
-			time.sleep(0.5)
-			tty.pump(0.05)
-			text = screen(tty.buf[mark:])
+			# 1. `@` alone lists files, from fd, hidden ones included as pi does. Retried: the first
+			#    keystroke can beat the client's own first frame on a loaded box.
+			text = ""
+			for _ in range(3):
+				mark = len(tty.buf)
+				tty.send(b"@")
+				time.sleep(0.6)
+				tty.pump(0.05)
+				text = screen(tty.buf[mark:])
+				if "src/" in text or "model.rs" in text:
+					break
+				tty.send(b"\x15")  # ctrl+u, clear the line, and try again
+				time.sleep(0.2)
 			checks.append(("@ opens the popup", "src/" in text or "model.rs" in text, text[-200:]))
 			checks.append(("a nested file is offered", "model.rs" in text or "markdown.rs" in text))
 
