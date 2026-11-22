@@ -63,6 +63,27 @@ describe("the constants", () => {
 	});
 });
 
+/**
+ * The other half of a dropped cell (measured 2026-11-22): a host call that had already returned did
+ * its work on the host, and the next kernel restores no value for it because the cell was never
+ * journaled. A child spawned by such a cell is reachable only by name, so the notice names the calls
+ * rather than leaving the model to conclude the effect never happened.
+ */
+describe("what a dropped cell had already done", () => {
+	it("names the settled host calls, once each, and says no result survived", () => {
+		const note = rebuildNote(false, ["rlm_spawn", "bash_host", "rlm_spawn"]);
+		expect(note).toContain("had already made host calls (rlm_spawn, bash_host) when it died");
+		expect(note).toContain("No result was journaled");
+		expect(note).toContain("re-read what matters through the host function");
+	});
+
+	it("says a single call as one call, and says nothing when none settled", () => {
+		expect(rebuildNote(true, ["rlm_spawn"])).toContain("had already made a host call (rlm_spawn) when it died");
+		expect(rebuildNote(false, [])).toBe(rebuildNote(false));
+		expect(rebuildNote(false, [])).not.toContain("host call");
+	});
+});
+
 describe.skipIf(!montyReady)("a cell that makes no host call", () => {
 	it("is stopped at the budget, with an error the cell could have caught, and the kernel survives", async () => {
 		const { dir, ctx, kernel } = await kernelWithFeedBudget(2);

@@ -53,7 +53,10 @@ way to run it; `packages/web-access` adds web host functions the same way.
   metadata-only `rlm-cell` entry in the transcript; a resumed or forked session rebuilds by
   replaying them as **one composite feed over `overlay` mounts with host calls served from the
   journal** — so replay cannot write to the host and does not re-run shell commands. The result
-  reports itself honestly, and a partial rebuild says which cell stopped it.
+  reports itself honestly, and a partial rebuild says which cell stopped it. Every restore line
+  says the same second thing: a host-call result is a snapshot of what that call returned, so live
+  state stays a host call away — and a dropped cell's notice names the host calls it had already
+  settled, whose effects stand while their results were never journaled.
 - **A dump fast path**: a matching `<sessionFile>.rlm-dump.bin` (written at `agent_end` and
   shutdown) restores the kernel directly, gated on the client version, the journal's cell count,
   and a `schema` field. A missing `schema` reads as `1` — every dump written before the code-mode

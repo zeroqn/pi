@@ -88,6 +88,24 @@ describe("what the model is told after a restore", () => {
 		expect(line).toContain("stopped in cell 1");
 		expect(line).not.toContain("rebuilt from journal");
 	});
+
+	/**
+	 * Measured 2026-11-22 against the real rlm host functions: a rebuilt kernel restored a handle
+	 * that still read `running` long after the child had finished, because every restore path hands
+	 * back the value a host call *returned*. The model is told, in every branch, that it must ask
+	 * the host for live state.
+	 */
+	it("says restored host results are snapshots, in every branch", () => {
+		const lines = [
+			restoredLine({ cells: 2, hostCalls: 3, partial: false }),
+			restoredLine({ cells: 2, hostCalls: 0, partial: false, note: "restored from a dump taken at cell 2" }),
+			restoredLine({ cells: 3, hostCalls: 1, partial: true, note: "stopped in cell 1: NameError" }),
+		];
+		for (const line of lines) {
+			expect(line).toContain("snapshots of what they returned");
+			expect(line).toContain("read live state through the host function");
+		}
+	});
 });
 
 describe("replay is reconstruction, not re-execution", () => {

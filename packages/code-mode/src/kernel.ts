@@ -133,16 +133,36 @@ function spanText(seconds: number): string {
  */
 export const MAX_FEED_SECONDS = 3600;
 /**
+ * What a dead cell's already-settled host calls mean for the kernel that replaces it.
+ *
+ * Measured 2026-11-22 with the real kernel and the real rlm host functions: a cell killed *after*
+ * `await rlm_spawn(...)` returned a child is never journaled (`if (!failure) journalCell(...)` below),
+ * so the next kernel has no handle — while the child exists and only `await rlm.list()` can name it.
+ * A call that returned already did its work on the host, and the call in flight at the kill may
+ * finish there too; neither result survives, because the cell that would own the record never
+ * completed. Naming the calls is what makes the effect re-derivable instead of invisible.
+ */
+export function lostCallNote(names: string[]): string {
+	const unique = [...new Set(names)];
+	if (unique.length === 0) return "";
+	const named = unique.length > 4 ? `${unique.slice(0, 4).join(", ")}, and ${unique.length - 4} more` : unique.join(", ");
+	return `# This cell had already made ${unique.length === 1 ? "a host call" : "host calls"} (${named}) when it died. What they did on the host still stands, and the call it was waiting on may have finished there too.\n# No result was journaled, so the next kernel has no value for them — re-read what matters through the host function that answers for it.\n`;
+}
+
+/**
  * What the model is told when a cell's kernel had to be dropped mid-cell — two causes, two sentences.
  *
  * A protocol error is a bug's shape; a **timed-out** worker is a cell that ran past its feed budget
  * (`long-work` ticket 07). A model told the wrong one draws the wrong lesson, which is also why the
  * abort path says the process group was killed rather than abandoned.
+ *
+ * `calls` is `cellCalls` at the moment of the drop: the host calls this cell had already settled.
  */
-export function rebuildNote(timedOut: boolean): string {
-	return timedOut
+export function rebuildNote(timedOut: boolean, calls: string[] = []): string {
+	const cause = timedOut
 		? "# the cell ran past its feed budget and the kernel has been dropped; this cell's work is lost.\n# The next cell rebuilds it from the journal and the scratch.\n"
 		: "# the kernel died with a monty protocol error and has been dropped; this cell's work is lost.\n# The next cell rebuilds it from the journal and the scratch.\n";
+	return cause + lostCallNote(calls);
 }
 
 /** Every checkout, so the limits are stated once. */
@@ -1364,15 +1384,23 @@ export function createKernel(options: {
 					// otherwise wedge every later cell in the session.
 					if (error instanceof monty.ProtocolError || error instanceof monty.MontyCrashedError) {
 						await dropKernel();
-						cellRebuild = rebuildNote(error instanceof monty.MontyCrashedError && error.timedOut === true);
+						cellRebuild = rebuildNote(
+							error instanceof monty.MontyCrashedError && error.timedOut === true,
+							// The calls this cell had settled, named in the notice: their effects stand and
+							// nothing records their results (a spawn's handle is the live case, 2026-11-22).
+							cellCalls.map((call) => call.name),
+						);
 					}
 					if (isSuspensionAbort(error)) {
 						const reason = await recoverFromAbort();
 						rotateTrace("recovered", suspensions, reason ?? undefined);
+						// The same fact as the rebuild note, for the path that keeps the kernel: this cell's
+						// settled calls took effect and their results are gone with the cell.
 						cellAbort =
-							reason === null
+							(reason === null
 								? "# kernel budget exhausted: this cell was stopped at a host call and its work is lost.\n# The kernel has been rebuilt; your definitions and values are intact.\n"
-								: `# kernel budget exhausted: this cell was stopped at a host call and its work is lost.\n# the kernel could not be rebuilt: ${reason} — the next cell will try again.\n`;
+								: `# kernel budget exhausted: this cell was stopped at a host call and its work is lost.\n# the kernel could not be rebuilt: ${reason} — the next cell will try again.\n`) +
+							lostCallNote(cellCalls.map((call) => call.name));
 					}
 					if (error instanceof monty.MontyRuntimeError || error instanceof monty.MontySyntaxError) {
 						failure = error.display("traceback");

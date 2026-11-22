@@ -74,6 +74,9 @@ describe.skipIf(!montyReady)("replaying a session's own journal with no contribu
 			const result = await kernel.execute({ code: "print(x + 1)" }, undefined, h.ctx);
 			const text = textOf(result);
 			expect(text).toContain("# kernel ");
+			// The rebuild the model reads says what its restored values are (2026-11-22): snapshots of
+			// what host calls returned, so live state is a host call away rather than in the variable.
+			expect(text).toContain("snapshots of what they returned");
 			expect(text).toContain("42");
 			await kernel.shutdown();
 		} finally {

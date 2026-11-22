@@ -60,16 +60,25 @@ export function readJournals(sessionFiles: string[]): CellRecord[] {
 	return records;
 }
 
+/**
+ * The one fact every restore shares, and the reason it is said out loud (measured 2026-11-22): a
+ * value that came from a host call is the result that call *returned*, restored from the journal or
+ * from the dump's heap. No restore path re-asks the host, so a handle's status is the status it had
+ * when the cell ran — a child that finished while the kernel was gone still reads `running`.
+ */
+const SNAPSHOT_SENTENCE =
+	"Host-call results are snapshots of what they returned then: read live state through the host function that answers for it.";
+
 /** What the model is told after a restore. Silence is the failure mode here. */
 export function restoredLine(report: RestoreReport): string {
 	if (report.partial) {
-		return `# kernel partially rebuilt: ${report.note ?? "replay stopped"}; everything defined after that point is missing.`;
+		return `# kernel partially rebuilt: ${report.note ?? "replay stopped"}; everything defined after that point is missing. ${SNAPSHOT_SENTENCE}`;
 	}
 	// A dump restore has no host calls to report, so the note is the honest message.
 	if (report.note) {
-		return `# kernel ${report.note}; values derived from file reads reflect the filesystem as of now.`;
+		return `# kernel ${report.note}; values derived from file reads reflect the filesystem as of now. ${SNAPSHOT_SENTENCE}`;
 	}
-	return `# kernel rebuilt from journal: replayed ${report.cells} cells and ${report.hostCalls} host calls; values derived from file reads reflect the filesystem as of now.`;
+	return `# kernel rebuilt from journal: replayed ${report.cells} cells and ${report.hostCalls} host calls; values derived from file reads reflect the filesystem as of now. ${SNAPSHOT_SENTENCE}`;
 }
 
 /** The exception type name monty maps onto a Python exception, with its fallback. */
