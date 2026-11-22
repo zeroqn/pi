@@ -12,8 +12,9 @@
  * this panel is the visible component, instead of reporting nothing and looking stalled. Pi's reporter
  * accepts only the session name, a dialog title or an error's first line as the message
  * (`program-status-reporter.ts`), so the message is the panel's own title and never a row or the filter.
- * The option applies to inline components only, which is what this picker is; a host older than 1.5.0
- * ignores the key, so there is no version check and no second code path.
+ * pi 1.6.0 also reports it for overlays, until their `done()`; this picker is an inline component, so it
+ * reports while visible. A host older than 1.5.0 ignores the key, so there is no version check and no
+ * second code path.
  */
 
 import type { ThinkingLevel } from "@earendil-works/pi-ai";
@@ -23,6 +24,8 @@ import { Container, type SelectItem, SelectList, Spacer, Text } from "@earendil-
 import { filterItems, isBackspace, isPrintable } from "./fuzzy.ts";
 
 const MAX_VISIBLE_ROWS = 10;
+/** Said in the dialog title when the picker degrades: a scroll list has no type-to-filter. */
+const DEGRADED_PICKER_HINT = "type-to-filter is not available in this host; choose from the list";
 const NAV_HINT = "type to filter • ↑↓ navigate • enter select • esc cancel";
 
 const ADVISOR_HEADER_TITLE = "Advisor Tool";
@@ -88,7 +91,32 @@ interface FilterablePickerOptions {
 	preferredValue?: string;
 }
 
+/**
+ * The dialog-primitive path for a host that cannot render a component (`ctx.mode !== "tui"`).
+ *
+ * pi's RPC mode — and this repo's Rust client — answer `select` natively and ignore `custom`, so the
+ * picker degrades to one `select` over the same rows. What is lost, and said out loud in the notify:
+ * the type-to-filter search (a long model list becomes a scroll), the bordered panel, and the prose
+ * lines, which move into the dialog title.
+ */
+async function selectWithPrimitives(
+	ctx: ExtensionContext,
+	opts: FilterablePickerOptions,
+): Promise<string | null> {
+	const labels = opts.items.map((item) => item.label);
+	const title = `${opts.title} — ${DEGRADED_PICKER_HINT}\n${opts.proseLines.join(" ")}`.trim();
+	const chosen = await ctx.ui.select(title, labels);
+	if (chosen == null) return null;
+	// A host answers with one of the offered lines; anything else is a typed custom value, which this
+	// picker has no row for, so it is treated as a dismissal rather than as a fabricated selection.
+	const index = labels.indexOf(chosen);
+	return index >= 0 ? opts.items[index].value : null;
+}
+
 function showFilterablePicker(ctx: ExtensionContext, opts: FilterablePickerOptions): Promise<string | null> {
+	// Only a host that *declares* a non-terminal mode is degraded. A host that declares nothing keeps the
+	// component path: it may be an older pi, or a wrapper that still renders `custom`.
+	if (ctx.mode !== undefined && ctx.mode !== "tui") return selectWithPrimitives(ctx, opts);
 	// What pi 1.5.0 reports to the terminal (OSC 7501) while this panel is the visible component: a program
 	// waiting on a question, named by the panel's own title. Inline components only — which this is — and a
 	// host older than 1.5.0 ignores the key, so there is no version check and no second code path.

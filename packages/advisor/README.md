@@ -120,3 +120,12 @@ everything the npm tarball published plus its 16 test files and its docs. (The i
   this port deleted, and the rest are vitest suites over rpiv mocks. What is pinned here is the port's own
   contract — the gate, the payload's legality, the surface block and its cache, the dict, the faults, the
   argument refusal, the config and its write semantics and the blocklist table — in `bun:test`.
+
+## Hosts without components
+
+`/advisor` builds its picker with `ctx.ui.custom()`, which renders only in a terminal. On a host that
+declares `ctx.mode` as anything other than `"tui"` — pi's RPC mode, an editor client, the Rust client in
+`extensions/tui` — the same rows are offered through `ctx.ui.select()` instead. Lost there: the
+type-to-filter search, the bordered panel and the prose lines (they move into the dialog title, which
+says so). The component path is kept for a host that declares no mode at all: it may be an older pi or a
+wrapper that still renders components.

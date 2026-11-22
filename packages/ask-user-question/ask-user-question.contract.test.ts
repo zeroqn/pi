@@ -199,6 +199,38 @@ describe("canRenderQuestionnaire — where the capability exists", () => {
 		expect(canRenderQuestionnaire({ hasUI: false, mode: "print", ui: bare } as never)).toBe(false);
 		expect(canRenderQuestionnaire({ hasUI: true, mode: "rpc", ui: bare } as never)).toBe(false);
 	});
+
+	it("picks the dialog walker by mode, even on a host whose custom() would answer", async () => {
+		// The gate is `mode`, not "custom() resolved undefined": an RPC host that renders custom UIs (a
+		// third-party client) would otherwise be downgraded to the walker's lower fidelity, and a TUI host
+		// whose custom() returned undefined would be stuck with no questionnaire at all. This test pins the
+		// order: mode === "rpc" wins.
+		const seen: string[] = [];
+		const ctx = {
+			hasUI: true,
+			mode: "rpc",
+			ui: {
+				// The walker answers with one of the offered lines and parses its index, so the fake
+				// must return the line it was given rather than a label.
+				select: async (title: string, options: string[]) => {
+					seen.push(`select:${title}`);
+					return options[1];
+				},
+				input: async () => "typed",
+				custom: async () => {
+					throw new Error("custom must not be used when mode is rpc");
+				},
+			},
+			sessionManager: { getSessionId: () => "s" },
+			isIdle: () => true,
+			signal: undefined,
+		};
+		const host = createAskUserQuestionHost({ ctx: ctx as never });
+		const result = await host([question()]);
+		expect(result.cancelled).toBe(false);
+		expect(seen.length).toBeGreaterThan(0);
+		expect(seen[0]).toContain("select:");
+	});
 });
 
 describe("the contributed prose", () => {

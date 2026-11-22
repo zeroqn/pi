@@ -42,3 +42,59 @@ describe("the advisor picker's terminal status", () => {
 		expect(h.options()).toEqual({ blocked: { kind: "question", message: "Reasoning Level" } });
 	});
 });
+
+/**
+ * The degraded path (`ctx.mode` declared and not "tui"): one `select` over the same rows, no component.
+ *
+ * pi's RPC mode ignores `custom`, so a picker built on it renders nothing there — silently, which is why
+ * the branch exists and why it is pinned. What it may not do: fabricate a selection out of an answer it
+ * did not offer, and keep the rich path on a host that declares no mode at all.
+ */
+function dialogCtx(mode: string | undefined, answer?: string | null) {
+	const seen: { title: string; options: string[] }[] = [];
+	const ctx = {
+		mode,
+		ui: {
+			custom: () => {
+				throw new Error("custom must not be used on a non-terminal host");
+			},
+			select: (title: string, options: string[]) => {
+				seen.push({ title, options });
+				return Promise.resolve(answer === undefined ? options[options.length - 1] : answer);
+			},
+		},
+	} as unknown as ExtensionContext;
+	return { ctx, seen };
+}
+
+describe("the advisor picker on a host without components", () => {
+	it("asks one select with the same rows when the mode is rpc", async () => {
+		const h = dialogCtx("rpc");
+		const items = [
+			{ value: "anthropic/opus", label: "Opus  (anthropic)" },
+			{ value: "openai/gpt", label: "GPT  (openai)" },
+		];
+		expect(await showAdvisorPicker(h.ctx, items)).toBe("openai/gpt");
+		expect(h.seen).toHaveLength(1);
+		expect(h.seen[0]!.options).toEqual(["Opus  (anthropic)", "GPT  (openai)"]);
+		expect(h.seen[0]!.title).toContain("type-to-filter is not available");
+		expect(h.seen[0]!.title).toContain("Advisor Tool");
+	});
+
+	it("treats an answer it did not offer as a dismissal", async () => {
+		const h = dialogCtx("rpc", "something typed");
+		expect(await showAdvisorPicker(h.ctx, [{ value: "x", label: "x" }])).toBeNull();
+	});
+
+	it("keeps the component path when the host declares no mode", async () => {
+		const h = recordingCtx();
+		await showAdvisorPicker(h.ctx, [{ value: "x", label: "x" }]);
+		expect(h.calls()).toBe(1);
+	});
+
+	it("degrades the effort picker the same way", async () => {
+		const h = dialogCtx("rpc");
+		expect(await showEffortPicker(h.ctx, [{ value: "high", label: "high" }], undefined, "high")).toBe("high");
+		expect(h.seen[0]!.title).toContain("Reasoning Level");
+	});
+});
