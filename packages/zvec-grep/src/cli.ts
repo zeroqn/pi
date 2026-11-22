@@ -61,10 +61,11 @@ export const spawnExec: Exec = (command, args, options) =>
 			if (timer) clearTimeout(timer);
 			if (killTimer) clearTimeout(killTimer);
 			options.signal?.removeEventListener("abort", kill);
-			// A process that died of a signal did **not** exit 0. pi's own `exec` reports `code ?? 0`
-			// and a `killed` flag nobody reads, so a timed-out search would look like a successful
-			// short one; in a cell that is a wrong answer rather than a slow one, so it is a failure
-			// here (ticket 03 records the deliberate divergence).
+			// A process that died of a signal did **not** exit 0. pi's own `exec` reports
+			// `code ?? 128+signal` since 1.6.0 (before that, `code ?? 0`), and a `killed` flag nobody
+			// reads; either way a timed-out search must not look like a successful short one, and a
+			// cell sees the code and not the signal, so a plain 1 is the failure here (ticket 03
+			// records the deliberate divergence).
 			settle({ stdout, stderr, code: code ?? (signal ? 1 : 0) });
 		};
 		const kill = () => {
