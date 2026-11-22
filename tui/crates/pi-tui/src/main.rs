@@ -1397,29 +1397,37 @@ fn handle_key(key: KeyEvent, state: &mut State, host: &Host) -> bool {
             state.composer.insert(&ch.to_string());
             // The palette popup follows the composer's first line (ticket 08): typing `/mo` lists `/model`.
             refresh_palette_popup(state);
+            // An `@`-mention opens the file popup and keeps it current as the path is typed (ticket 09 D3).
+            if typed_prefix_is_mention(state) {
+                offer_completions(state);
+            }
         }
     }
     true
 }
 
+
+/// Whether the token under the cursor is an `@`-mention, which keeps the file popup open while typing.
+fn typed_prefix_is_mention(state: &State) -> bool {
+    let (row, col) = state.composer.cursor();
+    let text = state.composer.text();
+    text.split('\n').nth(row).map(|line| completion::prefix_before_cursor(line, col).at).unwrap_or(false)
+}
+
 /// Replace the token before the cursor with a completion.
 fn replace_token(composer: &mut Composer, insert: &str) {
     // Delete the token's characters, then insert the completion. Counting in characters, not bytes,
-    // because the token may hold a wide or multi-codepoint grapheme.
-    let mut guard = 0;
-    while guard < 4096 {
-        let (row, col) = composer.cursor();
-        let text = composer.text();
-        let lines: Vec<&str> = text.split('\n').collect();
-        let Some(current) = lines.get(row) else { break };
-        if col == 0 {
-            break;
-        }
-        if completion::token_before_cursor(current, col).chars().count() == 0 {
-            break;
-        }
+    // because the token may hold a wide or multi-codepoint grapheme — and a quoted mention holds spaces,
+    // which is why the width comes from the same prefix scan that offered the completion.
+    let (row, col) = composer.cursor();
+    let text = composer.text();
+    let lines: Vec<&str> = text.split('\n').collect();
+    let width = lines
+        .get(row)
+        .map(|line| completion::prefix_before_cursor(line, col).width())
+        .unwrap_or(0);
+    for _ in 0..width {
         composer.backspace();
-        guard += 1;
     }
     composer.insert(insert);
 }
@@ -1437,13 +1445,14 @@ fn offer_completions(state: &mut State) {
     let text = state.composer.text();
     let lines: Vec<&str> = text.split('\n').collect();
     let Some(line) = lines.get(row) else { return };
+    let prefix = completion::prefix_before_cursor(line, col);
     let token = completion::token_before_cursor(line, col).to_string();
     let at_line_start = row == 0 || line[..col].trim_start().starts_with('/');
-    let items = if token.starts_with('/') || token.is_empty() && at_line_start {
+    let items = if token.starts_with('/') || (token.is_empty() && at_line_start) {
         completion::slash(&state.slash_commands, &token, at_line_start)
     } else {
         let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        completion::paths(&token, &cwd)
+        completion::paths(&prefix, &cwd)
     };
     state.completions = Completions::new(items);
 }
