@@ -1,0 +1,9 @@
+{
+  "scenario": "S2",
+  "arm": "pi",
+  "host": "1.5.0",
+  "facts": {
+    "partial answer text was shown": true,
+    "the abort is marked on screen": true
+  }
+}

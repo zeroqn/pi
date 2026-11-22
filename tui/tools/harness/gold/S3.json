@@ -1,0 +1,9 @@
+{
+  "scenario": "S3",
+  "arm": "pi",
+  "host": "1.5.0",
+  "facts": {
+    "scrolling revealed the prompt above the result": true,
+    "the tool card names the tool": true
+  }
+}

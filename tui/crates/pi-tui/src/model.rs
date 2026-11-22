@@ -480,10 +480,12 @@ impl Transcript {
                     // `stopReason: "aborted"` and an `errorMessage` (`interactive-mode.ts:3756-3777`
                     // renders exactly these).
                     if value.pointer("/message/stopReason").and_then(Value::as_str) == Some("aborted") {
+                        // pi fills this text **in its own UI** from the stop reason
+                        // (`interactive-mode.ts:3441-3446`): the host does not set `errorMessage`.
                         let text = value
                             .pointer("/message/errorMessage")
                             .and_then(Value::as_str)
-                            .unwrap_or("aborted");
+                            .unwrap_or("Operation aborted");
                         self.push_line(format!("... {text}"));
                     }
                     true

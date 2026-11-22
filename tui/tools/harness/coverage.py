@@ -48,6 +48,27 @@ SCENARIOS = {
 			("prose after the fence", ["The renderer walks", "Hermes"]),
 		],
 	},
+	"S2": {
+		"title": "abort a streaming answer",
+		"pace": 12,
+		"keystrokes": ["CODE: show the frame function", "\r", "\x1b"],
+		"settle": 8.0,
+		"facts": [
+			("partial answer text was shown", ["The renderer walks", "The frame function", "export function frame"]),
+			("the abort is marked on screen", ["Operation aborted", "aborted"]),
+		],
+	},
+	"S3": {
+		"title": "a long tool result, scrolled back with the page keys",
+		"keystrokes": ["BASH: run it", "\r", "\x1b[5~", "\x1b[5~", "\x1b[5~"],
+		"settle": 14.0,
+		"facts": [
+			# At the tail the window shows the tool result; the prompt that began the turn is only
+			# visible once the page keys have moved it back into view.
+			("scrolling revealed the prompt above the result", ["BASH: run it"]),
+			("the tool card names the tool", ["bash", "seq 1 1200"]),
+		],
+	},
 	"S4": {
 		"title": "open the model picker and the palette",
 		"keystrokes": ["\x0c", "\x1b", "/mo"],
@@ -78,7 +99,7 @@ def run_arm(arm, scenario, cols=120, rows=40):
 	question C-15 asks is whether the user ever saw it.
 	"""
 	spec = SCENARIOS[scenario]
-	with fake_model(script="fake_model_corpus.py") as port, pi_home(port) as home, workdir() as cwd:
+	with fake_model(script="fake_model_corpus.py", pace_ms=spec.get("pace", 0)) as port, pi_home(port) as home, workdir() as cwd:
 		if spec.get("setup") == "tree":
 			# A real tree to complete against: `fd` is asked about the working directory, so the scenario
 			# must give it one with files in it.
