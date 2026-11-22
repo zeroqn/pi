@@ -58,6 +58,40 @@ export const ROTATE_BACKOFF = Math.max(1, Math.floor((MAX_SUSPENSIONS - ROTATE_A
 export const ROTATE_FAILURE_CAP = 3;
 
 /**
+ * The protocol each monty release speaks and the oldest it still serves, read from
+ * `crates/monty-proto/src/lib.rs` (`PROTOCOL_VERSION` / `MIN_SUPPORTED_PROTOCOL_VERSION`) at
+ * each tag. The handshake is a *range*, not an equality: 1.4.0 serves 5-6, 1.5.0 serves 7,
+ * 1.6.0 serves 7-8, 1.7.0-beta.1 serves 7-9 — so a 1.6.0 client (protocol 8) drives the beta's
+ * worker, and the equality test this replaces refused exactly that pair.
+ *
+ * Why a table and not a query: neither side publishes its protocol on the CLI or in the
+ * JavaScript package (`--version` prints a release name only), so the numbers have to be
+ * written down. An unlisted release is *not* refused here — the handshake reports the truth,
+ * and guessing could refuse a pair that works.
+ */
+export const MONTY_PROTOCOLS: Record<string, { speaks: number; serves: number }> = {
+	"1.4.0": { speaks: 6, serves: 5 },
+	"1.5.0": { speaks: 7, serves: 7 },
+	"1.6.0": { speaks: 8, serves: 7 },
+	"1.7.0-beta.1": { speaks: 9, serves: 7 },
+};
+
+/**
+ * Why this client cannot drive this worker, or `null` when the pair is inside the worker's
+ * range — or when either release is not in {@link MONTY_PROTOCOLS}, which defers to the
+ * handshake rather than guessing.
+ */
+export function protocolProblem(clientRelease: string | null, workerReport: string): string | null {
+	if (!clientRelease) return null;
+	const worker = workerReport.replace(/^monty-runtime\s+/, "").trim();
+	const client = MONTY_PROTOCOLS[clientRelease];
+	const served = MONTY_PROTOCOLS[worker];
+	if (!client || !served) return null;
+	if (client.speaks >= served.serves && client.speaks <= served.speaks) return null;
+	return `client ${clientRelease} speaks protocol ${client.speaks}, and worker ${workerReport} serves ${served.serves} to ${served.speaks} — point MONTY_BIN at a worker whose range includes protocol ${client.speaks}`;
+}
+
+/**
  * A span of seconds as this kernel's notices print it: `45s`, `12m`, `1h`.
  *
  * One definition, so a notice and the guideline that describes it cannot drift apart. rlm's footer
@@ -704,7 +738,12 @@ export function createKernel(options: {
 		const cwd: string = ctx?.cwd ?? process.cwd();
 		scratch = scratchDirFor(ctx, cwd);
 		mkdirSync(scratch, { recursive: true });
-		const started = await monty.Monty.create();
+		// One pool per kernel, and `maxCheckoutsPerWorker: null` is pinned rather than left to the
+		// client's default: 1.4.0's "omitted" meant *never recycle a worker*, while 1.6.0's means
+		// 1000 checkouts (`DEFAULT_MAX_CHECKOUTS_PER_WORKER`), which silently retires a worker
+		// mid-life. Rotation is the only retirement this kernel wants, and it rebuilds the session
+		// from the journal itself (`replaceSession`), so the pool must not do it behind our back.
+		const started = await monty.Monty.create({ maxCheckoutsPerWorker: null });
 		pool = started;
 		session = await started.checkout(checkoutOptions);
 		root = cwd;
@@ -1150,12 +1189,8 @@ export function createKernel(options: {
 				const { spawnSync } = await import("node:child_process");
 				const probe = spawnSync(workerPath, ["--version"], { encoding: "utf8" });
 				const reported = String(probe.stdout ?? "").trim();
-				const client = clientVersion();
-				if (reported && client && !reported.includes(client)) {
-					found.push(
-						`client ${client} and worker ${reported} disagree — point MONTY_BIN at a worker from the same release as @pydantic/monty`,
-					);
-				}
+				const mismatch = protocolProblem(clientVersion(), reported);
+				if (mismatch) found.push(mismatch);
 			}
 		}
 		return found;

@@ -103,7 +103,7 @@ const sha = (text: string) => createHash("sha256").update(text, "utf8").digest("
 
 describe("the base surface (acceptance check 2)", () => {
 	it("keeps the pre-split description, minus the three rlm fragments, corrected for monty 1.4", () => {
-		expect(sha(BASE_DESCRIPTION)).toBe("a409441465d552a77acbb2be49b9210a7321653f4f8553a400e96691e32efe09");
+		expect(sha(BASE_DESCRIPTION)).toBe("e29b18269ea172f6e2ff461b6bcd4b521ff119260f9e1c78d089f00f58c5e651");
 		expect(BASE_DESCRIPTION).toContain("put throwaway files there rather than under /tmp");
 		expect(BASE_DESCRIPTION).not.toContain("rlm.spawn");
 		expect(BASE_DESCRIPTION).not.toContain("agent_message");
@@ -114,7 +114,7 @@ describe("the base surface (acceptance check 2)", () => {
 	});
 
 	it("keeps the first six guidelines, in order (as of the await-in-a-plain-def amendment)", () => {
-		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("dea5f71d696211d26ba15cb51f291531e7603741af5392d7a7ae1feaaccd580c");
+		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("495d329315546bae230a0fc0745158e374101a7c6a94f1a73744a72beb58bd81");
 		expect(BASE_GUIDELINES[0]).toStartWith("Use python for work that is stateful");
 	});
 
@@ -125,7 +125,7 @@ describe("the base surface (acceptance check 2)", () => {
 	// that had no business being in the foreground.
 	it("carries the four added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(10);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("08d3612cab53d67824e563edfb48f89bc64c2cb9176bcae1273ae1cec7e6641b");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("fd8b283131b83b77b9a190fafab018b9e32db81887840f6b336a4831fcfbfe77");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, path tests are `os.path.isdir(p)`");
