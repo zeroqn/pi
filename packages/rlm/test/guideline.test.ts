@@ -33,6 +33,22 @@ describe("the guideline's calls (rlm-stop, live acceptance 2026-10-09)", () => {
 		}
 	});
 
+	/**
+	 * Amended 2026-11-22: a journal rebuild restores a handle as the dict the host returned (its
+	 * status stale) and a cell killed after `rlm.spawn` returned leaves a child with no handle in
+	 * the next kernel. The model was told neither, and had no reason to call `list`.
+	 */
+	it("says what a rebuild leaves, between the transcript rule and the staleness rule", () => {
+		const transcript = RLM_GUIDELINE.indexOf("read an older child's answer from its stored transcript");
+		const rebuilt = RLM_GUIDELINE.indexOf("After a kernel rebuild");
+		const stale = RLM_GUIDELINE.indexOf("stops making progress is reported stale");
+		expect(rebuilt).toBeGreaterThan(transcript);
+		expect(rebuilt).toBeLessThan(stale);
+		expect(RLM_GUIDELINE).toContain("a handle you kept is a snapshot of what the host returned then");
+		expect(RLM_GUIDELINE).toContain("may have left a child whose handle never arrived");
+		expect(RLM_GUIDELINE).toContain("list before concluding that a missing handle means a missing child");
+	});
+
 	it("keeps both sentences ticket 08 decided, in order, with nothing promised that is absent", () => {
 		const stale = RLM_GUIDELINE.indexOf("stops making progress is reported stale");
 		const stop = RLM_GUIDELINE.indexOf("ends an unwanted child and everything below it");
