@@ -24,5 +24,5 @@
   };
 
   # Filled by the release workflow: the run that compiled pi with this pin and passed the gate.
-  verified = { run = "gh-dry-run-20261123-1352"; pi = "1.6.0"; };
+  verified = { run = "gh-pi-v1.6.0"; pi = "1.6.0"; };
 }
