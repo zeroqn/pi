@@ -32,9 +32,10 @@ must neither wait for it nor drag a half-finished client into a pi version.
 | the agent | `pi-v<pi version>` | `pi-aot-<pi>-<platform>.tar.gz` (the host and its assets), `bun-aot-<pin>-<platform>.zip` (the engine it was compiled with) | `nix/manifest.nix` |
 | the client | `tui-v<client version>` | `pi-tui-<client>-<platform>.tar.gz` (`rpi` and the `pi` wrapper) | `nix/manifest-tui.nix` |
 
-`tui-release.yml` publishes the client when `tui/Cargo.toml`'s workspace version changes, and on dispatch;
-it runs the client's own `cargo test` and both Linux legs on every push under `tui/`, whether or not it
-publishes. `aot-release.yml` publishes the agent when pi's own release version changes.
+`tui-release.yml` runs on **dispatch only** — the client is under heavy development, so nothing is built on
+a push. A dispatch always builds both Linux legs and runs the client's `cargo test`; it publishes
+`tui-v<version>` (from `tui/Cargo.toml`) when `publish` is checked. `aot-release.yml` publishes the agent
+when pi's own release version changes, on a daily schedule.
 
 Downstream, with this repository as an input (`extensions/` is the repository root, so the flake is in the
 `tui` subdirectory):

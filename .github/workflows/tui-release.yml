@@ -7,9 +7,9 @@ name: tui-release
 # Tag: `tui-v<version>`, where `<version>` is the workspace version in `tui/Cargo.toml`. Publishing is
 # version-driven: bump that version to release, the way pi's own releases work.
 #
-# On every push under `tui/`, and on dispatch, the workflow builds both Linux platforms and runs the client's
-# tests. It publishes only when the version differs from what `tui/nix/manifest-tui.nix` describes, or when a
-# dispatch says so.
+# It runs on dispatch only, and always builds both Linux platforms and runs the client's tests; it publishes
+# when `publish` is set, deriving `tui-v<version>` from `tui/Cargo.toml` unless a tag is given. Nothing is
+# built on a push: the client changes too often for that to be useful at this stage.
 #
 # What a release carries, per platform: `pi-tui-<version>-<platform>.tar.gz` - `rpi` and the `pi` wrapper
 # beside it - plus a build-provenance attestation (`gh attestation verify <asset> --repo <owner>/<repo>`).
@@ -18,14 +18,13 @@ name: tui-release
 # "Read and write"; a ruleset on main must list the GitHub Actions app as a bypass actor.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "tui/Cargo.toml"
-      - "tui/crates/**"
-      - "tui/bin/**"
-      - "tui/nix/tui-release.sh"
-      - ".github/workflows/tui-release.yml"
+  # Deliberately dispatch-only for now: the client is under heavy development, so a push under `tui/` must
+  # not build it on every commit. Re-enable the push trigger when the pace settles, or when a CI gate on the
+  # client is wanted:
+  #
+  #   push:
+  #     branches: [main]
+  #     paths: ["tui/Cargo.toml", "tui/crates/**", "tui/bin/**", "tui/nix/tui-release.sh"]
   workflow_dispatch:
     inputs:
       tag:
@@ -37,9 +36,10 @@ on:
         default: false
 
 concurrency:
-  # One release build per ref; a newer push supersedes the older run rather than queueing behind it.
+  # One client build at a time per ref. A dispatch is a deliberate act, so a newer run waits rather than
+  # killing the older one.
   group: tui-release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -77,30 +77,27 @@ jobs:
       - name: Decide what to publish
         id: decide
         env:
-          EVENT: ${{ github.event_name }}
           INPUT_TAG: ${{ inputs.tag }}
           INPUT_PUBLISH: ${{ inputs.publish }}
           VERSION: ${{ steps.version.outputs.version }}
           MANIFEST_VERSION: ${{ steps.manifest.outputs.version }}
         run: |
           set -eu
-          publish=false
-          tag="tui-v$VERSION"
-          if [ "$EVENT" = workflow_dispatch ]; then
-            publish="$INPUT_PUBLISH"
-            if [ -n "$INPUT_TAG" ]; then tag="$INPUT_TAG"; fi
-          elif [ "$VERSION" != "$MANIFEST_VERSION" ]; then
-            publish=true
-          fi
+          publish="$INPUT_PUBLISH"
+          tag="$INPUT_TAG"
+          if [ -z "$tag" ]; then tag="tui-v$VERSION"; fi
           {
             echo "publish=$publish"
             echo "tag=$tag"
             echo "version=$VERSION"
           } >> "$GITHUB_OUTPUT"
           {
-            echo "### tui-release watch"
+            echo "### tui-release"
             echo "- version in Cargo.toml: $VERSION"
             echo "- manifest-tui describes: ${MANIFEST_VERSION:-<empty>}"
+            if [ "$publish" = true ] && [ "$VERSION" = "$MANIFEST_VERSION" ]; then
+              echo "- note: this tag would republish the version already described"
+            fi
             echo "- decision: publish=$publish tag=$tag"
           } >> "$GITHUB_STEP_SUMMARY"
 
