@@ -30,6 +30,7 @@ def text_of(buf):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--binary", required=True)
+    ap.add_argument("--host", default="pi", help="the pi the client should spawn (default: pi on PATH)")
     ap.add_argument("--prompt", default="PLAIN: describe the render path")
     ap.add_argument("--needle", default="Done")
     ap.add_argument("--timeout", type=float, default=60.0)
@@ -38,7 +39,7 @@ def main():
         argv = [
             a.binary,
             "--pi",
-            f"pi --mode rpc {' '.join(MODEL_ARGS)}",
+            f"{a.host} --mode rpc {' '.join(MODEL_ARGS)}",
             "--stats",
             "/tmp/smoke-host-stats.json",
         ]

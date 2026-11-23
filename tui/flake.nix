@@ -36,14 +36,16 @@
       devShellFor =
         system:
         let
+          lib = nixpkgs.lib;
           pkgs = pkgsFor system;
           runtime = runtimeFor system;
-          # The two scripts of the release flow: the host build, and the tarballs a release page carries.
-          script = name: pkgs.stdenvNoCC.mkDerivation {
-            inherit name;
-            src = ./. + "/nix/${name}.sh";
+          # The release flow's scripts: the host build, the tarballs a release page carries, the gate, and
+          # the pin update. Each is installed under its own name so `nix develop --command <name>` finds it.
+          script = name: extension: pkgs.stdenvNoCC.mkDerivation {
+            name = lib.removeSuffix extension name;
+            src = ./. + "/nix/${name}";
             dontUnpack = true;
-            installPhase = "install -Dm755 $src $out/bin/${name}";
+            installPhase = "install -Dm755 $src $out/bin/${lib.removeSuffix extension name}";
           };
         in
         pkgs.mkShell {
@@ -67,8 +69,11 @@
             pkgs.pkg-config
             pkgs.cacert
             runtime
-            (script "aot-host")
-            (script "aot-release")
+            (script "aot-host.sh" ".sh")
+            (script "aot-release.sh" ".sh")
+            (script "aot-smoke.sh" ".sh")
+            (script "bun-pin-update.sh" ".sh")
+            (script "bun-pin-tools.py" ".py")
           ];
 
           shellHook = ''
@@ -80,7 +85,7 @@
 
             echo "pi-tui: bun $("$PI_TUI_RUNTIME" --version), node $(node --version)"
             echo "pi-tui: PI_REPO=''${PI_REPO:-<unset>} PI_TUI_OUT=$PI_TUI_OUT"
-            echo "pi-tui: aot-host | aot-release | cargo build --release | rpi | nix build .#rpi"
+            echo "pi-tui: aot-host | aot-release | aot-smoke | bun-pin-update | cargo build | nix build .#rpi"
           '';
         };
     in

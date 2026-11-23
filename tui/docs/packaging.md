@@ -20,20 +20,19 @@ The client resolves the same host on its own when the wrapper is not in front of
 else `PI_TUI_HOST`, else `pi` on PATH. That is how a `nix develop` shell points a bare `rpi` at the host
 it just built, without a wrapper and without baking a store path into the client.
 
-## Releases: prebuilt artifacts, and how a downstream flake installs them
+## Releases: prebuilt artifacts, gated and attested
 
 Building an AOT host needs the canary Bun, a pi checkout and a compile; a user of this client should not
-repeat any of that. So each release carries three artifacts per platform, and `nix/manifest.nix` names them
-by URL and hash:
+repeat any of that. So each release carries artifacts per platform, and `nix/manifest.nix` names them by URL
+and hash:
 
 | Asset | Contents |
 |---|---|
 | `pi-aot-<pi version>-<platform>.tar.gz` | `pi`, `package.json`, `theme/`, `assets/`, `export-html/`, `docs/`, `examples/`, `native/`, `photon_rs_bg.wasm`, `LICENSE` |
 | `pi-tui-<client version>-<platform>.tar.gz` | `rpi` and the `pi` wrapper beside it |
-| `bun-aot` (no asset: `nix/runtime.nix` fetches it) | the canary archive, pinned by hash |
 
-Downstream, with this repository as an input (`extensions/` is the repository root, so the flake is in
-the `tui` subdirectory):
+Downstream, with this repository as an input (`extensions/` is the repository root, so the flake is in the
+`tui` subdirectory):
 
 ```nix
 inputs.pi-tui = {
@@ -48,29 +47,47 @@ pi-tui.packages.x86_64-linux.bun-aot   # Bun 1.4.6, the engine the host was comp
 ```
 
 `pi-aot` and `rpi-bin` exist **only for a platform whose entry `nix/manifest.nix` carries**, so a downstream
-lock taken before the first release has `rpi` and `bun-aot` but no prebuilt host. The release must land
-before the manifest commit, and a downstream lock must be newer than both.
+lock taken before the first release has `rpi` and `bun-aot` and no prebuilt host. `pi-aot` installs the
+executable in `libexec` and the assets in `share`, and its `bin/pi` sets `PI_PACKAGE_DIR` at the second — the
+one-artifact rule as a store layout. Both are built by `nix/prebuilt.nix` with `autoPatchelfHook`.
 
-`pi-aot` installs the executable into `libexec` and the assets into `share`, and its `bin/pi` sets
-`PI_PACKAGE_DIR` at the second — the one-artifact rule above, expressed in a store layout. Both are built by
-`nix/prebuilt.nix` with `autoPatchelfHook`, so the interpreter is this store's glibc even though the tarball
-was compiled elsewhere.
+### What watches upstream, and what may publish
 
-```sh
-nix develop --command aot-release --pi /path/to/pi-checkout   # tarballs + this platform's manifest entry
-```
+`.github/workflows/aot-release.yml` is the whole flow. It runs on a schedule and on dispatch.
 
-`.github/workflows/aot-release.yml` runs that on three runners (`ubuntu-24.04`, `ubuntu-24.04-arm`,
-`macos-14`), because `--aot` cannot cross-compile, uploads the tarballs to a release, and commits
-`nix/manifest.nix`. The weekly scheduled run only reports: upstream pi's version, and whether the canary
-archive moved. Moving the Bun pin is a manual edit with a fresh hash for **every** platform, since the three
-archives in `nix/runtime.nix` are one set.
+| Upstream event | Behaviour |
+|---|---|
+| a new pi release | published as `pi-v<version>`; those are kept, because pi's releases are the versions we follow |
+| a moved Bun `canary` | adopted twice a week (Mon, Thu) as `bun-<date>`; only the newest three of those are kept, and neither prune ever touches a release the current manifest names |
+| nothing moved | the run reports and stops |
 
-Verified here: `nix build .#bun-aot` (1.4.6, `--aot` present), `aot-release` producing both tarballs and the
-manifest entry, then `nix build .#pi-aot .#rpi-bin` from a manifest naming them — `pi-aot/bin/pi --version`
-prints `1.6.0`, answers `get_state` over `--mode rpc`, and `rpi-bin/bin/pi --version` reaches the same host
-through the wrapper. Not verified: any run on `aarch64` or Darwin (no runner here), and macOS binaries are
-unsigned.
+The Bun pin is a separate, generated file: `nix/bun-pin.nix` records each archive's content hash and
+upstream's `etag`/`last-modified`, so the watch step is three HEAD requests and no download. `nix/runtime.nix`
+is hand-written and reads it. `bun-pin-update.sh --check` exits 10 when the canary moved; without `--check`
+it downloads, re-hashes and rewrites the file, and `bun-pin-tools.py verified <run> <pi>` stamps it as
+accepted.
+
+### Nothing publishes unless both gates pass
+
+1. `nix/aot-smoke.sh` — the executable reports the version of the manifest beside it, answers `get_state`
+   over `--mode rpc`, and the client starts under a pty.
+2. `tools/harness/smoke_host.py --host <aot pi>` — the client spawns that host, a fake model answers, and
+   the answer is painted. Verified locally: `ok: 'Done' rendered from a live RPC host (3796 bytes, 39
+   frames)`.
+
+A failing gate fails the run, and the pin, the manifest and the release page stay as they were. The manifest
+commit lands only after all three platforms passed, because it is what downstream flakes lock.
+
+### Attestation
+
+- **The artifacts we build** get GitHub build provenance: `gh attestation verify <asset> --repo <owner>/<repo>`.
+- **The Bun canary** is not built here, so no build provenance of ours could be honest about it. Instead the
+  pin file is attested with a custom predicate (`.../attestation/bun-pin/v1`) that records the upstream URL,
+  the etag and the hash of each archive the release was compiled with. The hash is what a downstream build
+  actually enforces; the attestation records the claim.
+
+Lean on the hash, not the attestation, for the canary: our signature says "these are the bytes our release
+used", and only the pin's hash says which bytes those are.
 
 ## What each invocation means
 

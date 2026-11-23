@@ -27,7 +27,9 @@ cargo build --release && rpi   # the client drives the host this shell built
 ```
 
 Released builds skip all of that: `packages.pi-aot`, `packages.rpi-bin` and `packages.bun-aot` install the
-tarballs named in `nix/manifest.nix`, with hashes. See `docs/packaging.md`.
+tarballs named in `nix/manifest.nix`, with hashes. `nix/bun-pin.nix` pins the Bun canary the host is
+compiled with. `.github/workflows/aot-release.yml` watches upstream, builds, gates and publishes. See
+`docs/packaging.md`.
 
 ```sh
 cargo build --release
