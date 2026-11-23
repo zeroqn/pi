@@ -60,6 +60,7 @@ only**:
 | Upstream event | Behaviour |
 |---|---|
 | a new pi release | published as `pi-v<version>`, with the AOT host, the client, and the Bun archive that host was compiled with |
+| a platform whose leg failed | the other platforms still publish; `nix/manifest.nix` names only the ones that passed |
 | nothing new | the run reports where the Bun pin stands and stops |
 | Bun's canary moves | nothing on its own schedule: Bun moves when a pi release is built, and travels inside that release |
 

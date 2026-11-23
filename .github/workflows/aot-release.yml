@@ -9,6 +9,11 @@ name: aot-release
 #    `bun-aot` (the canary archive that host was compiled with). Releases are kept: they are the versions we
 #    follow, and our own copy of Bun is what keeps them installable.
 #
+# Platforms: `x86_64-linux` and `aarch64-linux`. Darwin is not built: its leg was never able to start (a
+# `macos-14` job that reported `cancelled` one second after it was created, with no steps and no runner), and
+# nothing about the arm64 Linux leg depends on it. `aarch64-darwin` stays described but unreleased, so a
+# Darwin downstream gets no prebuilt and no wrong binary.
+#
 # Why Bun is copied rather than pointed at: upstream's `canary` assets are replaced daily and the old URLs
 # stop working, so a pin that names oven-sh's tag rots. Each release re-pins, downloads the archive it
 # verifies by hash, and uploads it; `nix/runtime.nix` prefers that release asset once the manifest carries it.
@@ -173,9 +178,6 @@ jobs:
           - runner: ubuntu-24.04-arm
             platform: aarch64-linux
             end-to-end: false
-          - runner: macos-14
-            platform: aarch64-darwin
-            end-to-end: false
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
@@ -260,8 +262,10 @@ jobs:
 
   publish:
     needs: [watch, build]
-    # Only a run that decided to publish: a dispatch without `publish` stops after the gates.
-    if: needs.watch.outputs.publish == 'true'
+    # Runs even when one platform's leg failed, because a platform that passed is installable on its own and
+    # the manifest names only the platforms that passed. `cancelled()` still stops it when the run itself was
+    # cancelled, and a run that published no platform at all fails below instead of creating an empty release.
+    if: ${{ !cancelled() && needs.watch.outputs.publish == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -282,6 +286,17 @@ jobs:
           pattern: artifacts-*
           path: ${{ runner.temp }}/artifacts
 
+      - name: Which platforms passed their gates
+        id: platforms
+        run: |
+          set -eu
+          found="$(find "$RUNNER_TEMP/artifacts" -name 'manifest-entry.nix' -printf '%h\n' | xargs -r -n1 basename | sed 's/artifacts-//' | sort | paste -sd, -)"
+          if [ -z "$found" ]; then
+            echo "no platform produced a manifest entry: every leg failed its gates" >&2
+            exit 1
+          fi
+          echo "found=$found" >> "$GITHUB_OUTPUT"
+
       - name: Create the release and upload the assets
         env:
           GH_TOKEN: ${{ github.token }}
@@ -289,6 +304,7 @@ jobs:
           PI_VERSION: ${{ needs.watch.outputs.pi-version }}
           BUN_VERSION: ${{ needs.watch.outputs.bun-version }}
           REPO: ${{ github.repository }}
+          PLATFORMS: ${{ steps.platforms.outputs.found }}
         run: |
           set -eu
           notes="$RUNNER_TEMP/notes.md"
