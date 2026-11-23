@@ -26,10 +26,10 @@ aot-host               # pi's dist, then `bun build --compile --aot` -> results/
 cargo build --release && rpi   # the client drives the host this shell built
 ```
 
-Released builds skip all of that: `packages.pi-aot`, `packages.rpi-bin` and `packages.bun-aot` install the
-tarballs named in `nix/manifest.nix`, with hashes. `nix/bun-pin.nix` pins the Bun canary the host is
-compiled with. `.github/workflows/aot-release.yml` watches upstream, builds, gates and publishes. See
-`docs/packaging.md`.
+Released builds skip all of that: `packages.pi-aot` and `packages.bun-aot` come from the agent's stream
+(`nix/manifest.nix`, tag `pi-v<pi version>`), and `packages.rpi-bin` from the client's own stream
+(`nix/manifest-tui.nix`, tag `tui-v<client version>`). `nix/bun-pin.nix` pins the Bun canary the host is
+compiled with. See `docs/packaging.md`.
 
 ```sh
 cargo build --release

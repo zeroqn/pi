@@ -1,0 +1,241 @@
+name: tui-release
+
+# The Rust client's own release stream. It is under active development, so it is versioned and published
+# separately from pi and Bun: a pi release never waits for a half-finished client, and the client does not
+# need a pi release to ship a fix.
+#
+# Tag: `tui-v<version>`, where `<version>` is the workspace version in `tui/Cargo.toml`. Publishing is
+# version-driven: bump that version to release, the way pi's own releases work.
+#
+# On every push under `tui/`, and on dispatch, the workflow builds both Linux platforms and runs the client's
+# tests. It publishes only when the version differs from what `tui/nix/manifest-tui.nix` describes, or when a
+# dispatch says so.
+#
+# What a release carries, per platform: `pi-tui-<version>-<platform>.tar.gz` - `rpi` and the `pi` wrapper
+# beside it - plus a build-provenance attestation (`gh attestation verify <asset> --repo <owner>/<repo>`).
+#
+# The publish job pushes with GITHUB_TOKEN, so Settings -> Actions -> General -> Workflow permissions must be
+# "Read and write"; a ruleset on main must list the GitHub Actions app as a bypass actor.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tui/Cargo.toml"
+      - "tui/crates/**"
+      - "tui/bin/**"
+      - "tui/nix/tui-release.sh"
+      - ".github/workflows/tui-release.yml"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'release tag; empty derives tui-v<version>'
+        required: false
+      publish:
+        description: 'publish, or build and test only'
+        type: boolean
+        default: false
+
+concurrency:
+  # One release build per ref; a newer push supersedes the older run rather than queueing behind it.
+  group: tui-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tui
+    outputs:
+      publish: ${{ steps.decide.outputs.publish }}
+      tag: ${{ steps.decide.outputs.tag }}
+      version: ${{ steps.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The version in Cargo.toml
+        id: version
+        run: |
+          set -eu
+          version="$(sed -n 's/^version = "(.*)"/\\1/p' Cargo.toml | head -1)"
+          [ -n "$version" ] || { echo "no workspace version in tui/Cargo.toml" >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: What the client manifest already describes
+        id: manifest
+        run: |
+          set -eu
+          version="$(sed -n 's/^      version = "(.*)";$/\\1/p' nix/manifest-tui.nix 2>/dev/null | head -1 || true)"
+          echo "version=${version:-}" >> "$GITHUB_OUTPUT"
+
+      - name: Decide what to publish
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+          VERSION: ${{ steps.version.outputs.version }}
+          MANIFEST_VERSION: ${{ steps.manifest.outputs.version }}
+        run: |
+          set -eu
+          publish=false
+          tag="tui-v$VERSION"
+          if [ "$EVENT" = workflow_dispatch ]; then
+            publish="$INPUT_PUBLISH"
+            if [ -n "$INPUT_TAG" ]; then tag="$INPUT_TAG"; fi
+          elif [ "$VERSION" != "$MANIFEST_VERSION" ]; then
+            publish=true
+          fi
+          {
+            echo "publish=$publish"
+            echo "tag=$tag"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### tui-release watch"
+            echo "- version in Cargo.toml: $VERSION"
+            echo "- manifest-tui describes: ${MANIFEST_VERSION:-<empty>}"
+            echo "- decision: publish=$publish tag=$tag"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: watch
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            platform: aarch64-linux
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: tui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: The client's own tests
+        run: nix develop --command cargo test --workspace --locked
+
+      - name: Build the tarball, and this platform's manifest entry
+        env:
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/download/${{ needs.watch.outputs.tag }}
+          MANIFEST_OUT: ${{ runner.temp }}/manifest-entry.nix
+        run: |
+          set -eu
+          nix develop --command tui-release --stage "$RUNNER_TEMP/release"
+
+      - name: Attest the artifact this run built
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ runner.temp }}/release/*.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.platform }}
+          path: |
+            ${{ runner.temp }}/release/*.tar.gz
+            ${{ runner.temp }}/manifest-entry.nix
+
+  publish:
+    needs: [watch, build]
+    # A platform that passed is installable on its own; the manifest names only the platforms that passed.
+    if: ${{ !cancelled() && needs.watch.outputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tui
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ github.token }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          path: ${{ runner.temp }}/artifacts
+
+      - name: Which platforms passed
+        id: platforms
+        run: |
+          set -eu
+          found="$(find "$RUNNER_TEMP/artifacts" -name 'manifest-entry.nix' -printf '%h\n' |
+            xargs -r -n1 basename | sed 's/artifacts-//' | sort | paste -sd, -)"
+          [ -n "$found" ] || { echo "no platform produced a manifest entry" >&2; exit 1; }
+          echo "found=$found" >> "$GITHUB_OUTPUT"
+
+      - name: Create the release and upload the assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.watch.outputs.tag }}
+          VERSION: ${{ needs.watch.outputs.version }}
+          REPO: ${{ github.repository }}
+          PLATFORMS: ${{ steps.platforms.outputs.found }}
+        run: |
+          set -eu
+          notes="$RUNNER_TEMP/notes.md"
+          {
+            echo "The Rust client for pi, version $VERSION."
+            echo
+            echo "Install through the flake: nix/manifest-tui.nix names these assets by hash."
+            echo
+            echo "Each asset carries a build-provenance attestation:"
+            echo
+            echo "    gh attestation verify <asset> --repo $REPO"
+            echo
+            echo "Platforms in this release: $PLATFORMS."
+          } > "$notes"
+          gh release create "$TAG" --title "$TAG" --notes-file "$notes" ||
+            echo "release $TAG already exists"
+          find "$RUNNER_TEMP/artifacts" -name '*.tar.gz' -print0 |
+            xargs -0 gh release upload "$TAG" --clobber
+
+      - name: Write nix/manifest-tui.nix from the per-platform entries
+        run: |
+          set -eu
+          {
+            echo "{"
+            find "$RUNNER_TEMP/artifacts" -name 'manifest-entry.nix' | sort |
+              while read -r entry; do cat "$entry"; done
+            echo "}"
+          } > nix/manifest-tui.nix
+
+      - name: Commit the client manifest
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add nix/manifest-tui.nix
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+          else
+            git commit -m "chore(tui): client ${{ needs.watch.outputs.version }}"
+            git push
+          fi
+
+      - name: Summary
+        env:
+          TAG: ${{ needs.watch.outputs.tag }}
+          VERSION: ${{ needs.watch.outputs.version }}
+          PLATFORMS: ${{ steps.platforms.outputs.found }}
+        run: |
+          set -eu
+          {
+            echo "### published $TAG (client $VERSION, $PLATFORMS)"
+            echo '```nix'
+            cat nix/manifest-tui.nix
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

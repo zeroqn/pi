@@ -20,16 +20,21 @@ The client resolves the same host on its own when the wrapper is not in front of
 else `PI_TUI_HOST`, else `pi` on PATH. That is how a `nix develop` shell points a bare `rpi` at the host
 it just built, without a wrapper and without baking a store path into the client.
 
-## Releases: prebuilt artifacts, gated and attested
+## Releases: two streams, gated and attested
 
 Building an AOT host needs the canary Bun, a pi checkout and a compile; a user of this client should not
-repeat any of that. So each release carries artifacts per platform, and `nix/manifest.nix` names them by URL
-and hash:
+repeat any of that. So each release carries artifacts per platform, named by URL and hash in one of two
+manifests. The two are separate on purpose: the client changes far more often than pi does, so a pi release
+must neither wait for it nor drag a half-finished client into a pi version.
 
-| Asset | Contents |
-|---|---|
-| `pi-aot-<pi version>-<platform>.tar.gz` | `pi`, `package.json`, `theme/`, `assets/`, `export-html/`, `docs/`, `examples/`, `native/`, `photon_rs_bg.wasm`, `LICENSE` |
-| `pi-tui-<client version>-<platform>.tar.gz` | `rpi` and the `pi` wrapper beside it |
+| Stream | Tag | Assets per platform | Manifest |
+|---|---|---|---|
+| the agent | `pi-v<pi version>` | `pi-aot-<pi>-<platform>.tar.gz` (the host and its assets), `bun-aot-<pin>-<platform>.zip` (the engine it was compiled with) | `nix/manifest.nix` |
+| the client | `tui-v<client version>` | `pi-tui-<client>-<platform>.tar.gz` (`rpi` and the `pi` wrapper) | `nix/manifest-tui.nix` |
+
+`tui-release.yml` publishes the client when `tui/Cargo.toml`'s workspace version changes, and on dispatch;
+it runs the client's own `cargo test` and both Linux legs on every push under `tui/`, whether or not it
+publishes. `aot-release.yml` publishes the agent when pi's own release version changes.
 
 Downstream, with this repository as an input (`extensions/` is the repository root, so the flake is in the
 `tui` subdirectory):
@@ -42,15 +47,15 @@ inputs.pi-tui = {
 
 # then, for the platform you build on:
 pi-tui.packages.x86_64-linux.pi-aot    # pi, ahead of time: bin/pi, libexec/pi/pi, share/pi
-pi-tui.packages.x86_64-linux.rpi-bin   # rpi + the wrapper: bin/{pi,rpi}
-pi-tui.packages.x86_64-linux.bun-aot   # the Bun the host was compiled with: the release's copy when there
-                                       # is one, else upstream's pinned canary
+pi-tui.packages.x86_64-linux.rpi-bin   # rpi + the wrapper, from the client's own release
+pi-tui.packages.x86_64-linux.bun-aot   # the Bun the host was compiled with
 ```
 
-`pi-aot` and `rpi-bin` exist **only for a platform whose entry `nix/manifest.nix` carries**, so a downstream
-lock taken before the first release has `rpi` and `bun-aot` and no prebuilt host. `pi-aot` installs the
-executable in `libexec` and the assets in `share`, and its `bin/pi` sets `PI_PACKAGE_DIR` at the second — the
-one-artifact rule as a store layout. Both are built by `nix/prebuilt.nix` with `autoPatchelfHook`.
+An attribute exists **only for a platform that manifest carries**, so a downstream lock taken before a
+release has `rpi` and `bun-aot` but no prebuilt host. `pi-aot` installs the executable in `libexec` and the
+assets in `share`, and its `bin/pi` sets `PI_PACKAGE_DIR` at the second — the one-artifact rule as a store
+layout. Everything installed from a release goes through `nix/prebuilt.nix`, which patches the interpreter
+for this store.
 
 ### What watches upstream, and what may publish
 
@@ -59,7 +64,7 @@ only**:
 
 | Upstream event | Behaviour |
 |---|---|
-| a new pi release | published as `pi-v<version>`, with the AOT host, the client, and the Bun archive that host was compiled with |
+| a new pi release | published as `pi-v<version>`, with the AOT host and the Bun archive that host was compiled with |
 | a platform whose leg failed | the other platforms still publish; `nix/manifest.nix` names only the ones that passed |
 | nothing new | the run reports where the Bun pin stands and stops |
 | Bun's canary moves | nothing on its own schedule: Bun moves when a pi release is built, and travels inside that release |

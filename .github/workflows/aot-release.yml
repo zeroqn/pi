@@ -5,9 +5,10 @@ name: aot-release
 #
 # What it watches
 #  - pi releases (github.com/earendil-works/pi). A new version publishes a release tagged `pi-v<version>`,
-#    carrying, per platform: `pi-aot` (the AOT host and its assets), `pi-tui` (the Rust client), and
-#    `bun-aot` (the canary archive that host was compiled with). Releases are kept: they are the versions we
-#    follow, and our own copy of Bun is what keeps them installable.
+#    carrying, per platform: `pi-aot` (the AOT host and its assets) and `bun-aot` (the canary archive that
+#    host was compiled with). Releases are kept: they are the versions we follow, and our own copy of Bun is
+#    what keeps them installable. The Rust client is not here: it has its own stream, `tui-release.yml`, with
+#    its own version, because it changes far more often than pi does.
 #
 # Platforms: `x86_64-linux` and `aarch64-linux`. Darwin is not built: its leg was never able to start (a
 # `macos-14` job that reported `cancelled` one second after it was created, with no steps and no runner), and
@@ -142,7 +143,8 @@ jobs:
             kind=dispatch
             publish="$INPUT_PUBLISH"
             tag="$INPUT_TAG"
-            [ -n "$tag" ] || tag="dry-run-$(date -u +%Y%m%d-%H%M)"
+            # A tag is only needed to publish; a dispatch that will not publish has no release name at all.
+            if [ -z "$tag" ] && [ "$publish" = true ]; then tag="pi-v$PI_VERSION"; fi
           elif [ "$PI_VERSION" != "$MANIFEST_VERSION" ]; then
             # A new pi release. Bun is re-pinned by this release's build, and travels with it.
             build=true
@@ -206,7 +208,7 @@ jobs:
         # writes is committed only by the publish job, and only with a release that passed the gates.
         run: ./nix/bun-pin-update.sh
 
-      - name: Build the AOT host, the client, and this platform's manifest entry
+      - name: Build the AOT host and this platform's manifest entry
         env:
           RELEASE_URL: https://github.com/${{ github.repository }}/releases/download/${{ needs.watch.outputs.tag }}
           MANIFEST_OUT: ${{ runner.temp }}/manifest-entry.nix
@@ -221,15 +223,17 @@ jobs:
           set -eu
           nix develop --command aot-smoke \
             --host "$RUNNER_TEMP/release/host" \
-            --client "$RUNNER_TEMP/release/tui/rpi" \
             --expect "${{ needs.watch.outputs.pi-version }}"
 
       - name: Gate 2 - the client drives it through a whole turn
         if: matrix.end-to-end
+        # The client is not released here, but it must still be able to drive this host: that is the whole
+        # contract between the two streams. Built from source, cached, a couple of minutes.
         run: |
           set -eu
+          nix build .#rpi --out-link "$RUNNER_TEMP/rpi"
           nix develop --command python3 tools/harness/smoke_host.py \
-            --binary "$RUNNER_TEMP/release/tui/rpi" \
+            --binary "$RUNNER_TEMP/rpi/bin/rpi" \
             --host "$RUNNER_TEMP/release/host"
 
       - name: Attest the artifacts this run built
@@ -309,8 +313,8 @@ jobs:
           set -eu
           notes="$RUNNER_TEMP/notes.md"
           {
-            echo "pi $PI_VERSION, compiled ahead of time with Bun $BUN_VERSION; it ships with the Rust"
-            echo "client (rpi) and the Bun archive the host was built with, so this release stays"
+            echo "pi $PI_VERSION, compiled ahead of time with Bun $BUN_VERSION, and shipped with"
+            echo "the Bun archive the host was built with, so this release stays"
             echo "installable after upstream's canary tag moves."
             echo
             echo 'Each asset carries a build-provenance attestation:'

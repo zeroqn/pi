@@ -7,7 +7,8 @@
 
 rustPlatform.buildRustPackage {
   pname = "pi-tui";
-  version = "0.0.0";
+  # Mirrors [workspace.package] version in ../Cargo.toml, which is what `tui-release` names a release after.
+  version = "0.1.0";
 
   inherit src;
 

@@ -73,6 +73,7 @@
             runtime
             (script "aot-host.sh" ".sh")
             (script "aot-release.sh" ".sh")
+            (script "tui-release.sh" ".sh")
             (script "aot-smoke.sh" ".sh")
             (script "bun-pin-update.sh" ".sh")
             (script "bun-pin-tools.py" ".py")
@@ -87,7 +88,7 @@
 
             echo "pi-tui: bun $("$PI_TUI_RUNTIME" --version), node $(node --version)"
             echo "pi-tui: PI_REPO=''${PI_REPO:-<unset>} PI_TUI_OUT=$PI_TUI_OUT"
-            echo "pi-tui: aot-host | aot-release | aot-smoke | bun-pin-update | cargo build | nix build .#rpi"
+            echo "pi-tui: aot-host | aot-release | tui-release | aot-smoke | bun-pin-update | cargo build"
           '';
         };
     in
@@ -100,7 +101,9 @@
           pkgs = pkgsFor system;
           prebuilt = pkgs.callPackage ./nix/prebuilt.nix { };
           manifest = import ./nix/manifest.nix;
+          manifestTui = import ./nix/manifest-tui.nix;
           released = manifest.${system} or { };
+          releasedTui = manifestTui.${system} or { };
         in
         {
           rpi = clientFor system;
@@ -110,8 +113,9 @@
         // nixpkgs.lib.optionalAttrs (released ? piAot) {
           pi-aot = prebuilt.mkPiAot released.piAot;
         }
-        // nixpkgs.lib.optionalAttrs (released ? piTui) {
-          rpi-bin = prebuilt.mkPiTui released.piTui;
+        // nixpkgs.lib.optionalAttrs (releasedTui ? piTui) {
+          # The client's own stream: released independently of pi, see nix/manifest-tui.nix.
+          rpi-bin = prebuilt.mkPiTui releasedTui.piTui;
         }
       );
 

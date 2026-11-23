@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
-# Builds the release artifacts for this platform and prints the `nix/manifest.nix` entries for them.
+# Builds this platform's AOT release artifacts: pi, compiled ahead of time, and the Bun that compiled it.
 #
-# Usage: aot-release.sh [--pi DIR] [--stage DIR] [--from DIR] [--commit]
+# Usage: aot-release.sh [--pi DIR] [--stage DIR] [--from DIR]
 #   --pi DIR      the pi tree the host is built from (default: $PI_REPO, else ../pi)
-#   --stage DIR   where the tarballs are written (default: $PI_TUI_OUT/../release, i.e. results/release)
+#   --stage DIR   where the artifacts are written (default: $ROOT/results/release)
 #   --from DIR    package this AOT build instead of compiling (a previous aot-host output)
 # Environment:
 #   RELEASE_URL   where the assets will be served from (default: the OWNER/REPO placeholder)
-#   MANIFEST_OUT  write this platform's manifest.nix entry to the file (the workflow reads it)
+#   MANIFEST_OUT  write this platform's entry for nix/manifest.nix to that file
 #
-# What goes in a tarball is what must sit together at run time, not everything the build wrote:
+# Two artifacts, one release stream (tag `pi-v<pi version>`), because both follow pi's releases:
 #   pi-aot-<pi version>-<platform>.tar.gz    pi, package.json, theme/, assets/, export-html/, docs/,
 #                                            examples/, native/, photon_rs_bg.wasm, LICENSE
-#   pi-tui-<client version>-<platform>.tar.gz  rpi and the `pi` wrapper beside it
-#   bun-aot-<pin version>-<platform>.zip        the canary archive the host was compiled with, hash-checked
+#   bun-aot-<pin version>-<platform>.zip      the Bun archive that host was compiled with, hash-checked
+#
+# The Rust client is its own stream: `tui-release.sh`, tag `tui-v<client version>`.
 #
 # On a NixOS host the tarball's interpreter is not there: install it through the flake (`packages.pi-aot`),
 # which patches it, rather than unpacking the tarball by hand.
@@ -28,7 +29,7 @@ while [ $# -gt 0 ]; do
 	--pi) PI_DIR="$2"; shift ;;
 	--stage) STAGE="$2"; shift ;;
 	--from) FROM="$2"; shift ;;
-	-h | --help) sed -n '2,20p' "$0"; exit 0 ;;
+	-h | --help) sed -n '2,18p' "$0"; exit 0 ;;
 	*) echo "aot-release: unknown option $1" >&2; exit 2 ;;
 	esac
 	shift
@@ -39,34 +40,25 @@ die() { echo "aot-release: $*" >&2; exit 1; }
 # working directory is the flake's, so $PWD is the tree; PI_TUI_SRC names one elsewhere.
 ROOT="${PI_TUI_SRC:-$PWD}"
 [ -f "$ROOT/Cargo.toml" ] || die "no flake tree at $ROOT (run from extensions/tui, or set PI_TUI_SRC)"
-platform() {
-	case "$(uname -s)-$(uname -m)" in
-	Linux-x86_64) echo x86_64-linux ;;
-	Linux-aarch64 | Linux-arm64) echo aarch64-linux ;;
-	Darwin-arm64 | Darwin-aarch64) echo aarch64-darwin ;;
-	*) die "no release artifact for $(uname -s) $(uname -m)" ;;
-	esac
-}
-PLATFORM="$(platform)"
-STAGE="${STAGE:-$PWD/results/release}"
+case "$(uname -s)-$(uname -m)" in
+Linux-x86_64) PLATFORM=x86_64-linux ;;
+Linux-aarch64 | Linux-arm64) PLATFORM=aarch64-linux ;;
+Darwin-arm64 | Darwin-aarch64) PLATFORM=aarch64-darwin ;;
+*) die "no release artifact for $(uname -s) $(uname -m)" ;;
+esac
+STAGE="${STAGE:-$ROOT/results/release}"
 mkdir -p "$STAGE"
-echo "==> platform $PLATFORM, staging into $STAGE"
+echo "==> $PLATFORM, staging into $STAGE"
 
-# --- the client ---------------------------------------------------------------------------------------
-CLIENT_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT/Cargo.toml" | head -1)"
-[ -n "$CLIENT_VERSION" ] || CLIENT_VERSION=0.0.0
-echo "==> rpi $CLIENT_VERSION (cargo build --release)"
- (cd "$ROOT" && cargo build --release --quiet -p pi-tui)
-RPI_BIN="$(cd "$ROOT" && cargo metadata --format-version 1 --no-deps --quiet |
-	python3 -c 'import json,sys;print(json.load(sys.stdin)["target_directory"])')/release/rpi"
-[ -x "$RPI_BIN" ] || die "no rpi at $RPI_BIN"
-TUI_TGZ="$STAGE/pi-tui-$CLIENT_VERSION-$PLATFORM.tar.gz"
-rm -rf "$STAGE/tui" && mkdir -p "$STAGE/tui"
-install -m755 "$RPI_BIN" "$STAGE/tui/rpi"
-install -m755 "$ROOT/bin/pi" "$STAGE/tui/pi"
-tar -C "$STAGE/tui" -czf "$TUI_TGZ" .
+hash_of() {
+	if command -v nix >/dev/null 2>&1; then
+		nix hash file --sri "$1"
+	else
+		echo "sha256-$(openssl dgst -sha256 -binary "$1" | base64 | tr -d '\n')"
+	fi
+}
 
-# --- the host -----------------------------------------------------------------------------------------
+# --- pi, ahead of time --------------------------------------------------------------------------------
 if [ -n "$FROM" ]; then
 	HOST_DIR="$FROM"
 else
@@ -85,34 +77,24 @@ install -m755 "$HOST_DIR/pi" "$STAGE/host-tar/pi"
 for asset in package.json theme assets export-html docs examples native photon_rs_bg.wasm; do
 	[ -e "$HOST_DIR/$asset" ] && cp -R "$HOST_DIR/$asset" "$STAGE/host-tar/"
 done
-if [ -f "$PI_DIR/LICENSE" ]; then cp "$PI_DIR/LICENSE" "$STAGE/host-tar/"; fi
+[ -f "$PI_DIR/LICENSE" ] && cp "$PI_DIR/LICENSE" "$STAGE/host-tar/"
 tar -C "$STAGE/host-tar" -czf "$PI_TGZ" .
 
-# --- the Bun the host was compiled with ---------------------------------------------------------------
-# Upstream's canary assets are replaced daily and their URLs stop working, so the release carries a copy.
-# The hash recorded here is the pin's, which is what the build resolved through `nix build .#bun-aot`.
+# --- the Bun that compiled it -------------------------------------------------------------------------
+# Upstream's canary assets are replaced daily and their old URLs stop working, so the release carries a copy.
 BUN_VERSION="$(sed -n 's/^  version = "\(.*\)";$/\1/p' "$ROOT/nix/bun-pin.nix")"
 read -r BUN_ASSET BUN_HASH <<<"$(python3 "$ROOT/nix/bun-pin-tools.py" asset "$PLATFORM")"
 [ -n "$BUN_ASSET" ] || die "no Bun archive for $PLATFORM in nix/bun-pin.nix"
-BUN_TGZ="$STAGE/bun-aot-$BUN_VERSION-$PLATFORM.zip"
 BUN_UPSTREAM="$(sed -n 's/^  upstream = "\(.*\)";$/\1/p' "$ROOT/nix/bun-pin.nix")"
-if [ ! -f "$BUN_TGZ" ]; then
+BUN_ZIP="$STAGE/bun-aot-$BUN_VERSION-$PLATFORM.zip"
+if [ ! -f "$BUN_ZIP" ]; then
 	echo "==> staging Bun $BUN_VERSION ($BUN_ASSET)"
-	curl -fsSL -o "$BUN_TGZ" "$BUN_UPSTREAM/$BUN_ASSET" || die "cannot download $BUN_ASSET"
+	curl -fsSL -o "$BUN_ZIP" "$BUN_UPSTREAM/$BUN_ASSET" || die "cannot download $BUN_ASSET"
 fi
-actual_hash="$(nix hash file --sri "$BUN_TGZ" 2>/dev/null || echo "sha256-$(openssl dgst -sha256 -binary "$BUN_TGZ" | base64 | tr -d '\n')")"
-[ "$actual_hash" = "$BUN_HASH" ] || die "the Bun archive staged does not match the pin: $actual_hash vs $BUN_HASH"
+[ "$(hash_of "$BUN_ZIP")" = "$BUN_HASH" ] ||
+	die "the Bun archive staged does not match the pin: $(hash_of "$BUN_ZIP") vs $BUN_HASH"
 
-# --- what a manifest entry needs ----------------------------------------------------------------------
-hash_of() {
-	if command -v nix >/dev/null 2>&1; then
-		nix hash file --sri "$1"
-	else
-		echo "sha256-$(openssl dgst -sha256 -binary "$1" | base64)" | tr -d '\n'
-	fi
-}
-# The release page URL is what a manifest entry points at. In CI the workflow passes RELEASE_URL; locally
-# the placeholder says what has to be filled in.
+# --- the manifest entry -------------------------------------------------------------------------------
 RELEASE_URL="${RELEASE_URL:-https://github.com/OWNER/REPO/releases/download/RELEASE_TAG}"
 ENTRY="$(
 	cat <<MANIFEST
@@ -122,14 +104,9 @@ ENTRY="$(
       url = "$RELEASE_URL/$(basename "$PI_TGZ")";
       hash = "$(hash_of "$PI_TGZ")";
     };
-    piTui = {
-      version = "$CLIENT_VERSION";
-      url = "$RELEASE_URL/$(basename "$TUI_TGZ")";
-      hash = "$(hash_of "$TUI_TGZ")";
-    };
     bunAot = {
       version = "$BUN_VERSION";
-      url = "$RELEASE_URL/$(basename "$BUN_TGZ")";
+      url = "$RELEASE_URL/$(basename "$BUN_ZIP")";
       hash = "$BUN_HASH";
     };
   };
@@ -138,7 +115,7 @@ MANIFEST
 
 echo
 echo "==> artifacts"
-ls -la "$PI_TGZ" "$TUI_TGZ" "$BUN_TGZ"
+ls -la "$PI_TGZ" "$BUN_ZIP"
 echo
 if [ -n "${MANIFEST_OUT:-}" ]; then
 	printf '%s\n' "$ENTRY" >"$MANIFEST_OUT"
@@ -147,4 +124,4 @@ fi
 printf '%s\n' "$ENTRY"
 echo
 echo "  sha256sum for people who do not use Nix:"
-(cd "$STAGE" && sha256sum "$(basename "$PI_TGZ")" "$(basename "$TUI_TGZ")" "$(basename "$BUN_TGZ")" 2>/dev/null) || true
+(cd "$STAGE" && sha256sum "$(basename "$PI_TGZ")" "$(basename "$BUN_ZIP")" 2>/dev/null) || true
