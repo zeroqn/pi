@@ -228,7 +228,7 @@ jobs:
           set -eu
           nix develop --command python3 tools/harness/smoke_host.py \
             --binary "$RUNNER_TEMP/release/tui/rpi" \
-            --host "$RUNNER_TEMP/release/host/bin/pi"
+            --host "$RUNNER_TEMP/release/host"
 
       - name: Attest the artifacts this run built
         uses: actions/attest-build-provenance@v2

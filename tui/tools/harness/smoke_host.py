@@ -30,11 +30,19 @@ def text_of(buf):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--binary", required=True)
-    ap.add_argument("--host", default="pi", help="the pi the client should spawn (default: pi on PATH)")
+    ap.add_argument(
+        "--host",
+        default="pi",
+        help="the pi the client should spawn; a directory means the `pi` inside it (default: pi on PATH)",
+    )
     ap.add_argument("--prompt", default="PLAIN: describe the render path")
     ap.add_argument("--needle", default="Done")
     ap.add_argument("--timeout", type=float, default=60.0)
     a = ap.parse_args()
+    # A release directory stages `pi` beside its assets; accepting the directory keeps the caller from having
+    # to know that, and a wrong guess here shows up as the client's own `NotFound` on screen.
+    if os.path.isdir(a.host):
+        a.host = os.path.join(a.host, "pi")
     with fake_model(script="fake_model_corpus.py") as port, pi_home(port) as home, workdir() as cwd:
         argv = [
             a.binary,
