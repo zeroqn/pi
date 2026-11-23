@@ -56,6 +56,11 @@ permissions:
 jobs:
   watch:
     runs-on: ubuntu-latest
+    # The flake is in `tui/`, not at the repository root: `nix develop` only finds it from there. Paths below
+    # are relative to that directory, which is also where `nix/-` and `tools/harness/` sit.
+    defaults:
+      run:
+        working-directory: tui
     outputs:
       publish: ${{ steps.decide.outputs.publish }}
       tag: ${{ steps.decide.outputs.tag }}
@@ -171,6 +176,9 @@ jobs:
             platform: aarch64-darwin
             end-to-end: false
     runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: tui
     steps:
       - uses: actions/checkout@v4
 
@@ -232,7 +240,7 @@ jobs:
       - name: Attest the pin claim
         uses: actions/attest@v2
         with:
-          subject-path: nix/bun-pin.nix
+          subject-path: tui/nix/bun-pin.nix
           predicate-type: https://github.com/zeroqn/pi/attestation/bun-pin/v1
           predicate-path: ${{ runner.temp }}/bun-claim.json
 
@@ -246,6 +254,9 @@ jobs:
   publish:
     needs: [watch, build]
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tui
     steps:
       - uses: actions/checkout@v4
         with:

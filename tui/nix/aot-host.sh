@@ -39,6 +39,15 @@ command -v npm >/dev/null 2>&1 || die "npm is required"
 
 DATA="$PI_DIR/packages/ai/src/providers/data"
 if [ "$BUILD" = 1 ]; then
+	# A fresh checkout has no dependencies, and pi's build is npm scripts.
+	if [ ! -d "$PI_DIR/node_modules" ]; then
+		echo "==> installing pi's dependencies"
+		if [ -f "$PI_DIR/package-lock.json" ]; then
+			(cd "$PI_DIR" && npm ci --no-audit --no-fund) || die "npm ci failed"
+		else
+			(cd "$PI_DIR" && npm install --no-audit --no-fund) || die "npm install failed"
+		fi
+	fi
 	# The generated model data is gitignored: `build:offline` refuses to build without it.
 	if [ ! -d "$DATA" ]; then
 		echo "==> model data missing: npm run hydrate:model-data (fetches models.dev, OpenRouter, the gateways)"
