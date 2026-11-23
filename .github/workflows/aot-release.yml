@@ -1,13 +1,17 @@
 name: aot-release
 
-# Watches upstream, builds, gates, and publishes: the AOT pi host, the Rust client, and the Bun canary pin.
+# Watches pi's releases, builds, gates, and publishes: the AOT pi host, the Rust client, and the Bun the host
+# was compiled with. Nothing here follows Bun on its own schedule.
 #
 # What it watches
-#  - pi releases (github.com/earendil-works/pi): a new version publishes a release tagged `pi-v<version>`.
-#    Those are kept, because pi's own releases are the versions we follow.
-#  - Bun's `canary` tag, whose archive is the AOT compiler: it moves almost daily, so its bytes are pinned
-#    in nix/bun-pin.nix by content hash. A moved canary is adopted twice a week (Monday and
-#    Thursday) and publishes a release tagged `bun-<date>`; only the newest three of those are kept.
+#  - pi releases (github.com/earendil-works/pi). A new version publishes a release tagged `pi-v<version>`,
+#    carrying, per platform: `pi-aot` (the AOT host and its assets), `pi-tui` (the Rust client), and
+#    `bun-aot` (the canary archive that host was compiled with). Releases are kept: they are the versions we
+#    follow, and our own copy of Bun is what keeps them installable.
+#
+# Why Bun is copied rather than pointed at: upstream's `canary` assets are replaced daily and the old URLs
+# stop working, so a pin that names oven-sh's tag rots. Each release re-pins, downloads the archive it
+# verifies by hash, and uploads it; `nix/runtime.nix` prefers that release asset once the manifest carries it.
 #
 # What must pass before anything publishes: `nix/aot-smoke.sh` (the executable reports the version of its
 # manifest, and answers `get_state` over `--mode rpc`) and `tools/harness/smoke_host.py` (the client spawns
@@ -17,10 +21,8 @@ name: aot-release
 # `--aot` cannot cross-compile ("--aot can't cross-compile. It only builds for the platform it runs on"),
 # so every platform builds on its own runner, and the manifest is written only after all of them passed.
 #
-# Attestation: the tarballs this workflow builds get a GitHub build-provenance attestation, and the pin file
-# gets a custom-predicate attestation recording which upstream Bun bytes the release was compiled with. The
-# canary itself is not built here, so that claim is what can be attested, and the hash is what a downstream
-# build actually checks.
+# Attestation: the artifacts this workflow builds get a GitHub build-provenance attestation, and the pin file
+# gets a custom-predicate attestation recording which upstream Bun bytes the release was compiled with.
 #
 # The publish job pushes with GITHUB_TOKEN, so Settings -> Actions -> General -> Workflow permissions must be
 # "Read and write"; a ruleset on main must list the GitHub Actions app as a bypass actor.
@@ -39,10 +41,8 @@ on:
         type: boolean
         default: false
   schedule:
-    # Daily: notice a new pi release.
-    - cron: "0 6 * * *"
-    # Twice a week: adopt a moved Bun canary. Same workflow, told apart by github.event.schedule.
-    - cron: "0 6 * * 1,4"
+    # Daily: notice a new pi release. Bun is re-pinned by that release's build, not here.
+    - cron: "0 6 * * 1"
 
 concurrency:
   group: aot-release-${{ github.ref }}
@@ -94,11 +94,11 @@ jobs:
           version="$(sed -n 's/^      version = "\(.*\)";$/\1/p' nix/manifest.nix 2>/dev/null | head -1 || true)"
           echo "version=${version:-}" >> "$GITHUB_OUTPUT"
 
-      - name: Has the Bun canary moved?
+      - name: Where the Bun pin stands
         id: bun
-        # Plain bash, not `nix develop`: the shell builds bun-aot, so it cannot start while the pin is stale,
-        # and a stale pin is exactly what this step exists to detect. `--check` downloads this platform's
-        # archive and hashes it, because upstream replaces canary assets without changing their etag.
+        # A report, not a trigger: Bun is adopted by a release build, never on its own schedule. Plain bash,
+        # because `nix develop` builds bun-aot and cannot start while the pin is stale; `--check` downloads
+        # this platform's archive and hashes it, since upstream replaces canary assets without changing an etag.
         run: |
           set -eu
           set +e
@@ -117,7 +117,6 @@ jobs:
         id: decide
         env:
           EVENT: ${{ github.event_name }}
-          SCHEDULE: ${{ github.event.schedule }}
           INPUT_TAG: ${{ inputs.tag }}
           INPUT_PUBLISH: ${{ inputs.publish }}
           PI_VERSION: ${{ steps.pi.outputs.version }}
@@ -129,21 +128,16 @@ jobs:
           publish=false
           kind=none
           tag=""
-          bun_cron="0 6 * * 1,4"
           if [ "$EVENT" = workflow_dispatch ]; then
             kind=dispatch
             publish="$INPUT_PUBLISH"
             tag="$INPUT_TAG"
             [ -n "$tag" ] || tag="dry-run-$(date -u +%Y%m%d-%H%M)"
           elif [ "$PI_VERSION" != "$MANIFEST_VERSION" ]; then
-            # A new pi release: publish it, taking a moved canary along with it.
+            # A new pi release. Bun is re-pinned by this release's build, and travels with it.
             publish=true
             kind=pi
             tag="pi-v$PI_VERSION"
-          elif [ "$BUN_MOVED" = true ] && [ "$SCHEDULE" = "$bun_cron" ]; then
-            publish=true
-            kind=bun
-            tag="bun-$(date -u +%Y%m%d)"
           fi
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "kind=$kind" >> "$GITHUB_OUTPUT"
@@ -152,7 +146,7 @@ jobs:
             echo "### aot-release watch"
             echo "- latest pi: $PI_VERSION at $PI_REF"
             echo "- manifest describes: ${MANIFEST_VERSION:-<empty>}"
-            echo "- Bun canary moved: $BUN_MOVED"
+            echo "- Bun canary moved since the pin: ${BUN_MOVED:-<not checked>} (re-pinned by the build)"
             echo "- decision: publish=$publish kind=$kind tag=${tag:-<none>}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -251,6 +245,7 @@ jobs:
           name: artifacts-${{ matrix.platform }}
           path: |
             ${{ runner.temp }}/release/*.tar.gz
+            ${{ runner.temp }}/release/*.zip
             ${{ runner.temp }}/manifest-entry.nix
 
   publish:
@@ -286,7 +281,9 @@ jobs:
           set -eu
           notes="$RUNNER_TEMP/notes.md"
           {
-            echo "pi $PI_VERSION, compiled ahead of time with Bun $BUN_VERSION, plus the Rust client (rpi)."
+            echo "pi $PI_VERSION, compiled ahead of time with Bun $BUN_VERSION; it ships with the Rust"
+            echo "client (rpi) and the Bun archive the host was built with, so this release stays"
+            echo "installable after upstream's canary tag moves."
             echo
             echo 'Each asset carries a build-provenance attestation:'
             echo
@@ -297,23 +294,20 @@ jobs:
           } > "$notes"
           gh release create "$TAG" --title "$TAG" --notes-file "$notes" ||
             echo "release $TAG already exists"
-          find "$RUNNER_TEMP/artifacts" -name '*.tar.gz' -print0 |
+          find "$RUNNER_TEMP/artifacts" \( -name '*.tar.gz' -o -name '*.zip' \) -print0 |
             xargs -0 gh release upload "$TAG" --clobber
 
-      - name: Move the pin if the canary moved, and mark it verified
+      - name: Pin the Bun the release carries, and mark it verified
         env:
-          BUN_MOVED: ${{ needs.watch.outputs.bun-moved }}
           TAG: ${{ needs.watch.outputs.tag }}
           PI_VERSION: ${{ needs.watch.outputs.pi-version }}
         run: |
           set -eu
-          if [ "$BUN_MOVED" = true ]; then
-            ./nix/bun-pin-update.sh
-            # A pin is accepted only now: a host compiled with it passed both gates in the build job.
-            python3 nix/bun-pin-tools.py verified "gh-$TAG" "$PI_VERSION"
-          else
-            echo "the pin did not move"
-          fi
+          # From the manifest entries, not from upstream: the pin must name the archives this release
+          # uploads, so it stays true after oven-sh's canary tag moves. The build job's own re-pin is
+          # scratch state, gone with its runner.
+          python3 nix/bun-pin-tools.py from-entries "$RUNNER_TEMP/artifacts"/*/manifest-entry.nix
+          python3 nix/bun-pin-tools.py verified "gh-$TAG" "$PI_VERSION"
 
       - name: Write nix/manifest.nix from the per-platform entries
         run: |
@@ -324,24 +318,6 @@ jobs:
               while read -r entry; do cat "$entry"; done
             echo "}"
           } > nix/manifest.nix
-
-      - name: Prune old Bun releases; never a pi release, never the current one
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CURRENT: ${{ needs.watch.outputs.tag }}
-        run: |
-          set -eu
-          # pi releases are kept: they are the versions we follow. `bun-*` releases rebuild the same pi with a
-          # newer engine, so the newest three of those are enough to move a downstream lock forward. The
-          # current tag is one of the three, so the list drops it first and keeps three.
-          gh release list --limit 200 --json tagName,createdAt |
-            jq -r 'sort_by(.createdAt) | reverse | .[].tagName | select(startswith("bun-"))' |
-            grep -v -x "$CURRENT" |
-            tail -n +4 |
-            while read -r old; do
-              echo "deleting $old"
-              gh release delete "$old" --yes --delete-tag
-            done
 
       - name: Commit the pin and the manifest
         env:

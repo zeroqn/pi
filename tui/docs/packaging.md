@@ -43,7 +43,8 @@ inputs.pi-tui = {
 # then, for the platform you build on:
 pi-tui.packages.x86_64-linux.pi-aot    # pi, ahead of time: bin/pi, libexec/pi/pi, share/pi
 pi-tui.packages.x86_64-linux.rpi-bin   # rpi + the wrapper: bin/{pi,rpi}
-pi-tui.packages.x86_64-linux.bun-aot   # Bun 1.4.6, the engine the host was compiled with
+pi-tui.packages.x86_64-linux.bun-aot   # the Bun the host was compiled with: the release's copy when there
+                                       # is one, else upstream's pinned canary
 ```
 
 `pi-aot` and `rpi-bin` exist **only for a platform whose entry `nix/manifest.nix` carries**, so a downstream
@@ -53,16 +54,24 @@ one-artifact rule as a store layout. Both are built by `nix/prebuilt.nix` with `
 
 ### What watches upstream, and what may publish
 
-`.github/workflows/aot-release.yml` is the whole flow. It runs on a schedule and on dispatch.
+`.github/workflows/aot-release.yml` runs on a daily schedule and on dispatch. It watches **pi's releases
+only**:
 
 | Upstream event | Behaviour |
 |---|---|
-| a new pi release | published as `pi-v<version>`; those are kept, because pi's releases are the versions we follow |
-| a moved Bun `canary` | adopted twice a week (Mon, Thu) as `bun-<date>`; only the newest three of those are kept, and neither prune ever touches a release the current manifest names |
-| nothing moved | the run reports and stops |
+| a new pi release | published as `pi-v<version>`, with the AOT host, the client, and the Bun archive that host was compiled with |
+| nothing new | the run reports where the Bun pin stands and stops |
+| Bun's canary moves | nothing on its own schedule: Bun moves when a pi release is built, and travels inside that release |
 
-The Bun pin is a separate, generated file: `nix/bun-pin.nix` records each archive's content hash, plus
-upstream's `etag`/`last-modified` as what upstream claims. `nix/runtime.nix` is hand-written and reads it.
+That is deliberate. Upstream's `canary` assets are replaced daily and their old URLs stop working, so a pin
+that named oven-sh's tag would rot between releases. Each release therefore re-pins, downloads the archive
+it verifies by hash, and uploads it as `bun-aot-<pin version>-<platform>.zip`; `nix/runtime.nix` prefers that
+release asset once `nix/manifest.nix` carries it, and falls back to the upstream pin only before a release
+exists. Releases are kept, because they are the pi versions we follow and because they hold our own copy of
+the engine.
+
+The pin is a generated file: `nix/bun-pin.nix` records each archive's content hash, plus upstream's
+`etag`/`last-modified` as what upstream claims. `nix/runtime.nix` is hand-written and reads it.
 
 **The hash is the pin, never the etag.** Measured 2026-11-23: Bun replaced a `canary` asset without changing
 its etag, so a check that trusted the etag passed a stale pin straight into a build, which then failed with
@@ -71,9 +80,9 @@ archive (about 78 MB) and hashes it. That also means `--check` needs no dev shel
 shell itself builds `bun-aot` and cannot start while the pin is stale:
 
 ```sh
-nix/bun-pin-update.sh --check   # exit 0 current, 10 moved; plain bash, no `nix develop`
-nix/bun-pin-update.sh           # rewrite the pin from what upstream serves now
-bun-pin-tools.py verified ...   # stamp it as accepted by a run (the workflow does this after the gates)
+nix/bun-pin-update.sh --check    # exit 0 current, 10 moved; plain bash, no `nix develop`
+nix/bun-pin-update.sh            # rewrite the pin from what upstream serves now
+bun-pin-tools.py from-entries …  # the pin a release publishes: its own archives, not upstream's
 ```
 
 If `nix develop` fails with a hash mismatch, the canary moved: run `nix/bun-pin-update.sh` and retry.

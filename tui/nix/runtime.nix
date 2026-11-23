@@ -1,41 +1,50 @@
-# The Bun the AOT host is compiled with: the canary archive pinned in nix/bun-pin.nix.
+# The Bun the AOT host is compiled with: the canary archive.
 #
-# Why not nixpkgs' bun: released Bun has no `--aot` (1.4.5, 2026-11-19, has neither the flag nor an AOT
-# string in its binary), while the canary has the full flag set. Why a hash instead of the tag: `canary` is
-# replaced daily, so the tag is not a pin; the archive bytes are.
+# Two sources, one shape. When a release of ours carries the archive (`manifest.nix`'s `bunAot`), that URL is
+# used: it is ours, it does not move, and it is the bytes a released host was compiled with. Otherwise the
+# upstream canary URL from nix/bun-pin.nix is used, which is what CI and a developer need *before* a release
+# exists. Upstream's canary assets are replaced daily and their old URLs stop working, which is why a release
+# copies the archive beside the host instead of pointing at oven-sh's tag.
 #
-# The pin file is generated (`nix/bun-pin-update.sh`), because a watch workflow moves it. This file is
-# hand-written and does not change.
-{
-  lib,
-  stdenv,
-  fetchurl,
-  unzip,
-  autoPatchelfHook,
-}:
-
+# The pin file is generated (`nix/bun-pin-update.sh`); this file is hand-written and does not change.
+{ lib, stdenv, fetchurl, unzip, autoPatchelfHook }:
 let
   pin = import ./bun-pin.nix;
+  manifest = import ./manifest.nix;
   target = stdenv.hostPlatform.system;
   archive =
     if builtins.hasAttr target pin.archives then
       pin.archives.${target}
     else
       throw "no pinned Bun canary for ${target}; add its archive to nix/bun-pin.nix";
+  released = (manifest.${target} or { }).bunAot or null;
+  source =
+    if released != null then
+      {
+        inherit (released) url;
+        hash = released.hash;
+        name = archive.asset;
+        version = released.version;
+      }
+    else
+      {
+        url = "${pin.upstream}/${archive.asset}";
+        inherit (archive) hash;
+        name = archive.asset;
+        version = pin.version;
+      };
 in
 # One attrset, passed once: `stdenv.mkDerivation { … } // extra` yields a derivation whose path was already
 # computed from the braces, so the extras (the phases below) would be silently dropped.
 stdenv.mkDerivation (
   {
     pname = "bun-aot";
-    version = pin.version;
+    inherit (source) version;
 
     # Linux archives are built for glibc and carry /lib64/ld-linux-x86-64.so.2; autoPatchelfHook rewrites
     # that and the rpath to this system's glibc, which is what lets it run here and inside a build.
     src = fetchurl {
-      inherit (archive) hash;
-      name = archive.asset;
-      url = "${pin.upstream}/${archive.asset}";
+      inherit (source) url hash name;
     };
 
     nativeBuildInputs = [ unzip ] ++ lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];

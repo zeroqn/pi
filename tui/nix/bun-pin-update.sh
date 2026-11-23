@@ -53,8 +53,8 @@ for block in re.finditer(
     r"    (\S+) = \{\n"
     r'      asset = "(.+)";\n'
     r'      hash = "(.+)";\n'
-    r'      etag = "(.+)";\n'
-    r'      lastModified = "(.+)";\n',
+    r'      etag = "(.*)";\n'
+    r'      lastModified = "(.*)";\n',
     text,
 ):
     system, asset, hash, etag, modified = block.groups()

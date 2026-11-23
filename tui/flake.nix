@@ -68,6 +68,8 @@
             pkgs.patchelf
             pkgs.pkg-config
             pkgs.cacert
+            pkgs.curl
+            pkgs.openssl
             runtime
             (script "aot-host.sh" ".sh")
             (script "aot-release.sh" ".sh")

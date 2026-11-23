@@ -13,6 +13,7 @@
 #   pi-aot-<pi version>-<platform>.tar.gz    pi, package.json, theme/, assets/, export-html/, docs/,
 #                                            examples/, native/, photon_rs_bg.wasm, LICENSE
 #   pi-tui-<client version>-<platform>.tar.gz  rpi and the `pi` wrapper beside it
+#   bun-aot-<pin version>-<platform>.zip        the canary archive the host was compiled with, hash-checked
 #
 # On a NixOS host the tarball's interpreter is not there: install it through the flake (`packages.pi-aot`),
 # which patches it, rather than unpacking the tarball by hand.
@@ -87,6 +88,21 @@ done
 if [ -f "$PI_DIR/LICENSE" ]; then cp "$PI_DIR/LICENSE" "$STAGE/host-tar/"; fi
 tar -C "$STAGE/host-tar" -czf "$PI_TGZ" .
 
+# --- the Bun the host was compiled with ---------------------------------------------------------------
+# Upstream's canary assets are replaced daily and their URLs stop working, so the release carries a copy.
+# The hash recorded here is the pin's, which is what the build resolved through `nix build .#bun-aot`.
+BUN_VERSION="$(sed -n 's/^  version = "\(.*\)";$/\1/p' "$ROOT/nix/bun-pin.nix")"
+read -r BUN_ASSET BUN_HASH <<<"$(python3 "$ROOT/nix/bun-pin-tools.py" asset "$PLATFORM")"
+[ -n "$BUN_ASSET" ] || die "no Bun archive for $PLATFORM in nix/bun-pin.nix"
+BUN_TGZ="$STAGE/bun-aot-$BUN_VERSION-$PLATFORM.zip"
+BUN_UPSTREAM="$(sed -n 's/^  upstream = "\(.*\)";$/\1/p' "$ROOT/nix/bun-pin.nix")"
+if [ ! -f "$BUN_TGZ" ]; then
+	echo "==> staging Bun $BUN_VERSION ($BUN_ASSET)"
+	curl -fsSL -o "$BUN_TGZ" "$BUN_UPSTREAM/$BUN_ASSET" || die "cannot download $BUN_ASSET"
+fi
+actual_hash="$(nix hash file --sri "$BUN_TGZ" 2>/dev/null || echo "sha256-$(openssl dgst -sha256 -binary "$BUN_TGZ" | base64 | tr -d '\n')")"
+[ "$actual_hash" = "$BUN_HASH" ] || die "the Bun archive staged does not match the pin: $actual_hash vs $BUN_HASH"
+
 # --- what a manifest entry needs ----------------------------------------------------------------------
 hash_of() {
 	if command -v nix >/dev/null 2>&1; then
@@ -111,13 +127,18 @@ ENTRY="$(
       url = "$RELEASE_URL/$(basename "$TUI_TGZ")";
       hash = "$(hash_of "$TUI_TGZ")";
     };
+    bunAot = {
+      version = "$BUN_VERSION";
+      url = "$RELEASE_URL/$(basename "$BUN_TGZ")";
+      hash = "$BUN_HASH";
+    };
   };
 MANIFEST
 )"
 
 echo
 echo "==> artifacts"
-ls -la "$PI_TGZ" "$TUI_TGZ"
+ls -la "$PI_TGZ" "$TUI_TGZ" "$BUN_TGZ"
 echo
 if [ -n "${MANIFEST_OUT:-}" ]; then
 	printf '%s\n' "$ENTRY" >"$MANIFEST_OUT"
@@ -126,4 +147,4 @@ fi
 printf '%s\n' "$ENTRY"
 echo
 echo "  sha256sum for people who do not use Nix:"
-(cd "$STAGE" && sha256sum "$(basename "$PI_TGZ")" "$(basename "$TUI_TGZ")" 2>/dev/null) || true
+(cd "$STAGE" && sha256sum "$(basename "$PI_TGZ")" "$(basename "$TUI_TGZ")" "$(basename "$BUN_TGZ")" 2>/dev/null) || true

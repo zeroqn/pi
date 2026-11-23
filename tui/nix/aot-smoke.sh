@@ -28,6 +28,10 @@ die() { echo "aot-smoke: FAIL $*" >&2; exit 1; }
 pass() { echo "==> ok: $*"; }
 [ -n "$HOST" ] || die "--host is required"
 
+# Absolute, because the checks below run from /tmp so a stray ~/.pi or a local package.json cannot change
+# what is being tested.
+case "$HOST" in /*) ;; *) HOST="$PWD/$HOST" ;; esac
+
 # Two layouts, one script: a release directory stages `pi` beside its assets; a store installation has a
 # `bin/pi` wrapper that sets `PI_PACKAGE_DIR` and an executable in `libexec`.
 if [ -x "$HOST/bin/pi" ]; then
@@ -65,6 +69,7 @@ pass "get_state over --mode rpc"
 
 # 3. The client starts at all, under a pty (it refuses a non-TTY). `script` has two spellings.
 if [ -n "$CLIENT" ]; then
+	case "$CLIENT" in /*) ;; *) CLIENT="$PWD/$CLIENT" ;; esac
 	[ -x "$CLIENT" ] || die "$CLIENT is not executable"
 	if command -v script >/dev/null 2>&1; then
 		out="$(mktemp)"

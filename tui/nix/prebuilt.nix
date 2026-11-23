@@ -2,12 +2,14 @@
 # to a GitHub release by `.github/workflows/aot-release.yml`. Nothing is compiled here.
 #
 # A platform's tarball holds what must sit together: for pi, the executable and the assets it reads from its
-# own directory; for the client, `rpi` and the `pi` wrapper.
+# own directory; for the client, `rpi` and the `pi` wrapper. The Bun archive is a zip, because `--compile`
+# appends to a Bun executable and that is what a rebuild needs.
 {
   lib,
   stdenv,
   stdenvNoCC,
   fetchurl,
+  unzip,
   autoPatchelfHook,
   glibc,
   libxcb,
@@ -69,6 +71,39 @@ WRAPPER
           homepage = "https://github.com/earendil-works/pi";
           license = lib.licenses.mit;
           mainProgram = "pi";
+        };
+      }
+    );
+
+  # The Bun the host was compiled with, carried on our release page so that a downstream build does not
+  # depend on oven-sh's movable `canary` tag. `runtime.nix` prefers this entry once it exists.
+  mkBunAot =
+    { url, hash, version }:
+    stdenvNoCC.mkDerivation (
+      commonAttrs { inherit url hash; }
+      // {
+        pname = "bun-aot";
+        inherit version;
+
+        nativeBuildInputs = [
+          autoPatchelfHook
+          unzip
+        ];
+
+        # `commonAttrs` sets `dontUnpack`, which skips the unpack phase outright, so the archive is opened here
+        # — the same shape as the two tarballs above.
+        installPhase = ''
+          runHook preInstall
+          mkdir -p unpacked $out/bin
+          unzip -q "$src" -d unpacked
+          install -m755 unpacked/*/bun $out/bin/bun
+          runHook postInstall
+        '';
+
+        meta = {
+          description = "Bun ${version} with the ahead-of-time compiler";
+          homepage = "https://github.com/oven-sh/bun";
+          mainProgram = "bun";
         };
       }
     );
