@@ -1,0 +1,210 @@
+name: aot-release
+
+# Builds the AOT pi host, the Rust client, and the Bun they need, then publishes them as release assets
+# that `nix/manifest.nix` names. A downstream flake then installs `packages.pi-aot` or `packages.rpi-bin`
+# without compiling anything (nix/prebuilt.nix).
+#
+# Two facts shape this workflow:
+#  - `bun build --compile --aot` cannot cross-compile ("--aot can't cross-compile. It only builds for the
+#    platform it runs on"), so every platform needs its own runner.
+#  - `--aot` is in Bun's canary builds only (released 1.4.5 has no `--aot`), so the engine is pinned by
+#    archive hash in nix/runtime.nix. Moving the pin is a deliberate edit, not something this workflow does
+#    silently: the weekly run reports upstream movement and stops.
+#
+# The manifest commit is what downstream flakes lock, so the release assets must exist before it lands. A
+# `publish` run creates the release, uploads the tarballs, then commits the entry; a dispatch without
+# `publish` builds and shows the entries in the job summary only.
+#
+# The publish job pushes with GITHUB_TOKEN, which needs Settings -> Actions -> General -> Workflow
+# permissions "Read and write"; a push made with that token does not itself trigger other workflows.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'release tag to publish, e.g. aot-1.6.0-1'
+        required: true
+      pi_ref:
+        
+        required: false
+      publish:
+        description: 'create the release, upload the assets, commit nix/manifest.nix'
+        type: boolean
+        default: false
+  schedule:
+    # Weekly: notice when upstream pi or the Bun pin moves. It never publishes.
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: aot-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      pi-ref: ${{ steps.pi.outputs.ref }}
+      pi-version: ${{ steps.pi.outputs.version }}
+      tag: ${{ steps.tag.outputs.tag }}
+      publish: ${{ steps.tag.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Which tag, and does this run publish?
+        id: tag
+        run: |
+          set -eu
+          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            tag="${{ inputs.tag }}"
+            publish="${{ inputs.publish }}"
+          else
+            # A scheduled run has no inputs; it reports only.
+            tag="aot-check-$(date -u +%Y%m%d)"
+            publish=false
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the pi revision to build
+        id: pi
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          ref="${{ inputs.pi_ref }}"
+          if [ -z "$ref" ]; then
+            ref="$(gh api repos/earendil-works/pi/releases/latest --jq .tag_name)"
+          fi
+          version="$(gh api "repos/earendil-works/pi/contents/packages/coding-agent/package.json?ref=$ref" \
+            --jq '.content' | base64 -d | jq -r .version)"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "pi $version at $ref"
+
+      - name: Report upstream movement
+        run: |
+          set -eu
+          pinned="$(sed -n 's/^  version = "bun-\(.*\)";$/\1/p' nix/runtime.nix || true)"
+          echo "pinned runtime: ${pinned:-unknown}" >> "$GITHUB_STEP_SUMMARY"
+          echo "pi to build: ${{ steps.pi.outputs.version }} (${{ steps.pi.outputs.ref }})" >> "$GITHUB_STEP_SUMMARY"
+          # The Bun pin is an archive hash of the `canary` tag, which is replaced daily. A newer archive is
+          # reported, never adopted: `--aot` behaviour comes from that engine, so moving it needs a
+          # measurement (docs/packaging.md) and a re-pin of the hash in nix/runtime.nix.
+          current="$(curl -fsSL https://api.github.com/repos/oven-sh/bun/releases/tags/canary |
+            jq -r '.assets[] | select(.name == "bun-linux-x64.zip") | .updated_at')"
+          echo "canary archive updated_at: ${current:-unknown}" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: plan
+    # A scheduled run only reports: publishing is a dispatch with `publish` set.
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            platform: aarch64-linux
+          - runner: macos-14
+            platform: aarch64-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # The host is compiled from the pi sources, so the tree has to be here: `aot-host` builds `dist/`
+      # itself when it is.
+      - name: Check out pi
+        run: |
+          set -eu
+          git clone --depth 1 --branch "${{ needs.plan.outputs.pi-ref }}" \
+            https://github.com/earendil-works/pi "$RUNNER_TEMP/pi" ||
+            git clone https://github.com/earendil-works/pi "$RUNNER_TEMP/pi" && \
+            git -C "$RUNNER_TEMP/pi" checkout "${{ needs.plan.outputs.pi-ref }}"
+
+      - name: Build the artifacts, and this platform's manifest entry
+        env:
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/download/${{ needs.plan.outputs.tag }}
+        run: |
+          set -eu
+          nix develop --command aot-release \
+            --pi "$RUNNER_TEMP/pi" \
+            --stage "$RUNNER_TEMP/release"
+          # The entry aot-release printed is also written where the publish job can find it.
+          cp /dev/null "$RUNNER_TEMP/manifest-entry.nix"
+          nix develop --command env MANIFEST_OUT="$RUNNER_TEMP/manifest-entry.nix" \
+            aot-release --pi "$RUNNER_TEMP/pi" --stage "$RUNNER_TEMP/release" --from "$RUNNER_TEMP/release/host"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.platform }}
+          path: |
+            ${{ runner.temp }}/release/*.tar.gz
+            ${{ runner.temp }}/manifest-entry.nix
+
+  publish:
+    needs: [plan, build]
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ github.token }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/artifacts
+
+      - name: Create the release and upload the assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          set -eu
+          gh release create "$TAG" --title "$TAG" \
+            --notes "pi ${{ needs.plan.outputs.pi-version }} compiled ahead of time, with the Rust client" ||
+            echo "release $TAG already exists"
+          find "$RUNNER_TEMP/artifacts" -name '*.tar.gz' -print0 |
+            xargs -0 gh release upload "$TAG" --clobber
+
+      - name: Write nix/manifest.nix from the per-platform entries
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          set -eu
+          {
+            echo "{"
+            find "$RUNNER_TEMP/artifacts" -name 'manifest-entry.nix' | sort |
+              while read -r entry; do cat "$entry"; done
+            echo "}"
+          } > nix/manifest.nix
+
+      - name: Commit the manifest
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add nix/manifest.nix
+          if git diff --cached --quiet; then
+            echo "manifest unchanged"
+          else
+            git commit -m "chore(tui): nix/manifest.nix for ${{ needs.plan.outputs.tag }} (pi ${{ needs.plan.outputs.pi-version }})"
+            git push
+          fi
+
+      - name: Summary
+        run: |
+          set -eu
+          echo "released ${{ needs.plan.outputs.tag }}: pi ${{ needs.plan.outputs.pi-version }}" >> "$GITHUB_STEP_SUMMARY"
+          cat nix/manifest.nix >> "$GITHUB_STEP_SUMMARY"

@@ -26,6 +26,9 @@ aot-host               # pi's dist, then `bun build --compile --aot` -> results/
 cargo build --release && rpi   # the client drives the host this shell built
 ```
 
+Released builds skip all of that: `packages.pi-aot`, `packages.rpi-bin` and `packages.bun-aot` install the
+tarballs named in `nix/manifest.nix`, with hashes. See `docs/packaging.md`.
+
 ```sh
 cargo build --release
 BIN=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys;print(json.load(sys.stdin)["target_directory"]+"/release/rpi")')

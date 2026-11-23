@@ -38,11 +38,12 @@
         let
           pkgs = pkgsFor system;
           runtime = runtimeFor system;
-          aotHost = pkgs.stdenvNoCC.mkDerivation {
-            name = "aot-host";
-            src = ./nix/aot-host.sh;
+          # The two scripts of the release flow: the host build, and the tarballs a release page carries.
+          script = name: pkgs.stdenvNoCC.mkDerivation {
+            inherit name;
+            src = ./. + "/nix/${name}.sh";
             dontUnpack = true;
-            installPhase = "install -Dm755 $src $out/bin/aot-host";
+            installPhase = "install -Dm755 $src $out/bin/${name}";
           };
         in
         pkgs.mkShell {
@@ -66,7 +67,8 @@
             pkgs.pkg-config
             pkgs.cacert
             runtime
-            aotHost
+            (script "aot-host")
+            (script "aot-release")
           ];
 
           shellHook = ''
@@ -78,15 +80,33 @@
 
             echo "pi-tui: bun $("$PI_TUI_RUNTIME" --version), node $(node --version)"
             echo "pi-tui: PI_REPO=''${PI_REPO:-<unset>} PI_TUI_OUT=$PI_TUI_OUT"
-            echo "pi-tui: aot-host | cargo build --release | rpi | nix build .#rpi"
+            echo "pi-tui: aot-host | aot-release | cargo build --release | rpi | nix build .#rpi"
           '';
         };
     in
     {
-      packages = forAll (system: {
-        rpi = clientFor system;
-        default = clientFor system;
-      });
+      # The release artifacts of nix/manifest.nix, installed without compiling anything, and the source
+      # build of the client. `pi-aot` and `rpi-bin` appear only for a platform that has been released.
+      packages = forAll (
+        system:
+        let
+          pkgs = pkgsFor system;
+          prebuilt = pkgs.callPackage ./nix/prebuilt.nix { };
+          manifest = import ./nix/manifest.nix;
+          released = manifest.${system} or { };
+        in
+        {
+          rpi = clientFor system;
+          default = clientFor system;
+          bun-aot = runtimeFor system;
+        }
+        // nixpkgs.lib.optionalAttrs (released ? piAot) {
+          pi-aot = prebuilt.mkPiAot released.piAot;
+        }
+        // nixpkgs.lib.optionalAttrs (released ? piTui) {
+          rpi-bin = prebuilt.mkPiTui released.piTui;
+        }
+      );
 
       devShells = forAll (system: {
         default = devShellFor system;

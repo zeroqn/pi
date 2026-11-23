@@ -20,6 +20,47 @@ The client resolves the same host on its own when the wrapper is not in front of
 else `PI_TUI_HOST`, else `pi` on PATH. That is how a `nix develop` shell points a bare `rpi` at the host
 it just built, without a wrapper and without baking a store path into the client.
 
+## Releases: prebuilt artifacts, and how a downstream flake installs them
+
+Building an AOT host needs the canary Bun, a pi checkout and a compile; a user of this client should not
+repeat any of that. So each release carries three artifacts per platform, and `nix/manifest.nix` names them
+by URL and hash:
+
+| Asset | Contents |
+|---|---|
+| `pi-aot-<pi version>-<platform>.tar.gz` | `pi`, `package.json`, `theme/`, `assets/`, `export-html/`, `docs/`, `examples/`, `native/`, `photon_rs_bg.wasm`, `LICENSE` |
+| `pi-tui-<client version>-<platform>.tar.gz` | `rpi` and the `pi` wrapper beside it |
+| `bun-aot` (no asset: `nix/runtime.nix` fetches it) | the canary archive, pinned by hash |
+
+Downstream, with this flake as an input:
+
+```nix
+pi-tui.packages.x86_64-linux.pi-aot    # pi, ahead of time: bin/pi, libexec/pi/pi, share/pi
+pi-tui.packages.x86_64-linux.rpi-bin   # rpi + the wrapper: bin/{pi,rpi}
+pi-tui.packages.x86_64-linux.bun-aot   # the engine, if you want to compile something yourself
+```
+
+`pi-aot` installs the executable into `libexec` and the assets into `share`, and its `bin/pi` sets
+`PI_PACKAGE_DIR` at the second — the one-artifact rule above, expressed in a store layout. Both are built by
+`nix/prebuilt.nix` with `autoPatchelfHook`, so the interpreter is this store's glibc even though the tarball
+was compiled elsewhere.
+
+```sh
+nix develop --command aot-release --pi /path/to/pi-checkout   # tarballs + this platform's manifest entry
+```
+
+`.github/workflows/aot-release.yml` runs that on three runners (`ubuntu-24.04`, `ubuntu-24.04-arm`,
+`macos-14`), because `--aot` cannot cross-compile, uploads the tarballs to a release, and commits
+`nix/manifest.nix`. The weekly scheduled run only reports: upstream pi's version, and whether the canary
+archive moved. Moving the Bun pin is a manual edit with a fresh hash for **every** platform, since the three
+archives in `nix/runtime.nix` are one set.
+
+Verified here: `nix build .#bun-aot` (1.4.6, `--aot` present), `aot-release` producing both tarballs and the
+manifest entry, then `nix build .#pi-aot .#rpi-bin` from a manifest naming them — `pi-aot/bin/pi --version`
+prints `1.6.0`, answers `get_state` over `--mode rpc`, and `rpi-bin/bin/pi --version` reaches the same host
+through the wrapper. Not verified: any run on `aarch64` or Darwin (no runner here), and macOS binaries are
+unsigned.
+
 ## What each invocation means
 
 | Invocation | Goes to | Why |
