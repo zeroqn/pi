@@ -42,7 +42,7 @@ def main():
     if not answers:
         sys.exit("no answers: give --sizes or --file")
     print(f"{'build':12} {'answer':>14} {'characters':>10} {'wall s':>8} {'cpu s':>8} {'of a core':>10} {'own MB':>7} {'frames':>7} "
-          f"{'M instr':>8} {'M instr/frame':>14}")
+          f"{'KB':>7} {'B/chunk':>8} {'M instr':>8} {'M instr/frame':>14}")
     for build in parse_builds(a.build):
         with fake_model(pace_ms=a.pace_ms, script="fake_model_stress.py") as port, pi_home(port) as home, workdir() as cwd:
             tty = Tty(pinned([*build.argv, "--no-session", *MODEL_ARGS], a.cpus), pi_env(home), cwd, cols=160, rows=48)
@@ -61,8 +61,11 @@ def main():
                 frames = tty.buf.count(b"\x1b[?2026h", start)
                 after = instructions(tty.pid)
                 minstr = f"{(after - instr) / 1e6:8.0f} {(after - instr) / 1e6 / max(frames, 1):14.2f}" if instr is not None and after else f"{'-':>8} {'-':>14}"
+                # C-6: the bytes this answer cost, and what one 24-character chunk of it cost.
+                written = len(tty.buf) - start
+                chunks = max(1, size // 24)
                 print(f"{build.name:12} {label:>14} {size:10} {wall:8.1f} {used:8.2f} {100 * used / wall:9.0f}% "
-                      f"{memory_mb(tty.pid).get('own', 0):7.0f} {frames:7} {minstr}", flush=True)
+                      f"{memory_mb(tty.pid).get('own', 0):7.0f} {frames:7} {written // 1024:7} {written // chunks:8} {minstr}", flush=True)
             tty.quit()
 
 
