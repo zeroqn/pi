@@ -61,11 +61,22 @@ one-artifact rule as a store layout. Both are built by `nix/prebuilt.nix` with `
 | a moved Bun `canary` | adopted twice a week (Mon, Thu) as `bun-<date>`; only the newest three of those are kept, and neither prune ever touches a release the current manifest names |
 | nothing moved | the run reports and stops |
 
-The Bun pin is a separate, generated file: `nix/bun-pin.nix` records each archive's content hash and
-upstream's `etag`/`last-modified`, so the watch step is three HEAD requests and no download. `nix/runtime.nix`
-is hand-written and reads it. `bun-pin-update.sh --check` exits 10 when the canary moved; without `--check`
-it downloads, re-hashes and rewrites the file, and `bun-pin-tools.py verified <run> <pi>` stamps it as
-accepted.
+The Bun pin is a separate, generated file: `nix/bun-pin.nix` records each archive's content hash, plus
+upstream's `etag`/`last-modified` as what upstream claims. `nix/runtime.nix` is hand-written and reads it.
+
+**The hash is the pin, never the etag.** Measured 2026-11-23: Bun replaced a `canary` asset without changing
+its etag, so a check that trusted the etag passed a stale pin straight into a build, which then failed with
+`hash mismatch in fixed-output derivation`. `bun-pin-update.sh --check` therefore downloads this platform's
+archive (about 78 MB) and hashes it. That also means `--check` needs no dev shell, which matters because the
+shell itself builds `bun-aot` and cannot start while the pin is stale:
+
+```sh
+nix/bun-pin-update.sh --check   # exit 0 current, 10 moved; plain bash, no `nix develop`
+nix/bun-pin-update.sh           # rewrite the pin from what upstream serves now
+bun-pin-tools.py verified ...   # stamp it as accepted by a run (the workflow does this after the gates)
+```
+
+If `nix develop` fails with a hash mismatch, the canary moved: run `nix/bun-pin-update.sh` and retry.
 
 ### Nothing publishes unless both gates pass
 

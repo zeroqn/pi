@@ -11,29 +11,26 @@
   upstream = "https://github.com/oven-sh/bun/releases/download/canary";
 
   archives = {
-    x86_64-linux = {
-      asset = "bun-linux-x64.zip";
-      hash = "sha256-ynLCJ7Dyzw+UgCTpaQKVwBy/yTokWoWpSV/gkCuxjGQ=";
-      etag = "0x8DF4944D676335D";
-      lastModified = "Mon, 23 Nov 2026 09:33:31 GMT";
+    aarch64-darwin = {
+      asset = "bun-darwin-aarch64.zip";
+      hash = "sha256-PG5a5ifyKs2rwvtjk2TcqNEwJBbUHHdM2nGu5+o9bY8=";
+      etag = "sha256-PG5a5ifyKs2rwvtjk2TcqNEwJBbUHHdM2nGu5+o9bY8=";
+      lastModified = "Mon, 23 Nov 2026 09:33:28 GMT";
     };
     aarch64-linux = {
       asset = "bun-linux-aarch64.zip";
       hash = "sha256-YD0/K/PFNLjV869oToOgCqHkj+jBBzHkT1fMZ/T56e8=";
-      etag = "0x8DF4944D3F87C6A";
+      etag = "sha256-YD0/K/PFNLjV869oToOgCqHkj+jBBzHkT1fMZ/T56e8=";
       lastModified = "Mon, 23 Nov 2026 09:33:27 GMT";
     };
-    aarch64-darwin = {
-      asset = "bun-darwin-aarch64.zip";
-      hash = "sha256-PG5a5ifyKs2rwvtjk2TcqNEwJBbUHHdM2nGu5+o9bY8=";
-      etag = "0x8DF4944D482F420";
-      lastModified = "Mon, 23 Nov 2026 09:33:28 GMT";
+    x86_64-linux = {
+      asset = "bun-linux-x64.zip";
+      hash = "sha256-3hL0OfncyICCPyTcM8Cin2EkrmAwbScLBqzT6cBZwuo=";
+      etag = "sha256-ynLCJ7Dyzw+UgCTpaQKVwBy/yTokWoWpSV/gkCuxjGQ=";
+      lastModified = "Mon, 23 Nov 2026 09:33:31 GMT";
     };
   };
 
-  # The measurements this pin was accepted on (docs/packaging.md): `pi --version` of the AOT host.
-  verified = {
-    run = "local";
-    pi = "1.6.0";
-  };
+  # Filled by the release workflow: the run that compiled pi with this pin and passed the gate.
+  verified = { run = "unverified"; pi = ""; };
 }

@@ -6,7 +6,7 @@ name: aot-release
 #  - pi releases (github.com/earendil-works/pi): a new version publishes a release tagged `pi-v<version>`.
 #    Those are kept, because pi's own releases are the versions we follow.
 #  - Bun's `canary` tag, whose archive is the AOT compiler: it moves almost daily, so its bytes are pinned
-#    in nix/bun-pin.nix by hash and by upstream's etag. A moved canary is adopted twice a week (Monday and
+#    in nix/bun-pin.nix by content hash. A moved canary is adopted twice a week (Monday and
 #    Thursday) and publishes a release tagged `bun-<date>`; only the newest three of those are kept.
 #
 # What must pass before anything publishes: `nix/aot-smoke.sh` (the executable reports the version of its
@@ -72,11 +72,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: cachix/install-nix-action@v31
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
       - name: Latest pi release
         id: pi
         env:
@@ -101,11 +96,13 @@ jobs:
 
       - name: Has the Bun canary moved?
         id: bun
-        # One HEAD request per archive: unchanged means no download, and `--check` exits 10 when it moved.
+        # Plain bash, not `nix develop`: the shell builds bun-aot, so it cannot start while the pin is stale,
+        # and a stale pin is exactly what this step exists to detect. `--check` downloads this platform's
+        # archive and hashes it, because upstream replaces canary assets without changing their etag.
         run: |
           set -eu
           set +e
-          nix develop --command bun-pin-update --check
+          ./nix/bun-pin-update.sh --check
           status=$?
           set -e
           case "$status" in
@@ -198,6 +195,11 @@ jobs:
           git -C "$RUNNER_TEMP/pi" fetch -q --depth 1 origin "$PI_REF"
           git -C "$RUNNER_TEMP/pi" checkout -q FETCH_HEAD
 
+      - name: Move the pin to what upstream serves
+        # Before `nix develop`, and in plain bash for the same reason as the watch step. The pin file this
+        # writes is committed only by the publish job, and only with a release that passed the gates.
+        run: ./nix/bun-pin-update.sh
+
       - name: Build the AOT host, the client, and this platform's manifest entry
         env:
           RELEASE_URL: https://github.com/${{ github.repository }}/releases/download/${{ needs.watch.outputs.tag }}
@@ -211,7 +213,7 @@ jobs:
       - name: Gate 1 - this host answers its own protocol
         run: |
           set -eu
-          nix develop --command aot-smoke.sh \
+          nix develop --command aot-smoke \
             --host "$RUNNER_TEMP/release/host" \
             --client "$RUNNER_TEMP/release/tui/rpi" \
             --expect "${{ needs.watch.outputs.pi-version }}"
@@ -234,7 +236,7 @@ jobs:
       - name: Record what the pin claims about upstream Bun
         run: |
           set -eu
-          nix develop --command bun-pin-tools claim > "$RUNNER_TEMP/bun-claim.json"
+          python3 nix/bun-pin-tools.py claim > "$RUNNER_TEMP/bun-claim.json"
           head -5 "$RUNNER_TEMP/bun-claim.json"
 
       - name: Attest the pin claim
@@ -306,9 +308,9 @@ jobs:
         run: |
           set -eu
           if [ "$BUN_MOVED" = true ]; then
-            nix develop --command bun-pin-update
+            ./nix/bun-pin-update.sh
             # A pin is accepted only now: a host compiled with it passed both gates in the build job.
-            nix develop --command bun-pin-tools verified "gh-$TAG" "$PI_VERSION"
+            python3 nix/bun-pin-tools.py verified "gh-$TAG" "$PI_VERSION"
           else
             echo "the pin did not move"
           fi
