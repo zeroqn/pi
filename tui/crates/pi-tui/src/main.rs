@@ -555,7 +555,14 @@ fn paint_frame(state: &mut State, tty: &writer::Writer, last_paint: &mut Instant
     if state.ui.has_dialog() && !state.models.is_empty() {
         state.ui.refresh_client_list("model", model_items(state));
     }
-    let mut composer_block = composer_rows;
+    // What the session is running on. `long_transcript.py` (v1's harness) waits for the model's name
+    // before it will type anything, and a reader wants to know which model answered (ticket 07 D2).
+    let mut composer_block: Vec<String> = Vec::new();
+    if let Some(model) = &state.current_model {
+        let thinking = state.current_thinking.clone().unwrap_or_else(|| "off".to_string());
+        composer_block.push(format!(" {model}  ·  thinking {thinking}"));
+    }
+    composer_block.extend(composer_rows);
     // The popup draws above the composer, in the transcript's row budget (ticket 09 D5): it must not
     // hide the text being typed, and it is never queued as a dialog.
     let popup = state.completions.render_rows(width as usize, state.settings.list_rows);
