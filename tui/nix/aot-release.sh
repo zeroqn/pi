@@ -119,7 +119,7 @@ echo
 echo "==> artifacts"
 ls -la "$PI_TGZ" "$TUI_TGZ"
 echo
-if [ -n "$MANIFEST_OUT" ]; then
+if [ -n "${MANIFEST_OUT:-}" ]; then
 	printf '%s\n' "$ENTRY" >"$MANIFEST_OUT"
 	echo "==> manifest entry written to $MANIFEST_OUT"
 fi
