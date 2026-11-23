@@ -53,8 +53,18 @@ struct Args {
     repeat: usize,
 }
 
+/// The host command when `--pi` is not given: `PI_TUI_HOST` (a dev shell or the wrapper sets it), else `pi`
+/// on PATH. A value may carry arguments (`"/nix/store/.../pi --mode rpc"`).
+fn default_host() -> Vec<String> {
+    std::env::var("PI_TUI_HOST")
+        .ok()
+        .map(|value| value.split_whitespace().map(str::to_string).collect::<Vec<String>>())
+        .filter(|argv| !argv.is_empty())
+        .unwrap_or_else(|| vec!["pi".into()])
+}
+
 fn parse_args() -> Args {
-    let mut args = Args { replay: None, pace_ms: 2, pi: vec!["pi".into()], stats: None, once: false, repeat: 1 };
+    let mut args = Args { replay: None, pace_ms: 2, pi: default_host(), stats: None, once: false, repeat: 1 };
     let mut argv = std::env::args().skip(1);
     while let Some(arg) = argv.next() {
         match arg.as_str() {
@@ -78,8 +88,11 @@ fn parse_args() -> Args {
             }
         }
     }
-    if args.replay.is_none() && args.pi.len() == 1 {
-        args.pi = vec!["pi".into(), "--mode".into(), "rpc".into()];
+    // RPC mode is how the client speaks to a host; a command that already names a mode keeps it, so a
+    // wrapper passing `--pi "pi --mode rpc"` is not given it twice.
+    if args.replay.is_none() && !args.pi.iter().any(|arg| arg == "--mode") {
+        args.pi.push("--mode".into());
+        args.pi.push("rpc".into());
     }
     args
 }

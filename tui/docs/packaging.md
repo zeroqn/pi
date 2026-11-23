@@ -16,6 +16,10 @@ bin/pi-host   the host (stock pi; `--mode rpc` reads it)
 load-bearing: a machine with only the stock pi still works, because the client speaks `--mode rpc` to
 whatever answers.
 
+The client resolves the same host on its own when the wrapper is not in front of it: `--pi 'CMD ARGS'`,
+else `PI_TUI_HOST`, else `pi` on PATH. That is how a `nix develop` shell points a bare `rpi` at the host
+it just built, without a wrapper and without baking a store path into the client.
+
 ## What each invocation means
 
 | Invocation | Goes to | Why |
@@ -31,20 +35,36 @@ whatever answers.
 The passthrough list is a `case` on `$1`; anything else reaches the client, which hands unknown arguments
 to the host, so an unlisted subcommand still works.
 
-## Two hosts, one switch
+## The host: upstream `bun build --compile --aot`
 
-- **Fallback (`hostFallback`)**: stock pi on stock Bun. This is the path that must never break, and the one
-  every number in `.scratch/tui-rust/results` was measured with.
-- **AOT (`hostAot`)**: needs **Pi-Bolt's patched WebKit and Bun**, pinned by commit (`sources.json`), plus a
-  `bytecode.order` profile **checked in per `PI_REV`** — nix cannot record one, and only ~87 % of function
-  ids survive a minor bump. It buys **startup and memory** (38 vs 116 ms launch, 11 vs 72 ms `--version`);
-  steady state is parity. Being third-party and per-release maintenance, it stays `null` in
-  `nix/package.nix` until someone owns it, and the derivation's shape is written out there as a comment.
+No patched engine and no fork. Bun's ahead-of-time compiler (`src/aot` in Bun, `Source/JavaScriptCore/aot/`
+in oven-sh/WebKit) is reachable as `bun build --compile --aot`:
 
-**The recorder problem.** Pi-Bolt's trainer types into *pi's own TUI* to record the profile. Behind the Rust
-client that TUI is gone, so the trainer must drive the host directly. The two honest options are (a) record
-against a stock pi build and reuse the profile, or (b) re-point the trainer at `--mode rpc`. Neither is
-done; this is the cost of Q11's "no fork".
+```sh
+nix develop && aot-host          # == nix/aot-host.sh: pi's dist, then the compile
+```
+
+Three facts decide the shape of it, all measured:
+
+- **Canary only.** Released Bun 1.4.5 (2026-11-19) has no `--aot` and no AOT strings in its binary; the
+  canary has the full flag set (`--aot`, `--explain`, `--aot-harden`, `--aot-order`, `--aot-allow-code-from-disk`,
+  `--compile-in-place`, `--obfuscate`). `nix/runtime.nix` therefore pins the canary archive **by hash**, not
+  by the moving tag.
+- **`--aot-allow-code-from-disk` is required.** Without it the executable refuses to load any extension
+  (`Cannot load 'node:dns/promises': it isn't in this executable`); with it, magic-context, rlm and code-mode
+  load from disk and the code-mode kernel mounts.
+- **The output carries `/lib64/ld-linux-x86-64.so.2`** whatever Bun's own interpreter is, so a NixOS host
+  needs `patchelf --set-interpreter`/`--set-rpath`; `aot-host` copies the runtime's own patched values.
+
+Measured on pi 1.6.0, same tree, warm `pi --version`:
+
+| Host | executable | `pi --version` |
+|---|---|---|
+| `--aot --splitting` | 219 MB | 37-51 ms |
+| `--bytecode` | 195 MB | 92-109 ms |
+
+No training profile is used. The receiver that would record one is Bun's own `--aot-record-order` /
+`--aot-order`, which is a later step, not a blocker.
 
 ## The client's own startup budget
 
@@ -54,18 +74,22 @@ bench measured 37-98 ms wall including process start.
 
 ## Verified, and not verified
 
-**Verified in this session**
+**Verified**
 
-- `bin/pi --version` exec'd the host and printed `1.5.0`.
-- `bin/pi --replay ...` reached the client, which refused a non-TTY with 0 bytes on stdout and one line on
-  stderr.
-- `bin/pi --help` printed pi's own help (the wrapper hands `--help` to the host; that text is the more
-  useful one for a person who asks what `pi` does).
+- `nix build .#rpi`: `$out/bin` holds `rpi`, `pi-tui -> rpi`, and the `pi` wrapper.
+- `nix develop`: `$PI_TUI_RUNTIME --version` is Bun 1.4.6 and its `--compile --help` lists `--aot`.
+- `aot-host` in that shell: pi 1.6.0's `dist`, the AOT compile (2,333 modules, 4.8 s), assets staged, the
+  interpreter patched — `results/pi/pi --version` prints `1.6.0`, and three runs took 36-55 ms.
+- The link: `PI_TUI_HOST=results/pi/pi $out/bin/pi --version` printed `1.6.0` (wrapper → host), and
+  `rpi --once` under a pty entered the alternate screen and painted frames against that AOT host.
+- `bin/pi --replay ...` refuses a non-TTY with 0 bytes on stdout and one line on stderr; `bin/pi --help`
+  prints pi's own help.
+- The AOT executable on its own: `pi -ne --mode rpc` answers `get_state`.
 
 **Not verified, said plainly**
 
-- `nix build` of `nix/package.nix`: written to be readable and to fail loudly, not run.
-- The AOT host: needs the patched engine and a recorded profile; `hostAot` is `null`.
-- A full turn through `bin/pi` on a real terminal: the wrapper path was exercised with `--replay` and
-  `--version`, and the client's own host path by `tools/harness/smoke_host.py`, but not the two together
-  behind the wrapper on a TTY.
+- A full interactive turn on a real terminal, with a model answering, through the wrapper.
+- `nix build` inside `extensions/` (a git tree) with these files untracked: Nix only sees tracked files,
+  so the files must be committed first. The build was verified from a copy outside git.
+- A recorded startup profile (`--aot-record-order`); the numbers above are without one.
+- `aarch64` and `darwin`: `nix/runtime.nix` pins the x86-64-linux archive only.

@@ -1,48 +1,31 @@
-# One `pi`, two binaries. See docs/packaging.md for the reasoning and the honest gaps.
-{ pkgs, lib, src }:
-let
-  # The client: plain cargo, no engine work. `Cargo.lock` is committed, so this builds offline.
-  client = pkgs.rustPlatform.buildRustPackage {
-    pname = "rpi";
-    version = "0.0.0";
-    src = src + "/../../tui";
-    cargoLock.lockFile = src + "/../../tui/Cargo.lock";
-    doCheck = false; # the tests need the recorded corpus, which is not in the repository
-    meta.description = "The Rust terminal client for pi";
-  };
+# The Rust client, rpi, and the `pi` wrapper that pairs it with a host. See docs/packaging.md.
+#
+# The host is not built here: it is `nix/aot-host.sh` in the dev shell (or any `pi` on PATH). A machine that has
+# only this package still works if a `pi` or `pi-host` is on PATH, because the client speaks `--mode rpc` to
+# whatever answers.
+{ lib, rustPlatform, src }:
 
-  # The fallback host: stock pi on stock Bun. This is the path that must never break (ticket 10), and the
-  # one every number in .scratch/tui-rust/results was measured with.
-  hostFallback = pkgs.writeShellScriptBin "pi-host" ''
-    exec ${pkgs.bun}/bin/bun ${src}/pi/packages/coding-agent/src/cli.ts "$@"
+rustPlatform.buildRustPackage {
+  pname = "pi-tui";
+  version = "0.0.0";
+
+  inherit src;
+
+  cargoLock.lockFile = src + "/Cargo.lock";
+  # The crate tests read a recorded corpus that is not in the repository.
+  doCheck = false;
+
+  # `pi` is the wrapper: it takes the name, and the client lives beside it as `rpi`.
+  postInstall = ''
+    install -Dm755 ${src}/bin/pi $out/bin/pi
+    # The client's own binary is `rpi`; keep the old name working for a build already installed under it.
+    ln -s rpi $out/bin/pi-tui
   '';
 
-  # The AOT host needs Pi-Bolt's patched WebKit and Bun pinned by commit, plus a `bytecode.order` profile
-  # checked in per `PI_REV` (nix cannot record one; ~87 % of ids survive a minor bump). It buys startup and
-  # memory only, so it stays null until someone owns it. Derivation shape:
-  #
-  #   hostAot = pkgs.stdenvNoCC.mkDerivation {
-  #     pname = "pi-host-aot";
-  #     src = <patched bun, pinned>;
-  #     nativeBuildInputs = [ patched-webkit ];
-  #     buildPhase = ''
-  #       BUN_JSC_useJIT=0 BUN_STATIC_HEAP=1 BUN_AOT=1 \
-  #       BUN_JSC_useAOTLoopSplitting=1 BUN_JSC_useImmutableIntrinsics=1 \
-  #       bun build --compile --bytecode --bytecode-order profiles/${PI_REV}.order \
-  #         ${src}/pi/packages/coding-agent/src/cli.ts --outfile pi-host
-  #     '';
-  #   };
-  hostAot = null;
-in
-{
-  inherit client hostFallback hostAot;
-
-  default = pkgs.symlinkJoin {
-    name = "pi-with-rust-tui";
-    paths = [ client hostFallback ];
-    postBuild = ''
-      # `pi` is the wrapper: the client takes the name, the host lives beside it as `pi-host`.
-      install -Dm755 ${src}/../../tui/bin/pi $out/bin/pi
-    '';
+  meta = {
+    description = "The Rust terminal client for pi, and the `pi` wrapper that starts it";
+    homepage = "https://github.com/earendil-works/pi";
+    license = lib.licenses.mit;
+    mainProgram = "pi";
   };
 }

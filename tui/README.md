@@ -5,7 +5,7 @@ A wayfinder effort, not a finished thing. The map is `.scratch/tui-rust/map.md`;
 
 The client renders pi's transcript itself and drives pi as a headless host over `pi --mode rpc`. **pi is
 not patched** — no fork, no per-release delta to re-port. `examples/` is retired as a patch harness;
-this package builds the client and, later, AOT-compiles a stock pi behind it.
+this package builds the client and AOT-compiles a stock pi behind it (`nix develop && aot-host`).
 
 ## What exists
 
@@ -17,6 +17,14 @@ this package builds the client and, later, AOT-compiles a stock pi behind it.
 
 Layout for a machine where `pi` is the client: `bin/pi` (wrapper), `bin/rpi` (the client),
 `bin/pi-host` (the host). See `docs/packaging.md` and `nix/package.nix`.
+
+`flake.nix` builds the client (`nix build .#rpi`) and gives the shell that builds the host:
+
+```sh
+nix develop            # rust, node 22, and nix/runtime.nix's Bun (the one with --aot)
+aot-host               # pi's dist, then `bun build --compile --aot` -> results/pi/pi
+cargo build --release && rpi   # the client drives the host this shell built
+```
 
 ```sh
 cargo build --release
