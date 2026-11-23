@@ -32,13 +32,24 @@ by URL and hash:
 | `pi-tui-<client version>-<platform>.tar.gz` | `rpi` and the `pi` wrapper beside it |
 | `bun-aot` (no asset: `nix/runtime.nix` fetches it) | the canary archive, pinned by hash |
 
-Downstream, with this flake as an input:
+Downstream, with this repository as an input (`extensions/` is the repository root, so the flake is in
+the `tui` subdirectory):
 
 ```nix
+inputs.pi-tui = {
+  url = "github:zeroqn/pi?dir=tui";
+  inputs.nixpkgs.follows = "nixpkgs";
+};
+
+# then, for the platform you build on:
 pi-tui.packages.x86_64-linux.pi-aot    # pi, ahead of time: bin/pi, libexec/pi/pi, share/pi
 pi-tui.packages.x86_64-linux.rpi-bin   # rpi + the wrapper: bin/{pi,rpi}
-pi-tui.packages.x86_64-linux.bun-aot   # the engine, if you want to compile something yourself
+pi-tui.packages.x86_64-linux.bun-aot   # Bun 1.4.6, the engine the host was compiled with
 ```
+
+`pi-aot` and `rpi-bin` exist **only for a platform whose entry `nix/manifest.nix` carries**, so a downstream
+lock taken before the first release has `rpi` and `bun-aot` but no prebuilt host. The release must land
+before the manifest commit, and a downstream lock must be newer than both.
 
 `pi-aot` installs the executable into `libexec` and the assets into `share`, and its `bin/pi` sets
 `PI_PACKAGE_DIR` at the second — the one-artifact rule above, expressed in a store layout. Both are built by
