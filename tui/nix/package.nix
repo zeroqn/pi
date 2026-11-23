@@ -3,7 +3,7 @@
 let
   # The client: plain cargo, no engine work. `Cargo.lock` is committed, so this builds offline.
   client = pkgs.rustPlatform.buildRustPackage {
-    pname = "pi-tui";
+    pname = "rpi";
     version = "0.0.0";
     src = src + "/../../tui";
     cargoLock.lockFile = src + "/../../tui/Cargo.lock";

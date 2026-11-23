@@ -4,7 +4,7 @@
 Three claims at once: the wrapper takes the `pi` name, the client spawns the host, and an unmodified
 `pi --mode rpc` answers. Exit 1 if the answer never appears.
 
-    ./smoke_packaging.py --wrapper ../../bin/pi --client target/release/pi-tui
+    ./smoke_packaging.py --wrapper ../../bin/pi --client target/release/rpi
 """
 
 import argparse

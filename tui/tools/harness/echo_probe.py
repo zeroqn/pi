@@ -5,7 +5,7 @@ Types into the client's pseudo-terminal and measures the time until the characte
 bytes the client wrote — the same yardstick `acceptance.md` C-1 uses for pi. The client's own
 `--stats` histogram is written beside these numbers so the two can be compared.
 
-    ./echo_probe.py --binary target/release/pi-tui --replay FIXTURE --pace-ms 2 --keys 200
+    ./echo_probe.py --binary target/release/rpi --replay FIXTURE --pace-ms 2 --keys 200
     ./echo_probe.py --binary ... --replay ... --load 0     # the client and a burner share core 0
 
 The marker character is `¶`, which no fixture contains, so an appearance in the stream is the echo.

@@ -6,7 +6,7 @@ Launches the client against a real host with `tools/harness/corpus-ext.ts` loade
 `extension_ui_response` lines. Then it checks the follow-up state — a status line, a widget, a notice —
 appeared in the client's own output.
 
-    ./smoke_dialogs.py --binary target/release/pi-tui
+    ./smoke_dialogs.py --binary target/release/rpi
 """
 
 import argparse

@@ -7,11 +7,11 @@ host it drives is a stock pi build.
 
 ```
 bin/pi        the wrapper: takes the `pi` name
-bin/pi-tui    the Rust client
+bin/rpi       the Rust client
 bin/pi-host   the host (stock pi; `--mode rpc` reads it)
 ```
 
-`bin/pi` resolves the client as `PI_TUI_CLIENT` -> `pi-tui` beside it -> `pi-tui` on PATH, and the host as
+`bin/pi` resolves the client as `PI_TUI_CLIENT` -> `rpi` beside it -> `rpi` on PATH, and the host as
 `PI_TUI_HOST` -> `pi-host` beside it -> `pi-host` on PATH -> `pi` on PATH. Nothing in the wrapper is
 load-bearing: a machine with only the stock pi still works, because the client speaks `--mode rpc` to
 whatever answers.

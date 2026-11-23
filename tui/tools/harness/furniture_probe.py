@@ -10,7 +10,7 @@ model, so the checks are the client's own behaviour over the real protocol:
   - `/session` routes to `get_session_stats` and shows a summary
   - `/tree` routes to `get_tree` and reports the nodes it was given
 
-    ./furniture_probe.py --binary target/release/pi-tui
+    ./furniture_probe.py --binary target/release/rpi
 """
 
 import argparse

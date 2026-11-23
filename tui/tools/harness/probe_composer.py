@@ -8,7 +8,7 @@ Three checks against the client alone (no host needed for the first two):
    `alt+enter`, `Enter` must NOT send a prompt and `alt+enter` must.
 3. **Tab completes a path.** Typing a prefix of a real file and pressing Tab replaces it.
 
-    ./probe_composer.py --binary target/release/pi-tui [--fixture F]
+    ./probe_composer.py --binary target/release/rpi [--fixture F]
 """
 
 import argparse

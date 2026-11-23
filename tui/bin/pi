@@ -2,11 +2,11 @@
 # `pi` for a machine where the Rust client owns the terminal.
 #
 # Layout: this wrapper takes the `pi` name, and the real host lives beside it as `pi-host`. The client is
-# `pi-tui`. Resolution order, so nothing here is load-bearing:
+# `rpi` (and an older build under the name `pi-tui` still works). Resolution order:
 #
 #   1. PI_TUI_CLIENT  (an explicit client binary, e.g. from a nix build)
-#   2. pi-tui next to this script
-#   3. pi-tui on PATH
+#   2. rpi next to this script
+#   3. rpi on PATH
 # and the host is PI_TUI_HOST, else pi-host next to this script, else pi-host on PATH, else `pi` on PATH —
 # a machine with the stock pi still works, because the client speaks `--mode rpc` to whatever answers.
 #
@@ -17,7 +17,9 @@ set -eu
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 client=${PI_TUI_CLIENT:-}
 if [ -z "$client" ]; then
-  if [ -x "$here/pi-tui" ]; then client="$here/pi-tui"
+  if [ -x "$here/rpi" ]; then client="$here/rpi"
+  elif command -v rpi >/dev/null 2>&1; then client=$(command -v rpi)
+  elif [ -x "$here/pi-tui" ]; then client="$here/pi-tui"
   elif command -v pi-tui >/dev/null 2>&1; then client=$(command -v pi-tui)
   fi
 fi

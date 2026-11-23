@@ -5,7 +5,7 @@ pi's split, which v2 adopted: `escape` aborts a turn, `ctrl+c` **clears** the co
 `ctrl+d` exits only with an empty composer, and a dead host ends the client rather than leaving it
 painted over a corpse.
 
-    ./failure_probe.py --binary target/release/pi-tui
+    ./failure_probe.py --binary target/release/rpi
 """
 
 import argparse

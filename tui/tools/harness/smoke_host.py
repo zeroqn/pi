@@ -5,7 +5,7 @@ Starts a scripted model and a throwaway `PI_CODING_AGENT_DIR`, launches the clie
 host command pointing at that model, types a prompt, and waits for the model's answer to appear in the
 client's own output. Exit status 1 if it does not.
 
-    ./smoke_host.py --binary target/release/pi-tui
+    ./smoke_host.py --binary target/release/rpi
 """
 
 import argparse

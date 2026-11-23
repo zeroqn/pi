@@ -6,7 +6,7 @@ license.workspace = true
 description = "The Rust terminal client: renders pi's transcript, owns the terminal and the composer"
 
 [[bin]]
-name = "pi-tui"
+name = "rpi"
 path = "src/main.rs"
 
 [dependencies]

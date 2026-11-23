@@ -7,7 +7,7 @@ Ticket 10 of `.scratch/tui-rust-v2/map.md`. Three of its decisions are observabl
   - ctrl+z restores the terminal, stops, and re-enters on resume (D2)
   - a paste while a dialog is open does not edit the editor behind it (D5)
 
-    ./input_probe.py --binary target/release/pi-tui
+    ./input_probe.py --binary target/release/rpi
 """
 
 import argparse

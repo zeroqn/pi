@@ -202,7 +202,7 @@ def main():
 	ap = argparse.ArgumentParser()
 	ap.add_argument("--arm", choices=["pi", "client"])
 	ap.add_argument("--scenario", required=True, choices=sorted(SCENARIOS))
-	ap.add_argument("--client-binary", default="pi-tui")
+	ap.add_argument("--client-binary", default="rpi")
 	ap.add_argument("--capture", help="write the facts here as JSON")
 	ap.add_argument("--check", action="store_true", help="compare against the reference gold file")
 	ap.add_argument("--gold", default=str(HERE / "gold"), help="where gold facts live, version-stamped")

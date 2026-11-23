@@ -5,7 +5,7 @@ The advisor extension is loaded into a live `pi --mode rpc`; the client gets the
 shows the `select` the extension falls back to (ticket 08/13), takes the last row ("No advisor") and
 writes the answer back. Exit status 1 if any step does not appear.
 
-    ./smoke_advisor.py --binary target/release/pi-tui
+    ./smoke_advisor.py --binary target/release/rpi
 """
 
 import argparse

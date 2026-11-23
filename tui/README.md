@@ -15,12 +15,12 @@ this package builds the client and, later, AOT-compiles a stock pi behind it.
 | `crates/pi-tui` | the client: spawns or replays a host, renders the transcript as wrapped lines, owns the terminal and the composer. Frames go through a writer thread (one-frame slot, newest wins), the screen is diffed row by row with scroll regions, and a dropped frame invalidates it. No markdown, no dialogs yet. |
 | `tools/harness/` | the measurement harness (Pi-Bolt's `bench/` subset), `record_corpus.py` (records the RPC corpus), `echo_probe.py` (echo latency from outside the client), `smoke_host.py` (end-to-end against a real host). |
 
-Layout for a machine where `pi` is the client: `bin/pi` (wrapper), `bin/pi-tui` (the client),
+Layout for a machine where `pi` is the client: `bin/pi` (wrapper), `bin/rpi` (the client),
 `bin/pi-host` (the host). See `docs/packaging.md` and `nix/package.nix`.
 
 ```sh
 cargo build --release
-BIN=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys;print(json.load(sys.stdin)["target_directory"]+"/release/pi-tui")')
+BIN=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys;print(json.load(sys.stdin)["target_directory"]+"/release/rpi")')
 ./tools/harness/smoke_host.py --binary $BIN      # the client drives a live `pi --mode rpc`
 ./tools/harness/echo_probe.py --binary $BIN --replay ../../.scratch/tui-rust/fixtures/code.jsonl \
   --pace-ms 2 --repeat 200 --keys 200 --stats /tmp/stats.json

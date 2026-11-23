@@ -45,7 +45,7 @@ python3 pauses.py --build pi=pi --scenario answer --gc
 `--build` is repeatable and takes `name=command`, so the Rust client is measured by the same tool:
 
 ```sh
-python3 long_transcript.py --build pi=pi --build client=extensions/tui/target/release/pi-tui \\
+python3 long_transcript.py --build pi=pi --build client=extensions/tui/target/release/rpi \\
   --entries 4000 --keys
 ```
 

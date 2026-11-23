@@ -4,7 +4,7 @@
 Ticket 09 of `.scratch/tui-rust-v2/map.md`: `fd` supplies the candidates (pi's own engine, `fd`'s own
 .gitignore handling), `@` opens the popup, and a path with a space is inserted inside quotes.
 
-    ./completion_probe.py --binary target/release/pi-tui
+    ./completion_probe.py --binary target/release/rpi
 """
 
 import argparse
