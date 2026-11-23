@@ -90,8 +90,15 @@ if command -v patchelf >/dev/null 2>&1; then
 	fi
 fi
 
+# The executable and what it reads beside itself are one artifact: pi's version is a run-time read of
+# `$PI_PACKAGE_DIR/defaults-to-dirname(execPath)/package.json` (packages/coding-agent/src/config.ts:417-607),
+# so a missing sidecar is not an error the binary reports — it prints `0.0.0`. Catch that here instead.
 "$OUT/pi" --version >/dev/null 2>&1 || die "$OUT/pi does not start (a non-NixOS host without patchelf needs /lib64)"
-echo "==> $OUT/pi ($(du -h "$OUT/pi" | cut -f1)), pi $("$OUT/pi" --version)"
+expected="$(node -p "require('$OUT/package.json').version" 2>/dev/null || true)"
+[ -n "$expected" ] || die "no readable package.json beside the executable: stage it, or set PI_PACKAGE_DIR"
+actual="$("$OUT/pi" --version)"
+[ "$actual" = "$expected" ] || die "$OUT/pi reports '$actual' but package.json says '$expected'"
+echo "==> $OUT/pi ($(du -h "$OUT/pi" | cut -f1)), pi $actual"
 # Startup, three runs, as the client pays it: the executable is a child process either way.
 for _ in 1 2 3; do
 	start=$(date +%s%N)

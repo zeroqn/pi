@@ -56,6 +56,14 @@ Three facts decide the shape of it, all measured:
 - **The output carries `/lib64/ld-linux-x86-64.so.2`** whatever Bun's own interpreter is, so a NixOS host
   needs `patchelf --set-interpreter`/`--set-rpath`; `aot-host` copies the runtime's own patched values.
 
+**The executable and what it reads beside itself are one artifact.** pi's version is a run-time read of
+`dirname(execPath)/package.json` (`packages/coding-agent/src/config.ts:417-607`), and a missing file is
+swallowed: the binary prints `0.0.0` instead of failing. `package.json`, `theme/`, `assets/`,
+`export-html/`, `docs/`, `examples/`, the photon wasm and the native prebuilts therefore stay in the
+executable's own directory, and `aot-host` refuses to finish if `--version` disagrees with the sidecar it
+staged. `PI_PACKAGE_DIR` is pi's own escape hatch for moving that directory; a compiled-in version would
+need a pi patch, which is the one delta this package does not take.
+
 Measured on pi 1.6.0, same tree, warm `pi --version`:
 
 | Host | executable | `pi --version` |
