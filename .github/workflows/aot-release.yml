@@ -62,6 +62,7 @@ jobs:
       run:
         working-directory: tui
     outputs:
+      build: ${{ steps.decide.outputs.build }}
       publish: ${{ steps.decide.outputs.publish }}
       tag: ${{ steps.decide.outputs.tag }}
       kind: ${{ steps.decide.outputs.kind }}
@@ -113,7 +114,7 @@ jobs:
           echo "moved=$moved" >> "$GITHUB_OUTPUT"
           echo "version=$(sed -n 's/^  version = "\(.*\)";$/\1/p' nix/bun-pin.nix)" >> "$GITHUB_OUTPUT"
 
-      - name: Decide what to publish
+      - name: Decide what to build and what to publish
         id: decide
         env:
           EVENT: ${{ github.event_name }}
@@ -125,34 +126,43 @@ jobs:
           BUN_MOVED: ${{ steps.bun.outputs.moved }}
         run: |
           set -eu
+          # Three outcomes: a scheduled run builds and publishes only when pi moved; a dispatch always builds
+          # (so the gates can be exercised without publishing), and publishes when `publish` is set.
+          build=false
           publish=false
           kind=none
           tag=""
           if [ "$EVENT" = workflow_dispatch ]; then
+            build=true
             kind=dispatch
             publish="$INPUT_PUBLISH"
             tag="$INPUT_TAG"
             [ -n "$tag" ] || tag="dry-run-$(date -u +%Y%m%d-%H%M)"
           elif [ "$PI_VERSION" != "$MANIFEST_VERSION" ]; then
             # A new pi release. Bun is re-pinned by this release's build, and travels with it.
+            build=true
             publish=true
             kind=pi
             tag="pi-v$PI_VERSION"
           fi
-          echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          echo "kind=$kind" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          {
+            echo "build=$build"
+            echo "publish=$publish"
+            echo "kind=$kind"
+            echo "tag=$tag"
+          } >> "$GITHUB_OUTPUT"
           {
             echo "### aot-release watch"
             echo "- latest pi: $PI_VERSION at $PI_REF"
             echo "- manifest describes: ${MANIFEST_VERSION:-<empty>}"
-            echo "- Bun canary moved since the pin: ${BUN_MOVED:-<not checked>} (re-pinned by the build)"
-            echo "- decision: publish=$publish kind=$kind tag=${tag:-<none>}"
+            echo "- Bun canary moved since the pin: $BUN_MOVED"
+            echo "- decision: build=$build publish=$publish kind=$kind tag=${tag:-<none>}"
           } >> "$GITHUB_STEP_SUMMARY"
 
   build:
     needs: watch
-    if: needs.watch.outputs.publish == 'true'
+    # A dispatch builds even when it will not publish, so the gates can be run without creating a release.
+    if: needs.watch.outputs.build == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -250,6 +260,8 @@ jobs:
 
   publish:
     needs: [watch, build]
+    # Only a run that decided to publish: a dispatch without `publish` stops after the gates.
+    if: needs.watch.outputs.publish == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
