@@ -70,6 +70,12 @@ struct RowCache {
 pub struct Transcript {
     items: Vec<Item>,
     cache: Option<RowCache>,
+    /// The open (still streaming) block's wrapped rows, with the width and the revision they were built
+    /// for. Rendering it twice per frame — once for the map, once for the window — was the quadratic path
+    /// `long_answer` measured: each chunk re-wrapped the whole answer, and the answer grows.
+    open_cache: Option<(usize, u64, Vec<StyledRow>)>,
+    /// Bumped whenever the open block's text changes, which is the only thing that invalidates the above.
+    open_revision: u64,
     assistant_src: String,
     md: StreamingMarkdown,
     theme: Theme,
@@ -86,6 +92,8 @@ impl Default for Transcript {
         Transcript {
             items: Vec::new(),
             cache: None,
+            open_cache: None,
+            open_revision: 0,
             assistant_src: String::new(),
             md: StreamingMarkdown::new(),
             theme: Theme::default(),
@@ -289,6 +297,24 @@ impl Transcript {
     }
 
     /// Drop the wrapped-row cache. Every mutator calls this: a stale cache paints a stale transcript.
+    fn bump_open(&mut self) {
+        self.open_revision = self.open_revision.wrapping_add(1);
+    }
+
+    /// The open block's rows at this width, wrapped **once** per change of the text (ticket 03 D6's
+    /// companion: `long_answer` spent 4.2 ms per chunk, half of it wrapping the answer twice).
+    fn open_rows(&mut self, width: usize) -> &[StyledRow] {
+        let stale = match &self.open_cache {
+            Some((cached_width, revision, _)) => *cached_width != width || *revision != self.open_revision,
+            None => true,
+        };
+        if stale {
+            let rows = pi_tui::render::wrap_rows(&self.md.styled_rows(), width);
+            self.open_cache = Some((width, self.open_revision, rows));
+        }
+        &self.open_cache.as_ref().expect("just built").2
+    }
+
     fn invalidate_rows(&mut self) {
         self.cache = None;
     }
@@ -318,7 +344,8 @@ impl Transcript {
             .as_ref()
             .map(|cache| cache.per_item.iter().map(Vec::len).collect())
             .unwrap_or_default();
-        counts.push(pi_tui::render::wrap_rows(&self.md.styled_rows(), width).len());
+        let open = self.open_rows(width).len();
+        counts.push(open);
         pi_tui::viewport::DocMap::new(counts)
     }
 
@@ -326,7 +353,9 @@ impl Transcript {
     /// rows. Nothing outside the window is wrapped, which is the whole point of the cache.
     pub fn window_rows(&mut self, width: usize, start: usize, height: usize) -> Vec<StyledRow> {
         self.refresh_cache(width);
-        let open_rows = pi_tui::render::wrap_rows(&self.md.styled_rows(), width);
+        // The open block's rows are needed by index, so the slice's length is taken before the borrow of
+        // `self.cache` starts; the rows themselves are cloned only for the part the window shows.
+        let open_len = self.open_rows(width).len();
         let end = start.saturating_add(height);
         let mut out: Vec<StyledRow> = Vec::with_capacity(height);
         let mut row = 0usize;
@@ -344,10 +373,11 @@ impl Transcript {
                 row = block_end;
             }
         }
-        if row < end && start < row + open_rows.len() {
+        if row < end && start < row + open_len {
             let from = start.saturating_sub(row);
-            let to = (end - row).min(open_rows.len());
-            out.extend(open_rows[from..to].iter().cloned());
+            let to = (end - row).min(open_len);
+            let rows: Vec<StyledRow> = self.open_rows(width)[from..to].to_vec();
+            out.extend(rows);
         }
         out.resize(height, StyledRow::default());
         out
@@ -407,6 +437,10 @@ impl Transcript {
 
     fn commit_open(&mut self) {
         self.invalidate_rows();
+        // The streaming renderer is reset just below, so the cached open rows belong to text that no
+        // longer exists.
+        self.open_cache = None;
+        self.bump_open();
         if !self.open.is_empty() {
             // The assistant's message becomes markdown rows; the streamed source already lives in the
             // incremental renderer, so nothing is re-parsed here.
@@ -582,6 +616,7 @@ impl Transcript {
                     // renderer re-parse only its open block (ticket 06).
                     self.assistant_src.push_str(text);
                     self.md.update_styled(&self.assistant_src, &self.theme);
+                    self.bump_open();
                     return true;
                 }
                 false
