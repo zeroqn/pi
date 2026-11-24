@@ -13,16 +13,15 @@ import {
 } from "./index-453s1hj6.js";
 import"./index-2qtx0q6h.js";
 import {
-  openDatabase
-} from "./index-z8pr5k0d.js";
-import"./index-fapenpch.js";
+  openDatabase2
+} from "./index-nw2xkg5r.js";
 import"./index-3bb24eb6.js";
 import"./index-8sqebjzk.js";
 import"./index-wfqysrwq.js";
 import"./index-x2n261wp.js";
 import"./index-xjhq27z9.js";
 import"./index-ghp32f9m.js";
-import"./index-gavj3e6h.js";
+import"./index-pqhc0k9d.js";
 import"./index-jhmz9tgv.js";
 import"./index-135e8hvg.js";
 import"./index-n0zjvs3h.js";
@@ -34,7 +33,7 @@ import {
   resolvePiHarnessKind,
   reportSubagentStartupError,
   registerMagicContextTools
-} from "./index-v7hmhn1r.js";
+} from "./index-717n2hme.js";
 import"./index-vcegxfwg.js";
 import"./index-5rcjs14a.js";
 import"./index-cxczethe.js";
@@ -45,17 +44,17 @@ import"./index-9p40dgkm.js";
 import"./index-79xfn84y.js";
 import"./index-yhzhdp3m.js";
 import"./index-d2g3h5r2.js";
-import"./index-46x2935k.js";
+import"./index-kr0k63a9.js";
 import"./index-d7yx4ymd.js";
 import"./index-73fw4cd4.js";
 import"./index-6x556c2q.js";
 import"./index-nvh6d3bz.js";
-import"./index-k7a8x7ba.js";
+import"./index-ay13n5s4.js";
 import"./index-8d2z6503.js";
-import"./index-cjhq42s7.js";
+import"./index-f1sga2dz.js";
 import"./index-4dqwxb7k.js";
 import"./index-29nw7n1r.js";
-import"./index-x7551srw.js";
+import"./index-adhdk6vc.js";
 import"./index-3s39a1md.js";
 import"./index-1ts77n1b.js";
 import {
@@ -111,7 +110,7 @@ function magicContextSubagentExtension(pi) {
         cwd: directory
       });
       setStoragePrivatePermissionEnforcement(cfg.storage.enforce_private_permissions);
-      const db = openDatabase();
+      const db = openDatabase2();
       if (!db) {
         throw new Error("storage open failed; refusing to start without Magic Context tools");
       }

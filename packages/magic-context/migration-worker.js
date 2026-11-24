@@ -10,15 +10,14 @@ import {
 import"./index-135e8hvg.js";
 import {
   runMigrationsWithRetry
-} from "./index-gavj3e6h.js";
+} from "./index-pqhc0k9d.js";
 import"./index-jhmz9tgv.js";
 import"./index-n0zjvs3h.js";
 import"./index-453s1hj6.js";
 import {
-  setSqlitePragmaConfig,
-  initializeDatabase
-} from "./index-z8pr5k0d.js";
-import"./index-fapenpch.js";
+  setSqlitePragmaConfig2,
+  initializeDatabase2
+} from "./index-nw2xkg5r.js";
 import"./index-3bb24eb6.js";
 import"./index-8sqebjzk.js";
 import"./index-wfqysrwq.js";
@@ -41,12 +40,12 @@ serveWorkerJobs(async (data, port) => {
   }
   async function main() {
     setLogLineForwarder2((line) => post({ type: "log", line }));
-    setSqlitePragmaConfig(data.sqlitePragmaConfig);
+    setSqlitePragmaConfig2(data.sqlitePragmaConfig);
     post({ type: "ready" });
     let db;
     try {
       db = new Database2(data.dbPath);
-      initializeDatabase(db, data.busyTimeoutMs);
+      initializeDatabase2(db, data.busyTimeoutMs);
       await runMigrationsWithRetry(db, {
         sleep: async (delayMs) => {
           post({ type: "lock-wait", waiting: true });

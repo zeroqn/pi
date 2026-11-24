@@ -26,9 +26,6 @@ import {
   scheduleAfterBootQuiet
 } from "./index-453s1hj6.js";
 import {
-  configureContextDatabasePragmas2
-} from "./index-fapenpch.js";
-import {
   attachFailClosedBlockingProcessEvidence
 } from "./index-3bb24eb6.js";
 import {
@@ -42,11 +39,11 @@ import {
   SESSION_REPLAY_DECISIONS_DDL,
   LKG_SLOTS_DDL,
   installCompartmentHistoryVersions,
-  FORK_MIGRATION_VERSION_FLOOR,
+  FORK_MIGRATION_VERSION_FLOOR2,
   hasPendingMigrations,
   getMainThreadMigrationBodyCount,
   runMigrations
-} from "./index-gavj3e6h.js";
+} from "./index-pqhc0k9d.js";
 import {
   setDatabase,
   loadToolDefinitionMeasurements,
@@ -886,6 +883,18 @@ function safeString(value) {
   }
 }
 
+// ../plugin/src/shared/sqlite-context-pragmas.ts
+function configureContextDatabasePragmas(db, readonly = false) {
+  const [row] = db.prepare(readonly ? "PRAGMA journal_mode" : "PRAGMA journal_mode=WAL").all();
+  const mode = row?.journal_mode?.toLowerCase();
+  if (mode === "memory" || readonly && mode !== "wal")
+    return;
+  if (mode !== "wal") {
+    throw new Error(`context.db requires WAL before synchronous=NORMAL (got ${mode ?? "unknown"})`);
+  }
+  db.exec("PRAGMA synchronous=NORMAL");
+}
+
 // ../plugin/src/features/magic-context/migration-worker-client.ts
 import { Worker } from "node:worker_threads";
 
@@ -1407,13 +1416,13 @@ var pathByDatabase = new WeakMap;
 var lastSchemaFenceRejection = null;
 var lastMigrationOnOpenRefusal = null;
 var lastUnconfirmedMigrationHolders = null;
-function getSchemaFenceRejection() {
+function getSchemaFenceRejection2() {
   return lastSchemaFenceRejection;
 }
-function getMigrationOnOpenRefusal() {
+function getMigrationOnOpenRefusal2() {
   return lastMigrationOnOpenRefusal;
 }
-var LATEST_SUPPORTED_VERSION = 95;
+var LATEST_SUPPORTED_VERSION2 = 95;
 var BOOT_SQLITE_BUSY_TIMEOUT_MS = 5000;
 function ensureSecureStorageDir(dir) {
   ensureStorageDirectorySync(dir);
@@ -1444,7 +1453,7 @@ function isFileBackedPath(dbPath) {
   const trimmed = dbPath.trim();
   return trimmed !== "" && trimmed !== ":memory:" && !trimmed.startsWith("file:");
 }
-function getDatabasePath(db) {
+function getDatabasePath2(db) {
   return pathByDatabase.get(db) ?? null;
 }
 function migrateLegacyStorageIfNeeded(targetDbPath, targetDbDir) {
@@ -1459,7 +1468,7 @@ function migrateLegacyStorageIfNeeded(targetDbPath, targetDbDir) {
   try {
     const legacyDb = new Database2(legacyDbPath);
     try {
-      configureContextDatabasePragmas2(legacyDb, true);
+      configureContextDatabasePragmas(legacyDb, true);
       legacyDb.exec("PRAGMA wal_checkpoint(TRUNCATE)");
     } finally {
       closeQuietly(legacyDb);
@@ -1488,13 +1497,16 @@ function migrateLegacyStorageIfNeeded(targetDbPath, targetDbDir) {
     }
   }
 }
-function getPersistedSchemaVersion(db) {
+function getPersistedSchemaVersion2(db) {
   const hasMigrationsTable = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'").get();
   if (!hasMigrationsTable) {
     return 0;
   }
-  const row = db.prepare("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations WHERE version < ?").get(FORK_MIGRATION_VERSION_FLOOR);
+  const row = db.prepare("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations WHERE version < ?").get(FORK_MIGRATION_VERSION_FLOOR2);
   return row?.version ?? 0;
+}
+function schemaVersionIsSupported2(db, latestSupportedVersion = LATEST_SUPPORTED_VERSION2) {
+  return getPersistedSchemaVersion2(db) <= latestSupportedVersion;
 }
 function formatSchemaFenceBootLog(persistedVersion, supportedVersion) {
   return `[magic-context] upstream migration lane at boot: database=v${persistedVersion}, supported_fence=v${supportedVersion}`;
@@ -1510,10 +1522,10 @@ function getRuntimeLatestSupportedVersion(options) {
       return parsed;
     }
   }
-  return LATEST_SUPPORTED_VERSION;
+  return LATEST_SUPPORTED_VERSION2;
 }
-function enforceSchemaFence(db, dbPath, latestSupportedVersion) {
-  const persistedVersion = getPersistedSchemaVersion(db);
+function enforceSchemaFence2(db, dbPath, latestSupportedVersion) {
+  const persistedVersion = getPersistedSchemaVersion2(db);
   if (persistedVersion <= latestSupportedVersion) {
     lastSchemaFenceRejection = null;
     return true;
@@ -1764,7 +1776,7 @@ function formatLiveProcessMigrationRefusal(dbPath, persistedVersion, latestSuppo
   return `[magic-context] storage fatal: refusing to migrate ${dbPath} from upstream migration v${persistedVersion} to v${latestSupportedVersion} while ${blockers.join(", ")} still use the old plugin build. Restart the blocking harness, then retry this process.`;
 }
 function enforceMigrationOnOpenGuard(db, dbPath, dbDir, latestSupportedVersion, processes) {
-  const persistedVersion = getPersistedSchemaVersion(db);
+  const persistedVersion = getPersistedSchemaVersion2(db);
   if (persistedVersion >= latestSupportedVersion) {
     lastMigrationOnOpenRefusal = null;
     return true;
@@ -1813,22 +1825,22 @@ var sqlitePragmaConfig = {
   cacheSizeMb: 64,
   mmapSizeMb: 0
 };
-function setSqlitePragmaConfig(config) {
+function setSqlitePragmaConfig2(config) {
   sqlitePragmaConfig = config;
 }
-function applySqliteTuningPragmas(db) {
+function applySqliteTuningPragmas2(db) {
   db.exec(`PRAGMA cache_size=-${Math.round(sqlitePragmaConfig.cacheSizeMb * 1024)}`);
   db.exec(`PRAGMA mmap_size=${Math.round(sqlitePragmaConfig.mmapSizeMb * 1024 * 1024)}`);
   db.exec("PRAGMA analysis_limit=400");
 }
-function runSqliteOptimize(db) {
+function runSqliteOptimize2(db) {
   try {
     db.exec("PRAGMA analysis_limit=400");
     db.exec("PRAGMA optimize");
   } catch {}
 }
 function finishDatabaseOpen(db, dbPath, explicitDbPath, latestSupportedVersion) {
-  if (!enforceSchemaFence(db, dbPath, latestSupportedVersion)) {
+  if (!enforceSchemaFence2(db, dbPath, latestSupportedVersion)) {
     closeQuietly(db);
     return null;
   }
@@ -1885,7 +1897,7 @@ function finishDatabaseOpen(db, dbPath, explicitDbPath, latestSupportedVersion) 
   persistenceByDatabase.set(db, true);
   persistenceErrorByDatabase.delete(db);
   if (!explicitDbPath) {
-    log2(formatSchemaFenceBootLog(getPersistedSchemaVersion(db), latestSupportedVersion));
+    log2(formatSchemaFenceBootLog(getPersistedSchemaVersion2(db), latestSupportedVersion));
   }
   return db;
 }
@@ -1898,12 +1910,19 @@ function journalMode(db) {
     return "unknown";
   }
 }
-function applyJournalMode(db, dbPath) {
-  const unsafeFilesystem = dbPath === undefined ? null : detectWalUnsafeFilesystem(dbPath);
-  if (unsafeFilesystem === null) {
-    configureContextDatabasePragmas2(db);
+var reportedRollbackJournal = new Set;
+function applyContextJournalMode2(db, dbPath, readonly = false) {
+  if (dbPath === undefined) {
+    configureContextDatabasePragmas(db, readonly);
     return;
   }
+  const unsafeFilesystem = detectWalUnsafeFilesystem(dbPath);
+  if (unsafeFilesystem === null) {
+    configureContextDatabasePragmas(db, readonly);
+    return;
+  }
+  if (readonly)
+    return;
   db.exec("PRAGMA synchronous=FULL");
   if (journalMode(db) !== "delete") {
     try {
@@ -1914,16 +1933,19 @@ function applyJournalMode(db, dbPath) {
   }
   const mode = journalMode(db);
   if (mode === "delete") {
-    log2(`[magic-context] ${unsafeFilesystem} cannot support SQLite WAL: using journal_mode=delete with synchronous=FULL for ${dbPath}`);
+    if (!reportedRollbackJournal.has(dbPath)) {
+      reportedRollbackJournal.add(dbPath);
+      log2(`[magic-context] ${unsafeFilesystem} cannot support SQLite WAL: using journal_mode=delete with synchronous=FULL for ${dbPath}`);
+    }
     return;
   }
   log2(`[magic-context] WARNING ${unsafeFilesystem} cannot support SQLite WAL, but ${dbPath} is still in journal_mode=${mode}: durability is not guaranteed until a connection can take the database to itself`);
 }
-function initializeDatabase(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS, dbPath) {
+function initializeDatabase2(db, busyTimeoutMs = BOOT_SQLITE_BUSY_TIMEOUT_MS, dbPath) {
   db.exec(`PRAGMA busy_timeout=${resolveBootBusyTimeoutMs(busyTimeoutMs)}`);
   db.exec("PRAGMA foreign_keys=ON");
-  applyJournalMode(db, dbPath);
-  applySqliteTuningPragmas(db);
+  applyContextJournalMode2(db, dbPath);
+  applySqliteTuningPragmas2(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS tags (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3153,7 +3175,7 @@ CREATE INDEX IF NOT EXISTS idx_dream_queue_pending ON dream_queue(started_at, en
         ON message_history_index(harness, session_id, updated_at);
     `);
   ensureColumn(db, "workspaces", "share_categories", `TEXT NOT NULL DEFAULT '["CONSTRAINTS"]'`);
-  const version = getPersistedSchemaVersion(db);
+  const version = getPersistedSchemaVersion2(db);
   if (version === 0 || version >= 95)
     installV95PerfSchema(db, false, version === 0);
   installTagIdentityRevisionTrigger(db);
@@ -3176,7 +3198,7 @@ function healWedgedChannel2Claims(db) {
       statements.heal.run(staleBefore);
   } catch {}
 }
-function openDatabase(dbPathOrOptions) {
+function openDatabase2(dbPathOrOptions) {
   const options = typeof dbPathOrOptions === "string" ? { dbPath: dbPathOrOptions } : dbPathOrOptions;
   const explicitDbPath = options?.dbPath !== undefined;
   const { dbDir, dbPath } = resolveDatabasePath(options?.dbPath);
@@ -3194,7 +3216,7 @@ function openDatabase(dbPathOrOptions) {
       log2("[magic-context] storage unavailable: native turn deadlines must be selected on the first open; restart the host");
       return null;
     }
-    if (!enforceSchemaFence(existing, dbPath, latestSupportedVersion)) {
+    if (!enforceSchemaFence2(existing, dbPath, latestSupportedVersion)) {
       return null;
     }
     if (!persistenceByDatabase.has(existing)) {
@@ -3220,7 +3242,7 @@ function openDatabase(dbPathOrOptions) {
     }
     db = options?.nativeTurnDeadlines ? createSqliteTurnDatabase2(dbPath) : new Database2(dbPath);
     installBootBusyTimeout(db, dbPath, busyTimeoutMs, options?.onBootBusyTimeout);
-    if (!enforceSchemaFence(db, dbPath, latestSupportedVersion)) {
+    if (!enforceSchemaFence2(db, dbPath, latestSupportedVersion)) {
       closeQuietly(db);
       return null;
     }
@@ -3233,7 +3255,7 @@ function openDatabase(dbPathOrOptions) {
       closeQuietly(db);
       return null;
     }
-    initializeDatabase(db, busyTimeoutMs, dbPath);
+    initializeDatabase2(db, busyTimeoutMs, dbPath);
     if (options?.allowMigrations === false) {
       if (hasPendingMigrations(db)) {
         closeQuietly(db);
@@ -3252,10 +3274,10 @@ function openDatabase(dbPathOrOptions) {
     throw new Error(`[magic-context] storage unavailable: ${detail}. Magic Context is disabled for this run; check log for details.`);
   }
 }
-function openCurrentDatabase(options = {}) {
-  return openDatabase({ ...options, allowMigrations: false });
+function openCurrentDatabase2(options = {}) {
+  return openDatabase2({ ...options, allowMigrations: false });
 }
-async function openDatabaseAsync(dbPathOrOptions) {
+async function openDatabaseAsync2(dbPathOrOptions) {
   const options = typeof dbPathOrOptions === "string" ? { dbPath: dbPathOrOptions } : dbPathOrOptions;
   const explicitDbPath = options?.dbPath !== undefined;
   const { dbDir, dbPath } = resolveDatabasePath(options?.dbPath);
@@ -3270,7 +3292,7 @@ async function openDatabaseAsync(dbPathOrOptions) {
       return null;
     }
     const startedAt = performance.now();
-    const accepted = enforceSchemaFence(existing, dbPath, latestSupportedVersion);
+    const accepted = enforceSchemaFence2(existing, dbPath, latestSupportedVersion);
     if (accepted) {
       if (!persistenceByDatabase.has(existing))
         persistenceByDatabase.set(existing, true);
@@ -3319,12 +3341,12 @@ async function openDatabaseAsync(dbPathOrOptions) {
       installBootBusyTimeout(db, dbPath, busyTimeoutMs, options?.onBootBusyTimeout);
       openMs = performance.now() - openStartedAt;
       guardStartedAt = performance.now();
-      if (!enforceSchemaFence(db, dbPath, latestSupportedVersion)) {
+      if (!enforceSchemaFence2(db, dbPath, latestSupportedVersion)) {
         guardMs = performance.now() - guardStartedAt;
         closeQuietly(db);
         return null;
       }
-      const processes = getPersistedSchemaVersion(db) < latestSupportedVersion ? await inspectProcessesAsync() : undefined;
+      const processes = getPersistedSchemaVersion2(db) < latestSupportedVersion ? await inspectProcessesAsync() : undefined;
       if (!enforceMigrationOnOpenGuard(db, dbPath, dbDir, latestSupportedVersion, processes)) {
         guardMs = performance.now() - guardStartedAt;
         closeQuietly(db);
@@ -3342,7 +3364,7 @@ async function openDatabaseAsync(dbPathOrOptions) {
       if (hasPendingMigrations(db)) {
         throw new Error("the migration worker did not complete the pending migration; reinstall or rebuild the plugin");
       }
-      initializeDatabase(db, busyTimeoutMs, dbPath);
+      initializeDatabase2(db, busyTimeoutMs, dbPath);
       if (hasPendingMigrations(db)) {
         throw new Error("storage initialization left a pending migration; reinstall or rebuild the plugin");
       }
@@ -3378,7 +3400,17 @@ async function openDatabaseAsync(dbPathOrOptions) {
       pendingAsyncOpens.delete(dbPath);
   }
 }
-function closeDatabase() {
+function isDatabasePersisted2(db) {
+  if (!db)
+    return false;
+  return persistenceByDatabase.get(db) ?? false;
+}
+function getDatabasePersistenceError2(db) {
+  if (!db)
+    return null;
+  return persistenceErrorByDatabase.get(db) ?? null;
+}
+function closeDatabase2() {
   pendingAsyncOpens.clear();
   for (const [key, db] of databases) {
     const state = startupBackfills.get(db);
@@ -3404,4 +3436,4 @@ function closeDatabase() {
   return Promise.all(pendingDatabaseCloses).then(() => {});
 }
 
-export { piHarnessKindFromExecutable, isPidAlive, readProcessStartTime, getErrorMessage, describeError, startBootDeadline, getSchemaFenceRejection, getMigrationOnOpenRefusal, LATEST_SUPPORTED_VERSION, getDatabasePath, getPersistedSchemaVersion, enforceSchemaFence, setSqlitePragmaConfig, applySqliteTuningPragmas, runSqliteOptimize, initializeDatabase, openDatabase, openCurrentDatabase, openDatabaseAsync, closeDatabase };
+export { piHarnessKindFromExecutable, isPidAlive, readProcessStartTime, getErrorMessage, describeError, startBootDeadline, getSchemaFenceRejection2, getMigrationOnOpenRefusal2, LATEST_SUPPORTED_VERSION2, getDatabasePath2, getPersistedSchemaVersion2, schemaVersionIsSupported2, enforceSchemaFence2, setSqlitePragmaConfig2, applySqliteTuningPragmas2, runSqliteOptimize2, applyContextJournalMode2, initializeDatabase2, openDatabase2, openCurrentDatabase2, openDatabaseAsync2, isDatabasePersisted2, getDatabasePersistenceError2, closeDatabase2 };

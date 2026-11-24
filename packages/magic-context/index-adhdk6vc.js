@@ -102,11 +102,11 @@ import {
   expandWorkspaceIdentitySetWithAliases,
   resolveStoredPathWorkspaceIdentity,
   sourceNameForMemory
-} from "./index-gavj3e6h.js";
+} from "./index-pqhc0k9d.js";
 import {
   getNotes,
   getActivePrimers
-} from "./index-k7a8x7ba.js";
+} from "./index-ay13n5s4.js";
 import {
   computeNormalizedHash
 } from "./index-9x1f96r8.js";

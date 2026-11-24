@@ -5,9 +5,6 @@ import {
   Database2
 } from "./index-2qtx0q6h.js";
 import {
-  configureContextDatabasePragmas2
-} from "./index-fapenpch.js";
-import {
   isWorkerCloseMessage,
   exitOnWorkerClose
 } from "./index-x2n261wp.js";
@@ -33,11 +30,12 @@ import {
 } from "./index-79xfn84y.js";
 import"./index-453s1hj6.js";
 import {
-  LATEST_SUPPORTED_VERSION,
-  enforceSchemaFence
-} from "./index-z8pr5k0d.js";
+  LATEST_SUPPORTED_VERSION2,
+  enforceSchemaFence2,
+  applyContextJournalMode2
+} from "./index-nw2xkg5r.js";
 import"./index-3bb24eb6.js";
-import"./index-gavj3e6h.js";
+import"./index-pqhc0k9d.js";
 import"./index-jhmz9tgv.js";
 import"./index-135e8hvg.js";
 import"./index-n0zjvs3h.js";
@@ -50,13 +48,13 @@ import {
 serveWorkerJobs((workerData, port) => {
   setHarness2(workerData.harness);
   const db = new Database2(workerData.path);
-  if (!enforceSchemaFence(db, workerData.path, LATEST_SUPPORTED_VERSION)) {
+  if (!enforceSchemaFence2(db, workerData.path, LATEST_SUPPORTED_VERSION2)) {
     db.close();
     throw new Error("chunk embedding writer rejected an unsupported store schema");
   }
   const timeout = Math.max(0, Math.floor(workerData.timeout));
   db.exec(`PRAGMA busy_timeout=${timeout}; PRAGMA foreign_keys=ON`);
-  configureContextDatabasePragmas2(db);
+  applyContextJournalMode2(db, workerData.path);
   exitOnWorkerClose(port, () => db.close(), false);
   port.on("message", (input) => {
     if (isWorkerCloseMessage(input))

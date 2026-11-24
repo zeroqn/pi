@@ -56,7 +56,7 @@ import {
 import {
   piHarnessKindFromExecutable,
   getErrorMessage
-} from "./index-z8pr5k0d.js";
+} from "./index-nw2xkg5r.js";
 import {
   getOrCreateSessionMeta,
   updateSessionMeta,
@@ -70,7 +70,7 @@ import {
   renderMessageByOrdinal2,
   renderVerboseRange2,
   renderItemByTag2
-} from "./index-46x2935k.js";
+} from "./index-kr0k63a9.js";
 import {
   getLastIndexedOrdinal
 } from "./index-d7yx4ymd.js";
@@ -142,7 +142,7 @@ import {
   resolveMemoriesByIdsForSearch2,
   unifiedSearch2,
   formatSearchResults2
-} from "./index-x7551srw.js";
+} from "./index-adhdk6vc.js";
 import {
   resolveOpenCodeDbPath,
   assertOpenCodeStoreGeneration
@@ -159,7 +159,7 @@ import {
   resolveStoredPathWorkspaceIdentity,
   storedPathBelongsToWorkspace,
   sourceNameForMemory
-} from "./index-gavj3e6h.js";
+} from "./index-pqhc0k9d.js";
 import {
   getNoteByIdInScope,
   getNotes,
@@ -170,7 +170,7 @@ import {
   updateNote,
   dismissNotes,
   dismissNote
-} from "./index-k7a8x7ba.js";
+} from "./index-ay13n5s4.js";
 import {
   isMarkerCandidateBasisCurrent2,
   invalidateMarkerCandidateBasis2,

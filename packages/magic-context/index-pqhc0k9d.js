@@ -1066,7 +1066,7 @@ function bumpEpochsForWorkspaceMemberSet(db, identities, now = Date.now()) {
 }
 
 // ../plugin/src/features/magic-context/migrations.ts
-var FORK_MIGRATION_VERSION_FLOOR = 1e4;
+var FORK_MIGRATION_VERSION_FLOOR2 = 1e4;
 var MIGRATION_LOCK_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
 
 class MigrationLockBusyError extends Error {
@@ -3458,7 +3458,7 @@ function ensureMigrationsTable(db) {
 	`);
 }
 function getCurrentVersion(db) {
-  const row = db.prepare("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations WHERE version < ?").get(FORK_MIGRATION_VERSION_FLOOR);
+  const row = db.prepare("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations WHERE version < ?").get(FORK_MIGRATION_VERSION_FLOOR2);
   return row?.version ?? 0;
 }
 function isMigrationApplied(db, version) {
@@ -3587,4 +3587,4 @@ async function runMigrationsWithRetry(db, options = {}) {
   }
 }
 
-export { unescapeXml, parseCompartmentOutput, layoutLkgPrefix, assembleLkgPrefix, LKG_SLOT_CHUNKS_DDL, SESSION_REPLAY_DECISIONS_DDL, LKG_SLOTS_DDL, installCompartmentHistoryVersions, resolveWorkspaceShareCategories, resolveWorkspaceIdentitySet, expandWorkspaceIdentitySetWithAliases, resolveStoredPathWorkspaceIdentity, storedPathBelongsToWorkspace, sourceNameForMemory, computeWorkspaceEpochFingerprint, FORK_MIGRATION_VERSION_FLOOR, managedAuthorityNoteRow, hasPendingMigrations, getMainThreadMigrationBodyCount, runMigrations, runMigrationsWithRetry };
+export { unescapeXml, parseCompartmentOutput, layoutLkgPrefix, assembleLkgPrefix, LKG_SLOT_CHUNKS_DDL, SESSION_REPLAY_DECISIONS_DDL, LKG_SLOTS_DDL, installCompartmentHistoryVersions, resolveWorkspaceShareCategories, resolveWorkspaceIdentitySet, expandWorkspaceIdentitySetWithAliases, resolveStoredPathWorkspaceIdentity, storedPathBelongsToWorkspace, sourceNameForMemory, computeWorkspaceEpochFingerprint, FORK_MIGRATION_VERSION_FLOOR2, managedAuthorityNoteRow, hasPendingMigrations, getMainThreadMigrationBodyCount, runMigrations, runMigrationsWithRetry };

@@ -6,7 +6,7 @@ import {
 } from "./index-2qtx0q6h.js";
 import {
   managedAuthorityNoteRow
-} from "./index-gavj3e6h.js";
+} from "./index-pqhc0k9d.js";
 
 // ../plugin/src/features/magic-context/storage-notes.ts
 var NOTE_TYPES = new Set(["session", "smart"]);

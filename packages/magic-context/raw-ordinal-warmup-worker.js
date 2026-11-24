@@ -19,7 +19,7 @@ serveWorkerJobs(async (input, port) => {
   await main();
   async function main() {
     if (input.v2ArchiveReader) {
-      const { serveV2ArchiveReads } = await import("./v2-archive-reader-cvyrfgxj.js");
+      const { serveV2ArchiveReads } = await import("./v2-archive-reader-p4acgydw.js");
       await serveV2ArchiveReads(port, openConnections);
       return;
     }
@@ -51,7 +51,7 @@ serveWorkerJobs(async (input, port) => {
         await runMessageFtsRowidMapBackfill(db);
         reply = { kind: "fts-rowid-backfill" };
       } else if (input.searchArchive) {
-        const { renderSearchArchive } = await import("./search-archive-0htg319b.js");
+        const { renderSearchArchive } = await import("./search-archive-z8rke01b.js");
         const { readRawSessionMessageIdOrdinalsForRangeFromDb } = await import("./read-session-raw-0tytrjye.js");
         const archive = input.searchArchive;
         let raw;
@@ -80,11 +80,11 @@ serveWorkerJobs(async (input, port) => {
       } else if (input.indexMessage) {
         const { setHarness } = await import("./harness-9872e0ym.js");
         setHarness(input.harness ?? "opencode");
-        const [{ indexMessageInShortChunks }, { configureContextDatabasePragmas }] = await Promise.all([
+        const [{ indexMessageInShortChunks }, { applyContextJournalMode }] = await Promise.all([
           import("./message-index-bounded-fqeqp76p.js"),
-          import("./sqlite-context-pragmas-gcgch6qz.js")
+          import("./storage-db-qnw4d9mj.js")
         ]);
-        configureContextDatabasePragmas(db);
+        applyContextJournalMode(db, input.path);
         const writer = db;
         const message = input.indexMessage;
         const cancellation = input.indexCancellation ? new Int32Array(input.indexCancellation) : undefined;

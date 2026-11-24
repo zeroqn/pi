@@ -169,7 +169,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-v7hmhn1r.js";
+} from "./index-717n2hme.js";
 import"./index-4knyh1kt.js";
 import {
   canonicalModelIdentity,
@@ -460,19 +460,20 @@ import {
   getErrorMessage,
   describeError,
   startBootDeadline,
-  getSchemaFenceRejection,
-  getMigrationOnOpenRefusal,
-  LATEST_SUPPORTED_VERSION,
-  getDatabasePath,
-  getPersistedSchemaVersion,
-  setSqlitePragmaConfig,
-  applySqliteTuningPragmas,
-  runSqliteOptimize,
-  openDatabase,
-  openCurrentDatabase,
-  openDatabaseAsync,
-  closeDatabase
-} from "./index-z8pr5k0d.js";
+  getSchemaFenceRejection2,
+  getMigrationOnOpenRefusal2,
+  LATEST_SUPPORTED_VERSION2,
+  getDatabasePath2,
+  getPersistedSchemaVersion2,
+  setSqlitePragmaConfig2,
+  applySqliteTuningPragmas2,
+  runSqliteOptimize2,
+  applyContextJournalMode2,
+  openDatabase2,
+  openCurrentDatabase2,
+  openDatabaseAsync2,
+  closeDatabase2
+} from "./index-nw2xkg5r.js";
 import {
   LkgRecoveryFenceError,
   clearLkgFenceProcessState,
@@ -598,7 +599,7 @@ import {
   getSourceContents,
   recordSubagentInvocation,
   getLatestHistorianInvocationId
-} from "./index-46x2935k.js";
+} from "./index-kr0k63a9.js";
 import {
   resolveOpenCodeDbPath,
   assertOpenCodeStoreGeneration,
@@ -719,10 +720,7 @@ import {
   expandWorkspaceIdentitySetWithAliases,
   sourceNameForMemory,
   computeWorkspaceEpochFingerprint
-} from "./index-gavj3e6h.js";
-import {
-  configureContextDatabasePragmas2
-} from "./index-fapenpch.js";
+} from "./index-pqhc0k9d.js";
 import {
   getNotes,
   addNote,
@@ -744,7 +742,7 @@ import {
   createPrimer,
   updatePrimerSupport,
   updatePrimerAnswer
-} from "./index-k7a8x7ba.js";
+} from "./index-ay13n5s4.js";
 import {
   setEmbeddingSessionBusy2,
   isEmbeddingHostBusy2
@@ -836,7 +834,7 @@ import {
   scheduleClearAndReindex,
   clearSessionTracking,
   createAutoSearchDiagnostics
-} from "./index-x7551srw.js";
+} from "./index-adhdk6vc.js";
 import"./index-3s39a1md.js";
 import {
   DREAMER_PRIMER_INVESTIGATOR_ALLOWED_TOOLS,
@@ -869,7 +867,7 @@ import {
 } from "./index-51xr6g7s.js";
 import"./index-71rg8j43.js";
 import"./index-8d2z6503.js";
-import"./index-cjhq42s7.js";
+import"./index-f1sga2dz.js";
 import"./index-4dqwxb7k.js";
 import {
   __toESM
@@ -1778,7 +1776,7 @@ async function runSessionProjectBackfillPass(db, source, options = {}) {
 
 // ../plugin/src/features/magic-context/storage-unavailable-reason.ts
 function describeStorageUnavailability(fallbackCause) {
-  const migration = getMigrationOnOpenRefusal();
+  const migration = getMigrationOnOpenRefusal2();
   const blockingProcesses = migration?.blockingProcesses ?? migration?.serverPids.map((pid) => ({ kind: "process", pid })) ?? [];
   if (migration && (blockingProcesses.length > 0 || migration.unreadableFile)) {
     return {
@@ -1790,7 +1788,7 @@ function describeStorageUnavailability(fallbackCause) {
       ...migration.unreadableArm ? { unreadableArm: migration.unreadableArm } : {}
     };
   }
-  const fence = getSchemaFenceRejection();
+  const fence = getSchemaFenceRejection2();
   if (fence) {
     return {
       kind: "schema_fence",
@@ -4820,19 +4818,19 @@ function recordStaleFence(persistedVersion, supportedVersion, reason = "newer_sc
 }
 function probeChildSpawnFence(db) {
   if (!db) {
-    const knownRejection = getSchemaFenceRejection();
+    const knownRejection = getSchemaFenceRejection2();
     if (knownRejection) {
       return recordStaleFence(knownRejection.persistedVersion, knownRejection.supportedVersion);
     }
     return { allowSpawn: true };
   }
   try {
-    const persistedVersion = getPersistedSchemaVersion(db);
-    if (persistedVersion > LATEST_SUPPORTED_VERSION) {
-      return recordStaleFence(persistedVersion, LATEST_SUPPORTED_VERSION);
+    const persistedVersion = getPersistedSchemaVersion2(db);
+    if (persistedVersion > LATEST_SUPPORTED_VERSION2) {
+      return recordStaleFence(persistedVersion, LATEST_SUPPORTED_VERSION2);
     }
   } catch {
-    return recordStaleFence(LATEST_SUPPORTED_VERSION, LATEST_SUPPORTED_VERSION, "read_error");
+    return recordStaleFence(LATEST_SUPPORTED_VERSION2, LATEST_SUPPORTED_VERSION2, "read_error");
   }
   state2.consecutiveFailures = 0;
   state2.latched = false;
@@ -10146,7 +10144,7 @@ async function runHistorianPrompt(args) {
     const actualModelRef = completion?.providerId && completion.modelId ? `${completion.providerId}/${completion.modelId}` : handle?.attemptedModel ?? configuredModel?.model ?? null;
     const usedConfiguredFallback = actualModelRef !== null && (fallbackModels ?? []).some((candidate) => toModelEntry(candidate)?.model === actualModelRef);
     return recordChildInvocation({
-      db: openDatabase(),
+      db: openDatabase2(),
       parentSessionId,
       harness: executor.capabilities.harness,
       subagent: agentId === HISTORIAN_EDITOR_AGENT ? "historian_editor" : subagentKind ?? "historian",
@@ -20046,7 +20044,7 @@ function directoryStillExists(directory) {
 function openTimerDatabaseOrNull(context) {
   let db;
   try {
-    db = openCurrentDatabase();
+    db = openCurrentDatabase2();
   } catch (error) {
     log2(`[dreamer] storage fatal; skipping ${context}: ${getErrorMessage(error)}`);
     return null;
@@ -20175,7 +20173,7 @@ function runTick(origin) {
       persistTickOutcome(db, failure);
       if (origin === "startup")
         return;
-      runSqliteOptimize(db);
+      runSqliteOptimize2(db);
     } catch (error) {
       log2("[magic-context] timer-triggered maintenance check failed:", error);
     } finally {
@@ -21246,7 +21244,7 @@ class PiSubagentRunner {
       const providerSeparator = modelRef?.indexOf("/") ?? -1;
       const hasProvider = providerSeparator > 0;
       recordChildInvocation({
-        db: openDatabase(),
+        db: openDatabase2(),
         parentSessionId: options.accountingSessionId,
         harness: this.harness,
         subagent: options.accountingSubagent ?? inferAccountingSubagent(options.agent),
@@ -21294,7 +21292,7 @@ class PiSubagentRunner {
     if (ZERO_TOOL_PROMPT_REQUIRED_AGENTS.has(options.agent) && options.systemPrompt.trim().length === 0) {
       return failBeforeSpawn("invalid_prompt", `zero-tool Pi subagent "${options.agent}" requires a non-empty system prompt`, true);
     }
-    const fence = probeChildSpawnFence(openDatabase());
+    const fence = probeChildSpawnFence(openDatabase2());
     if (!fence.allowSpawn) {
       return failBeforeSpawn("spawn_failed", `Magic Context: plugin build is older than its database (database=v${fence.failure.persistedVersion}, supported_fence=v${fence.failure.supportedVersion}) — restart Pi.`);
     }
@@ -24860,7 +24858,7 @@ function schedulePiTransformDecisionResolve(args) {
   const targetMessageId = findNewestPiAssistantEntryIdAfter(args.branchEntries, pending.snapshotNewestAssistantEntryId);
   if (!targetMessageId)
     return false;
-  const dbPath = getDatabasePath(args.db);
+  const dbPath = getDatabasePath2(args.db);
   if (!dbPath)
     return false;
   pendingPiDecisionBySession.delete(args.sessionId);
@@ -24967,7 +24965,7 @@ function writeTransformDecisionRow(dbPath, row) {
   const db = new Database2(dbPath);
   try {
     db.exec("PRAGMA busy_timeout=0");
-    configureContextDatabasePragmas2(db);
+    applyContextJournalMode2(db, dbPath);
     writeTransformDecisionRowOnDatabase(db, row, true);
   } finally {
     closeQuietly(db);
@@ -58647,12 +58645,12 @@ async function src_default(pi) {
     return;
   }
   setStoragePrivatePermissionEnforcement(bootConfig.config.storage.enforce_private_permissions);
-  setSqlitePragmaConfig({
+  setSqlitePragmaConfig2({
     cacheSizeMb: bootConfig.config.sqlite.cache_size_mb,
     mmapSizeMb: bootConfig.config.sqlite.mmap_size_mb
   });
   if (!databaseExitHookRegistered) {
-    process.once("exit", closeDatabase);
+    process.once("exit", closeDatabase2);
     databaseExitHookRegistered = true;
   }
   const storageDir = getMagicContextStorageDir();
@@ -58664,7 +58662,7 @@ async function src_default(pi) {
   let openFailureCause = null;
   const openStorage = async () => {
     try {
-      return await openDatabaseAsync({ nativeTurnDeadlines: true });
+      return await openDatabaseAsync2({ nativeTurnDeadlines: true });
     } catch (error) {
       openFailureCause = error instanceof Error ? error.message : String(error);
       return null;
@@ -58797,11 +58795,11 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
     dedupe: true
   });
   setStoragePrivatePermissionEnforcement(config.storage.enforce_private_permissions);
-  setSqlitePragmaConfig({
+  setSqlitePragmaConfig2({
     cacheSizeMb: config.sqlite.cache_size_mb,
     mmapSizeMb: config.sqlite.mmap_size_mb
   });
-  applySqliteTuningPragmas(db);
+  applySqliteTuningPragmas2(db);
   setKeepSubagents(config.keep_subagents === true);
   if (!config.enabled) {
     info("plugin DISABLED via config (enabled: false) — skipping registration");

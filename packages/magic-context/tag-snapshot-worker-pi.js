@@ -6,10 +6,9 @@ import"./index-0h2mkab2.js";
 import"./index-dnp1jjar.js";
 import"./index-tm11k42a.js";
 import {
-  LATEST_SUPPORTED_VERSION,
-  getPersistedSchemaVersion
-} from "./index-z8pr5k0d.js";
-import"./index-fapenpch.js";
+  LATEST_SUPPORTED_VERSION2,
+  getPersistedSchemaVersion2
+} from "./index-nw2xkg5r.js";
 import"./index-3bb24eb6.js";
 import"./index-8sqebjzk.js";
 import"./index-wfqysrwq.js";
@@ -18,7 +17,7 @@ import {
 } from "./index-x2n261wp.js";
 import"./index-xjhq27z9.js";
 import"./index-ghp32f9m.js";
-import"./index-gavj3e6h.js";
+import"./index-pqhc0k9d.js";
 import {
   tagRevisionKey
 } from "./index-jhmz9tgv.js";
@@ -209,10 +208,10 @@ serveWorkerJobs(async (request, port) => {
       generationStatement = db.prepare(`SELECT
 		COALESCE((SELECT value FROM schema_migrations_meta WHERE key = ?), '0') AS revision,
 		COALESCE((SELECT tags_version FROM session_meta WHERE session_id = ?), 0) AS durable`);
-      const version = getPersistedSchemaVersion(db);
+      const version = getPersistedSchemaVersion2(db);
       persistedVersion = version;
-      if (version > LATEST_SUPPORTED_VERSION)
-        throw new UnsupportedSchema(`shared database schema v${version} is newer than this build supports (v${LATEST_SUPPORTED_VERSION}); update and restart this host`);
+      if (version > LATEST_SUPPORTED_VERSION2)
+        throw new UnsupportedSchema(`shared database schema v${version} is newer than this build supports (v${LATEST_SUPPORTED_VERSION2}); update and restart this host`);
       await stream("tags");
       await stream("fallback");
       if (request.test?.crash === "before-end")
@@ -237,7 +236,7 @@ serveWorkerJobs(async (request, port) => {
         type: "failed",
         code: error instanceof StaleGeneration ? "stale" : error instanceof UnsupportedSchema ? "schema" : opened ? "failed" : "open",
         persistedVersion,
-        supportedVersion: LATEST_SUPPORTED_VERSION,
+        supportedVersion: LATEST_SUPPORTED_VERSION2,
         reason: error instanceof Error ? error.message : String(error)
       });
       if (request.test?.crash === "before-end") {

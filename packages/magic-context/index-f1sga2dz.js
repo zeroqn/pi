@@ -140,8 +140,8 @@ async function serveV2ArchiveReads2(port, openConnections) {
     import("./store-reader-mmfw2h48.js"),
     import("./store-grcwn6hs.js"),
     import("./read-session-chunk-tjj2wzxs.js"),
-    import("./render-83qe3mrp.js"),
-    import("./search-archive-0htg319b.js"),
+    import("./render-7hd5d6jh.js"),
+    import("./search-archive-z8rke01b.js"),
     import("./expand-attachments-8sxeyj26.js")
   ]);
   const pool = new V2StoreReaderPool;

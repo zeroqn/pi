@@ -1,7 +1,7 @@
 import {
   readV2ArchiveOffThread2,
   serveV2ArchiveReads2
-} from "./index-cjhq42s7.js";
+} from "./index-f1sga2dz.js";
 import"./index-8sqebjzk.js";
 import"./index-2qtx0q6h.js";
 import"./index-x2n261wp.js";
