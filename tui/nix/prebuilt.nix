@@ -13,6 +13,8 @@
   autoPatchelfHook,
   glibc,
   libxcb,
+  onnxruntime,
+  onnxruntimeShim,
 }:
 
 let
@@ -56,9 +58,22 @@ in
           done
           mkdir -p $out/bin
           # A quoted delimiter: an unquoted one would expand `"$@"` here, at build time.
+          #
+          # The last two exports are Magic Context's native embeddings: this host embeds a Bun >= 1.4, so
+          # the plugin takes the `native` path and loads the binding `../packages/onnxruntime-node`
+          # ships. `LD_LIBRARY_PATH` names the ABI shim's directory (the only place the binding's
+          # `NEEDED libonnxrtabi24.so.1` is satisfied) plus libstdc++/libgcc_s for its other needs;
+          # `ONNXRUNTIME_LIB_PATH` names the *real* library's directory, which the shim forwards to.
+          # Both are read by a *process* at start, so they belong here and not in the extension: glibc
+          # snapshots `LD_LIBRARY_PATH` before any JavaScript runs. `''${LD_LIBRARY_PATH:+:…}` keeps an
+          # inherited search path below the two entries this adds.
+          #
+          # The shim is a reference of this output, so installing `.#pi-aot` installs it too.
           cat > $out/bin/pi <<'WRAPPER'
 #!/bin/sh
 export PI_PACKAGE_DIR="@out@/share/pi"
+export ONNXRUNTIME_LIB_PATH="${onnxruntime}/lib"
+export LD_LIBRARY_PATH="${onnxruntimeShim}/lib:${stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 exec "@out@/libexec/pi/pi" "$@"
 WRAPPER
           substituteInPlace $out/bin/pi --subst-var out

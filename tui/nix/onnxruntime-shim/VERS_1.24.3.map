@@ -1,0 +1,8 @@
+/* Give OrtGetApiBase the exact version node the 1.24.3 binding asks for,
+ * and export nothing else. */
+VERS_1.24.3 {
+  global:
+    OrtGetApiBase;
+  local:
+    *;
+};

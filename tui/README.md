@@ -14,6 +14,7 @@ this package builds the client and AOT-compiles a stock pi behind it (`nix devel
 | `crates/pi-rpc` | the wire: the event inventory (hand-written, from pi 1.5.0's types), validation, JSONL framing. `cargo test` here is the drift detector. |
 | `crates/pi-tui` | the client: spawns or replays a host, renders the transcript as wrapped lines, owns the terminal and the composer. Frames go through a writer thread (one-frame slot, newest wins), the screen is diffed row by row with scroll regions, and a dropped frame invalidates it. No markdown, no dialogs yet. |
 | `tools/harness/` | the measurement harness (Pi-Bolt's `bench/` subset), `record_corpus.py` (records the RPC corpus), `echo_probe.py` (echo latency from outside the client), `smoke_host.py` (end-to-end against a real host). |
+| `nix/onnxruntime-shim/` | the `libonnxrtabi24.so.1` ABI shim Magic Context's native embeddings are loaded through, built against this flake's `onnxruntime` (ported from `shell/onnxruntime-shim/`); `nix/onnxruntime-check.sh` is its gate. |
 
 Layout for a machine where `pi` is the client: `bin/pi` (wrapper), `bin/rpi` (the client),
 `bin/pi-host` (the host). See `docs/packaging.md` and `nix/package.nix`.
@@ -25,6 +26,12 @@ nix develop            # rust, node 22, and nix/runtime.nix's Bun (the one with 
 aot-host               # pi's dist, then `bun build --compile --aot` -> results/pi/pi
 cargo build --release && rpi   # the client drives the host this shell built
 ```
+
+The shell also exports what Magic Context's local embeddings need — `LD_LIBRARY_PATH` carrying the shim and
+`ONNXRUNTIME_LIB_PATH` naming the nixpkgs ONNX Runtime it forwards to — and `.#pi-aot`'s `bin/pi` exports
+both itself, so installing the host installs the shim with it. `onnxruntime-check --host $PI_TUI_OUT/pi`
+proves the seam end to end: a 384-dimension embedding from the plugin's own chunk, on the shell's Bun and
+inside the host's own process.
 
 Released builds skip all of that: `packages.pi-aot` and `packages.bun-aot` come from the agent's stream
 (`nix/manifest.nix`, tag `pi-v<pi version>`), and `packages.rpi-bin` from the client's own stream

@@ -33,12 +33,18 @@
       # AOT needs a Bun with `--aot`; see nix/runtime.nix for why that is a canary build.
       runtimeFor = system: (pkgsFor system).callPackage ./nix/runtime.nix { };
 
+      # The ONNX Runtime ABI shim the vendored `onnxruntime-node` binding in
+      # `../packages/onnxruntime-node` is loaded against; see nix/onnxruntime-shim/default.nix. The host
+      # embeds the canary Bun above (>= 1.4), so Magic Context's local embeddings take the native path.
+      shimFor = system: (pkgsFor system).callPackage ./nix/onnxruntime-shim { };
+
       devShellFor =
         system:
         let
           lib = nixpkgs.lib;
           pkgs = pkgsFor system;
           runtime = runtimeFor system;
+          shim = shimFor system;
           # The release flow's scripts: the host build, the tarballs a release page carries, the gate, and
           # the pin update. Each is installed under its own name so `nix develop --command <name>` finds it.
           script = name: extension: pkgs.stdenvNoCC.mkDerivation {
@@ -71,24 +77,46 @@
             pkgs.curl
             pkgs.openssl
             runtime
+            # What Magic Context's native embeddings load: the shim directory the loader is fed and the
+            # real ONNX Runtime it forwards to are both exported below.
+            shim
             (script "aot-host.sh" ".sh")
             (script "aot-release.sh" ".sh")
             (script "tui-release.sh" ".sh")
             (script "aot-smoke.sh" ".sh")
+            (script "onnxruntime-check.sh" ".sh")
             (script "bun-pin-update.sh" ".sh")
             (script "bun-pin-tools.py" ".py")
           ];
 
           shellHook = ''
+            # Magic Context's local embeddings are native on this host — it embeds the canary Bun above,
+            # which is >= 1.4 — and what they load is the binding `../packages/onnxruntime-node` ships.
+            # Two exports are the whole contract, and both are needed by the *launching* environment:
+            # glibc reads LD_LIBRARY_PATH at program start, and the shim reads its target in the same
+            # process. `LD_LIBRARY_PATH` names the shim's directory (the one place the binding's
+            # `NEEDED libonnxrtabi24.so.1` can be satisfied) and libstdc++/libgcc_s for the binding's
+            # other needs; `ONNXRUNTIME_LIB_PATH` names the *real* library's directory — the flake's own
+            # `onnxruntime`, never the shim itself, which the shim refuses rather than absorbs.
+            #
+            # Set, not defaulted, unlike PI_REPO below: an inherited `ONNXRUNTIME_LIB_PATH` may name a
+            # library built against a glibc this shell's host cannot load, and the shim answers that with
+            # `_exit(1)` — which takes the whole pi process with it the first time an embedding runs.
+            export ONNXRUNTIME_LIB_PATH="${pkgs.onnxruntime}/lib"
+            export LD_LIBRARY_PATH="${shim}/lib:${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
             # The pi tree the host is built from: this checkout's sibling, or set PI_REPO first.
             export PI_REPO="''${PI_REPO:-$(cd "$PWD/../../pi" 2>/dev/null && pwd || true)}"
+            # The extensions repository this flake's `tui/` sits in — what `onnxruntime-check` reads the
+            # vendored member and the Magic Context chunk from.
+            export PI_TUI_EXTENSIONS="''${PI_TUI_EXTENSIONS:-$(cd "$PWD/.." 2>/dev/null && pwd || true)}"
             export PI_TUI_OUT="''${PI_TUI_OUT:-$PWD/results/pi}"
             # Every client in this shell drives the host this shell builds, not whatever `pi` is on PATH.
             export PI_TUI_HOST="''${PI_TUI_HOST:-$PI_TUI_OUT/pi}"
 
             echo "pi-tui: bun $("$PI_TUI_RUNTIME" --version), node $(node --version)"
             echo "pi-tui: PI_REPO=''${PI_REPO:-<unset>} PI_TUI_OUT=$PI_TUI_OUT"
-            echo "pi-tui: aot-host | aot-release | tui-release | aot-smoke | bun-pin-update | cargo build"
+            echo "pi-tui: aot-host | aot-release | tui-release | aot-smoke | onnxruntime-check | bun-pin-update | cargo build"
           '';
         };
     in
@@ -99,7 +127,7 @@
         system:
         let
           pkgs = pkgsFor system;
-          prebuilt = pkgs.callPackage ./nix/prebuilt.nix { };
+          prebuilt = pkgs.callPackage ./nix/prebuilt.nix { onnxruntimeShim = shimFor system; };
           manifest = import ./nix/manifest.nix;
           manifestTui = import ./nix/manifest-tui.nix;
           released = manifest.${system} or { };
@@ -109,6 +137,8 @@
           rpi = clientFor system;
           default = clientFor system;
           bun-aot = runtimeFor system;
+          # The ABI shim `.#pi-aot`'s wrapper exports, and what `onnxruntime-check` runs against.
+          onnxruntime-shim = shimFor system;
         }
         // nixpkgs.lib.optionalAttrs (released ? piAot) {
           pi-aot = prebuilt.mkPiAot released.piAot;

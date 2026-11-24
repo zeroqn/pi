@@ -58,6 +58,15 @@ assets in `share`, and its `bin/pi` sets `PI_PACKAGE_DIR` at the second — the 
 layout. Everything installed from a release goes through `nix/prebuilt.nix`, which patches the interpreter
 for this store.
 
+`pi-aot`'s `bin/pi` also exports `ONNXRUNTIME_LIB_PATH` and a `LD_LIBRARY_PATH` entry carrying
+`packages.onnxruntime-shim`, so a consumer of this flake's host gets Magic Context's native embeddings
+without a dev shell: the host embeds the canary Bun above (>= 1.4), the plugin takes the `native` path, and
+what it loads is the binding `../packages/onnxruntime-node` ships. Both exports have to be in the launching
+process — glibc reads `LD_LIBRARY_PATH` before any JavaScript runs — and the shim is a reference of the
+output, so installing the host installs the shim. `nix/onnxruntime-check.sh` is the gate: it builds vectors
+from the plugin's own transformers chunk on the shell's Bun and, with `--host`, inside the host's own
+process with the outer environment stripped.
+
 ### What watches upstream, and what may publish
 
 `.github/workflows/aot-release.yml` runs on a daily schedule and on dispatch. It watches **pi's releases
