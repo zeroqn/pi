@@ -63,9 +63,11 @@ for this store.
 without a dev shell: the host embeds the canary Bun above (>= 1.4), the plugin takes the `native` path, and
 what it loads is the binding `../packages/onnxruntime-node` ships. Both exports have to be in the launching
 process — glibc reads `LD_LIBRARY_PATH` before any JavaScript runs — and the shim is a reference of the
-output, so installing the host installs the shim. `nix/onnxruntime-check.sh` is the gate: it builds vectors
-from the plugin's own transformers chunk on the shell's Bun and, with `--host`, inside the host's own
-process with the outer environment stripped.
+output, so installing the host installs the shim. Both exports exist on `x86_64-linux` only: the binding
+`packages/onnxruntime-node` vendors is `linux/x64`, so the shim's one declared platform is the only one with
+something to load it, and the aarch64 host `nix/manifest.nix` carries exports neither.
+`nix/onnxruntime-check.sh` is the gate: it builds vectors from the plugin's own transformers chunk on the
+shell's Bun and, with `--host`, inside the host's own process with the outer environment stripped.
 
 ### What watches upstream, and what may publish
 

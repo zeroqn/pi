@@ -38,6 +38,15 @@
       # embeds the canary Bun above (>= 1.4), so Magic Context's local embeddings take the native path.
       shimFor = system: (pkgsFor system).callPackage ./nix/onnxruntime-shim { };
 
+      # That binding is vendored for `linux/x64` alone (`../packages/onnxruntime-node/bin/napi-v6/linux/x64`)
+      # and `nix/onnxruntime-shim/default.nix` declares the same one platform, so the shim exists nowhere
+      # else. The list is written here rather than read from the declared `meta.platforms`, because
+      # *evaluating* the package on another platform is the failure this avoids: nixpkgs refuses it while the
+      # derivation is built — `Refusing to evaluate package 'onnxruntime-shim-1.24.3' … because it is not
+      # available on the requested hostPlatform` — before any attribute of it can be inspected, which is how
+      # the aarch64 leg of `aot-release.yml` broke once the shim entered the dev shell. Keep the two in step.
+      hasShim = system: builtins.elem system [ "x86_64-linux" ];
+
       devShellFor =
         system:
         let
@@ -45,6 +54,16 @@
           pkgs = pkgsFor system;
           runtime = runtimeFor system;
           shim = shimFor system;
+          # What Magic Context's native embeddings need in the environment of whatever launches pi: the
+          # shim's directory on `LD_LIBRARY_PATH` (the one place the binding's `NEEDED libonnxrtabi24.so.1`
+          # is satisfied, plus libstdc++/libgcc_s for its other needs) and the *real* library's directory in
+          # `ONNXRUNTIME_LIB_PATH`, which the shim forwards to. Both are read by a *process* at start, so they
+          # belong in the environment and not in an extension. Empty where there is no shim: the vendored
+          # binding is `linux/x64`, so another platform has nothing to satisfy.
+          embeddingExports = lib.optionalString (hasShim system) ''
+            export ONNXRUNTIME_LIB_PATH="${pkgs.onnxruntime}/lib"
+            export LD_LIBRARY_PATH="${shim}/lib:${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          '';
           # The release flow's scripts: the host build, the tarballs a release page carries, the gate, and
           # the pin update. Each is installed under its own name so `nix develop --command <name>` finds it.
           script = name: extension: pkgs.stdenvNoCC.mkDerivation {
@@ -78,8 +97,8 @@
             pkgs.openssl
             runtime
             # What Magic Context's native embeddings load: the shim directory the loader is fed and the
-            # real ONNX Runtime it forwards to are both exported below.
-            shim
+            # real ONNX Runtime it forwards to are both exported below, on the one platform that has a shim.
+            (lib.optional (hasShim system) shim)
             (script "aot-host.sh" ".sh")
             (script "aot-release.sh" ".sh")
             (script "tui-release.sh" ".sh")
@@ -102,8 +121,7 @@
             # Set, not defaulted, unlike PI_REPO below: an inherited `ONNXRUNTIME_LIB_PATH` may name a
             # library built against a glibc this shell's host cannot load, and the shim answers that with
             # `_exit(1)` — which takes the whole pi process with it the first time an embedding runs.
-            export ONNXRUNTIME_LIB_PATH="${pkgs.onnxruntime}/lib"
-            export LD_LIBRARY_PATH="${shim}/lib:${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            ${embeddingExports}
 
             # The pi tree the host is built from: this checkout's sibling, or set PI_REPO first.
             export PI_REPO="''${PI_REPO:-$(cd "$PWD/../../pi" 2>/dev/null && pwd || true)}"
@@ -127,7 +145,12 @@
         system:
         let
           pkgs = pkgsFor system;
-          prebuilt = pkgs.callPackage ./nix/prebuilt.nix { onnxruntimeShim = shimFor system; };
+          # A shim only where one exists: `nix/prebuilt.nix` leaves the embeddings' exports out of the
+          # wrapper when it is `null` (see `hasShim`), so a host on another platform names no package that
+          # would not evaluate.
+          prebuilt = pkgs.callPackage ./nix/prebuilt.nix {
+            onnxruntimeShim = if hasShim system then shimFor system else null;
+          };
           manifest = import ./nix/manifest.nix;
           manifestTui = import ./nix/manifest-tui.nix;
           released = manifest.${system} or { };
@@ -137,6 +160,8 @@
           rpi = clientFor system;
           default = clientFor system;
           bun-aot = runtimeFor system;
+        }
+        // nixpkgs.lib.optionalAttrs (hasShim system) {
           # The ABI shim `.#pi-aot`'s wrapper exports, and what `onnxruntime-check` runs against.
           onnxruntime-shim = shimFor system;
         }

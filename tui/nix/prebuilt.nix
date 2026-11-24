@@ -14,10 +14,30 @@
   glibc,
   libxcb,
   onnxruntime,
-  onnxruntimeShim,
+  # `null` where the platform has no shim: `packages/onnxruntime-node` vendors the `linux/x64` binding
+  # alone, so only that platform's host carries the exports that load it. The flake decides, from its
+  # `hasShim`, because evaluating a shim on another platform is an evaluation error in nixpkgs.
+  onnxruntimeShim ? null,
 }:
 
 let
+  # Magic Context's local embeddings, as the two exports a `bin/pi` wrapper carries: the host embeds a
+  # Bun >= 1.4, so the plugin takes the `native` path and loads the binding
+  # `../packages/onnxruntime-node` ships. That binding is vendored for `linux/x64` alone and asks the loader
+  # for `libonnxrtabi24.so.1`, which only this flake's ABI shim provides — so the exports exist on the one
+  # platform that has both, and every other platform's wrapper names neither package.
+  #
+  # `LD_LIBRARY_PATH` names the shim's directory (the only place the binding's `NEEDED
+  # libonnxrtabi24.so.1` is satisfied) plus libstdc++/libgcc_s for its other needs;
+  # `ONNXRUNTIME_LIB_PATH` names the *real* library's directory, which the shim forwards to. Both are read
+  # by a *process* at start, so they belong here and not in the extension: glibc snapshots
+  # `LD_LIBRARY_PATH` before any JavaScript runs. `''${LD_LIBRARY_PATH:+:…}` keeps an inherited search path
+  # below the two entries this adds.
+  embeddingExports = lib.optionalString (onnxruntimeShim != null) ''
+    export ONNXRUNTIME_LIB_PATH="${onnxruntime}/lib"
+    export LD_LIBRARY_PATH="${onnxruntimeShim}/lib:${stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  '';
+
   # The AOT executable needs glibc at run time, and its interpreter is rewritten for this store.
   commonAttrs = { url, hash }: {
     src = fetchurl { inherit url hash; };
@@ -59,22 +79,13 @@ in
           mkdir -p $out/bin
           # A quoted delimiter: an unquoted one would expand `"$@"` here, at build time.
           #
-          # The last two exports are Magic Context's native embeddings: this host embeds a Bun >= 1.4, so
-          # the plugin takes the `native` path and loads the binding `../packages/onnxruntime-node`
-          # ships. `LD_LIBRARY_PATH` names the ABI shim's directory (the only place the binding's
-          # `NEEDED libonnxrtabi24.so.1` is satisfied) plus libstdc++/libgcc_s for its other needs;
-          # `ONNXRUNTIME_LIB_PATH` names the *real* library's directory, which the shim forwards to.
-          # Both are read by a *process* at start, so they belong here and not in the extension: glibc
-          # snapshots `LD_LIBRARY_PATH` before any JavaScript runs. `''${LD_LIBRARY_PATH:+:…}` keeps an
-          # inherited search path below the two entries this adds.
-          #
-          # The shim is a reference of this output, so installing `.#pi-aot` installs it too.
+          # The line between the package directory and the `exec` is `embeddingExports` above: Magic
+          # Context's native embeddings, on the platform whose binding exists. That is also what makes the
+          # shim a reference of this output, so installing `.#pi-aot` installs it too.
           cat > $out/bin/pi <<'WRAPPER'
 #!/bin/sh
 export PI_PACKAGE_DIR="@out@/share/pi"
-export ONNXRUNTIME_LIB_PATH="${onnxruntime}/lib"
-export LD_LIBRARY_PATH="${onnxruntimeShim}/lib:${stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-exec "@out@/libexec/pi/pi" "$@"
+${embeddingExports}exec "@out@/libexec/pi/pi" "$@"
 WRAPPER
           substituteInPlace $out/bin/pi --subst-var out
           chmod +x $out/bin/pi

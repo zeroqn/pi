@@ -29,9 +29,10 @@ cargo build --release && rpi   # the client drives the host this shell built
 
 The shell also exports what Magic Context's local embeddings need — `LD_LIBRARY_PATH` carrying the shim and
 `ONNXRUNTIME_LIB_PATH` naming the nixpkgs ONNX Runtime it forwards to — and `.#pi-aot`'s `bin/pi` exports
-both itself, so installing the host installs the shim with it. `onnxruntime-check --host $PI_TUI_OUT/pi`
-proves the seam end to end: a 384-dimension embedding from the plugin's own chunk, on the shell's Bun and
-inside the host's own process.
+both itself, so installing the host installs the shim with it. Both are `x86_64-linux` only, because the
+binding they load is vendored for `linux/x64` alone (`packages/onnxruntime-node`).
+`onnxruntime-check --host $PI_TUI_OUT/pi` proves the seam end to end: a 384-dimension embedding from the
+plugin's own chunk, on the shell's Bun and inside the host's own process.
 
 Released builds skip all of that: `packages.pi-aot` and `packages.bun-aot` come from the agent's stream
 (`nix/manifest.nix`, tag `pi-v<pi version>`), and `packages.rpi-bin` from the client's own stream

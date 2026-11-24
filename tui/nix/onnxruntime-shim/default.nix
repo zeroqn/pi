@@ -69,6 +69,10 @@ stdenv.mkDerivation {
     runHook postInstall
   '';
 
+  # One platform, because that is the one the binding is vendored for: `../packages/onnxruntime-node`
+  # ships `bin/napi-v6/linux/x64` and nothing else, so no other host asks for this name. This is a
+  # declaration the flake reads (`hasShim` in `../../flake.nix`) rather than a build limit — evaluating
+  # the derivation on another platform is a nixpkgs refusal, before any attribute of it can be asked.
   meta = {
     description = "OrtGetApiBase@@VERS_1.24.3 ABI shim over nixpkgs' ONNX Runtime";
     platforms = [ "x86_64-linux" ];
