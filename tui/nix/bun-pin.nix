@@ -5,19 +5,13 @@
 # release asset and falls back to this pin's upstream URL, which is what CI needs before a release
 # exists.
 {
-  version = "canary-20261123";
+  version = "canary-20261124";
   upstream = "https://github.com/oven-sh/bun/releases/download/canary";
 
   archives = {
-    aarch64-linux = {
-      asset = "bun-linux-aarch64.zip";
-      hash = "sha256-YD0/K/PFNLjV869oToOgCqHkj+jBBzHkT1fMZ/T56e8=";
-      etag = "";
-      lastModified = "";
-    };
     x86_64-linux = {
       asset = "bun-linux-x64.zip";
-      hash = "sha256-3hL0OfncyICCPyTcM8Cin2EkrmAwbScLBqzT6cBZwuo=";
+      hash = "sha256-S1LWNwfyYaqu8rGfPXzept5sHucg6G9zfl6UzrIqDIs=";
       etag = "";
       lastModified = "";
     };
