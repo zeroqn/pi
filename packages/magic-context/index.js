@@ -169,7 +169,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-04v2wgfy.js";
+} from "./index-v7hmhn1r.js";
 import"./index-4knyh1kt.js";
 import {
   canonicalModelIdentity,
@@ -421,7 +421,7 @@ import {
   setSessionWorkMetrics,
   getSessionWorkMetrics,
   resolveEpochFloorForPass
-} from "./index-tfeh3x8v.js";
+} from "./index-73fw4cd4.js";
 import {
   textMentionsRecentCommit,
   hasMeaningfulUserText2,
@@ -433,7 +433,7 @@ import {
   estimateTokens,
   estimateFixedPromptTokens,
   normalizeText
-} from "./index-svzkk03s.js";
+} from "./index-pefn1gt5.js";
 import {
   stableStringify,
   BoundedSessionMap,
@@ -441,7 +441,7 @@ import {
   observeTemporalDecisions,
   freezeTemporalDecisions,
   tagIdentityRevisionKey
-} from "./index-j8s9qn84.js";
+} from "./index-jhmz9tgv.js";
 import {
   inRootAsyncContext2,
   Database2,
@@ -472,7 +472,7 @@ import {
   openCurrentDatabase,
   openDatabaseAsync,
   closeDatabase
-} from "./index-vmk9bj7r.js";
+} from "./index-z8pr5k0d.js";
 import {
   LkgRecoveryFenceError,
   clearLkgFenceProcessState,
@@ -598,7 +598,7 @@ import {
   getSourceContents,
   recordSubagentInvocation,
   getLatestHistorianInvocationId
-} from "./index-jtt4xy77.js";
+} from "./index-46x2935k.js";
 import {
   resolveOpenCodeDbPath,
   assertOpenCodeStoreGeneration,
@@ -664,11 +664,11 @@ import {
   getRawSessionTagKeysThrough2,
   getLegacyProtectedTailStartOrdinal2,
   readSessionChunk2
-} from "./index-9vta4h0t.js";
+} from "./index-2kb65n0s.js";
 import"./index-nvh6d3bz.js";
 import {
   formatSynapseLaneDescriptor
-} from "./index-tfa7vbsa.js";
+} from "./index-5rcjs14a.js";
 import"./index-ghp32f9m.js";
 import {
   buildCanonicalChunkTextFromFts2,
@@ -679,7 +679,7 @@ import {
   replaceCompartmentChunkEmbeddings2,
   deleteChunkEmbedBackoffForSession2,
   chunkWindowSourceKey2
-} from "./index-02pkcpgf.js";
+} from "./index-cxczethe.js";
 import {
   recordSessionProjectIdentity,
   GIT_SWEEP_LEASE_RENEWAL_MS,
@@ -704,7 +704,7 @@ import {
   clearCompressionDepthRange,
   cleanSearchText,
   matchedSearchSnippet
-} from "./index-kt9jw3sg.js";
+} from "./index-d7yx4ymd.js";
 import {
   rememberV1HiddenRun
 } from "./index-6x556c2q.js";
@@ -719,7 +719,7 @@ import {
   expandWorkspaceIdentitySetWithAliases,
   sourceNameForMemory,
   computeWorkspaceEpochFingerprint
-} from "./index-nat56e33.js";
+} from "./index-gavj3e6h.js";
 import {
   configureContextDatabasePragmas2
 } from "./index-fapenpch.js";
@@ -744,7 +744,7 @@ import {
   createPrimer,
   updatePrimerSupport,
   updatePrimerAnswer
-} from "./index-s7mecqkm.js";
+} from "./index-k7a8x7ba.js";
 import {
   setEmbeddingSessionBusy2,
   isEmbeddingHostBusy2
@@ -780,7 +780,7 @@ import {
   getCachedLocalEmbeddingPooling,
   resolveLocalEmbeddingWorkerRuntime,
   getLoadedLocalEmbeddingRuntimes
-} from "./index-96he1a59.js";
+} from "./index-bte6kzsd.js";
 import {
   describeShadowBackfillWriteRefusal2,
   contentSha2562,
@@ -799,10 +799,10 @@ import {
   embedSessionCompartmentChunks2,
   getEmbeddingCoverageStatus2,
   getAutoEmbeddingSessionCoverage2
-} from "./index-4fhtnqrz.js";
+} from "./index-65c30zze.js";
 import {
   cosineSimilarity
-} from "./index-ccbzmr3m.js";
+} from "./index-d2g3h5r2.js";
 import {
   USER_FACING_FAILURES,
   renderUserFacingFailure,
@@ -836,7 +836,7 @@ import {
   scheduleClearAndReindex,
   clearSessionTracking,
   createAutoSearchDiagnostics
-} from "./index-f8kg6y2e.js";
+} from "./index-x7551srw.js";
 import"./index-3s39a1md.js";
 import {
   DREAMER_PRIMER_INVESTIGATOR_ALLOWED_TOOLS,
@@ -850,7 +850,7 @@ import {
   HISTORIAN_CACHE_TAIL_ENV2,
   HISTORIAN_MAX_OUTPUT_TOKENS_ENV2,
   SUBAGENT_OUTPUT_CEILING_ENV2
-} from "./index-cr4vzncd.js";
+} from "./index-j4mwdz3q.js";
 import {
   PI_CONTEXT_BUDGET,
   PiContextDeadlineError,
@@ -866,14 +866,14 @@ import {
   drainPiTagSnapshotSession,
   assertPiTagSnapshotReady,
   ensurePiTagSnapshotReady
-} from "./index-zwgxd42f.js";
+} from "./index-51xr6g7s.js";
 import"./index-71rg8j43.js";
 import"./index-8d2z6503.js";
-import"./index-4k4qgncm.js";
-import"./index-4cv4mh15.js";
+import"./index-cjhq42s7.js";
+import"./index-4dqwxb7k.js";
 import {
   __toESM
-} from "./index-22jkk6wg.js";
+} from "./index-8pcrajnf.js";
 import {
   retreatPastHostUnservedRows
 } from "./index-by1bzjcd.js";
@@ -13544,7 +13544,7 @@ function getAsyncModule() {
     if (beforeModuleLoad)
       await beforeModuleLoad();
     const [{ default: singlefileAsyncifyVariant }, { newQuickJSAsyncWASMModuleFromVariant }] = await importPluginModule(() => Promise.all([
-      import("./index-jnhzwwgg.js").then((m)=>__toESM(m.default,1)),
+      import("./index-848bf1st.js").then((m)=>__toESM(m.default,1)),
       import("./index-b7p25tm0.js")
     ]));
     const module = await newQuickJSAsyncWASMModuleFromVariant(singlefileAsyncifyVariant);
