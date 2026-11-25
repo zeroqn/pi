@@ -230,6 +230,127 @@ pub enum Dialog {
     Editor { title: String, text: String },
 }
 
+/// What pi draws under the composer: the cwd, then one status line — token totals, cost and the context
+/// budget on the left, the model on the right (`pi/.../components/footer.ts:150-283`).
+///
+/// The client had neither, so a session's cost, its context budget and the directory it belonged to were
+/// invisible (ticket 15's F8): every number here comes from the host's own `get_session_stats`
+/// (`SessionStats`), never from the client's guess.
+#[derive(Default, Clone, Debug)]
+pub struct Footer {
+    /// The session's working directory, already shortened to `~` the way pi does.
+    pub cwd: String,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_read: u64,
+    pub cache_write: u64,
+    pub cost: f64,
+    /// `contextUsage.percent`; `None` right after a compaction, when the host reports it as unknown.
+    pub context_percent: Option<f64>,
+    /// The model's context window in tokens.
+    pub context_window: u64,
+    /// `get_state`'s `autoCompactionEnabled`.
+    pub auto_compaction: bool,
+    pub model: String,
+    pub provider: String,
+    /// Whether this model reasons at all; pi shows the level only when it does.
+    pub reasoning: bool,
+    pub thinking: String,
+    /// How many providers the session has, so the provider is named only when it disambiguates.
+    pub providers: usize,
+}
+
+impl Footer {
+    /// pi's `formatTokens`: `999`, `1.2k`, `16k`, `1.2M`, `16M`.
+    pub fn format_tokens(count: u64) -> String {
+        match count {
+            0..=999 => count.to_string(),
+            1000..=9999 => format!("{:.1}k", count as f64 / 1000.0),
+            10_000..=999_999 => format!("{}k", (count as f64 / 1000.0).round() as u64),
+            1_000_000..=9_999_999 => format!("{:.1}M", count as f64 / 1_000_000.0),
+            _ => format!("{}M", (count as f64 / 1_000_000.0).round() as u64),
+        }
+    }
+
+    /// pi's `formatToolDuration`'s cousin: a context window as `200k`.
+    pub fn window(tokens: u64) -> String {
+        Footer::format_tokens(tokens)
+    }
+
+    /// The two rows pi draws: the cwd, then the status line. Empty pieces are omitted, so a session whose
+    /// stats have not arrived yet shows only the cwd.
+    pub fn rows(&self, width: usize) -> Vec<String> {
+        use unicode_width::UnicodeWidthStr;
+        let mut rows: Vec<String> = Vec::new();
+        if !self.cwd.is_empty() {
+            rows.push(self.cwd.clone());
+        }
+        let mut parts: Vec<String> = Vec::new();
+        if self.input_tokens > 0 {
+            parts.push(format!("↑{}", Footer::format_tokens(self.input_tokens)));
+        }
+        if self.output_tokens > 0 {
+            parts.push(format!("↓{}", Footer::format_tokens(self.output_tokens)));
+        }
+        if self.cache_read > 0 {
+            parts.push(format!("R{}", Footer::format_tokens(self.cache_read)));
+        }
+        if self.cache_write > 0 {
+            parts.push(format!("W{}", Footer::format_tokens(self.cache_write)));
+        }
+        if self.cost > 0.0 {
+            parts.push(format!("${:.3}", self.cost));
+        }
+        // The budget is drawn only when the host has said how big it is: a `?/0` would be a number this
+        // client invented, and pi always knows the window because it owns the model list.
+        if self.context_window > 0 {
+            let auto = if self.auto_compaction { " (auto)" } else { "" };
+            let percent = match self.context_percent {
+                Some(value) => format!("{value:.1}%"),
+                None => "?".to_string(),
+            };
+            parts.push(format!("{percent}/{}{auto}", Footer::window(self.context_window)));
+        }
+        let left = parts.join(" ");
+        let mut right = if self.model.is_empty() { String::new() } else { self.model.clone() };
+        if self.reasoning && !self.model.is_empty() {
+            right = if self.thinking.is_empty() || self.thinking == "off" {
+                format!("{} • thinking off", self.model)
+            } else {
+                format!("{} • {}", self.model, self.thinking)
+            };
+        }
+        if self.providers > 1 && !self.provider.is_empty() {
+            let with_provider = format!("({}) {right}", self.provider);
+            if UnicodeWidthStr::width(left.as_str()) + 2 + UnicodeWidthStr::width(with_provider.as_str()) <= width {
+                right = with_provider;
+            }
+        }
+        let left_width = UnicodeWidthStr::width(left.as_str());
+        let right_width = UnicodeWidthStr::width(right.as_str());
+        let line = if right.is_empty() {
+            left.clone()
+        } else if left_width + right_width + 2 <= width {
+            // Both fit: the model is right-aligned, with at least two cells between the two sides.
+            let pad = width.saturating_sub(left_width + right_width);
+            let mut line = left.clone();
+            line.push_str(&" ".repeat(pad));
+            line.push_str(&right);
+            line
+        } else if width > right_width + 1 {
+            // Squeeze only when the pair does not fit; the model keeps its name where it can.
+            let mut line: String = left.chars().take(width.saturating_sub(right_width + 1)).collect();
+            line.push(' ');
+            line.push_str(&right);
+            line
+        } else {
+            left.clone()
+        };
+        rows.push(line);
+        rows
+    }
+}
+
 /// What the client does with a request it cannot render: one record per method, shown once.
 pub struct UiState {
     pub dialog: Option<(String, Dialog)>,
@@ -247,6 +368,8 @@ pub struct UiState {
     /// The messages the host has queued for the running turn, kind-tagged: `queue_update`
     /// (`agent-session.ts:1110`). Ticket 02 D3 of `.scratch/tui-rust-v2/map.md`.
     pub pending: Vec<(String, String)>,
+    /// What the screen says about the session, under the composer (ticket 15).
+    pub footer: Footer,
 }
 
 impl Default for UiState {
@@ -263,6 +386,7 @@ impl Default for UiState {
             notices_seen: 0,
             list_rows: 5,
             pending: Vec::new(),
+            footer: Footer::default(),
         }
     }
 }
@@ -570,7 +694,6 @@ impl UiState {
                 }
             }
         } else {
-            let _ = width;
             // The queued messages, where pi draws them: dim lines above the composer, kind-tagged,
             // with the chord that takes them back into the editor (`interactive-mode.ts:4962-4983`).
             for (kind, text) in &self.pending {
@@ -581,7 +704,13 @@ impl UiState {
                     rows.push(format!(" ↳ {key} to edit all queued messages"));
                 }
             }
+            // pi's editor is a box: a rule above the buffer and a rule below it, then the cwd and the
+            // status line (`components/dynamic-border.ts:23`, `footer.ts:284-286`). Without the rules the
+            // composer was indistinguishable from the transcript (ticket 15's F9).
+            rows.push(rule(width));
             rows.extend(composer_rows.iter().cloned());
+            rows.push(rule(width));
+            rows.extend(self.footer.rows(width));
         }
         for widget in self.widgets.values().filter(|w| w.placement == Placement::Below) {
             rows.extend(widget.lines.iter().cloned());
@@ -599,6 +728,11 @@ impl UiState {
             _ => String::new(),
         }
     }
+}
+
+/// The full-width `─` rule pi draws around its editor.
+fn rule(width: usize) -> String {
+    "\u{2500}".repeat(width.max(1))
 }
 
 /// A queue row is one line: a newline inside a queued message must not split the dock.
@@ -636,6 +770,10 @@ mod tests {
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn is_rule(row: &str) -> bool {
+        !row.is_empty() && row.chars().all(|ch| ch == '\u{2500}')
     }
 
     /// pi's defaults, which is what a client with no `keybindings.json` uses.
@@ -764,11 +902,13 @@ mod tests {
         assert!(rows.iter().any(|r| r.contains("Steering: fix the test")), "{rows:?}");
         assert!(rows.iter().any(|r| r.contains("Follow-up: then run it")), "{rows:?}");
         assert!(rows.iter().any(|r| r.contains("to edit all queued messages")), "{rows:?}");
-        // The queue sits above the composer, and the composer is the last row.
+        // The queue sits above the composer, and the composer sits inside the editor's rules
+        // (`rule`, `composer`, `rule`, footer) — ticket 15's F9.
         let position = rows.iter().position(|r| r.contains("Steering:")).unwrap();
         let composer = rows.iter().position(|r| r == "composer").unwrap();
         assert!(position < composer, "the queue must be above the composer");
-        assert_eq!(rows.last().unwrap(), "composer");
+        assert!(is_rule(&rows[composer - 1]), "a rule above the buffer: {rows:?}");
+        assert!(is_rule(&rows[composer + 1]), "and one below it: {rows:?}");
     }
 
     #[test]
@@ -789,7 +929,44 @@ mod tests {
         assert!(rows.iter().any(|r| r.contains("hello")), "notice missing: {rows:?}");
         assert!(rows.iter().any(|r| r.contains("k: v")), "status missing: {rows:?}");
         assert!(rows.iter().any(|r| r == "w1"), "widget missing: {rows:?}");
-        assert_eq!(rows.last().unwrap(), "composer");
+        let composer = rows.iter().position(|r| r == "composer").expect("the composer row");
+        assert!(is_rule(&rows[composer - 1]) && is_rule(&rows[composer + 1]), "the editor is boxed: {rows:?}");
+        // A widget without a placement is pi's `aboveEditor`, so it is drawn above the editor's rule.
+        assert!(rows.iter().position(|r| r == "w1").unwrap() < composer - 1);
+    }
+
+    #[test]
+    fn the_footer_names_the_cwd_and_puts_the_model_on_the_right() {
+        // Ticket 15's F8: pi's two footer rows (`components/footer.ts:150-283`).
+        let mut ui = UiState::default();
+        ui.footer = Footer {
+            cwd: "~/workspace/pi".to_string(),
+            input_tokens: 5700,
+            output_tokens: 464,
+            cost: 5.019,
+            context_percent: Some(12.5),
+            context_window: 200_000,
+            auto_compaction: true,
+            model: "claude-sonnet".to_string(),
+            reasoning: true,
+            thinking: "off".to_string(),
+            ..Footer::default()
+        };
+        let rows = ui.footer.rows(80);
+        assert_eq!(rows[0], "~/workspace/pi", "the cwd is the first row");
+        assert!(rows[1].starts_with("↑5.7k ↓464 $5.019 12.5%/200k (auto)"), "{:?}", rows[1]);
+        assert!(rows[1].ends_with("claude-sonnet • thinking off"), "the model is right-aligned: {:?}", rows[1]);
+        assert_eq!(rows[1].chars().count(), 80, "and flush to the right edge");
+    }
+
+    #[test]
+    fn an_unknown_context_budget_reads_as_a_question_mark() {
+        // After a compaction the host reports `contextUsage.percent` as null; pi prints `?`, and a
+        // guessed number would be worse than the mark.
+        let mut ui = UiState::default();
+        ui.footer = Footer { context_window: 200_000, auto_compaction: false, ..Footer::default() };
+        let rows = ui.footer.rows(40);
+        assert_eq!(rows.last().unwrap(), "?/200k", "{rows:?}");
     }
 
     #[test]

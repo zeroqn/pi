@@ -12,7 +12,7 @@ this package builds the client and AOT-compiles a stock pi behind it (`nix devel
 | Path | What it is |
 |---|---|
 | `crates/pi-rpc` | the wire: the event inventory (hand-written, from pi 1.5.0's types), validation, JSONL framing. `cargo test` here is the drift detector. |
-| `crates/pi-tui` | the client: spawns or replays a host, renders the transcript as wrapped lines, owns the terminal and the composer. Frames go through a writer thread (one-frame slot, newest wins), the screen is diffed row by row with scroll regions, and a dropped frame invalidates it. No markdown, no dialogs yet. |
+| `crates/pi-tui` | the client: spawns or replays a host, renders the transcript as wrapped lines, owns the terminal and the composer. Frames go through a writer thread (one-frame slot, newest wins), the screen is diffed row by row with scroll regions, and a dropped frame invalidates it. Markdown is typeset (headings, fences with syntax colour, lists, tables), dialogs and the pickers are pi's, and the composer sits in pi's editor box above the session footer (cwd, tokens, context budget, cost, model). |
 | `tools/harness/` | the measurement harness (Pi-Bolt's `bench/` subset), `record_corpus.py` (records the RPC corpus), `echo_probe.py` (echo latency from outside the client), `smoke_host.py` (end-to-end against a real host). |
 | `nix/onnxruntime-shim/` | the `libonnxrtabi24.so.1` ABI shim Magic Context's native embeddings are loaded through, built against this flake's `onnxruntime` (ported from `shell/onnxruntime-shim/`); `nix/onnxruntime-check.sh` is its gate. |
 

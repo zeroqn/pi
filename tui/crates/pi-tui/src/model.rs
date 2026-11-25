@@ -19,34 +19,111 @@ use pi_rpc::Line;
 /// whole here — truncation happens at render time, so expanding costs no re-parse.
 pub struct ToolCard {
     pub id: String,
-    /// Kept for the per-tool policy (bash keeps its tail, edits render as diffs) and for a future
-    /// per-tool expand default.
+    /// The tool's name, for the per-tool policy (bash keeps its tail, edits render as diffs).
     #[allow(dead_code)]
     pub name: String,
+    /// The call's own row: `$ <command>` for a shell tool, `<name> key=value …` otherwise (pi's
+    /// `formatShellCall` and `formatToolCallWithArgs`). It stays when the result arrives, so a call and
+    /// its output are one card — before ticket 14 they were two blocks the transcript could separate.
     pub summary: StyledRow,
     pub body: Vec<StyledRow>,
     pub cap: usize,
     pub keep_last: bool,
     /// Recorded when the result failed, for the error styling the summary already applies.
-    #[allow(dead_code)]
     pub is_error: bool,
     pub expanded: bool,
+    /// True between the call and its result: the summary is drawn, the body has not arrived.
+    pub pending: bool,
+    /// `tool_execution_end`'s own measurement, drawn as pi's `Took 0.4s`.
+    pub duration_ms: Option<u64>,
 }
 
 impl ToolCard {
-    /// The rows to draw: the summary, the capped body, and the hint when lines are hidden.
+    /// The rows to draw: the call, the capped body with its hint, and the duration.
+    ///
+    /// pi's order for a body that keeps its tail is hint **above** the tail
+    /// (`core/tools/renderers/bash.ts:58-66`), so the command stays next to the output it produced; the
+    /// client put the hint below, where it read as a footnote to the wrong row.
     pub fn rows(&self) -> Vec<StyledRow> {
         let mut out = vec![self.summary.clone()];
-        if self.expanded || self.body.is_empty() {
-            out.extend(self.body.iter().cloned());
-            return out;
+        if !self.body.is_empty() {
+            // pi separates the call from its output with a blank row (`renderers/bash.ts:59`).
+            out.push(StyledRow::default());
+            if self.expanded || self.body.len() <= self.cap {
+                out.extend(self.body.iter().cloned());
+            } else {
+                let (kept, hidden) = pi_tui::render::truncate_visual(self.body.clone(), self.cap, self.keep_last);
+                if self.keep_last {
+                    out.push(pi_tui::render::more_lines_hint_kind(hidden, "ctrl+o", true));
+                    out.extend(kept);
+                } else {
+                    out.extend(kept);
+                    out.push(pi_tui::render::more_lines_hint_kind(hidden, "ctrl+o", false));
+                }
+            }
         }
-        let (kept, hidden) = pi_tui::render::truncate_visual(self.body.clone(), self.cap, self.keep_last);
-        out.extend(kept);
-        if hidden > 0 {
-            out.push(pi_tui::render::more_lines_hint(hidden, "ctrl+o"));
+        if let Some(ms) = self.duration_ms {
+            if !out.is_empty() {
+                out.push(StyledRow::default());
+            }
+            out.push(StyledRow::styled(format!("Took {}", format_duration(ms)), Role::Muted));
         }
         out
+    }
+}
+
+/// pi's `formatToolDuration` (`core/tools/render-utils.ts:112-124`): seconds below a minute, then
+/// minutes and seconds, then hours.
+fn format_duration(ms: u64) -> String {
+    let seconds = ms as f64 / 1000.0;
+    if seconds < 60.0 {
+        return format!("{seconds:.1}s");
+    }
+    let total = ms / 1000;
+    let minutes = total / 60;
+    let remainder = total % 60;
+    if minutes < 60 {
+        return format!("{minutes}m {remainder}s");
+    }
+    format!("{}h {}m {}s", minutes / 60, minutes % 60, remainder)
+}
+
+/// The call's row, in pi's shape: a shell call is `$ <command>`, anything else is `name key=value …`.
+fn tool_summary(name: &str, args: Option<&Value>) -> StyledRow {
+    let title = if name == "bash" || name == "shell" {
+        match args.and_then(|args| args.get("command")).and_then(Value::as_str) {
+            Some(command) => format!("$ {}", first_line(command, 160)),
+            None => format!("$ {name}"),
+        }
+    } else {
+        let mut text = name.to_string();
+        if let Some(Value::Object(map)) = args {
+            let mut parts: Vec<String> = Vec::new();
+            for (key, value) in map {
+                let rendered = match value {
+                    Value::String(text) => format!("{text:?}"),
+                    other => other.to_string(),
+                };
+                parts.push(format!("{key}={rendered}"));
+            }
+            if !parts.is_empty() {
+                text.push(' ');
+                text.push_str(&first_line(&parts.join(" "), 120));
+            }
+        }
+        text
+    };
+    StyledRow::styled(title, Role::ToolTitle)
+}
+
+fn first_line(text: &str, limit: usize) -> String {
+    let line = text.lines().next().unwrap_or("");
+    if line.chars().count() > limit {
+        let mut cut: String = line.chars().take(limit.saturating_sub(1)).collect();
+        cut.push('…');
+        cut
+    } else {
+        line.to_string()
     }
 }
 
@@ -126,7 +203,10 @@ fn role_for_line(line: &str) -> Role {
     /// other result is plain output, and a failed one keeps the error background role for its first line.
 fn render_tool_body(name: &str, text: &str, failed: bool) -> Vec<StyledRow> {
         let mut rows: Vec<StyledRow> = Vec::new();
-        for line in text.split('\n') {
+        // A tool result ends with a newline: pi trims it (`renderers/bash.ts:39`), and one blank row
+        // inside the kept tail costs the card a *visible* line, which is how the client showed 1197-1200
+        // where pi showed 1196-1200 (measured 2026-11-24).
+        for line in text.trim_end_matches('\n').split('\n') {
             if line.is_empty() {
                 rows.push(StyledRow::default());
                 continue;
@@ -155,65 +235,111 @@ impl Transcript {
 
     /// Fold a `get_messages` reply into the transcript, so attaching to an existing session renders its
     /// history through the same rows as live traffic (ticket 11).
+    ///
+    /// The tool calls are the reason this had to be rewritten (ticket 14, F7): a session stores the
+    /// **call** on the assistant message (`content: [{type: "toolCall", id, name, arguments}]`) and its
+    /// result in a following `toolResult` message. Before this, only the result was read, so every call in
+    /// a resumed session rendered as `< python (history)` with no command — unreadable for a day that
+    /// starts by continuing yesterday's work.
     pub fn apply_history(&mut self, messages: &serde_json::Value) -> bool {
         let Some(items) = messages.as_array() else { return false };
         let mut changed = false;
+        // The card each call opened, by tool-call id, so its result lands in the same card.
+        let mut open_cards: Vec<(String, usize)> = Vec::new();
+        let push_card = |card: ToolCard, items: &mut Vec<Item>, open_cards: &mut Vec<(String, usize)>| {
+            let id = card.id.clone();
+            items.push(Item::Tool(card));
+            if !id.is_empty() {
+                open_cards.push((id, items.len() - 1));
+            }
+        };
         for message in items {
             let role = message.get("role").and_then(Value::as_str).unwrap_or("");
             match role {
                 "user" => {
-                    if let Some(text) = message.get("content").and_then(Value::as_str) {
+                    let text: Option<String> = match message.get("content") {
+                        Some(Value::String(text)) => Some(text.clone()),
+                        Some(Value::Array(parts)) => {
+                            let joined: String = parts
+                                .iter()
+                                .filter_map(|part| part.get("text").and_then(Value::as_str))
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            if joined.is_empty() { None } else { Some(joined) }
+                        }
+                        _ => None,
+                    };
+                    if let Some(text) = text {
                         let rows: Vec<StyledRow> = text
                             .split('\n')
-                            .map(|line| StyledRow::styled(format!("> {line}"), Role::UserText))
+                            .map(|line| StyledRow::styled(format!(" {line}"), Role::UserText))
                             .collect();
                         self.items.push(Item::User(rows));
+                        self.items.push(Item::Rows(vec![StyledRow::default()]));
                         changed = true;
-                    } else if let Some(parts) = message.get("content").and_then(Value::as_array) {
-                        let text: String = parts
-                            .iter()
-                            .filter_map(|part| part.get("text").and_then(Value::as_str))
-                            .collect();
-                        if !text.is_empty() {
-                            let rows: Vec<StyledRow> = text
-                                .split('\n')
-                                .map(|line| StyledRow::styled(format!("> {line}"), Role::UserText))
-                                .collect();
-                            self.items.push(Item::Rows(rows));
-                            changed = true;
-                        }
                     }
                 }
                 "assistant" => {
+                    let parts: Vec<&Value> = message
+                        .get("content")
+                        .and_then(Value::as_array)
+                        .map(|parts| parts.iter().collect())
+                        .unwrap_or_default();
                     let mut source = String::new();
-                    if let Some(parts) = message.get("content").and_then(Value::as_array) {
-                        for part in parts {
-                            match part.get("type").and_then(Value::as_str) {
-                                Some("text") => {
-                                    if let Some(text) = part.get("text").and_then(Value::as_str) {
-                                        source.push_str(text);
-                                        source.push('\n');
+                    let mut calls: Vec<(String, String, Option<Value>)> = Vec::new();
+                    for part in parts {
+                        match part.get("type").and_then(Value::as_str) {
+                            Some("text") => {
+                                if let Some(text) = part.get("text").and_then(Value::as_str) {
+                                    if !source.is_empty() {
+                                        source.push_str("\n\n");
                                     }
+                                    source.push_str(text);
                                 }
-                                _ => {}
                             }
+                            Some("toolCall") => {
+                                let id = part.get("id").and_then(Value::as_str).unwrap_or("").to_string();
+                                let name = part.get("name").and_then(Value::as_str).unwrap_or("tool").to_string();
+                                let args = part.get("arguments").cloned();
+                                calls.push((id, name, args));
+                            }
+                            // A thinking block is hidden by default in pi, so the client leaves it out
+                            // rather than inventing a label pi would not draw.
+                            _ => {}
                         }
                     }
                     if !source.trim().is_empty() {
                         let mut md = StreamingMarkdown::new();
                         md.update_styled(&source, &self.theme);
                         let rows = md.styled_rows();
-                        self.last_assistant =
-                            rows.iter().map(|row| row.text()).collect::<Vec<_>>().join("\n");
+                        self.last_assistant = rows.iter().map(|row| row.text()).collect::<Vec<_>>().join("\n");
                         if !rows.is_empty() {
                             self.items.push(Item::Rows(rows));
-                            self.items.push(Item::Rows(vec![StyledRow::default()]));
-                            changed = true;
                         }
+                        changed = true;
+                    }
+                    for (id, name, args) in calls {
+                        let card = ToolCard {
+                            summary: tool_summary(&name, args.as_ref()),
+                            cap: if name == "bash" { 5 } else { 10 },
+                            keep_last: name == "bash",
+                            id,
+                            name,
+                            body: Vec::new(),
+                            is_error: false,
+                            expanded: false,
+                            pending: true,
+                            duration_ms: None,
+                        };
+                        push_card(card, &mut self.items, &mut open_cards);
+                        changed = true;
                     }
                 }
                 "toolResult" => {
                     let name = message.get("toolName").and_then(Value::as_str).unwrap_or("tool").to_string();
+                    let call_id = message.get("toolCallId").and_then(Value::as_str).unwrap_or("").to_string();
+                    let failed = message.get("isError").and_then(Value::as_bool).unwrap_or(false);
+                    let duration_ms = message.get("durationMs").and_then(Value::as_u64);
                     let text: String = message
                         .get("content")
                         .and_then(Value::as_array)
@@ -225,20 +351,49 @@ impl Transcript {
                                 .join("\n")
                         })
                         .unwrap_or_default();
-                    if !text.is_empty() {
-                        let body = render_tool_body(&name, &text, false);
-                        self.items.push(Item::Tool(ToolCard {
-                            id: String::new(),
-                            name: name.clone(),
-                            summary: StyledRow::styled(format!("< {name} (history)"), Role::Muted),
-                            body,
-                            cap: if name == "bash" { 20 } else { 10 },
-                            keep_last: name == "bash",
-                            is_error: false,
-                            expanded: false,
-                        }));
-                        changed = true;
+                    if text.is_empty() && duration_ms.is_none() {
+                        continue;
                     }
+                    let body = render_tool_body(&name, &text, failed);
+                    let slot = open_cards.iter().find(|(id, _)| *id == call_id).map(|(_, index)| *index);
+                    match slot {
+                        Some(index) => {
+                            if let Some(Item::Tool(card)) = self.items.get_mut(index) {
+                                card.body = body;
+                                card.is_error = failed;
+                                card.pending = false;
+                                card.duration_ms = duration_ms;
+                                if failed {
+                                    card.summary.spans.push(pi_tui::render::StyledSpan::new(
+                                        " (failed)".to_string(),
+                                        Role::Error,
+                                    ));
+                                }
+                            }
+                        }
+                        None => {
+                            // A result whose call is not in the history (a truncated session): show it
+                            // under the tool's name rather than dropping the output.
+                            let mut summary = tool_summary(&name, None);
+                            if failed {
+                                summary.spans.push(pi_tui::render::StyledSpan::new(" (failed)".to_string(), Role::Error));
+                            }
+                            let card = ToolCard {
+                                summary,
+                                id: call_id,
+                                name,
+                                body,
+                                cap: 10,
+                                keep_last: false,
+                                is_error: failed,
+                                expanded: false,
+                                pending: false,
+                                duration_ms,
+                            };
+                            push_card(card, &mut self.items, &mut open_cards);
+                        }
+                    }
+                    changed = true;
                 }
                 _ => {}
             }
@@ -458,6 +613,19 @@ impl Transcript {
         }
     }
 
+    /// Rows the client itself puts at the top of a fresh transcript: the boot block (ticket 15). They are
+    /// committed rows, so they scroll away like everything else rather than being redrawn as chrome.
+    pub fn push_boot(&mut self, rows: &[StyledRow]) {
+        if rows.is_empty() {
+            return;
+        }
+        self.commit_open();
+        self.invalidate_rows();
+        self.items.push(Item::Rows(rows.to_vec()));
+        // The blank row a message would leave, so the first answer starts below the block.
+        self.items.push(Item::Rows(vec![StyledRow::default()]));
+    }
+
     fn push_line(&mut self, text: impl Into<String>) {
         self.commit_open();
         self.invalidate_rows();
@@ -479,7 +647,7 @@ impl Transcript {
         self.commit_open();
         let rows: Vec<StyledRow> = text
             .split('\n')
-            .map(|line| StyledRow::styled(format!("> {line}"), Role::UserText))
+            .map(|line| StyledRow::styled(format!(" {line}"), Role::UserText))
             .collect();
         self.items.push(Item::User(rows));
         self.invalidate_rows();
@@ -529,14 +697,26 @@ impl Transcript {
             }
             "tool_execution_start" => {
                 self.tool_calls += 1;
-                let name = value.get("toolName").and_then(Value::as_str).unwrap_or("tool");
-                let detail = value
-                    .pointer("/args/command")
-                    .or_else(|| value.pointer("/args/path"))
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
-                let detail = detail.lines().next().unwrap_or("").chars().take(60).collect::<String>();
-                self.push_line(format!("> {name}: {detail}"));
+                self.commit_open();
+                let name = value.get("toolName").and_then(Value::as_str).unwrap_or("tool").to_string();
+                let id = value.get("toolCallId").and_then(Value::as_str).unwrap_or("").to_string();
+                // The call opens its card now and the result fills it later, so a card cannot be
+                // separated from its command by whatever the transcript does in between (ticket 14, F6).
+                self.items.push(Item::Tool(ToolCard {
+                    id,
+                    summary: tool_summary(&name, value.get("args")),
+                    // pi's caps: five visual lines for bash (`renderers/bash.ts:18`), ten for the rest
+                    // (`components/tool-execution.ts:23`).
+                    cap: if name == "bash" { 5 } else { 10 },
+                    keep_last: name == "bash",
+                    name,
+                    body: Vec::new(),
+                    is_error: false,
+                    expanded: false,
+                    pending: true,
+                    duration_ms: None,
+                }));
+                self.invalidate_rows();
                 true
             }
             "tool_execution_end" => {
@@ -548,31 +728,48 @@ impl Transcript {
                     .and_then(Value::as_str)
                     .unwrap_or("")
                     .to_string();
-                let bytes = text.len();
+                let duration_ms = value.get("durationMs").and_then(Value::as_u64);
                 self.commit_open();
-                // Bash output keeps its tail (pi shows the last 20 lines); other tools keep their head.
-                let (cap, keep_last) = if name == "bash" { (20, true) } else { (10, false) };
                 let body = render_tool_body(&name, &text, failed);
-                let summary = StyledRow {
-                    spans: vec![
-                        pi_tui::render::StyledSpan::new(format!("< {name} "), Role::ToolTitle),
-                        pi_tui::render::StyledSpan::new(
-                            if failed { "failed" } else { "done" },
-                            if failed { Role::Error } else { Role::Success },
-                        ),
-                        pi_tui::render::StyledSpan::new(format!(" ({bytes} B)"), Role::Muted),
-                    ],
-                };
-                self.items.push(Item::Tool(ToolCard {
-                    id,
-                    name,
-                    summary,
-                    body,
-                    cap,
-                    keep_last,
-                    is_error: failed,
-                    expanded: false,
-                }));
+                // The card opened by the call, or a new one when the start never reached us.
+                let index = self
+                    .items
+                    .iter()
+                    .rposition(|item| matches!(item, Item::Tool(card) if card.id == id || (card.pending && card.id.is_empty())));
+                match index {
+                    Some(index) => {
+                        if let Item::Tool(card) = &mut self.items[index] {
+                            card.body = body;
+                            card.is_error = failed;
+                            card.pending = false;
+                            card.duration_ms = duration_ms;
+                            let mut spans = std::mem::take(&mut card.summary.spans);
+                            if failed {
+                                spans.push(pi_tui::render::StyledSpan::new(" (failed)".to_string(), Role::Error));
+                            }
+                            card.summary.spans = spans;
+                        }
+                    }
+                    None => {
+                        let mut summary = tool_summary(&name, value.get("args"));
+                        if failed {
+                            summary.spans.push(pi_tui::render::StyledSpan::new(" (failed)".to_string(), Role::Error));
+                        }
+                        self.items.push(Item::Tool(ToolCard {
+                            id,
+                            name: name.clone(),
+                            summary,
+                            body,
+                            cap: if name == "bash" { 5 } else { 10 },
+                            keep_last: name == "bash",
+                            is_error: failed,
+                            expanded: false,
+                            pending: false,
+                            duration_ms,
+                        }));
+                    }
+                }
+                self.invalidate_rows();
                 true
             }
             "compaction_start" => {
@@ -696,7 +893,7 @@ mod tests {
         let mut t = Transcript::default();
         assert!(t.push_user("what does this do?"));
         let text = t.lines().join("\n");
-        assert!(text.contains("> what does this do?"), "the prompt must show: {text}");
+        assert!(text.contains(" what does this do?"), "the prompt must show: {text}");
     }
 
     #[test]
@@ -711,6 +908,61 @@ mod tests {
         let text = t.lines().join("\n");
         assert!(text.contains("half an answer"), "the partial answer stays: {text}");
         assert!(text.contains("Operation aborted"), "the abort text must be shown: {text}");
+    }
+
+    fn tool_call(id: &str, name: &str, args: serde_json::Value) -> serde_json::Value {
+        json!({
+            "type": "tool_execution_start",
+            "toolCallId": id,
+            "toolName": name,
+            "args": args
+        })
+    }
+
+    #[test]
+    fn a_call_and_its_result_are_one_card_with_the_command_on_top() {
+        // Ticket 14's F6: the call used to be its own row (`> bash: cmd`) and the result a second block
+        // (`< bash done (N B)`), so a scrolled transcript separated them.
+        let mut t = Transcript::default();
+        apply(&mut t, tool_call("call-1", "bash", json!({"command": "seq 1 1200 | sed 's/^/line /'"})));
+        apply(&mut t, tool_end("bash", "line 1\nline 2\n".to_string(), false));
+        let text: Vec<String> = t.styled_rows().iter().map(|row| row.text()).collect();
+        assert_eq!(text[0], "$ seq 1 1200 | sed 's/^/line /'", "the command heads the card: {text:?}");
+        assert!(text.iter().any(|row| row == "line 2"), "the body is in the same card: {text:?}");
+        assert!(!text.iter().any(|row| row.starts_with("< bash")), "no second block: {text:?}");
+        assert!(!text.iter().any(|row| row.starts_with("> bash")), "no separate call row: {text:?}");
+    }
+
+    #[test]
+    fn a_calls_duration_is_drawn_below_the_body_as_pi_writes_it() {
+        let mut t = Transcript::default();
+        apply(&mut t, json!({"type": "tool_execution_end", "toolCallId": "c", "toolName": "read",
+                             "isError": false, "durationMs": 4200,
+                             "result": {"content": [{"type": "text", "text": "body"}]}}));
+        let text: Vec<String> = t.styled_rows().iter().map(|row| row.text()).collect();
+        assert_eq!(text.last().unwrap(), "Took 4.2s", "{text:?}");
+    }
+
+    #[test]
+    fn a_history_tool_call_keeps_its_command_and_its_result() {
+        // Ticket 14's F7: a resumed session rendered `< python (history)` with no command.
+        let mut t = Transcript::default();
+        t.set_theme(Theme::parse(r#"{"colors": {"text": "okhsl(234 3% 89%)"}}"#).expect("a theme"));
+        let history = json!([
+            { "role": "assistant", "content": [
+                { "type": "text", "text": "Running it." },
+                { "type": "toolCall", "id": "call-9", "name": "python",
+                  "arguments": { "code": "print(1)" } }
+            ]},
+            { "role": "toolResult", "toolCallId": "call-9", "toolName": "python", "isError": false,
+              "durationMs": 150, "content": [ { "type": "text", "text": "1" } ] }
+        ]);
+        assert!(t.apply_history(&history));
+        let text: Vec<String> = t.styled_rows().iter().map(|row| row.text()).collect();
+        assert!(text.iter().any(|row| row.starts_with("python code=")), "the call carries its args: {text:?}");
+        assert!(text.iter().any(|row| row == "1"), "the result is in the card: {text:?}");
+        assert!(text.iter().any(|row| row.starts_with("Took ")), "and its duration: {text:?}");
+        assert!(!text.iter().any(|row| row.contains("(history)")), "no placeholder: {text:?}");
     }
 
     fn tool_end(name: &str, text: String, failed: bool) -> serde_json::Value {
@@ -729,9 +981,9 @@ mod tests {
         let body = (1..=40).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
         apply(&mut t, tool_end("read", body, false));
         let rows = t.styled_rows();
-        // summary + 10 body rows + hint
-        assert_eq!(rows.len(), 12, "{:?}", rows.iter().map(|r| r.text()).collect::<Vec<_>>());
-        assert_eq!(rows[1].text(), "line 1", "the head is kept for a read");
+        // summary, a blank row, 10 body rows, hint
+        assert_eq!(rows.len(), 13, "{:?}", rows.iter().map(|r| r.text()).collect::<Vec<_>>());
+        assert_eq!(rows[2].text(), "line 1", "the head is kept for a read");
         let hint = rows.last().unwrap().text();
         assert!(hint.contains("30 more lines"), "{hint:?}");
         assert!(hint.contains("ctrl+o"), "the chord is named: {hint:?}");
@@ -743,10 +995,10 @@ mod tests {
         let body = (1..=40).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
         apply(&mut t, tool_end("read", body, false));
         assert!(t.toggle_tool_expansion(None));
-        assert_eq!(t.styled_rows().len(), 41, "summary plus every body line");
+        assert_eq!(t.styled_rows().len(), 42, "summary, a blank row, and every body line");
         // Collapsing toggles the same card back; the call reports that it acted.
         assert!(t.toggle_tool_expansion(None));
-        assert_eq!(t.styled_rows().len(), 12);
+        assert_eq!(t.styled_rows().len(), 13);
     }
 
     #[test]
@@ -755,10 +1007,10 @@ mod tests {
         let body = (1..=40).map(|i| format!("row {i}")).collect::<Vec<_>>().join("\n");
         apply(&mut t, tool_end("bash", body, false));
         let rows = t.styled_rows();
-        assert_eq!(rows.len(), 22, "summary + 20 body rows + hint");
-        let kept_last = rows.len() - 2;
-        assert_eq!(rows[kept_last].text(), "row 40", "the tail is what matters for bash");
-        assert!(rows.last().unwrap().text().contains("20 more lines"));
+        // pi keeps five visual lines for a bash body, with the hint **above** the tail.
+        assert_eq!(rows.len(), 8, "summary, blank, hint, 5 body rows");
+        assert_eq!(rows[2].text(), "... (35 earlier lines, ctrl+o to expand)", "{:?}", rows.iter().map(|r| r.text()).collect::<Vec<_>>());
+        assert_eq!(rows.last().unwrap().text(), "row 40", "the tail is what matters for bash");
     }
 
     #[test]
@@ -766,7 +1018,7 @@ mod tests {
         let mut t = Transcript::default();
         apply(&mut t, tool_end("edit", "+added\n-removed\n context\n".to_string(), false));
         let rows = t.styled_rows();
-        let roles: Vec<Role> = rows.iter().skip(1).flat_map(|r| r.spans.iter().map(|s| s.role)).collect();
+        let roles: Vec<Role> = rows.iter().skip(2).flat_map(|r| r.spans.iter().map(|s| s.role)).collect();
         assert_eq!(roles, vec![Role::DiffAdded, Role::DiffRemoved, Role::DiffContext]);
     }
 
@@ -776,7 +1028,7 @@ mod tests {
         apply(&mut t, tool_end("bash", "boom\n".to_string(), true));
         let rows = t.styled_rows();
         assert_eq!(rows[0].spans[1].role, Role::Error);
-        assert_eq!(rows[1].spans[0].role, Role::Error);
+        assert_eq!(rows[2].spans[0].role, Role::Error);
     }
 
     #[test]
@@ -790,8 +1042,9 @@ mod tests {
         ]);
         assert!(t.apply_history(&history));
         let rows = t.styled_rows();
-        assert_eq!(rows.iter().find(|r| r.text().starts_with("> earlier")).unwrap().spans[0].role, Role::UserText);
-        assert!(rows.iter().any(|r| r.text() == "# Answer"));
+        assert_eq!(rows.iter().find(|r| r.text().starts_with(" earlier")).unwrap().spans[0].role, Role::UserText);
+        // A heading is styled, not spelled (ticket 13's F3): the markdown marks are gone.
+        assert!(rows.iter().any(|r| r.text() == "Answer"));
         assert!(rows.iter().any(|r| r.text() == "history output"), "a historical tool result renders as body rows");
     }
 
@@ -803,9 +1056,9 @@ mod tests {
         apply(&mut t, tool_end("bash", "out\n".to_string(), false));
         apply(&mut t, json!({"type": "message_end", "message": {"role": "assistant"}}));
         let rows = t.styled_rows();
-        let heading = rows.iter().position(|r| r.text() == "# Heading").expect("the heading row");
+        let heading = rows.iter().position(|r| r.text() == "Heading").expect("the heading row");
         assert_eq!(rows[heading].spans[0].role, Role::MdHeading);
-        let summary = rows.iter().position(|r| r.text().starts_with("< bash ")).expect("the tool summary");
+        let summary = rows.iter().position(|r| r.text().starts_with("$ ")).expect("the tool summary");
         assert!(summary > heading, "the tool card comes after the assistant's text");
     }
 }

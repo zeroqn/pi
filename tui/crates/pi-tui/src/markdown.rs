@@ -21,8 +21,6 @@ use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 pub struct Block {
     /// The block's source text, terminator included.
     pub source: String,
-    /// Rendered rows, already wrapped-free: the painter wraps.
-    pub lines: Vec<String>,
     /// Whether this block is still open (its terminator has not been seen).
     pub open: bool,
 }
@@ -67,125 +65,22 @@ fn split_blocks(source: &str) -> Vec<(usize, usize, bool)> {
 /// rendered: headings, fences, lists, quotes, rules, emphasis-as-text. Ticket 05 adds colour and the
 /// full construct set; the *cost model* is what this module proves.
 pub fn render_block(source: &str) -> Vec<String> {
-    let mut options = Options::empty();
-    options.insert(Options::ENABLE_TABLES);
-    options.insert(Options::ENABLE_STRIKETHROUGH);
-    let mut out: Vec<String> = Vec::new();
-    let mut current = String::new();
-    let mut in_code_block = false;
-    #[allow(unused_assignments)]
-    let mut code_language = String::new();
-    let mut list_depth = 0usize;
-    let mut quote_depth = 0usize;
-    let mut pending_link: Option<String> = None;
-
-    let flush = |out: &mut Vec<String>, current: &mut String| {
-        if !current.is_empty() {
-            out.push(std::mem::take(current));
-        }
-    };
-
-    for event in Parser::new_ext(source, options) {
-        match event {
-            Event::Start(Tag::CodeBlock(kind)) => {
-                flush(&mut out, &mut current);
-                in_code_block = true;
-                code_language = match kind {
-                    pulldown_cmark::CodeBlockKind::Fenced(info) => info.trim().to_string(),
-                    pulldown_cmark::CodeBlockKind::Indented => String::new(),
-                };
-                out.push(if code_language.is_empty() {
-                    "```".to_string()
-                } else {
-                    format!("```{code_language}")
-                });
-            }
-            Event::End(TagEnd::CodeBlock) => {
-                in_code_block = false;
-                out.push("```".to_string());
-            }
-            Event::Start(Tag::Heading { level, .. }) => {
-                flush(&mut out, &mut current);
-                let marks = "#".repeat(level as usize);
-                current.push_str(&format!("{marks} "));
-            }
-            Event::Start(Tag::List(_)) => {
-                flush(&mut out, &mut current);
-                list_depth += 1;
-            }
-            Event::End(TagEnd::List(_)) => {
-                list_depth = list_depth.saturating_sub(1);
-            }
-            Event::Start(Tag::Item) => {
-                flush(&mut out, &mut current);
-                current.push_str(&format!("{} ", if list_depth > 1 { "-" } else { "-" }));
-            }
-            Event::Start(Tag::BlockQuote(_)) => {
-                flush(&mut out, &mut current);
-                quote_depth += 1;
-            }
-            Event::End(TagEnd::BlockQuote(_)) => {
-                quote_depth = quote_depth.saturating_sub(1);
-            }
-            Event::Start(Tag::Link { dest_url, .. }) => {
-                pending_link = Some(dest_url.to_string());
-            }
-            Event::End(TagEnd::Link) => {
-                if let Some(url) = pending_link.take() {
-                    if !url.is_empty() && !url.starts_with('#') {
-                        current.push_str(&format!(" ({url})"));
-                    }
-                }
-            }
-            Event::Text(text) => {
-                if in_code_block {
-                    for line in text.split('\n') {
-                        out.push(line.to_string());
-                    }
-                } else {
-                    current.push_str(&text);
-                }
-            }
-            Event::SoftBreak | Event::HardBreak => {
-                if in_code_block {
-                    // A hard break inside a fenced block is text, already handled above.
-                } else {
-                    flush(&mut out, &mut current);
-                }
-            }
-            Event::Rule => {
-                flush(&mut out, &mut current);
-                out.push("---".to_string());
-            }
-            Event::End(TagEnd::Paragraph) => flush(&mut out, &mut current),
-            Event::End(TagEnd::Heading(_)) => flush(&mut out, &mut current),
-            Event::End(TagEnd::Item) => flush(&mut out, &mut current),
-            Event::Code(code) => {
-                current.push_str(&format!("`{code}`"));
-            }
-            Event::Html(html) | Event::InlineHtml(html) => {
-                // HTML is stripped (ticket 04's "not in v1" list is about images/LaTeX/mermaid).
-                let _ = html;
-            }
-            _ => {}
-        }
-    }
-    flush(&mut out, &mut current);
-    if quote_depth > 0 {
-        for line in out.iter_mut() {
-            *line = format!("> {line}");
-        }
-    }
-    out
+    // One renderer, one answer: plain text is the styled rows' text, so the bench's whole-source
+    // baseline and the painted transcript cannot drift apart. Before ticket 13 they did — the plain
+    // walker kept heading marks and inline backticks that the styled one hid.
+    render_block_styled(source, &crate::theme::Theme::find_default())
+        .iter()
+        .map(crate::render::StyledRow::text)
+        .collect()
 }
 
-/// The incremental renderer: block list plus the open tail.
+/// The incremental renderer: a block list with a stable frozen prefix, and one styled row set per block.
 #[derive(Default)]
 pub struct StreamingMarkdown {
     blocks: Vec<Block>,
     /// Styled rows per block, computed when a block is (re)parsed — so a frozen block never pays for
     /// colour twice, which is the whole point of ticket 06's partitioning.
-    styled: Vec<Vec<crate::render::StyledRow>>, 
+    styled: Vec<Vec<crate::render::StyledRow>>,
     /// Length of the source consumed so far, for the prefix check.
     pub source_len: usize,
 }
@@ -195,79 +90,64 @@ impl StreamingMarkdown {
         StreamingMarkdown { blocks: Vec::new(), styled: Vec::new(), source_len: 0 }
     }
 
-    /// The rendered rows in order.
+    /// The rendered rows in order, with one blank row between blocks. Spacing is a property of the
+    /// document, not of a block: pi ends every block with a blank row (`markdown.ts:597-600`, `:651-657`),
+    /// and before ticket 13 the client had none, so an answer's paragraphs, headings and fences collided
+    /// into a wall of text. Plain text is the styled rows' text, so both paths agree.
     pub fn lines(&self) -> Vec<String> {
-        let mut out = Vec::new();
-        for block in &self.blocks {
-            out.extend(block.lines.iter().cloned());
-        }
-        out
+        self.styled_rows().iter().map(crate::render::StyledRow::text).collect()
     }
 
     pub fn is_open(&self) -> bool {
         self.blocks.last().map(|block| block.open).unwrap_or(false)
     }
 
-    /// Feed the *whole* accumulated source. Frozen blocks are kept by prefix equality; only the open
-    /// block (and anything after the frozen prefix) is re-parsed. Returns how many blocks were parsed,
-    /// so a test can assert the linear behaviour rather than only its speed.
+    /// Feed the *whole* accumulated source, rendered with the default theme. Frozen blocks are kept by
+    /// prefix equality; only the open block (and anything after the frozen prefix) is re-parsed. Returns
+    /// how many blocks were parsed, so a test can assert the linear behaviour rather than only its speed.
     pub fn update(&mut self, source: &str) -> usize {
+        self.render(source, &crate::theme::Theme::find_default())
+    }
+
+    /// Update and style in one pass: a frozen block keeps its styled rows, so a streaming frame pays only
+    /// for the open tail.
+    pub fn update_styled(&mut self, source: &str, theme: &crate::theme::Theme) -> usize {
+        self.render(source, theme)
+    }
+
+    /// The one render path both callers share: freeze the prefix, then render what is left.
+    fn render(&mut self, source: &str, theme: &crate::theme::Theme) -> usize {
         let spans = split_blocks(source);
-        let mut parsed = 0;
         let mut frozen = 0;
-        // Keep the frozen prefix: a span is frozen when it is closed (not open) and its source matches.
-        for (index, (start, end, open)) in spans.iter().enumerate() {
+        for (index, (start, end, _)) in spans.iter().enumerate() {
             match self.blocks.get(index) {
-                Some(block) if block.source == source[*start..*end] && !block.open => {
-                    frozen = index + 1;
-                    let _ = open;
-                }
+                Some(block) if block.source == source[*start..*end] && !block.open => frozen = index + 1,
                 _ => break,
             }
         }
         self.blocks.truncate(frozen);
-        // Re-parse the tail, open block included.
+        self.styled.truncate(frozen);
         for (start, end, open) in spans.iter().skip(frozen) {
             let block_source = source[*start..*end].to_string();
-            let lines = render_block(&block_source);
-            parsed += 1;
-            self.blocks.push(Block { source: block_source, lines, open: *open });
+            let rows = render_block_styled(&block_source, theme);
+            self.blocks.push(Block { source: block_source, open: *open });
+            self.styled.push(rows);
         }
         self.source_len = source.len();
-        parsed
+        spans.len() - frozen
     }
 
-    /// The same blocks with roles attached, from the cache built at parse time.
+    /// The rows in order, a blank row between blocks. The last block does not get a trailing one: the
+    /// message-level spacer in the transcript (`model.rs::commit_open`) already separates messages.
     pub fn styled_rows(&self) -> Vec<crate::render::StyledRow> {
         let mut out = Vec::new();
-        for block in &self.styled {
+        for (index, block) in self.styled.iter().enumerate() {
+            if index > 0 {
+                out.push(crate::render::StyledRow::default());
+            }
             out.extend(block.iter().cloned());
         }
         out
-    }
-
-    /// Update and style in one pass: a frozen block keeps both its plain lines and its styled rows, so a
-    /// streaming frame pays only for the open tail.
-    pub fn update_styled(&mut self, source: &str, theme: &crate::theme::Theme) -> usize {
-        // The plain pass decides which blocks are frozen; the styled cache follows that boundary.
-        let parsed_from = {
-            let spans = split_blocks(source);
-            let mut frozen = 0;
-            for (index, (start, end, _)) in spans.iter().enumerate() {
-                match self.blocks.get(index) {
-                    Some(block) if block.source == source[*start..*end] && !block.open => frozen = index + 1,
-                    _ => break,
-                }
-            }
-            frozen
-        };
-        let parsed = self.update(source);
-        self.styled.truncate(parsed_from);
-        for block in self.blocks.iter().skip(parsed_from) {
-            let rows = render_block_styled(&block.source, theme);
-            self.styled.push(rows);
-        }
-        parsed
     }
 
     /// Number of frozen (unchanged) blocks: the measure of how much work an append avoids.
@@ -276,12 +156,17 @@ impl StreamingMarkdown {
     }
 }
 
-
 /// Render a block with pi's roles attached.
 ///
 /// The construct set is ticket 04's decision: headings, lists, inline code, fenced code (syntax colours
 /// projected onto pi's nine `syntax*` roles), links, quotes, rules. Images become alt text, HTML is
-/// dropped, and LaTeX/mermaid stay literal because pi's own renderers are out of v1.
+/// Render a block with pi's roles attached.
+///
+/// The construct set is ticket 04's decision, aligned with pi's own renderer by ticket 13: headings (marks
+/// hidden below level 3), lists, inline code without its backticks, fenced code with syntax colours,
+/// links, quotes, a glyph rule, and real tables. Images become alt text, HTML is dropped, and
+/// LaTeX/mermaid stay literal because pi's own renderers are out of v1. Spacing *between* blocks is the
+/// streaming renderer's job, not this one's: a block renders only its own rows.
 pub fn render_block_styled(source: &str, theme: &crate::theme::Theme) -> Vec<crate::render::StyledRow> {
     use crate::render::{StyledRow, StyledSpan};
     use crate::theme::Role;
@@ -298,6 +183,7 @@ pub fn render_block_styled(source: &str, theme: &crate::theme::Theme) -> Vec<cra
     let mut rows: Vec<StyledRow> = Vec::new();
     let mut current: Vec<StyledSpan> = Vec::new();
     let mut heading = false;
+    let mut table: Option<TableBuild> = None;
 
     for event in Parser::new_ext(source, options) {
         match event {
@@ -305,7 +191,13 @@ pub fn render_block_styled(source: &str, theme: &crate::theme::Theme) -> Vec<cra
             Event::Start(Tag::Heading { level, .. }) => {
                 flush(&mut rows, &mut current);
                 heading = true;
-                current.push(StyledSpan::new(format!("{} ", "#".repeat(level as usize)), Role::MdHeading));
+                // pi hides the marks for levels 1 and 2 and keeps them from 3 down
+                // (`pi/packages/tui/src/components/markdown.ts:576-600`): a heading reads as a heading
+                // because it is styled, not because it is spelled.
+                let marks = level as usize;
+                if marks >= 3 {
+                    current.push(StyledSpan::new(format!("{} ", "#".repeat(marks)), Role::MdHeading));
+                }
             }
             Event::End(TagEnd::Heading(_)) => {
                 flush(&mut rows, &mut current);
@@ -321,25 +213,198 @@ pub fn render_block_styled(source: &str, theme: &crate::theme::Theme) -> Vec<cra
             }
             Event::Start(Tag::Link { .. }) => {}
             Event::End(TagEnd::Link) => {}
-            Event::Code(code) => current.push(StyledSpan::new(format!("`{code}`"), Role::MdCode)),
+            Event::Code(code) => {
+                // pi styles the run and drops the delimiters (`markdown.ts:833-835`).
+                push_or_cell(&mut current, &mut table, StyledSpan::new(code.to_string(), Role::MdCode));
+            }
             Event::Text(text) => {
                 let role = if heading { Role::MdHeading } else { Role::Text };
-                current.push(StyledSpan::new(text.to_string(), role));
+                push_or_cell(&mut current, &mut table, StyledSpan::new(text.to_string(), role));
             }
-            Event::SoftBreak | Event::HardBreak => flush(&mut rows, &mut current),
+            Event::SoftBreak | Event::HardBreak => {
+                if table.is_none() {
+                    flush(&mut rows, &mut current);
+                }
+            }
             Event::Rule => {
                 flush(&mut rows, &mut current);
-                rows.push(StyledRow::styled("---", Role::MdHr));
+                // pi's rule is a glyph row, not markdown source (`markdown.ts:745-750`).
+                rows.push(StyledRow::styled("\u{2500}".repeat(80), Role::MdHr));
             }
             Event::End(TagEnd::Paragraph) => flush(&mut rows, &mut current),
             Event::End(TagEnd::BlockQuote(_)) => flush(&mut rows, &mut current),
             Event::End(TagEnd::Item) => flush(&mut rows, &mut current),
+            Event::Start(Tag::Table(_)) => {
+                flush(&mut rows, &mut current);
+                table = Some(TableBuild::default());
+            }
+            Event::Start(Tag::TableHead) | Event::Start(Tag::TableRow) => {
+                if let Some(build) = table.as_mut() {
+                    build.row.clear();
+                }
+            }
+            Event::Start(Tag::TableCell) => {
+                if let Some(build) = table.as_mut() {
+                    build.cell.clear();
+                }
+            }
+            Event::End(TagEnd::TableCell) => {
+                if let Some(build) = table.as_mut() {
+                    let cell = std::mem::take(&mut build.cell);
+                    build.row.push(cell);
+                }
+            }
+            Event::End(TagEnd::TableHead) | Event::End(TagEnd::TableRow) => {
+                if let Some(build) = table.as_mut() {
+                    let row = std::mem::take(&mut build.row);
+                    if !row.is_empty() {
+                        let head = build.rows.is_empty();
+                        build.heads.push(head);
+                        build.rows.push(row);
+                    }
+                }
+            }
+            Event::End(TagEnd::Table) => {
+                if let Some(build) = table.take() {
+                    rows.extend(table_rows(build));
+                }
+            }
             Event::Html(_) | Event::InlineHtml(_) => {}
             _ => {}
         }
     }
     flush(&mut rows, &mut current);
     rows
+}
+
+/// Text belongs to the open table's cell while a table is open, and to the running line otherwise.
+fn push_or_cell(
+    current: &mut Vec<crate::render::StyledSpan>,
+    table: &mut Option<TableBuild>,
+    span: crate::render::StyledSpan,
+) {
+    match table.as_mut() {
+        Some(build) => build.cell.push(span),
+        None => current.push(span),
+    }
+}
+
+/// A table being collected. pulldown-cmark emits the header row first, so `heads` is true for index 0.
+#[derive(Default)]
+struct TableBuild {
+    rows: Vec<Vec<Vec<crate::render::StyledSpan>>>,
+    row: Vec<Vec<crate::render::StyledSpan>>,
+    cell: Vec<crate::render::StyledSpan>,
+    heads: Vec<bool>,
+}
+
+/// The widest a table may be before its columns are squeezed. The block renderer has no pane width (the
+/// painter owns wrapping, and blocks are cached by source alone), so a table is laid out at its natural
+/// width capped here: narrow enough for a normal pane, wide enough for a real table not to be cut.
+const TABLE_MAX_WIDTH: usize = 100;
+
+/// A table as a box-drawn grid with pi's glyphs (`markdown.ts:1126-1163`). A cell keeps its spans; a cell
+/// wider than its column wraps inside the cell rather than losing text.
+fn table_rows(build: TableBuild) -> Vec<crate::render::StyledRow> {
+    use crate::render::{StyledRow, StyledSpan};
+    use crate::theme::Role;
+
+    let columns = build.rows.iter().map(Vec::len).max().unwrap_or(0);
+    if columns == 0 || build.rows.is_empty() {
+        return Vec::new();
+    }
+    let mut widths = vec![1usize; columns];
+    for row in &build.rows {
+        for (index, cell) in row.iter().enumerate() {
+            let width: usize = cell.iter().map(|span| span_width(&span.text)).sum();
+            widths[index] = widths[index].max(width);
+        }
+    }
+    let overhead = 3 * columns + 1;
+    let room = TABLE_MAX_WIDTH.saturating_sub(overhead).max(columns);
+    while widths.iter().sum::<usize>() > room {
+        let widest = widths
+            .iter()
+            .enumerate()
+            .filter(|(_, width)| **width > 1)
+            .max_by_key(|(_, width)| *width)
+            .map(|(index, _)| index);
+        match widest {
+            Some(index) => widths[index] -= 1,
+            None => break,
+        }
+    }
+
+    let border = |left: &str, join: &str, right: &str| -> StyledRow {
+        let mut text = String::new();
+        text.push_str(left);
+        for (index, width) in widths.iter().enumerate() {
+            if index > 0 {
+                text.push_str(join);
+            }
+            text.push_str(&"\u{2500}".repeat(*width));
+        }
+        text.push_str(right);
+        StyledRow::styled(text, Role::Dim)
+    };
+    let row_line = |cells: &[StyledRow]| -> StyledRow {
+        let mut spans: Vec<StyledSpan> = vec![StyledSpan::new("\u{2502} ", Role::Dim)];
+        for (index, cell) in cells.iter().enumerate() {
+            if index > 0 {
+                spans.push(StyledSpan::new(" \u{2502} ", Role::Dim));
+            }
+            let width: usize = cell.spans.iter().map(|span| span_width(&span.text)).sum();
+            spans.extend(cell.spans.iter().cloned());
+            let pad = widths[index].saturating_sub(width);
+            if pad > 0 {
+                spans.push(StyledSpan::new(" ".repeat(pad), Role::Text));
+            }
+        }
+        spans.push(StyledSpan::new(" \u{2502}", Role::Dim));
+        StyledRow { spans }
+    };
+
+    let mut out: Vec<StyledRow> = Vec::new();
+    out.push(border("\u{250c}\u{2500}", "\u{2500}\u{252c}\u{2500}", "\u{2500}\u{2510}"));
+    for (index, row) in build.rows.iter().enumerate() {
+        let head = build.heads.get(index).copied().unwrap_or(false);
+        // Each cell is wrapped inside its own column, and the row is as tall as its tallest cell.
+        let wrapped: Vec<Vec<StyledRow>> = (0..columns)
+            .map(|column| {
+                let spans: Vec<StyledSpan> = row
+                    .get(column)
+                    .map(|cell| {
+                        cell.iter()
+                            .map(|span| StyledSpan {
+                                text: span.text.clone(),
+                                role: if head { Role::MdHeading } else { span.role },
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                crate::render::wrap_rows(&[StyledRow { spans }], widths[column])
+            })
+            .collect();
+        let height = wrapped.iter().map(Vec::len).max().unwrap_or(1).max(1);
+        for line in 0..height {
+            let cells: Vec<StyledRow> = wrapped
+                .iter()
+                .map(|lines| lines.get(line).cloned().unwrap_or_default())
+                .collect();
+            out.push(row_line(&cells));
+        }
+        if index == 0 && build.rows.len() > 1 {
+            out.push(border("\u{251c}\u{2500}", "\u{2500}\u{253c}\u{2500}", "\u{2500}\u{2524}"));
+        }
+    }
+    out.push(border("\u{2514}\u{2500}", "\u{2500}\u{2534}\u{2500}", "\u{2500}\u{2518}"));
+    out
+}
+
+/// The cells a string occupies in a terminal.
+fn span_width(text: &str) -> usize {
+    use unicode_width::UnicodeWidthStr;
+    UnicodeWidthStr::width(text)
 }
 
 /// Whether a role is one of pi's nine syntax colours (used by tests to assert highlighted bodies).
@@ -395,17 +460,22 @@ pub fn fence_parts(source: &str) -> Option<(String, String)> {
 fn fence_styled(info: &str, body: &str, theme: &crate::theme::Theme) -> Vec<crate::render::StyledRow> {
     use crate::render::StyledRow;
     use crate::theme::Role;
+    // pi replaces a tab with three spaces and indents a code row by two (`render-utils.ts:replaceTabs`,
+    // `markdown.ts:638-654`). The client passed tabs through, so the terminal's tab stop (8) decided the
+    // indent and a fenced block did not line up with pi's.
+    let body = body.replace('\t', "   ");
+    let indent = "  ";
     let mut cache = crate::highlight::Cache::new(info);
     let mut rows = vec![StyledRow::styled(
         if info.is_empty() { "```".to_string() } else { format!("```{info}") },
         Role::MdCodeBlockBorder,
     )];
-    for (line, spans) in crate::highlight::style_lines(body, info, &mut cache) {
+    for (line, spans) in crate::highlight::style_lines(&body, info, &mut cache) {
         if line.is_empty() {
             rows.push(StyledRow::default());
             continue;
         }
-        let mut row = StyledRow { spans: Vec::new() };
+        let mut row = StyledRow { spans: vec![crate::render::StyledSpan::new(indent, Role::Text)] };
         for span in spans {
             let text = span.text(&line).to_string();
             if text.is_empty() {
@@ -413,7 +483,7 @@ fn fence_styled(info: &str, body: &str, theme: &crate::theme::Theme) -> Vec<crat
             }
             row.spans.push(crate::render::StyledSpan::new(text, syntax_role(&span.style, theme)));
         }
-        rows.push(if row.spans.is_empty() { StyledRow::default() } else { row });
+        rows.push(row);
     }
     if body.ends_with('\n') {
         rows.push(StyledRow::styled("```", Role::MdCodeBlockBorder));
@@ -500,12 +570,57 @@ mod tests {
     }
 
     #[test]
-    fn a_heading_keeps_its_marks_and_a_rule_survives() {
+    fn a_heading_hides_its_marks_below_level_three_and_the_rule_is_a_glyph() {
+        // pi's rule (`markdown.ts:576-600`, `:745-750`), ticket 13's F3 and the rule row.
+        let rows = render_block_styled("# Title\n", &crate::theme::Theme::find_default());
+        assert_eq!(rows[0].text(), "Title", "an h1 is styled, not spelled");
+        assert_eq!(rows[0].spans[0].role, crate::theme::Role::MdHeading);
+        let rows = render_block_styled("### Details\n", &crate::theme::Theme::find_default());
+        assert_eq!(rows[0].text(), "### Details", "an h3 keeps its marks, as pi does");
+        let rows = render_block_styled("---\n", &crate::theme::Theme::find_default());
+        assert!(rows[0].text().starts_with('\u{2500}'), "a glyph rule: {:?}", rows[0].text());
+        assert!(rows[0].text().chars().all(|ch| ch == '\u{2500}'), "no markdown source");
+    }
+
+    #[test]
+    fn blocks_are_separated_by_one_blank_row() {
+        // Ticket 13's F2: a heading, a paragraph and a fence must not collide.
         let mut md = StreamingMarkdown::new();
-        md.update("# Title\n\n---\n\n");
+        md.update("# Title\n\nA paragraph.\n\n```ts\nconst a = 1;\n```\n");
         let lines = md.lines();
-        assert_eq!(lines[0], "# Title");
-        assert!(lines.iter().any(|line| line == "---"));
+        let blank = |index: usize| lines.get(index).map(|line| line.is_empty()).unwrap_or(false);
+        let heading = lines.iter().position(|line| line == "Title").expect("the heading");
+        assert!(blank(heading + 1), "a blank row after the heading: {lines:?}");
+        let para = lines.iter().position(|line| line == "A paragraph.").expect("the paragraph");
+        assert!(blank(para + 1), "a blank row after the paragraph: {lines:?}");
+        let fence = lines.iter().position(|line| line == "```ts").expect("the fence");
+        assert!(blank(fence - 1), "a blank row before the fence: {lines:?}");
+    }
+
+    #[test]
+    fn inline_code_drops_its_backticks_and_keeps_the_code_role() {
+        // Ticket 13's F4: pi styles the run and drops the delimiters (`markdown.ts:833-835`).
+        let rows = render_block_styled("See `tui-main-screen.ts` here.\n", &crate::theme::Theme::find_default());
+        let text = rows.iter().map(|row| row.text()).collect::<Vec<_>>().join("\n");
+        assert_eq!(text, "See tui-main-screen.ts here.");
+        let code: Vec<_> = rows
+            .iter()
+            .flat_map(|row| row.spans.iter())
+            .filter(|span| span.role == crate::theme::Role::MdCode)
+            .collect();
+        assert_eq!(code.len(), 1, "the run carries the code role");
+    }
+
+    #[test]
+    fn a_table_is_a_grid_that_keeps_every_cell() {
+        // Ticket 13's F5: a table used to collapse into one concatenated line.
+        let theme = crate::theme::Theme::find_default();
+        let rows = render_block_styled("| a | b |\n| --- | --- |\n| 1 | 2 |\n", &theme);
+        let lines = rows.iter().map(|row| row.text()).collect::<Vec<_>>();
+        assert!(lines[0].starts_with('\u{250c}'), "a top border: {lines:?}");
+        assert!(lines.iter().any(|line| line.contains("\u{2502} a") && line.contains("\u{2502} b")), "{}", lines.join("\n"));
+        assert!(lines.iter().any(|line| line.contains("\u{2502} 1") && line.contains("\u{2502} 2")), "{}", lines.join("\n"));
+        assert!(lines.last().unwrap().starts_with('\u{2514}'), "a bottom border: {lines:?}");
     }
 
     #[test]
@@ -513,7 +628,7 @@ mod tests {
         let theme = crate::theme::Theme::parse(r#"{"colors": {"mdHeading": "okhsl(83 88% 67%)", "mdListBullet": "okhsl(295 50% 67%)"}}"#).expect("a theme");
         let rows = render_block_styled("# Title\n\n- one\n- two\n", &theme);
         let heading = &rows[0];
-        assert_eq!(heading.text(), "# Title");
+        assert_eq!(heading.text(), "Title");
         assert_eq!(heading.spans[0].role, crate::theme::Role::MdHeading);
         // Two items means two bullet spans, each in the bullet role; the text of the items survives.
         let bullet_spans: Vec<_> = rows
@@ -535,9 +650,10 @@ mod tests {
         assert_eq!(rows.last().unwrap().text(), "```");
         let body: Vec<_> = rows.iter().skip(1).take(rows.len() - 2).collect();
         assert_eq!(body.len(), 1);
-        assert!(role_is_syntax(body[0].spans[0].role), "code carries a syntax role: {:?}", body[0].spans);
-        // The text is intact: colour never rewrites the code.
-        assert_eq!(body[0].text(), "const answer = 42;");
+        let syntax: Vec<_> = body[0].spans.iter().filter(|span| role_is_syntax(span.role)).collect();
+        assert!(!syntax.is_empty(), "code carries a syntax role: {:?}", body[0].spans);
+        // The text is intact, and indented by two like pi (`markdown.ts:638-654`).
+        assert_eq!(body[0].text(), "  const answer = 42;");
     }
 
     #[test]

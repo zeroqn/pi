@@ -48,6 +48,11 @@ struct Args {
     replay: Option<String>,
     pace_ms: u64,
     pi: Vec<String>,
+    /// Flags the client does not own, handed to the host unchanged: `-c`, `-r`, `--session <id>`,
+    /// `--session-id`, `-m <model>`, `--thinking …`. The host's own parser honours all of them in RPC
+    /// mode (`pi/packages/coding-agent/src/cli/args.ts:111-142`), so the client only has to stop refusing
+    /// them — which is what `pi -c` hit before ticket 14 (the client's `unknown argument` exit 2).
+    forward: Vec<String>,
     stats: Option<String>,
     once: bool,
     repeat: usize,
@@ -64,9 +69,22 @@ fn default_host() -> Vec<String> {
 }
 
 fn parse_args() -> Args {
-    let mut args = Args { replay: None, pace_ms: 2, pi: default_host(), stats: None, once: false, repeat: 1 };
+    let mut args = Args {
+        replay: None,
+        pace_ms: 2,
+        pi: default_host(),
+        forward: Vec::new(),
+        stats: None,
+        once: false,
+        repeat: 1,
+    };
     let mut argv = std::env::args().skip(1);
     while let Some(arg) = argv.next() {
+        // Everything after `--` belongs to the host, whatever it is.
+        if arg == "--" {
+            args.forward.extend(argv);
+            break;
+        }
         match arg.as_str() {
             "--replay" => args.replay = argv.next(),
             "--pace-ms" => args.pace_ms = argv.next().and_then(|v| v.parse().ok()).unwrap_or(2),
@@ -78,21 +96,26 @@ fn parse_args() -> Args {
                 println!(
                     "pi-tui [--replay FIXTURE] [--pace-ms N] [--repeat N] [--pi 'CMD ARGS'] [--stats FILE] [--once]\n\n\
                      With no --replay, spawns the host (default `pi`) in RPC mode and talks to it.\n\
-                     --stats writes one JSON line of frame and echo samples on exit."
+                     --stats writes one JSON line of frame and echo samples on exit.\n\
+                     Any other argument is passed to the host unchanged (`-c`, `-r`, `--session <id>`, `-m <model>`)."
                 );
                 std::process::exit(0);
             }
-            other => {
-                eprintln!("unknown argument {other:?}; try --help");
-                std::process::exit(2);
-            }
+            // Not the client's: the host's. `pi -c`, `pi --session <id>` and `pi -m <model>` are the
+            // first act of a working day, and the host has always been able to serve them.
+            other => args.forward.push(other.to_string()),
         }
     }
     // RPC mode is how the client speaks to a host; a command that already names a mode keeps it, so a
     // wrapper passing `--pi "pi --mode rpc"` is not given it twice.
-    if args.replay.is_none() && !args.pi.iter().any(|arg| arg == "--mode") {
-        args.pi.push("--mode".into());
-        args.pi.push("rpc".into());
+    if args.replay.is_none() {
+        let has_mode = args.pi.iter().any(|arg| arg == "--mode") || args.forward.iter().any(|arg| arg == "--mode");
+        if !has_mode {
+            args.pi.push("--mode".into());
+            args.pi.push("rpc".into());
+        }
+        let forward = std::mem::take(&mut args.forward);
+        args.pi.extend(forward);
     }
     args
 }
@@ -192,6 +215,70 @@ impl Drop for Screen {
     }
 }
 
+/// The cwd as pi writes it in its footer: `~` for home, `~/x` below it, the absolute path otherwise.
+fn footer_cwd() -> String {
+    let cwd = std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default();
+    let Some(home) = std::env::var("HOME").ok().filter(|home| !home.is_empty()) else {
+        return cwd;
+    };
+    if cwd == home {
+        return "~".to_string();
+    }
+    match cwd.strip_prefix(&format!("{home}/")) {
+        Some(rest) => format!("~/{rest}"),
+        None => cwd,
+    }
+}
+
+/// The rows the client opens with: what it is, which host it drives, and the chords it actually answers.
+///
+/// Only chords that are implemented are named — pi's boot line names `! bash` and startup help, which
+/// this client does not have, and a hint that does nothing is worse than no hint.
+fn boot_rows(args: &Args, keys: &Keymap) -> Vec<pi_tui::render::StyledRow> {
+    use pi_tui::render::StyledRow;
+    use pi_tui::theme::Role;
+    let version = host_version(&args.pi).unwrap_or_default();
+    let title = if version.is_empty() {
+        "pi".to_string()
+    } else {
+        format!("pi {version}")
+    };
+    let host = args.pi.iter().find(|arg| arg.contains("pi")).cloned().unwrap_or_else(|| "pi".to_string());
+    let hint = |id: &str, what: &str| -> String { format!("{} {what}", keys.display(id).unwrap_or_else(|| "-".to_string())) };
+    let line = [
+        hint("app.interrupt", "interrupt"),
+        hint("app.clear", "clear"),
+        hint("app.exit", "exit"),
+        "/ commands".to_string(),
+        "@ files".to_string(),
+        hint("app.tools.expand", "expand tools"),
+    ]
+    .join(" · ");
+    let host_line = host.split_whitespace().next().unwrap_or("pi").to_string();
+    vec![
+        StyledRow::styled(title, Role::Accent),
+        StyledRow::styled(line, Role::Dim),
+        StyledRow::styled(format!(" rpc host: {host_line}"), Role::Muted),
+    ]
+}
+
+/// The host's own `--version`, asked once at startup. A host that does not answer is not an error: the
+/// boot block simply does not name a version.
+fn host_version(pi: &[String]) -> Option<String> {
+    let program = pi.first()?;
+    let output = std::process::Command::new(program).arg("--version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let line = text.lines().next()?.trim().to_string();
+    if line.is_empty() {
+        None
+    } else {
+        Some(line)
+    }
+}
+
 fn main() -> std::io::Result<()> {
     let args = parse_args();
     // A client that owns the screen must not write to a pipe: refuse rather than corrupt a stream (ticket
@@ -208,6 +295,9 @@ fn main() -> std::io::Result<()> {
     host.send(json!({"id": "models", "type": "get_available_models"}));
     host.send(json!({"id": "commands", "type": "get_commands"}));
     host.send(json!({"id": "state", "type": "get_state"}));
+    // The footer's numbers, from the session the host just opened — a resumed session has them without a
+    // new turn (`SessionStats` is accumulated from the entries). The reply is not a notice: nobody asked.
+    host.send(json!({"id": "stats", "type": "get_session_stats"}));
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let mut out = std::io::stdout();
@@ -227,6 +317,12 @@ fn main() -> std::io::Result<()> {
     let tty = writer::Writer::spawn();
     let mut state = State::new(args.pace_ms);
     state.transcript.set_theme(state.theme.clone());
+    // What pi draws under the composer from the first frame: the directory this session belongs to
+    // (ticket 15's F8/F9). The host is spawned in this directory, so the client's own cwd is the session's.
+    state.ui.footer.cwd = footer_cwd();
+    // pi's boot block (ticket 15's F10): a version, one line of what the client answers, and a tip. An
+    // empty screen with one footer row looked like a hang.
+    state.transcript.push_boot(&boot_rows(&args, &state.keymap));
     // A binding that does nothing is worse than a notice, so the keymap reports itself once at start.
     for conflict in state.keymap.conflicts.clone() {
         state.ui.notify(format!("[ui] keybinding conflict: {conflict}"));
@@ -308,14 +404,19 @@ struct State {
     queued_paste: Option<String>,
     /// Whether the hardware cursor is currently shown, so the sequence is written only on a change.
     hardware_cursor_shown: bool,
-    /// The models the host reports as available: `(provider, id)` (ticket 07).
-    models: Vec<(String, String)>,
+    /// The models the host reports as available: `(provider, id, contextWindow, reasoning)` (ticket 07;
+// the last two feed the footer's context budget, ticket 15).
+    models: Vec<(String, String, u64, bool)>,
     /// The palette: the host's commands and pi's built-ins, with their routes (ticket 08).
     palette: Vec<pi_tui::palette::Entry>,
     /// What `get_state` said, for the notice after a switch and for the picker's current mark.
     current_model: Option<String>,
     current_provider: Option<String>,
     current_thinking: Option<String>,
+    /// A `get_session_stats` request is in flight: the turn-end refresh must not stack requests.
+    awaiting_stats: bool,
+    /// The next stats reply is one the user asked for, so it is also shown as a notice.
+    stats_notice: bool,
 }
 
 impl State {
@@ -352,6 +453,8 @@ impl State {
             current_model: None,
             current_provider: None,
             current_thinking: None,
+            awaiting_stats: false,
+            stats_notice: false,
         }
     }
 }
@@ -471,6 +574,15 @@ fn run(host: &mut Host, state: &mut State, tty: &writer::Writer, args: &Args, sc
                     if state.transcript.apply(&line) {
                         dirty_host = true;
                     }
+                    // A turn's numbers change when it settles, so that is when the footer asks for them
+                    // (`agent_settled` is the host's own "nothing is running now": `rpc-mode.ts:329-333`).
+                    if line.value().get("type").and_then(|t| t.as_str()) == Some("agent_settled")
+                        && !state.awaiting_stats
+                    {
+                        state.awaiting_stats = true;
+                        state.stats_notice = false;
+                        host.send(json!({"id": "stats", "type": "get_session_stats"}));
+                    }
                     drained += 1;
                 }
                 Err(_) => break,
@@ -568,14 +680,10 @@ fn paint_frame(state: &mut State, tty: &writer::Writer, last_paint: &mut Instant
     if state.ui.has_dialog() && !state.models.is_empty() {
         state.ui.refresh_client_list("model", model_items(state));
     }
-    // What the session is running on. `long_transcript.py` (v1's harness) waits for the model's name
-    // before it will type anything, and a reader wants to know which model answered (ticket 07 D2).
-    let mut composer_block: Vec<String> = Vec::new();
-    if let Some(model) = &state.current_model {
-        let thinking = state.current_thinking.clone().unwrap_or_else(|| "off".to_string());
-        composer_block.push(format!(" {model}  ·  thinking {thinking}"));
-    }
-    composer_block.extend(composer_rows);
+    // The model, its thinking level and the session's numbers live in the footer now (ticket 15):
+    // `long_transcript.py` (v1's harness) still waits for the model's name before it types, and that name
+    // is drawn under the composer where pi draws it, not above it over the buffer.
+    let mut composer_block: Vec<String> = composer_rows;
     // The popup draws above the composer, in the transcript's row budget (ticket 09 D5): it must not
     // hide the text being typed, and it is never queued as a dialog.
     let popup = state.completions.render_rows(width as usize, state.settings.list_rows);
@@ -825,9 +933,19 @@ fn apply_response(state: &mut State, response: &Value) -> bool {
                     .filter_map(|model| {
                         let provider = model.get("provider").and_then(Value::as_str)?;
                         let id = model.get("id").and_then(Value::as_str)?;
-                        Some((provider.to_string(), id.to_string()))
+                        let window = model.get("contextWindow").and_then(Value::as_u64).unwrap_or(0);
+                        let reasoning = model.get("reasoning").and_then(Value::as_bool).unwrap_or(false);
+                        state.ui.footer.providers = 0;
+                        Some((provider.to_string(), id.to_string(), window, reasoning))
                     })
                     .collect();
+                state.ui.footer.providers = state
+                    .models
+                    .iter()
+                    .map(|(provider, _, _, _)| provider.clone())
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len();
+                footer_model_facts(state);
             }
         }
         "get_commands" => {
@@ -862,6 +980,14 @@ fn apply_response(state: &mut State, response: &Value) -> bool {
             if let Some(level) = data.and_then(|d| d.get("thinkingLevel")).and_then(Value::as_str) {
                 state.current_thinking = Some(level.to_string());
             }
+            // The footer is fed from the host's own state, never from a guess (ticket 15).
+            if let Some(enabled) = data.and_then(|d| d.get("autoCompactionEnabled")).and_then(Value::as_bool) {
+                state.ui.footer.auto_compaction = enabled;
+            }
+            state.ui.footer.model = state.current_model.clone().unwrap_or_default();
+            state.ui.footer.provider = state.current_provider.clone().unwrap_or_default();
+            state.ui.footer.thinking = state.current_thinking.clone().unwrap_or_else(|| "off".to_string());
+            footer_model_facts(state);
         }
         "set_model" | "cycle_model" => {
             if success {
@@ -939,7 +1065,25 @@ fn apply_response(state: &mut State, response: &Value) -> bool {
                     .pointer("/tokens/total")
                     .and_then(Value::as_u64)
                     .unwrap_or(0);
-                state.ui.notify(format!("{messages} messages · {tokens} tokens · ${cost:.4}"));
+                // The footer is refreshed from the same reply: pi draws these numbers under the composer
+                // on every frame (`components/footer.ts:110-190`), the client only ever showed them as a
+                // notice when `/session` was typed (ticket 15's F8).
+                state.ui.footer.input_tokens = stats.pointer("/tokens/input").and_then(Value::as_u64).unwrap_or(0);
+                state.ui.footer.output_tokens = stats.pointer("/tokens/output").and_then(Value::as_u64).unwrap_or(0);
+                state.ui.footer.cache_read = stats.pointer("/tokens/cacheRead").and_then(Value::as_u64).unwrap_or(0);
+                state.ui.footer.cache_write = stats.pointer("/tokens/cacheWrite").and_then(Value::as_u64).unwrap_or(0);
+                state.ui.footer.cost = cost;
+                if let Some(usage) = stats.get("contextUsage") {
+                    state.ui.footer.context_percent = usage.get("percent").and_then(Value::as_f64);
+                    if let Some(window) = usage.get("contextWindow").and_then(Value::as_u64) {
+                        state.ui.footer.context_window = window;
+                    }
+                }
+                if state.stats_notice {
+                    state.ui.notify(format!("{messages} messages · {tokens} tokens · ${cost:.4}"));
+                    state.stats_notice = false;
+                }
+                state.awaiting_stats = false;
             }
         }
         "set_session_name" => {
@@ -984,11 +1128,29 @@ fn thinking(state: &State) -> String {
 
 /// The model picker's rows: `provider/id` with the provider in the right column and the current model
 /// marked (ticket 07 D4).
+/// Copy the current model's context window and reasoning flag into the footer, so the budget reads right
+/// before the first turn's stats arrive. The host's model list is the only source for it.
+fn footer_model_facts(state: &mut State) {
+    let Some(model) = state.current_model.clone() else { return };
+    let provider = state.current_provider.clone().unwrap_or_default();
+    let facts = state
+        .models
+        .iter()
+        .find(|(candidate_provider, id, _, _)| *id == model && (provider.is_empty() || *candidate_provider == provider))
+        .map(|(_, _, window, reasoning)| (*window, *reasoning));
+    if let Some((window, reasoning)) = facts {
+        if state.ui.footer.context_window == 0 {
+            state.ui.footer.context_window = window;
+        }
+        state.ui.footer.reasoning = reasoning;
+    }
+}
+
 fn model_items(state: &State) -> Vec<ui::ListItem> {
     state
         .models
         .iter()
-        .map(|(provider, id)| {
+        .map(|(provider, id, _, _)| {
             let mut item = ui::ListItem::label(id.clone());
             item.right = provider.clone();
             if state.current_model.as_deref() == Some(id.as_str())
@@ -1131,7 +1293,11 @@ fn route_dialog_answer(state: &mut State, host: &Host, answer: Value) {
 /// The provider and id behind a picker row. A row shows the id; the provider is in its right column, so the
 /// lookup is by id and falls back to the only model with that id.
 fn model_by_id(state: &State, id: &str) -> Option<(String, String)> {
-    state.models.iter().find(|(_, known)| known == id).cloned()
+    state
+        .models
+        .iter()
+        .find(|(_, known, _, _)| known == id)
+        .map(|(provider, id, _, _)| (provider.clone(), id.clone()))
 }
 
 /// The palette's answer after `/`: a built-in with a route runs it, anything else is prompt text.
@@ -1150,6 +1316,11 @@ fn route_command(state: &mut State, host: &Host, text: String) -> bool {
             true
         }
         pi_tui::palette::Route::Command(command) => {
+            // A stats reply the user asked for is also shown as a notice; the silent refresh after a turn
+            // only feeds the footer (ticket 15).
+            if command == "get_session_stats" {
+                state.stats_notice = true;
+            }
             host.send(json!({"id": "slash", "type": command}));
             state.ui.notify(format!("/{name}: sent"));
             true
@@ -1173,6 +1344,9 @@ fn route_command(state: &mut State, host: &Host, text: String) -> bool {
                 true
             }
             "session" => {
+                // The user asked for the numbers, so the reply is also shown as a notice; the silent
+                // refresh after every turn only feeds the footer.
+                state.stats_notice = true;
                 host.send(json!({"id": "stats", "type": "get_session_stats"}));
                 true
             }

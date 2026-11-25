@@ -126,61 +126,125 @@ impl StyledRow {
     }
 }
 
-/// Wrap one row to `width` cells, splitting inside a span when it must and preserving each piece's role.
-/// Wrapping is grapheme-wise so a flag or an emoji is never cut in half.
+/// Wrap one row to `width` cells, breaking at a space where one is available and inside a word only
+/// when no space fits.
+///
+/// pi's own wrapper (`pi/packages/tui/src/utils.ts`, `wrapTextWithAnsi`) is the reference: it fills a
+/// line greedily and breaks at the last space, so a wrapped answer reads as prose. Breaking per grapheme
+/// — what this did before the wear-in day — put "…The tree is cl" and "an." on separate lines for every
+/// row that overflowed. Grapheme-wise cutting survives only for a single word wider than the pane, which
+/// is what pi does too.
 pub fn wrap(row: &StyledRow, width: usize, out: &mut Vec<StyledRow>) {
     let width = width.max(1);
     if row.spans.is_empty() {
         out.push(StyledRow::default());
         return;
     }
-    let mut current = StyledRow::default();
-    let mut used = 0;
+    if !row.spans.iter().any(|span| span.text.contains('\n')) {
+        wrap_line(&row.spans, width, out);
+        return;
+    }
+    // A row should not carry newlines (the markdown renderer splits them), but a plain row handed
+    // straight from the model may: each newline ends a line, even when it ends nothing else.
+    let mut piece: Vec<StyledSpan> = Vec::new();
     for span in &row.spans {
-        if span.text.is_empty() {
-            continue;
-        }
-        if span.text.contains('\n') {
-            // A row should not carry newlines (the markdown renderer splits them), but a plain row
-            // handed straight from the model may.
-            for (index, piece) in span.text.split('\n').enumerate() {
-                if index > 0 {
-                    out.push(std::mem::take(&mut current));
-                    used = 0;
-                }
-                if !piece.is_empty() {
-                    let piece_row = StyledRow { spans: vec![StyledSpan::new(piece, span.role)] };
-                    let mut inner = Vec::new();
-                    wrap(&piece_row, width, &mut inner);
-                    for (i, part) in inner.into_iter().enumerate() {
-                        if i > 0 {
-                            out.push(std::mem::take(&mut current));
-                        }
-                        used = part.width();
-                        current.spans.extend(part.spans);
-                    }
-                }
+        for (index, part) in span.text.split('\n').enumerate() {
+            if index > 0 {
+                wrap_line(&piece, width, out);
+                piece.clear();
             }
-            continue;
-        }
-        let mut buffer = String::new();
-        for grapheme in span.text.graphemes(true) {
-            let cells = UnicodeWidthStr::width(grapheme);
-            if used + cells > width && used > 0 {
-                if !buffer.is_empty() {
-                    current.spans.push(StyledSpan::new(std::mem::take(&mut buffer), span.role));
-                }
-                out.push(std::mem::take(&mut current));
-                used = 0;
+            if !part.is_empty() {
+                piece.push(StyledSpan::new(part, span.role));
             }
-            buffer.push_str(grapheme);
-            used += cells;
-        }
-        if !buffer.is_empty() {
-            current.spans.push(StyledSpan::new(buffer, span.role));
         }
     }
-    out.push(current);
+    wrap_line(&piece, width, out);
+}
+
+/// One logical line, already free of newlines: fill each row up to `width`, break at the last space.
+fn wrap_line(spans: &[StyledSpan], width: usize, out: &mut Vec<StyledRow>) {
+    if spans.is_empty() {
+        out.push(StyledRow::default());
+        return;
+    }
+    let cells: usize = spans.iter().map(|span| UnicodeWidthStr::width(span.text.as_str())).sum();
+    if cells <= width {
+        out.push(StyledRow { spans: spans.to_vec() });
+        return;
+    }
+    // Flatten to graphemes with their role, so a break can fall anywhere and a span can be split
+    // without losing its colour.
+    let mut graphemes: Vec<(&str, Role)> = Vec::with_capacity(cells);
+    for span in spans {
+        for grapheme in span.text.graphemes(true) {
+            graphemes.push((grapheme, span.role));
+        }
+    }
+    let mut start = 0usize;
+    while start < graphemes.len() {
+        // Spaces left over by the break belong to neither row.
+        while start < graphemes.len() && graphemes[start].0 == " " {
+            start += 1;
+        }
+        if start >= graphemes.len() {
+            break;
+        }
+        let mut used = 0usize;
+        let mut end = start;
+        let mut last_space = None;
+        while end < graphemes.len() {
+            let cells = UnicodeWidthStr::width(graphemes[end].0);
+            if used + cells > width && used > 0 {
+                break;
+            }
+            used += cells;
+            if graphemes[end].0 == " " {
+                last_space = Some(end);
+            }
+            end += 1;
+        }
+        // Break before the space that ended the row; a word wider than the pane is cut at the width,
+        // and a row that took the whole remainder takes all of it.
+        let next = if end >= graphemes.len() {
+            end
+        } else {
+            match last_space {
+                Some(space) if space > start => space,
+                _ => end,
+            }
+        };
+        let next = if next <= start { (start + 1).min(graphemes.len()) } else { next };
+        let mut emit = next;
+        while emit > start && graphemes[emit - 1].0 == " " {
+            emit -= 1;
+        }
+        if emit == start {
+            // A row of nothing but spaces: it carries nothing, so the break is what matters.
+            emit = start + 1;
+        }
+        push_graphemes(&graphemes[start..emit], out);
+        start = next;
+    }
+}
+
+/// One row out of graphemes, merging runs that share a role back into spans.
+fn push_graphemes(graphemes: &[(&str, Role)], out: &mut Vec<StyledRow>) {
+    let mut row = StyledRow::default();
+    let mut buffer = String::new();
+    let mut role: Option<Role> = None;
+    for (grapheme, cell_role) in graphemes {
+        if role != Some(*cell_role) {
+            if !buffer.is_empty() {
+                row.spans.push(StyledSpan::new(std::mem::take(&mut buffer), role.expect("a role for the buffer")));
+            }
+            role = Some(*cell_role);
+        }
+        buffer.push_str(grapheme);
+    }
+    if !buffer.is_empty() {
+        row.spans.push(StyledSpan::new(buffer, role.expect("a role for the buffer")));
+    }
+    out.push(row);
 }
 
 /// Wrap a whole document of rows.
@@ -209,15 +273,27 @@ pub fn truncate_visual(rows: Vec<StyledRow>, max: usize, keep_last: bool) -> (Ve
 }
 
 /// The `... (N more lines, <chord> to expand)` hint pi shows, split into role-tagged spans.
-pub fn more_lines_hint(hidden: usize, chord: &str) -> StyledRow {
+///
+/// `keep_last` picks pi's word for a body that kept its tail: a bash result says *earlier* lines
+/// (`core/tools/renderers/bash.ts:61-66`), everything else says *more* lines
+/// (`components/tool-execution.ts:155-162`).
+pub fn more_lines_hint_kind(hidden: usize, chord: &str, keep_last: bool) -> StyledRow {
+    let noun = if keep_last { "earlier lines" } else { "more lines" };
     StyledRow {
         spans: vec![
-            StyledSpan::new(format!("... ({hidden} more lines, "), Role::Muted),
+            StyledSpan::new(format!("... ({hidden} {noun}, "), Role::Muted),
             StyledSpan::new(chord.to_string(), Role::Accent),
             StyledSpan::new(" to expand)", Role::Muted),
         ],
     }
 }
+
+/// The hint as pi writes it for a body that kept its head.
+pub fn more_lines_hint(hidden: usize, chord: &str) -> StyledRow {
+    more_lines_hint_kind(hidden, chord, false)
+}
+
+
 
 #[cfg(test)]
 mod tests {
@@ -284,10 +360,28 @@ mod tests {
         };
         let wrapped = wrap_rows(&[row], 10);
         let text: Vec<String> = wrapped.iter().map(|row| row.text()).collect();
-        // Wrapping fills a row greedily across spans, so the pieces flow: "plain " + "code" fits exactly.
-        assert_eq!(text, vec!["plain code", "-span tail"]);
-        assert_eq!(wrapped[0].spans[1].role, Role::MdCode, "the role survives the split");
-        assert_eq!(wrapped[1].spans[1].role, Role::Dim, "and so does the next span's role");
+        // The break is at a space, so no word is cut: "code-span" moves whole to the next row even
+        // though "plain " + "code" would have filled the first one (ticket 13's F1).
+        assert_eq!(text, vec!["plain", "code-span", "tail"]);
+        assert_eq!(wrapped[1].spans[0].role, Role::MdCode, "the role survives the break");
+        assert_eq!(wrapped[2].spans[0].role, Role::Dim, "and so does the next span's role");
+        assert!(wrapped.iter().all(|row| row.width() <= 10));
+    }
+
+    #[test]
+    fn a_wrapped_line_breaks_at_a_space_and_never_inside_a_word() {
+        let row = StyledRow::styled("the quick brown fox jumps over the lazy dog", Role::Text);
+        let wrapped = wrap_rows(&[row], 12);
+        let text: Vec<String> = wrapped.iter().map(|row| row.text()).collect();
+        assert_eq!(text, vec!["the quick", "brown fox", "jumps over", "the lazy dog"]);
+    }
+
+    #[test]
+    fn a_word_wider_than_the_pane_is_cut_and_the_rest_still_flows() {
+        let row = StyledRow::styled("a supercalifragilistic word", Role::Text);
+        let wrapped = wrap_rows(&[row], 10);
+        let text: Vec<String> = wrapped.iter().map(|row| row.text()).collect();
+        assert_eq!(text, vec!["a", "supercalif", "ragilistic", "word"]);
         assert!(wrapped.iter().all(|row| row.width() <= 10));
     }
 

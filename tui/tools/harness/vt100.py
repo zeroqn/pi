@@ -84,8 +84,12 @@ class Screen:
 		if w == 2 and self.col + 1 < self.cols:
 			self.grid[self.row][self.col + 1] = ""
 		self.col += w
-		if self.col >= self.cols:
-			self.col = self.cols - 1
+		# A cursor that just wrote the last cell stays one past it: the terminal is in *pending wrap*, and
+		# the next printable character wraps. Clamping to the last column here made a row that fills the
+		# pane lose its last cell to the `\x1b[K` a client writes after the row (measured 2026-11-24: the
+		# Rust client's rule and footer rows read one column short, pi's did not because pi erases before
+		# it paints). Erasing from `self.col == self.cols` now erases nothing, which is what a terminal
+		# does.
 
 	def _linefeed(self):
 		if self.row == self.bottom:
