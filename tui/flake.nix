@@ -105,6 +105,8 @@
             pkgs.nodejs_22
             pkgs.git
             pkgs.python3
+            # What the hook below hands the interactive shell over to, and what `nix develop -c fish` runs.
+            pkgs.fish
             pkgs.unzip
             pkgs.jq
             pkgs.patchelf
@@ -166,6 +168,22 @@
               echo "pi-tui: no AOT host yet at $PI_TUI_HOST — run aot-host (or set PI_TUI_HOST to another pi)"
             fi
             echo "pi-tui: aot-host | aot-release | tui-release | aot-smoke | onnxruntime-check | bun-pin-update | cargo build"
+
+            # The interactive shell is fish. `nix develop` has no knob for this: it runs nixpkgs'
+            # bashInteractive and overrides `SHELL` in the environment it builds (nix's src/nix/develop.cc),
+            # and stdenv's setup exports `SHELL` again, so a `SHELL` attribute here is ignored. This hook is
+            # therefore the only place left, and it runs *inside* that bash. `$-` carries `i` only when the
+            # bash nix started is interactive (it is started without `-c` and reads a terminal); `nix develop
+            # -c` instead runs this same script non-interactively and then execs its command, so a command
+            # keeps bash. Note the trade a fish shell makes: stdenv's exported bash functions (`genericBuild`,
+            # `buildPhase`) exist only in bash — use `nix develop -c bash` or `--phase build` for those.
+            case $- in
+              *i*)
+                # `SHELL` names the shell you are in, not the bash nix started.
+                export SHELL=${pkgs.fish}/bin/fish
+                exec ${pkgs.fish}/bin/fish
+                ;;
+            esac
           '';
         };
     in
