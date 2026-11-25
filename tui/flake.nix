@@ -113,9 +113,6 @@
             pkgs.curl
             pkgs.openssl
             runtime
-            # What Magic Context's native embeddings load: the shim directory the loader is fed and the
-            # real ONNX Runtime it forwards to are both exported below, on the one platform that has a shim.
-            (lib.optional (hasShim system) shim)
             (script "aot-host.sh" ".sh")
             (script "aot-release.sh" ".sh")
             (script "tui-release.sh" ".sh")
@@ -124,7 +121,12 @@
             (script "bun-pin-update.sh" ".sh")
             (script "bun-pin-tools.py" ".py")
             clientLauncher
-          ];
+          ]
+          # Appended rather than placed in the list above: `lib.optional` answers a *list*, so as a list
+          # element it became a nested list, which nixpkgs 26.05 warns about and will refuse. What Magic
+          # Context's native embeddings load: the shim's directory the loader is fed, and the real ONNX
+          # Runtime it forwards to (both exported below), on the one platform that has a shim.
+          ++ lib.optional (hasShim system) shim;
 
           shellHook = ''
             # Magic Context's local embeddings are native on this host — it embeds the canary Bun above,
