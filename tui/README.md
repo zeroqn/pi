@@ -27,6 +27,11 @@ aot-host               # pi's dist, then `bun build --compile --aot` -> results/
 cargo build --release && rpi   # the client drives the host this shell built
 ```
 
+Run `rpi` **in that shell**: it is an interactive terminal client, and the shell is where it finds both
+`PI_TUI_HOST` and the binary you built. Scripted and non-interactive callers go through a shell of their
+own — `nix develop --command bash -c 'rpi …'`. Plain `nix develop --command rpi …` runs the client as
+nix's own child process, where its terminal reader gets no usable input and it exits after its first frame.
+
 The shell also exports what Magic Context's local embeddings need — `LD_LIBRARY_PATH` carrying the shim and
 `ONNXRUNTIME_LIB_PATH` naming the nixpkgs ONNX Runtime it forwards to — and `.#pi-aot`'s `bin/pi` exports
 both itself, so installing the host installs the shim with it. Both are `x86_64-linux` only, because the
@@ -40,15 +45,16 @@ Released builds skip all of that: `packages.pi-aot` and `packages.bun-aot` come 
 compiled with. See `docs/packaging.md`.
 
 ```sh
-cargo build --release
-BIN=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys;print(json.load(sys.stdin)["target_directory"]+"/release/rpi")')
-./tools/harness/smoke_host.py --binary $BIN      # the client drives a live `pi --mode rpc`
+cargo build --release && rpi                      # `rpi` is on PATH inside the shell
+./tools/harness/smoke_host.py --binary "$(command -v rpi)"   # the client drives a live `pi --mode rpc`
 ./tools/harness/echo_probe.py --binary $BIN --replay ../../.scratch/tui-rust/fixtures/code.jsonl \
   --pace-ms 2 --repeat 200 --keys 200 --stats /tmp/stats.json
 ```
 
-`cargo` writes into `CARGO_TARGET_DIR` here, which is not `extensions/tui/target`; take the path from
-`cargo metadata` rather than guessing.
+The shell puts an `rpi` on `PATH` that runs the client you built: `cargo build --release` in this
+directory, then plain `rpi`. It finds the binary in `./target` (or one and two directories up, so
+`nix develop --command rpi` works from `nix/` and `tools/harness/` too) and honours `CARGO_TARGET_DIR`
+first if you set one. Nothing has to be copied or found by hand.
 
 ## The corpus
 

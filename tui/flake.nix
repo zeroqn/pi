@@ -72,6 +72,23 @@
             dontUnpack = true;
             installPhase = "install -Dm755 $src $out/bin/${lib.removeSuffix extension name}";
           };
+
+          # `rpi` for the shell: the client you built, found where cargo put it. It is a launcher and not
+          # the binary because the binary does not exist until `cargo build --release`, and it lives on
+          # PATH as a package rather than as a shellHook export so `nix develop --command rpi` works too
+          # (that mode never runs the hook — the same reason PI_TUI_RUNTIME is an attribute above).
+          clientLauncher = pkgs.writeShellScriptBin "rpi" ''
+            set -eu
+            # The shell's own target directory, then the tree the caller is standing in: `target/` from
+            # extensions/tui, `../target` from nix/, `../../target` from tools/harness.
+            for dir in "''${CARGO_TARGET_DIR:-}" "$PWD/target" "$PWD/../target" "$PWD/../../target"; do
+              [ -n "$dir" ] || continue
+              if [ -x "$dir/release/rpi" ]; then exec "$dir/release/rpi" "$@"; fi
+            done
+            echo "rpi: no built client. Run 'cargo build --release' in extensions/tui." >&2
+            echo "rpi: looked in ''${CARGO_TARGET_DIR:+$CARGO_TARGET_DIR }$PWD/target $PWD/../target $PWD/../../target" >&2
+            exit 127
+          '';
         in
         pkgs.mkShell {
           name = "pi-tui";
@@ -106,6 +123,7 @@
             (script "onnxruntime-check.sh" ".sh")
             (script "bun-pin-update.sh" ".sh")
             (script "bun-pin-tools.py" ".py")
+            clientLauncher
           ];
 
           shellHook = ''
@@ -132,8 +150,19 @@
             # Every client in this shell drives the host this shell builds, not whatever `pi` is on PATH.
             export PI_TUI_HOST="''${PI_TUI_HOST:-$PI_TUI_OUT/pi}"
 
+            # No CARGO_TARGET_DIR override: `cargo build --release` writes `./target` where it is run, which
+            # is extensions/tui per this README, and the `rpi` launcher looks there (and one and two
+            # directories up) with `$CARGO_TARGET_DIR` honoured first. The shell used to name no target
+            # directory at all, so the binary landed somewhere nothing knew and `rpi` was not a command.
+
             echo "pi-tui: bun $("$PI_TUI_RUNTIME" --version), node $(node --version)"
             echo "pi-tui: PI_REPO=''${PI_REPO:-<unset>} PI_TUI_OUT=$PI_TUI_OUT"
+            echo "pi-tui: rpi -> the client cargo builds here (cargo build --release)"
+            if [ ! -x "$PI_TUI_HOST" ]; then
+              # The shell points PI_TUI_HOST at the host it builds, so a client run before `aot-host` fails
+              # on a missing file. Say so here rather than letting the client report it.
+              echo "pi-tui: no AOT host yet at $PI_TUI_HOST — run aot-host (or set PI_TUI_HOST to another pi)"
+            fi
             echo "pi-tui: aot-host | aot-release | tui-release | aot-smoke | onnxruntime-check | bun-pin-update | cargo build"
           '';
         };
