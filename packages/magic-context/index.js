@@ -95,7 +95,7 @@ import {
   curateCategoryForMemoryCategory,
   peekCurateCategoryScope,
   beginCurateCategoryRun,
-  curateTaskStateAfterSuccess,
+  curateTaskStateAfterCategoryTurn,
   MEMORY_MURAL_BLOCK,
   buildMagicContextSection,
   resolveMuralWire,
@@ -136,6 +136,7 @@ import {
   stripMemoryMuralBlock,
   resetPrefixTrimFallbackState,
   isDirectiveShapedProjectRule,
+  parseCurateSafetyRefusal,
   takeCurateSafetyRefusalCount,
   wakePlaneStatus,
   loadPiConfig,
@@ -147,6 +148,13 @@ import {
   resolvePiHarnessDetection,
   resolvePiHarnessKind,
   readSubagentStartupError,
+  legacyTui,
+  canRenderPiRows,
+  piTerminalRows,
+  piOverlayOptions,
+  matchesKey,
+  truncateToWidth,
+  visibleWidth,
   inheritPiOrdinalAlignment,
   resolvePiOrdinalAlignment,
   piRawOrdinalOffsetSource,
@@ -169,7 +177,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-717n2hme.js";
+} from "./index-nrwaxwkd.js";
 import"./index-4knyh1kt.js";
 import {
   canonicalModelIdentity,
@@ -421,7 +429,7 @@ import {
   setSessionWorkMetrics,
   getSessionWorkMetrics,
   resolveEpochFloorForPass
-} from "./index-73fw4cd4.js";
+} from "./index-nh4srq1p.js";
 import {
   textMentionsRecentCommit,
   hasMeaningfulUserText2,
@@ -473,7 +481,7 @@ import {
   openCurrentDatabase2,
   openDatabaseAsync2,
   closeDatabase2
-} from "./index-nw2xkg5r.js";
+} from "./index-6gm43ppw.js";
 import {
   LkgRecoveryFenceError,
   clearLkgFenceProcessState,
@@ -512,6 +520,7 @@ import {
   getCompartments,
   getLastCompartmentEndMessage,
   getLastCompartmentEndMessageId,
+  cachedHistoryCoversLatestCompartment,
   getCompartmentsByEndMessageId,
   appendCompartments,
   saveRecompStagingPass,
@@ -528,7 +537,10 @@ import {
   requestPendingMaterialization,
   pendingMaterializationOrigin,
   hasPendingMaterializationOrigin,
+  hasExplicitRefreshRequest,
   clearPendingMaterialization,
+  clearReclaimedMaterialization,
+  clearPendingMaterializationOrigin,
   recordSystemRefreshOwnership,
   recordSystemPromptForRequest,
   recordHeldHeadForRequest,
@@ -599,7 +611,7 @@ import {
   getSourceContents,
   recordSubagentInvocation,
   getLatestHistorianInvocationId
-} from "./index-kr0k63a9.js";
+} from "./index-tksyex8e.js";
 import {
   resolveOpenCodeDbPath,
   assertOpenCodeStoreGeneration,
@@ -665,7 +677,7 @@ import {
   getRawSessionTagKeysThrough2,
   getLegacyProtectedTailStartOrdinal2,
   readSessionChunk2
-} from "./index-2kb65n0s.js";
+} from "./index-hpbdnbtf.js";
 import"./index-nvh6d3bz.js";
 import {
   formatSynapseLaneDescriptor
@@ -705,7 +717,7 @@ import {
   clearCompressionDepthRange,
   cleanSearchText,
   matchedSearchSnippet
-} from "./index-d7yx4ymd.js";
+} from "./index-0t9xfj3x.js";
 import {
   rememberV1HiddenRun
 } from "./index-6x556c2q.js";
@@ -797,10 +809,7 @@ import {
   embedSessionCompartmentChunks2,
   getEmbeddingCoverageStatus2,
   getAutoEmbeddingSessionCoverage2
-} from "./index-65c30zze.js";
-import {
-  cosineSimilarity
-} from "./index-d2g3h5r2.js";
+} from "./index-s2zjddb6.js";
 import {
   USER_FACING_FAILURES,
   renderUserFacingFailure,
@@ -812,6 +821,7 @@ import {
   renderSingleStoreMigrationRequiredRefusal,
   SingleStoreMigrationRequiredError,
   projectNeedsSingleStoreMigration,
+  cosineSimilarity,
   promoteSessionFactsDurable,
   embedPromotedFacts,
   recordMemoryMapping,
@@ -834,7 +844,8 @@ import {
   scheduleClearAndReindex,
   clearSessionTracking,
   createAutoSearchDiagnostics
-} from "./index-adhdk6vc.js";
+} from "./index-pj9b2mmd.js";
+import"./index-t5pyexcf.js";
 import"./index-3s39a1md.js";
 import {
   DREAMER_PRIMER_INVESTIGATOR_ALLOWED_TOOLS,
@@ -864,11 +875,11 @@ import {
   drainPiTagSnapshotSession,
   assertPiTagSnapshotReady,
   ensurePiTagSnapshotReady
-} from "./index-51xr6g7s.js";
+} from "./index-pdrberjp.js";
 import"./index-71rg8j43.js";
 import"./index-8d2z6503.js";
-import"./index-f1sga2dz.js";
-import"./index-4dqwxb7k.js";
+import"./index-qhdmqkan.js";
+import"./index-fvfq9gva.js";
 import {
   __toESM
 } from "./index-8pcrajnf.js";
@@ -3620,7 +3631,7 @@ function startHostStallProfilerSwitch() {
 // package.json
 var package_default = {
   name: "@cortexkit/pi-magic-context",
-  version: "0.49.70",
+  version: "0.49.79",
   type: "module",
   description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
   main: "dist/index.js",
@@ -3649,7 +3660,7 @@ var package_default = {
   ],
   "//": "The build intentionally bundles typebox (no --external typebox) and keeps it a regular dependency. OMP's extension loader rewrites every bare `typebox` import to its own omptype-based shim, whose schemas are callable objects rather than JSON Schema; they fail structuredClone during tool registration, so an external typebox import stops Magic Context loading on OMP. src/typebox-bundling.test.ts guards this.",
   scripts: {
-    build: "bun ../../scripts/check-bun.mjs && tsc -p ../retina-local-fs/tsconfig.build.json && bun ../../scripts/clean-dist-chunks.mjs dist index.js subagent-entry.js historian-calibration-extension.js embedding-worker-process.js raw-ordinal-warmup-worker.js tag-snapshot-worker-pi.js transformers-web.js transformers-node-wasm.js && bun build ../plugin/src/features/magic-context/memory/transformers-web-entry.ts --outfile dist/transformers-web.js --target browser --format esm --external onnxruntime-web && bun ../plugin/scripts/build-transformers-node-wasm.ts dist && bun build src/index.ts src/tag-snapshot-worker-pi.ts src/subagent-entry.ts src/historian-calibration-extension.ts ../plugin/src/features/magic-context/memory/embedding-worker.ts ../plugin/src/features/magic-context/memory/embedding-worker-process.ts ../plugin/src/features/magic-context/migration-worker.ts ../plugin/src/hooks/magic-context/auto-search-worker.ts ../plugin/src/hooks/magic-context/raw-ordinal-warmup-worker.ts ../plugin/src/features/magic-context/compaction-marker-candidates-worker.ts ../plugin/src/features/magic-context/chunk-embedding-write-worker.ts --outdir dist --entry-naming '[name].[ext]' --target node --format esm --splitting --external @earendil-works/pi-coding-agent --external @oh-my-pi/pi-coding-agent --external @earendil-works/pi-tui --external @earendil-works/pi-ai --external onnxruntime-node --external onnxruntime-web --external sharp --external bun:ffi --external node:sqlite",
+    build: "bun ../../scripts/check-bun.mjs && tsc -p ../retina-local-fs/tsconfig.build.json && bun ../../scripts/clean-dist-chunks.mjs dist index.js subagent-entry.js historian-calibration-extension.js embedding-worker-process.js raw-ordinal-warmup-worker.js tag-snapshot-worker-pi.js transformers-web.js transformers-node-wasm.js && bun build ../plugin/src/features/magic-context/memory/transformers-web-entry.ts --outfile dist/transformers-web.js --target browser --format esm --external onnxruntime-web && bun ../plugin/scripts/build-transformers-node-wasm.ts dist && bun build src/index.ts src/tag-snapshot-worker-pi.ts src/subagent-entry.ts src/historian-calibration-extension.ts ../plugin/src/features/magic-context/memory/embedding-worker.ts ../plugin/src/features/magic-context/memory/embedding-worker-process.ts ../plugin/src/features/magic-context/migration-worker.ts ../plugin/src/hooks/magic-context/auto-search-worker.ts ../plugin/src/hooks/magic-context/raw-ordinal-warmup-worker.ts ../plugin/src/features/magic-context/compaction-marker-candidates-worker.ts ../plugin/src/features/magic-context/chunk-embedding-write-worker.ts --outdir dist --entry-naming '[name].[ext]' --target node --format esm --splitting --external @earendil-works/pi-coding-agent --external @oh-my-pi/pi-coding-agent --external @earendil-works/pi-tui --external @oh-my-pi/pi-tui --external '@oh-my-pi/pi-tui/*' --external @earendil-works/pi-ai --external onnxruntime-node --external onnxruntime-web --external sharp --external bun:ffi --external node:sqlite",
     "build:e2e-argv": `bun ../../scripts/clean-dist-chunks.mjs ../../tests/docker/.generated subagent-runner-e2e.mjs && bun build src/subagent-runner.ts --outdir ../../tests/docker/.generated --entry-naming 'subagent-runner-e2e.mjs' --splitting --target node --format esm --external node:sqlite && node --input-type=module -e 'const { __test } = await import("../../tests/docker/.generated/subagent-runner-e2e.mjs"); if (typeof __test.buildArgs !== "function" || typeof __test.resolvePiInvocation !== "function") throw new Error("argv renderer exports missing"); console.log("Node argv renderer: 2 exports loaded")'`,
     typecheck: "tsc -p ../retina-local-fs/tsconfig.build.json && tsc --noEmit",
     test: "bun ../../scripts/check-bun.mjs && bun install --frozen-lockfile && MC_SLOW_TESTS=0 BUN_JSC_useOMGJIT=0 bun test --parallel=4 --timeout 30000",
@@ -11555,7 +11566,7 @@ ${currentDocs?.structure ?? "(read from project)"}
 
 Find claims in these sections that the diff makes wrong or incomplete. Propose one focused change per claim or section. Do not investigate unrelated areas. Read the docs and relevant source with read-only tools. These files are short maps read by every agent in every session. Describe how the system works now, never what changed or when: no change log, dates, or commit lists. One short paragraph per subsystem at most. Mechanism detail belongs in docs/architecture/; you may name a docs page for it but never move that detail into these two files. Propose a change only when code contradicts the docs or a major piece is missing. Prefer rewriting a stale sentence to adding one. Propose nothing when nothing is wrong. Keep both files within the combined budget. Never touch protected regions (<!-- mc:protected START ... --> through <!-- mc:protected END -->); preserve their bytes.
 
-Return ONLY a JSON array (or []), with each entry {"file":"ARCHITECTURE.md"|"STRUCTURE.md","action":"replace"|"add"|"remove","heading":"## Exact section heading","text":"## Full replacement section including heading and body (empty for remove)","reason":"one-line reason"}. A replacement includes the entire section, including its heading. Additions are appended at the end of the file. Do not include any unmodified sections. No file writes.`;
+Return ONLY a JSON array (or []), with each entry {"file":"ARCHITECTURE.md"|"STRUCTURE.md","action":"replace"|"add"|"remove","heading":"## Exact section heading","text":"## Full section including heading and body (empty for remove)","reason":"one-line reason"}. A section is its heading and everything under it until the next heading of the same or a higher level outside code fences, or the end of the file. Replace, add, or remove exactly one whole section per entry, including its subsections. Additions are appended at the end of the file. Do not include entries for unmodified sections. No file writes.`;
 }
 function buildDreamTaskPrompt(task, args) {
   switch (task) {
@@ -12660,23 +12671,35 @@ ${stat}`
     return null;
   }
 }
-function sections(text) {
-  const lines = text.split(`
-`);
+var ATX_HEADING = /^ {0,3}(#{1,6})(?=[ \t]|$)/;
+function sections(lines) {
   const result = [];
-  let fenced = false;
+  const open = [];
+  let fence;
   for (let i = 0;i < lines.length; i++) {
-    if (/^\s*(```|~~~)/.test(lines[i]))
-      fenced = !fenced;
-    if (!fenced && /^#{1,6} \S/.test(lines[i])) {
-      if (result.length)
-        result[result.length - 1].end = i;
-      result.push({ heading: lines[i], text: "", start: i, end: lines.length });
+    const heading = lines[i].replace(/\r$/, "");
+    const marker = heading.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (fence) {
+      if (marker?.[1].startsWith(fence) && !marker[2].trim())
+        fence = undefined;
+      continue;
     }
+    if (marker && (marker[1][0] === "~" || !marker[2].includes("`"))) {
+      fence = marker[1];
+      continue;
+    }
+    const match = heading.match(ATX_HEADING);
+    if (!match)
+      continue;
+    const level = match[1].length;
+    for (let previous = open.at(-1);previous && previous.level >= level; previous = open.at(-1)) {
+      previous.end = i;
+      open.pop();
+    }
+    const section = { heading, level, start: i, end: lines.length };
+    result.push(section);
+    open.push(section);
   }
-  for (const section of result)
-    section.text = lines.slice(section.start, section.end).join(`
-`);
   return result;
 }
 function protectedBytes(text) {
@@ -12699,76 +12722,140 @@ function diff(name, before, after) {
   }
 }
 function parseDocsProposalOutput(output) {
-  const match = output.match(/```json\s*([\s\S]*?)```/);
-  const parsed = JSON.parse(match?.[1] ?? output);
+  let parsed;
+  try {
+    parsed = JSON.parse(output);
+  } catch (error) {
+    const match = output.match(/```json[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```(?=\s|$)/) ?? output.match(/```json\s*([\s\S]*?)```/);
+    if (!match)
+      throw error;
+    parsed = JSON.parse(match[1]);
+  }
   if (!Array.isArray(parsed))
     throw new Error("proposal must be a JSON array");
-  const changes = parsed;
-  if (changes.some((item) => !item || !FILES.includes(item.file)))
-    throw new Error("unknown proposal file");
+  return parsed;
+}
+function readChange(item) {
+  if (!item || typeof item !== "object" || Array.isArray(item))
+    return "expected an object";
+  const { file, action, heading, text, reason } = item;
+  if (file !== "ARCHITECTURE.md" && file !== "STRUCTURE.md")
+    return "unknown proposal file";
+  if (action !== "replace" && action !== "add" && action !== "remove")
+    return "invalid action";
+  if (typeof heading !== "string" || /[\r\n]/.test(heading) || !ATX_HEADING.test(heading))
+    return "invalid section heading";
+  if (typeof text !== "string")
+    return "section text must be a string";
+  if (typeof reason !== "string" || !reason.trim() || /[\r\n]/.test(reason))
+    return "expected a one-line reason";
+  return { file, action, heading, text, reason };
+}
+function applyChange(before, change) {
+  const lines = before.split(`
+`);
+  const existing = sections(lines);
+  const index = existing.findIndex((item) => item.heading === change.heading);
+  const replacement = change.action === "remove" ? [] : change.text.trimEnd().split(`
+`);
+  const inserted = sections(replacement);
+  const wholeSection = inserted[0]?.heading === change.heading && inserted[0].start === 0 && inserted[0].end === replacement.length;
+  const expectedHeadings = existing.map((item) => item.heading);
+  const insertedHeadings = inserted.map((item) => item.heading);
+  let after;
+  if (change.action === "add") {
+    if (index !== -1 || !wholeSection)
+      return `invalid addition ${change.heading}`;
+    after = `${before.endsWith(`
+`) ? before : `${before}
+`}
+${replacement.join(`
+`)}
+`;
+    expectedHeadings.push(...insertedHeadings);
+  } else {
+    if (index === -1)
+      return `missing section ${change.heading}`;
+    if (change.action === "replace" && !wholeSection)
+      return `invalid replacement ${change.heading}`;
+    const section = existing[index];
+    const affected = existing.filter((item) => item.start >= section.start && item.start < section.end);
+    expectedHeadings.splice(index, affected.length, ...insertedHeadings);
+    if (change.action === "replace" && section.end === lines.length && before.endsWith(`
+`))
+      replacement.push("");
+    lines.splice(section.start, section.end - section.start, ...replacement);
+    after = lines.join(`
+`);
+  }
+  if (JSON.stringify(protectedBytes(before)) !== JSON.stringify(protectedBytes(after)))
+    return `protected region changed in ${change.file}`;
+  if (JSON.stringify(sections(after.split(`
+`)).map((item) => item.heading)) !== JSON.stringify(expectedHeadings))
+    return `markdown structure changed in ${change.file}`;
+  if (after === before)
+    return "no doc changes proposed";
+  return { after };
+}
+function applyChanges(items, originals, overBudget) {
+  const docs = { ...originals };
+  const kept = [];
+  const dropped = [];
   const seen = new Set;
-  for (const change of changes) {
+  for (const [index, item] of items.entries()) {
+    const change = overBudget.get(index) ?? readChange(item);
+    if (typeof change === "string") {
+      dropped.push({ index, reason: change });
+      continue;
+    }
     const key = `${change.file}:${change.heading}`;
-    if (!["replace", "add", "remove"].includes(change.action) || typeof change.heading !== "string" || !/^#{1,6} [^\r\n]+$/.test(change.heading) || typeof change.text !== "string" || typeof change.reason !== "string" || !change.reason.trim() || /[\r\n]/.test(change.reason) || seen.has(key))
-      throw new Error(`invalid section change in ${change.file}`);
+    const before = docs[change.file];
+    const result = seen.has(key) ? `duplicate section change ${change.heading}` : applyChange(before, change);
+    if (typeof result === "string") {
+      dropped.push({ index, reason: result });
+      continue;
+    }
+    kept.push({ index, change, grew: result.after.length > before.length });
+    docs[change.file] = result.after;
     seen.add(key);
   }
-  return changes;
+  const tokens = FILES.reduce((sum, file) => sum + Math.ceil(docs[file].length / 3.5), 0);
+  return { docs, kept, dropped, tokens };
 }
 function validateDocsProposal(projectDir, output, budget, expected) {
-  if (Object.entries(expected).some(([name, value]) => docsBaseHashes(projectDir)[name] !== value))
+  const readDoc = (file) => {
+    const path = join8(projectDir, file);
+    return existsSync6(path) ? readFileSync6(path, "utf8") : "";
+  };
+  const originals = {
+    "ARCHITECTURE.md": readDoc("ARCHITECTURE.md"),
+    "STRUCTURE.md": readDoc("STRUCTURE.md")
+  };
+  if (Object.keys(expected).some((name) => !FILES.some((file) => file === name && hash(originals[file]) === expected[name])))
     throw new Error("base drifted");
-  const changes = parseDocsProposalOutput(output);
-  if (!changes.length)
-    throw new Error("empty proposal");
-  let tokens = 0;
-  let diffs = "";
-  for (const file of FILES) {
-    const before = existsSync6(join8(projectDir, file)) ? readFileSync6(join8(projectDir, file), "utf8") : "";
-    let after = before;
-    for (const change of changes.filter((item) => item.file === file)) {
-      const section = sections(after).find((item) => item.heading === change.heading);
-      if (change.action === "add") {
-        if (section || !change.text.startsWith(`${change.heading}
-`))
-          throw new Error(`invalid addition ${change.heading}`);
-        after += `${after.endsWith(`
-`) ? "" : `
-`}
-${change.text.trimEnd()}
-`;
-      } else {
-        if (!section)
-          throw new Error(`missing section ${change.heading}`);
-        if (change.action === "replace" && (!change.text.startsWith(`${change.heading}
-`) || sections(change.text).length !== 1))
-          throw new Error(`invalid replacement ${change.heading}`);
-        const lines = after.split(`
-`);
-        lines.splice(section.start, section.end - section.start, ...change.action === "remove" ? [] : change.text.trimEnd().split(`
-`));
-        after = lines.join(`
-`);
-      }
-    }
-    if (JSON.stringify(protectedBytes(before)) !== JSON.stringify(protectedBytes(after)))
-      throw new Error(`protected region changed in ${file}`);
-    const originalHeadings = sections(before).map((item) => item.heading);
-    const expectedHeadings = originalHeadings.filter((heading) => !changes.some((item) => item.file === file && item.action === "remove" && item.heading === heading)).concat(changes.filter((item) => item.file === file && item.action === "add").map((item) => item.heading));
-    if (JSON.stringify(sections(after).map((item) => item.heading)) !== JSON.stringify(expectedHeadings))
-      throw new Error(`markdown structure changed in ${file}`);
-    tokens += Math.ceil(after.length / 3.5);
-    if (after !== before)
-      diffs += diff(file, before, after);
+  const items = parseDocsProposalOutput(output);
+  const overBudget = new Map;
+  let result = applyChanges(items, originals, overBudget);
+  while (result.tokens > budget && result.kept.length) {
+    const reason = `over budget: ${result.tokens} > ${budget}`;
+    const latestGrowth = [...result.kept].reverse().find((item) => item.grew);
+    if (!latestGrowth)
+      break;
+    overBudget.set(latestGrowth.index, reason);
+    result = applyChanges(items, originals, overBudget);
   }
-  if (tokens > budget)
-    throw new Error(`over budget: ${tokens} > ${budget}`);
-  if (!diffs)
-    throw new Error("no doc changes proposed");
-  return { changes, tokens, diffs };
+  const diffs = FILES.filter((file) => originals[file] !== result.docs[file]).map((file) => diff(file, originals[file], result.docs[file])).join("");
+  return {
+    changes: result.kept.map((item) => item.change),
+    dropped: result.dropped,
+    tokens: result.tokens,
+    diffs
+  };
 }
 function writeDocsProposal(projectDir, output, budget, expected, head) {
   const result = validateDocsProposal(projectDir, output, budget, expected);
+  if (!result.diffs)
+    return { path: null, dropped: result.dropped };
   const dir = proposalDir(projectDir);
   mkdirSync2(join8(dir, "superseded"), { recursive: true });
   ensureCortexKitArtifactGitignore(projectDir);
@@ -12802,7 +12889,7 @@ ${result.diffs}
   for (const old of listPendingDocsProposals(projectDir))
     if (old !== path)
       renameSync(old, join8(dir, "superseded", old.split("/").at(-1) ?? "proposal.md"));
-  return path;
+  return { path, dropped: result.dropped };
 }
 
 // ../plugin/src/agents/smart-note-compiler.ts
@@ -17809,7 +17896,7 @@ async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budg
   const verifiedHead = headAtPrompt === undefined ? await readGitHead(args.sessionDirectory) : headAtPrompt;
   const writes = [];
   let refused = 0;
-  const skipped = valid.skipped.length;
+  let skipped = valid.skipped.length;
   for (const v of valid.verified) {
     const files = await normalizeFiles(args, v.files);
     writes.push({ kind: "verify", id: v.id, files });
@@ -17923,6 +18010,12 @@ async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budg
       const memory = getMemoryById2(args.db, w.id);
       if (!isPrimaryMutable(memory))
         continue;
+      if (memory.content !== batchById.get(w.id)?.content) {
+        log2(`[dreamer] verify skipped: memory_id=${w.id} verdict=${w.kind} reason=content-changed-since-prompt`);
+        if (w.kind === "skip")
+          skipped -= 1;
+        continue;
+      }
       if (w.kind === "verify") {
         recordMemoryVerifications(args.db, w.id, w.files, now);
         updateMemoryVerification2(args.db, w.id, "verified");
@@ -17932,8 +18025,6 @@ async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budg
           recordVerifiedCommit(args.db, verifiedMemory, now, verifiedHead);
         verified += 1;
       } else if (w.kind === "skip") {
-        if (memory.content !== batchById.get(w.id)?.content)
-          continue;
         updateMemoryVerification2(args.db, w.id, "unverified");
         recordVerificationVerdict(args.db, memory, "skip", now, w.fingerprint);
       } else if (w.kind === "update") {
@@ -18133,8 +18224,11 @@ function validateCurateAssistantText(text) {
   }
   return text;
 }
+function emptyCurateMemoryOperations() {
+  return { totalCalls: 0, completedActions: [], refusals: [] };
+}
 function inspectCurateMemoryOperations(messages) {
-  const summary = { totalCalls: 0, completedActions: [] };
+  const summary = emptyCurateMemoryOperations();
   if (!Array.isArray(messages))
     return summary;
   for (const message of messages) {
@@ -18149,28 +18243,69 @@ function inspectCurateMemoryOperations(messages) {
       const toolName = part.tool ?? part.name;
       if (toolName !== "ctx_memory")
         continue;
-      summary.totalCalls += 1;
-      if (!isRecord(part.state) || part.state.status !== "completed")
-        continue;
-      const input = isRecord(part.state.input) ? part.state.input : null;
+      const state = isRecord(part.state) ? part.state : null;
+      const input = isRecord(state?.input) ? state.input : null;
       const action = input?.action;
-      const output = typeof part.state.output === "string" ? part.state.output : "";
-      if (output === "completed" && (action === "merge" || action === "archive" || action === "update") || action === "merge" && output.startsWith("Merged memories") || action === "archive" && output.startsWith("Archived memor") || action === "update" && output.startsWith("Updated memory"))
+      const output = state?.status === "completed" && typeof state.output === "string" ? state.output : null;
+      if (output && (action === "get" || action === "list") && /^(?:Found \d+ (?:active )?memor(?:y|ies):|No active memories found\.$|id -?\d+: not found or not visible from this project)/.test(output))
+        continue;
+      summary.totalCalls += 1;
+      if (!output)
+        continue;
+      if (action === "merge" && output.startsWith("Merged memories") || action === "archive" && output.startsWith("Archived memor") || action === "update" && output.startsWith("Updated memory")) {
         summary.completedActions.push(action);
+      } else {
+        const reasons = parseCurateSafetyRefusal(action, output);
+        if (reasons)
+          summary.refusals.push(reasons);
+      }
     }
   }
   return summary;
 }
+function unrecognisedCurateOperations(operations) {
+  return operations.totalCalls - operations.completedActions.length - operations.refusals.length;
+}
+function validateCurateOutput(messages, text, transport) {
+  const operations = inspectCurateMemoryOperations(messages);
+  if (text)
+    validateCurateAssistantText(text);
+  if (operations.completedActions.length || operations.refusals.length && !unrecognisedCurateOperations(operations))
+    return operations;
+  if (!text && transport === "child")
+    throw new Error("Dreamer returned no assistant output.");
+  if (operations.totalCalls > 0)
+    throw new Error("Curate returned no completed ctx_memory tool result.");
+  if (!text)
+    throw new Error("Dreamer returned no assistant output.");
+  return operations;
+}
 function formatExpiredArchiveProgress(count) {
   return `curate: archived ${count} expired ${count === 1 ? "memory" : "memories"}`;
 }
-function formatCurateMemoryOperations(actions) {
+function formatCurateMemoryOperations(operations) {
+  const { completedActions: actions, refusals } = operations;
+  if (!actions.length && !refusals.length)
+    return null;
   const actionCounts = new Map;
   for (const action of actions)
     actionCounts.set(action, (actionCounts.get(action) ?? 0) + 1);
   const actionDetail = [...actionCounts].map(([action, count]) => count === 1 ? action : `${action} ×${count}`).join(", ");
-  const noun = actions.length === 1 ? "operation" : "operations";
-  return `curate: ${actions.length} memory ${noun} applied${actionDetail ? ` (${actionDetail})` : ""}`;
+  const applied = actions.length ? `${actions.length} memory ${actions.length === 1 ? "operation" : "operations"} applied (${actionDetail})` : "no changes";
+  const detail = [`curate: ${applied}`];
+  if (refusals.length) {
+    const reasonCounts = new Map;
+    for (const reasons of refusals) {
+      for (const reason of reasons)
+        reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+    }
+    const countedReasons = [...reasonCounts].sort(([a], [b]) => a.localeCompare(b)).map(([reason, count]) => `${reason} ×${count}`).join(", ");
+    detail.push(`${refusals.length} ${refusals.length === 1 ? "operation" : "operations"} refused (${countedReasons})`);
+  }
+  const unrecognised = unrecognisedCurateOperations(operations);
+  if (unrecognised)
+    detail.push(`${unrecognised} with an unrecognised result`);
+  return detail.join("; ");
 }
 function requireDreamClient(client) {
   if (!client)
@@ -18378,6 +18513,7 @@ function createDreamTaskExecutor(deps) {
       };
       return writtenIds.length || deletedIds.length || archivedIds.length || mergedIds.length ? changes : null;
     }
+    let curateCategory;
     try {
       const skip = (reason) => {
         log2(`[dreamer] ${config.task}: skipped (${reason})`);
@@ -18689,7 +18825,10 @@ function createDreamTaskExecutor(deps) {
         computeMemoryDelta,
         reportProgress,
         leaseAcquisition,
-        moduleRoute
+        moduleRoute,
+        onCurateCategory: (category) => {
+          curateCategory = category;
+        }
       });
     } catch (error) {
       if (error instanceof DreamTokenBudgetExceeded) {
@@ -18707,7 +18846,11 @@ function createDreamTaskExecutor(deps) {
         transient,
         error: brief,
         failureDetail: formatDreamRunFailure(failure),
-        ...retrospectiveOverflow ? { schedulePatch: retrospectiveOverflow.schedulePatch } : {}
+        ...retrospectiveOverflow ? { schedulePatch: retrospectiveOverflow.schedulePatch } : curateCategory && !transient ? {
+          schedulePatch: {
+            taskStateJson: curateTaskStateAfterCategoryTurn(db, projectIdentity, curateCategory)
+          }
+        } : {}
       };
     } finally {
       deps.onProgress?.(null, config.task);
@@ -19214,6 +19357,8 @@ async function runAgenticTask(config, ctx, helpers) {
       const scope = beginCurateCategoryRun(db, projectIdentity, loadActiveMemoryPromptMemories(db, projectIdentity));
       curateMemories = scope?.memories ?? [];
       curateCategory = scope?.category;
+      if (curateCategory)
+        helpers.onCurateCategory(curateCategory);
       log2(`[dreamer] curate pool: category=${curateCategory ?? "none"} in_scope=${curateMemories.length} expired_archived=${expiredArchived}`);
       if (curateMemories.length === 0) {
         const progress = expiredArchived > 0 ? formatExpiredArchiveProgress(expiredArchived) : "curate: no populated project-memory category";
@@ -19249,7 +19394,7 @@ async function runAgenticTask(config, ctx, helpers) {
     }
     const curateChunks = curateMemories ? chunkCurateMemories(curateMemories, Math.max(4000, Math.floor(resolveRetrospectiveUsableInputTokens(config, deps) * 2))) : [];
     const batches = task === "curate" ? curateChunks : [{ memories: [], crossChunkCandidates: [] }];
-    const completedActions = [];
+    const curateOperations = emptyCurateMemoryOperations();
     let curateRefused = 0;
     let run = {
       output: [],
@@ -19298,14 +19443,7 @@ async function runAgenticTask(config, ctx, helpers) {
               parseDocsProposalOutput(text);
             if (task !== "curate")
               return text;
-            const memoryOperations = inspectCurateMemoryOperations(completion.messages);
-            if (text)
-              validateCurateAssistantText(text);
-            if (memoryOperations.totalCalls > 0 && memoryOperations.completedActions.length === 0)
-              throw new Error("Curate returned no completed ctx_memory tool result.");
-            if (!text && memoryOperations.completedActions.length === 0)
-              throw new Error("Dreamer returned no assistant output.");
-            return { text: text || null, memoryOperations };
+            return validateCurateOutput(completion.messages, text, "hidden");
           }
         });
         childSessionId = hidden.childSessionId;
@@ -19364,24 +19502,15 @@ async function runAgenticTask(config, ctx, helpers) {
                 parseDocsProposalOutput(text);
               return text;
             }
-            const memoryOperations = inspectCurateMemoryOperations(messages);
-            if (text)
-              validateCurateAssistantText(text);
-            if (memoryOperations.completedActions.length > 0) {
-              return { text, memoryOperations };
-            }
-            if (!text)
-              throw new Error("Dreamer returned no assistant output.");
-            if (memoryOperations.totalCalls > 0) {
-              throw new Error("Curate returned no completed ctx_memory tool result.");
-            }
-            return { text, memoryOperations };
+            return validateCurateOutput(messages, text, "child");
           }
         });
         promptSettled = true;
       }
-      if (task === "curate") {
-        completedActions.push(...run.validated.memoryOperations.completedActions);
+      if (typeof run.validated !== "string") {
+        curateOperations.totalCalls += run.validated.totalCalls;
+        curateOperations.completedActions.push(...run.validated.completedActions);
+        curateOperations.refusals.push(...run.validated.refusals);
         curateRefused += takeCurateSafetyRefusalCount(childSessionId ?? "");
       }
       if (childSessionId && !deps.hiddenCompletionExecutor) {
@@ -19397,33 +19526,25 @@ async function runAgenticTask(config, ctx, helpers) {
         childSessionId = null;
       }
     }
-    if (task === "curate")
-      run.validated = {
-        text: null,
-        memoryOperations: { totalCalls: completedActions.length, completedActions }
-      };
     if (leaseLost)
       throw new Error("Dream lease lost during task");
     if (curateRefused > 0) {
       helpers.reportProgress(curateRefused, curateRefused);
       log2(`[dreamer] curate safety summary: refused=${curateRefused}`);
     }
+    const unrecognised = unrecognisedCurateOperations(curateOperations);
+    if (unrecognised > 0)
+      log2(`[dreamer] curate result summary: unrecognised=${unrecognised}`);
     recordInvocation("completed", run.output);
     if (task === "maintain-docs" && docsHashes && changes) {
       try {
-        if (parseDocsProposalOutput(String(run.validated)).length === 0) {
-          helpers.recordRun("completed", null, { progress: "no corrections proposed" });
-          return {
-            status: "completed",
-            detail: "no corrections proposed",
-            schedulePatch: { taskStateJson: JSON.stringify({ head: changes.head }) }
-          };
-        }
-        const path = writeDocsProposal(docsDir, String(run.validated), config.docsMaxTokens ?? 12000, docsHashes, changes.head);
-        helpers.recordRun("completed", null, { progress: `proposal: ${path}` });
+        const { path, dropped } = writeDocsProposal(docsDir, String(run.validated), config.docsMaxTokens ?? 12000, docsHashes, changes.head);
+        const outcome = path ? `proposal: ${path}` : "no corrections proposed";
+        const detail = dropped.length ? `${outcome}; dropped ${dropped.map(({ index, reason }) => `entry ${index + 1}: ${reason}`).join("; ")}` : outcome;
+        helpers.recordRun("completed", null, { progress: detail });
         return {
           status: "completed",
-          detail: `proposal: ${path}`,
+          detail,
           schedulePatch: { taskStateJson: JSON.stringify({ head: changes.head }) }
         };
       } catch (error) {
@@ -19433,13 +19554,12 @@ async function runAgenticTask(config, ctx, helpers) {
         return { status: "failed", error: reason };
       }
     }
-    const curateOutput = task === "curate" ? run.validated : undefined;
     const curateScopeProgress = task === "curate" && curateCategory && curateMemories ? `curate: ${curateCategory} (${curateMemories.length})` : null;
     const progress = [
       curateScopeProgress,
       expiredArchived > 0 ? formatExpiredArchiveProgress(expiredArchived) : null,
-      curateOutput && curateOutput.memoryOperations.completedActions.length > 0 ? formatCurateMemoryOperations(curateOutput.memoryOperations.completedActions) : null,
-      curateRefused > 0 ? `curate: refused ${curateRefused} unsafe mutation(s)` : null
+      formatCurateMemoryOperations(curateOperations),
+      curateRefused > 0 && !curateOperations.refusals.length ? `curate: refused ${curateRefused} unsafe mutation(s)` : null
     ].filter((value) => Boolean(value)).join("; ");
     const curateCount = task === "curate" && curateCategory ? loadActiveMemoryPromptMemories(db, projectIdentity).filter((memory) => curateCategoryForMemoryCategory(memory.category) === curateCategory).length : undefined;
     const curateBacklog = curateCount !== undefined && curateCategory ? {
@@ -19458,7 +19578,7 @@ async function runAgenticTask(config, ctx, helpers) {
       ...curateBacklog ? { backlog: curateBacklog } : {},
       ...curateCategory ? {
         schedulePatch: {
-          taskStateJson: curateTaskStateAfterSuccess(db, projectIdentity, curateCategory)
+          taskStateJson: curateTaskStateAfterCategoryTurn(db, projectIdentity, curateCategory)
         }
       } : {}
     };
@@ -21877,15 +21997,23 @@ class PiSubagentRunner {
         });
         if (settled)
           return;
-        const settleCompletedToolOnlyDreamer = (messages, completedMemoryCalls) => {
-          if (!DREAMER_ACTION_AGENTS.has(options.agent) || completedMemoryCalls.length === 0) {
+        const toolResults = (messages) => {
+          if (options.accountingTask === "curate")
+            return {
+              curateMemoryToolCalls: extractCurateMemoryToolCalls(messages)
+            };
+          const completedToolCalls = extractCompletedToolCalls(messages).filter((call) => call.name === "ctx_memory");
+          return completedToolCalls.length ? { completedToolCalls } : {};
+        };
+        const settleToolOnlyDreamer = (messages, results) => {
+          if (!DREAMER_ACTION_AGENTS.has(options.agent) || !results.completedToolCalls?.length && !results.curateMemoryToolCalls?.length) {
             return false;
           }
           settle({
             ok: true,
             assistantText: "",
             toolCallCount: countToolCalls(messages),
-            completedToolCalls: completedMemoryCalls,
+            ...results,
             durationMs: Date.now() - startTime,
             meta: { stderr: stderr.length > 0 ? stderr : undefined }
           });
@@ -21893,11 +22021,10 @@ class PiSubagentRunner {
         };
         if (sawAgentEnd) {
           const outputMessages = agentEndMessages ?? accumulatedMessages;
-          const completedCalls = extractCompletedToolCalls(outputMessages);
-          const completedMemoryCalls = completedCalls.filter((call) => call.name === "ctx_memory");
+          const results = toolResults(outputMessages);
           const trimmedAssistantText = finalAssistantText?.trim() ?? null;
           if (trimmedAssistantText === null || trimmedAssistantText.length === 0) {
-            if (settleCompletedToolOnlyDreamer(outputMessages, completedMemoryCalls))
+            if (settleToolOnlyDreamer(outputMessages, results))
               return;
             const emptyAssistantReason = trimmedAssistantText === null ? "pi agent_end did not include an assistant message" : "pi assistant produced empty text";
             settle({
@@ -21926,7 +22053,7 @@ class PiSubagentRunner {
             ok: true,
             assistantText: trimmedAssistantText,
             toolCallCount: countToolCalls(outputMessages),
-            ...completedMemoryCalls.length > 0 ? { completedToolCalls: completedMemoryCalls } : {},
+            ...results,
             durationMs: Date.now() - startTime,
             meta: { stderr: stderr.length > 0 ? stderr : undefined }
           });
@@ -21960,8 +22087,7 @@ class PiSubagentRunner {
           });
           return;
         }
-        const completedMemoryCalls = extractCompletedToolCalls(accumulatedMessages).filter((call) => call.name === "ctx_memory");
-        if (settleCompletedToolOnlyDreamer(accumulatedMessages, completedMemoryCalls))
+        if (settleToolOnlyDreamer(accumulatedMessages, toolResults(accumulatedMessages)))
           return;
         settle({
           ok: false,
@@ -22116,10 +22242,11 @@ function buildArgs(options, opts) {
     args.push("--extension", historianCalibrationEntryPath);
   }
   const strictTools = STRICT_TOOL_ALLOWLIST.get(options.agent);
+  const emptyToolFlag = ompTarget ? "--tools=" : "--no-tools";
   let activeToolNames = [];
   if (strictTools === undefined) {
-    sessionLog2(options.accountingSessionId ?? "pi-subagent", `Pi subagent agent "${options.agent}" has no strict tool allow-list; forcing --no-tools`);
-    args.push("--no-tools");
+    sessionLog2(options.accountingSessionId ?? "pi-subagent", `Pi subagent agent "${options.agent}" has no strict tool allow-list; forcing an empty tool list`);
+    args.push(emptyToolFlag);
   } else {
     const resolution = resolveHostToolAllowlistDetails(strictTools, ompTarget, ompTarget ? opts?.hostToolNames : undefined);
     const hostTools = resolution.tools;
@@ -22137,7 +22264,7 @@ function buildArgs(options, opts) {
     if (hostTools.length > 0) {
       args.push("--tools", hostTools.join(","));
     } else {
-      args.push("--no-tools");
+      args.push(emptyToolFlag);
     }
   }
   if (ompTarget) {
@@ -22179,7 +22306,7 @@ function extractFinalAssistant(messages) {
   }
   return { text: null, stopReason: null, errorMessage: null };
 }
-function extractCompletedToolCalls(messages) {
+function extractToolInvocations(messages) {
   const invocations = new Map;
   for (const message of messages) {
     if (typeof message !== "object" || message === null)
@@ -22201,6 +22328,10 @@ function extractCompletedToolCalls(messages) {
       invocations.set(id, { name, arguments: args });
     }
   }
+  return invocations;
+}
+function extractCompletedToolCalls(messages) {
+  const invocations = extractToolInvocations(messages);
   const completed = [];
   const seen = new Set;
   for (const message of messages) {
@@ -22219,6 +22350,36 @@ function extractCompletedToolCalls(messages) {
     completed.push(invocation);
   }
   return completed;
+}
+function extractCurateMemoryToolCalls(messages) {
+  const calls = new Map;
+  for (const [id, call] of extractToolInvocations(messages)) {
+    if (call.name === "ctx_memory")
+      calls.set(id, {
+        id,
+        name: call.name,
+        arguments: call.arguments,
+        status: "pending"
+      });
+  }
+  for (const message of messages) {
+    if (typeof message !== "object" || message === null)
+      continue;
+    const result = message;
+    if (result.role !== "toolResult" || typeof result.toolCallId !== "string" || typeof result.isError !== "boolean")
+      continue;
+    const call = calls.get(result.toolCallId);
+    if (call?.status !== "pending" || typeof result.toolName === "string" && result.toolName !== call.name)
+      continue;
+    call.status = result.isError ? "error" : "completed";
+    if (Array.isArray(result.content)) {
+      const text = result.content.flatMap((part) => part?.type === "text" && typeof part.text === "string" ? [part.text] : []).join(`
+`);
+      if (text)
+        call.output = text;
+    }
+  }
+  return [...calls.values()];
 }
 function countToolCalls(messages) {
   let count = 0;
@@ -23316,7 +23477,7 @@ function createPiDreamerClient(opts, onAdjunctsRefreshNeeded = opts.onAdjunctsRe
           dreamSession.messages = [
             makeMessage("user", [{ type: "text", text: userMessage }]),
             makeMessage("assistant", [
-              ...syntheticToolParts(result.toolCallCount ?? 0, result.completedToolCalls),
+              ...syntheticToolParts(result.toolCallCount ?? 0, result.completedToolCalls, accountingTask === "curate" ? result.curateMemoryToolCalls ?? [] : undefined),
               ...result.assistantText ? [{ type: "text", text: result.assistantText }] : []
             ])
           ];
@@ -23432,9 +23593,17 @@ function extractBodyAgent(args) {
   const agent = body.agent;
   return typeof agent === "string" && agent.length > 0 ? agent : undefined;
 }
-function syntheticToolParts(count, completedCalls = []) {
-  const safe = Math.max(completedCalls.length, Math.max(0, Math.floor(count)));
-  const completed = completedCalls.map((call, index) => ({
+function syntheticToolParts(count, completedCalls = [], curateCalls) {
+  const calls = curateCalls ? curateCalls.map((call) => ({
+    type: "tool",
+    callID: call.id,
+    tool: call.name,
+    state: {
+      status: call.status,
+      input: call.arguments,
+      ...call.output === undefined ? {} : call.status === "error" ? { error: call.output } : { output: call.output }
+    }
+  })) : completedCalls.map((call, index) => ({
     type: "tool",
     callID: `pi-completed-tool-${index}`,
     tool: call.name,
@@ -23444,12 +23613,12 @@ function syntheticToolParts(count, completedCalls = []) {
       output: "completed"
     }
   }));
-  const remaining = Array.from({ length: safe - completed.length }, () => ({
+  const remaining = Array.from({ length: Math.max(0, Math.floor(count) - calls.length) }, () => ({
     type: "tool",
     tool: "investigation",
     state: { input: { description: "investigation step" } }
   }));
-  return [...completed, ...remaining];
+  return [...calls, ...remaining];
 }
 function makeMessage(role, parts) {
   return {
@@ -23462,7 +23631,6 @@ function makeMessage(role, parts) {
 }
 
 // src/commands/pi-command-utils.ts
-import { Box, matchesKey, Text } from "@earendil-works/pi-tui";
 var CTX_STATUS_CUSTOM_TYPE = "ctx-status";
 var statusLifecycleSignals = new WeakMap;
 function registerCtxStatusLifecycleSignal(pi, signal) {
@@ -23484,11 +23652,13 @@ function resolveSessionId(ctx) {
   }
 }
 async function showCtxStatusDialog(ctx, content) {
+  if (!canRenderPiRows)
+    return false;
   let factoryInvoked = false;
   await ctx.ui.custom((_tui, theme, _keybindings, done) => {
     factoryInvoked = true;
     return new CtxStatusDialog(content, theme, done);
-  }, { overlay: true, overlayOptions: { anchor: "center", width: 92 } });
+  }, piOverlayOptions(92));
   return factoryInvoked;
 }
 
@@ -23532,13 +23702,13 @@ function statusTitleColor(level) {
 }
 var renderCtxStatusEntry = (entry, _options, theme) => {
   const data = entry?.data;
-  if (!data || typeof data !== "object" || typeof data.title !== "string" || typeof data.text !== "string") {
+  if (!legacyTui || !data || typeof data !== "object" || typeof data.title !== "string" || typeof data.text !== "string") {
     return;
   }
   const title = theme.bold(theme.fg(statusTitleColor(data.level), `[${data.title}]`));
   const body = theme.fg("customMessageText", data.text);
-  const box = new Box(1, 0, (text) => theme.bg("customMessageBg", text));
-  box.addChild(new Text(`${title}
+  const box = new legacyTui.Box(1, 0, (text) => theme.bg("customMessageBg", text));
+  box.addChild(new legacyTui.Text(`${title}
 ${body}`));
   return box;
 };
@@ -24189,6 +24359,15 @@ import * as crypto3 from "node:crypto";
 
 // ../plugin/src/hooks/magic-context/event-resolvers.ts
 var DEFAULT_CONTEXT_LIMIT = 200000;
+var WRAPUP_WINDOW_UNAVAILABLE = "Cannot run /ctx-wrapup: the model's context window is unknown. Select a model with a configured context window or send a message with that model, then retry.";
+function readPersistedWrapupWindow(db, sessionId, modelKey) {
+  const { lastUsageContextLimit, lastObservedModelKey } = getOrCreateSessionMeta(db, sessionId);
+  if (!isSaneLimit(lastUsageContextLimit) || !lastObservedModelKey)
+    return;
+  if (modelKey && piModelRefToCanonical(modelKey) !== piModelRefToCanonical(lastObservedModelKey))
+    return;
+  return { contextLimit: lastUsageContextLimit, modelKey: lastObservedModelKey };
+}
 var clampWarnSeen = new Set;
 function isFinitePositive(v) {
   return typeof v === "number" && Number.isFinite(v) && v > 0;
@@ -24740,6 +24919,7 @@ var canonicalReasons = new Set([
   "ttl_idle",
   "explicit_flush",
   "user_flush",
+  "user_wrapup",
   "fit_retry",
   "pending_materialization",
   "variant_change",
@@ -36263,14 +36443,16 @@ function softRefreshCachedM1Pi(args) {
         throw new PiMaterializeContentionError(`missing sibling cached m[0]/m[1] for ${args.state.sessionId}`);
       }
       const siblingCompartments = getRenderableCompartmentsPi(args.db, args.state);
+      const replayed = applyCachedPiRow({
+        row: sibling,
+        state: args.state,
+        compartmentsForNormalization: siblingCompartments
+      });
       return {
-        ...applyCachedPiRow({
-          row: sibling,
-          state: args.state,
-          compartmentsForNormalization: siblingCompartments
-        }),
+        ...replayed,
         memoryUpdateCount: 0,
-        recomputed: false
+        recomputed: false,
+        wrapupPublicationUnconfirmed: args.state.skipPressureRefold === true && !cachedHistoryCoversLatestCompartment(siblingCompartments, replayed.markers.maxCompartmentSeq, replayed.markers.lastBaselineEndMessageId)
       };
     }
     steps.mark("staleCheck");
@@ -36433,6 +36615,7 @@ function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = fal
   let contentionExhausted = false;
   let memoryUpdateCount = 0;
   let m1Recomputed = false;
+  let wrapupPublicationUnconfirmed;
   let freshFallbackRenderedMemoryIds = null;
   if (decision.value) {
     try {
@@ -36511,6 +36694,7 @@ function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = fal
       markers = refreshed.markers;
       memoryUpdateCount = refreshed.memoryUpdateCount;
       m1Recomputed = refreshed.recomputed;
+      wrapupPublicationUnconfirmed = refreshed.wrapupPublicationUnconfirmed;
     } catch (error) {
       if (!state.allowFreshContentionFallback)
         throw error;
@@ -36537,7 +36721,7 @@ function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = fal
   const m1HasContent = m1 !== PI_M1_PLACEHOLDER;
   const { m0Tokens, m1Tokens } = cachedInjectionTokenCounts(state.sessionId, m0, m1);
   const m1OverAbsoluteCap = m1HasContent && m1Tokens > m1AbsoluteBudget;
-  if (!materialized && !contentionExhausted && m1Recomputed && recomputeM1ThisPass && (memoryUpdateCount > 40 || m1OverAbsoluteCap || m1HasContent && m0Tokens >= M0_DRIFT_RATIO_FLOOR_TOKENS && m1Tokens > m0Tokens * M1_DRIFT_RATIO)) {
+  if (!materialized && !contentionExhausted && m1Recomputed && recomputeM1ThisPass && !state.skipPressureRefold && (memoryUpdateCount > 40 || m1OverAbsoluteCap || m1HasContent && m0Tokens >= M0_DRIFT_RATIO_FLOOR_TOKENS && m1Tokens > m0Tokens * M1_DRIFT_RATIO)) {
     decision = { value: true, reason: "drift" };
     try {
       const result = materializeM0PiWithRetry(state, db, 3, snapshot);
@@ -36593,6 +36777,7 @@ function injectM0M1Pi(state, db, piMessages, entryIds, recomputeM1ThisPass = fal
     m0Bytes: m0.length,
     m1Bytes: m1.length,
     contentionExhausted,
+    wrapupPublicationUnconfirmed,
     renderedBoundary,
     m1RenderedCoverage,
     syntheticLeadingCount: insertionIndex + 2
@@ -37653,9 +37838,6 @@ function resolvePiWindowGeometry(args) {
 function resolvePiUsableContextLimit(args) {
   return resolvePiWindowGeometry(args)?.usableSoft;
 }
-
-// src/pi-context-refusal.ts
-import { Text as Text2 } from "@earendil-works/pi-tui";
 
 // src/omp-diagnostic-context.ts
 function isOmpDumpContextStack(stack) {
@@ -43843,8 +44025,8 @@ function piImageWirePlaceholder(args) {
     return args.role === "toolResult" ? PI_NON_VISION_TOOL_IMAGE_PLACEHOLDER : PI_NON_VISION_USER_IMAGE_PLACEHOLDER;
   return;
 }
-function piToolImageWireTokens(args) {
-  const placeholder = piImageWirePlaceholder({ ...args, role: "toolResult" });
+function piImageWireTokens(args) {
+  const placeholder = piImageWirePlaceholder(args);
   return placeholder === undefined ? PI_IMAGE_TOKENS : estimateTokens(placeholder);
 }
 function piMessagesWithWireImages(messages, args) {
@@ -44673,7 +44855,10 @@ function registerPiGuardedContext(pi, handler, options = {}) {
       return operation?.refused ? piRefusedPayload(operation.refusalMessage ?? RETRY_MESSAGE) : undefined;
     });
   }
-  pi.registerEntryRenderer?.(ENTRY_TYPE, (entry) => new Text2(entry.data?.message ?? RETRY_MESSAGE, 0, 0));
+  if (legacyTui) {
+    const { Text } = legacyTui;
+    pi.registerEntryRenderer?.(ENTRY_TYPE, (entry) => new Text(entry.data?.message ?? RETRY_MESSAGE, 0, 0));
+  }
   pi.on("context", async (event, ctx) => {
     if (fenceEnabled && isOmpDumpContext())
       return { messages: event.messages };
@@ -47722,8 +47907,8 @@ function createPiTranscript(source, sessionId, entryIds, options = {}) {
   toolRemovals.set(working, removals);
   if (options.authorizeToolRemoval)
     toolRemovalAuthorization.set(working, options.authorizeToolRemoval);
-  if (options.toolImageTokens)
-    toolImageTokenCost.set(working, options.toolImageTokens);
+  if (options.imageTokens)
+    imageTokenCost.set(working, options.imageTokens);
   const emptyRemovedMessages = new Set;
   const toolInputChanges = new Map;
   const transcriptMessages = buildTranscriptView(working, sessionId, (messageIndex, toolCallId) => {
@@ -47986,7 +48171,7 @@ function createPiUserArrayPart(working, messageIndex, partIndex, markDirty) {
     ignored: msg.ignored || part?.ignored,
     imageTokens() {
       const current = working[messageIndex].content;
-      return Array.isArray(current) && current[partIndex]?.type === "image" ? PI_IMAGE_TOKENS : 0;
+      return Array.isArray(current) && current[partIndex]?.type === "image" ? imageTokenCost.get(working)?.(messageIndex, partIndex) ?? PI_IMAGE_TOKENS : 0;
     },
     id: undefined,
     getText() {
@@ -48199,8 +48384,7 @@ function createPiToolResultPart(working, messageIndex, partIndex, markDirty) {
     imageTokens() {
       if (working[messageIndex].content[partIndex]?.type !== "image")
         return 0;
-      const cost = toolImageTokenCost.get(working);
-      return cost ? cost(messageIndex, partIndex) : PI_IMAGE_TOKENS;
+      return imageTokenCost.get(working)?.(messageIndex, partIndex) ?? PI_IMAGE_TOKENS;
     },
     remove() {
       return markToolRemoval(working, messageIndex, partIndex);
@@ -48299,7 +48483,7 @@ function extractStableId(msg, index, entryIds) {
 }
 var toolRemovals = new WeakMap;
 var toolRemovalAuthorization = new WeakMap;
-var toolImageTokenCost = new WeakMap;
+var imageTokenCost = new WeakMap;
 function markToolRemoval(working, messageIndex, partIndex) {
   const removals = toolRemovals.get(working);
   if (!removals)
@@ -48737,11 +48921,6 @@ function clearSystemPromptRefresh(sessionId) {
 }
 function hasPendingMaterialization(sessionId) {
   return pendingMaterializationSessions.has(sessionId);
-}
-function consumePendingMaterialization(sessionId) {
-  const wasSet = pendingMaterializationSessions.has(sessionId);
-  clearPendingMaterialization(pendingMaterializationSessions, sessionId);
-  return wasSet;
 }
 function resolveSessionId2(ctx) {
   const sm = ctx.sessionManager;
@@ -50884,7 +51063,7 @@ function registerPiContextHandler(pi, baseOptions) {
           inputTokens: usageInputTokens
         },
         isCacheBusting,
-        userFlushOrigin: hasPendingMaterializationOrigin(pendingMaterializationSessions, sessionId, "user_flush"),
+        userFlushOrigin: hasExplicitRefreshRequest(pendingMaterializationSessions, sessionId),
         reasoningClearing: {
           keepReasoningTokens: resolveKeepReasoningTokens(options.heuristics?.keepReasoningTokens, resolvePiContextModelKey(ctx)),
           nativeReasoningMayClear: canClearNativeReasoning(ctx.model),
@@ -52307,7 +52486,7 @@ Historian previously failed ${failureCount} time(s), so Magic Context is retryin
     const trigger = checkCompartmentTrigger(db, sessionId, sessionMeta, usage, 0, triggerInputs.executeThresholdPercentage, triggerInputs.triggerBudget, triggerInputs.keepReasoningTokens, triggerInputs.commitClusterTrigger, args.activeTags, boundaryContextLimit, () => readPiHistorianTail(db, sessionId, provider), args.taggerFloor, { canClearReasoning: true }, {
       hardFold: false,
       force: usage.percentage >= historianForceMaterializationPercentage && (usage.percentage >= 95 || getEmergencyInputSample(db, sessionId) === 0),
-      explicitFlush: hasPendingMaterializationOrigin(pendingMaterializationSessions, sessionId, "user_flush"),
+      explicitFlush: hasExplicitRefreshRequest(pendingMaterializationSessions, sessionId),
       publishedHistory: args.publishedHistoryRide,
       permission: {
         signedThinkingHold: args.signedThinkingHeld === true,
@@ -52755,6 +52934,9 @@ async function runPipeline(args) {
   let publishedM1RefreshedThisPass = false;
   let prefixPreflightContended = false;
   const softRefreshOpportunity = args.schedulerDecision === "execute";
+  const wrapupPending = hasPendingMaterializationOrigin(pendingMaterializationSessions, args.sessionId, "user_wrapup");
+  if (piM0State)
+    piM0State.skipPressureRefold = wrapupPending;
   const cachedPrefixBeforePreflight = piM0State && (foldDueDecision.value || softRefreshOpportunity) && !emergencyDropEligible ? prepareCachedM0M1PiReplay(piM0State, args.db, injectionPassSnapshot?.cachedRow) : undefined;
   let preFoldInjectionResult = null;
   const persistedM0BeforeFold = injectionPassSnapshot?.sessionMeta ?? args.sessionMeta;
@@ -52887,9 +53069,10 @@ async function runPipeline(args) {
       saved: nativeRemovalInputs,
       canApply: isCacheBustingPass
     }),
-    toolImageTokens: (messageIndex, partIndex) => {
+    imageTokens: (messageIndex, partIndex) => {
       const message = args.messages[messageIndex];
-      return piToolImageWireTokens({
+      return piImageWireTokens({
+        role: message?.role,
         block: Array.isArray(message?.content) ? message.content[partIndex] : undefined,
         stripped: imageStrippedMessage(message, messageIndex),
         modelAcceptsImages: args.modelAcceptsImages !== false
@@ -52924,7 +53107,7 @@ async function runPipeline(args) {
     subagentExecute: args.sessionMeta.isSubagent && args.schedulerDecision === "execute",
     hardFold: foldBustsServedPrefixThisPass || systemPrefixChangedThisPass || requestToolListChanged || firstRenderBust || isCacheBustingPass,
     force: (args.forceMaterialization === true || emergencyDropEligible) && (args.contextUsage.percentage >= 95 || getEmergencyInputSample(args.db, args.sessionId) === 0),
-    explicitFlush: !protectedSignedPrefix && (args.userFlushOrigin === true || hasPendingMaterializationOrigin(pendingMaterializationSessions, args.sessionId, "user_flush")),
+    explicitFlush: !protectedSignedPrefix && (args.userFlushOrigin === true || hasExplicitRefreshRequest(pendingMaterializationSessions, args.sessionId)),
     publishedHistory: !prefixPreflightContended && publishedM1RefreshedThisPass
   };
   const ridePermissionGate = {
@@ -53370,7 +53553,7 @@ async function runPipeline(args) {
       if (hasPendingMaterializeSignal) {
         if (args.heuristics === undefined) {
           if (!pendingOps.some((op) => newTargets.get(op.tagId)?.thinkingDropProtected))
-            consumePendingMaterialization(args.sessionId);
+            clearReclaimedMaterialization(pendingMaterializationSessions, args.sessionId);
         }
       }
     } catch (err) {
@@ -53542,7 +53725,7 @@ async function runPipeline(args) {
       executedWorkThisPass = true;
       if (hasPendingMaterializeSignal) {
         if (!pendingOps.some((op) => newTargets.get(op.tagId)?.thinkingDropProtected))
-          consumePendingMaterialization(args.sessionId);
+          clearReclaimedMaterialization(pendingMaterializationSessions, args.sessionId);
       }
       if (currentTurnId !== null) {
         lastHeuristicsTurnIdBySession.set(args.sessionId, currentTurnId);
@@ -53868,6 +54051,10 @@ async function runPipeline(args) {
         }
       }
       if (!heldHeadReleasedForSystemChange) {
+        if (wrapupPending && isCacheBustingPass && !protectedSignedPrefix && wireInjectionResult.injected && !wireInjectionResult.contentionExhausted && !wireInjectionResult.wrapupPublicationUnconfirmed) {
+          clearPendingMaterializationOrigin(pendingMaterializationSessions, args.sessionId, "user_wrapup");
+          historyWasConsumedThisPass = true;
+        }
         if (args.isCacheBusting && prefixMutationAllowed) {
           historyRefreshSessions.delete(args.sessionId);
           historyWasConsumedThisPass = true;
@@ -55105,13 +55292,6 @@ function inferLevel(text) {
   return "info";
 }
 
-// src/dialogs/status-dialog.ts
-import {
-  matchesKey as matchesKey2,
-  truncateToWidth,
-  visibleWidth
-} from "@earendil-works/pi-tui";
-
 // ../plugin/src/features/magic-context/memory/memory-diagnostics.ts
 function emptyMemoryImportanceHistogram() {
   return {
@@ -56156,6 +56336,10 @@ async function showStatusDialog(pi, ctx, deps) {
   const sessionId = resolveSessionId(ctx);
   if (!sessionId)
     throw new Error("No active Pi session is available.");
+  if (!canRenderPiRows) {
+    ctx.ui.notify(formatPiStatusSummary(buildPiStatusDetail(pi, ctx, deps, sessionId)), "info");
+    return;
+  }
   await ctx.ui.custom((tui, theme, _keybindings, done) => new StatusDialogComponent({
     pi,
     ctx,
@@ -56164,10 +56348,7 @@ async function showStatusDialog(pi, ctx, deps) {
     theme,
     tui,
     done
-  }), {
-    overlay: true,
-    overlayOptions: { anchor: "center", width: 78 }
-  });
+  }), piOverlayOptions(78));
 }
 var openStatusDialogs = new Set;
 function stopStatusDialogRefresh() {
@@ -56201,22 +56382,22 @@ class StatusDialogComponent {
   handleInput(data) {
     if (this.closed)
       return;
-    if (matchesKey2(data, "escape") || matchesKey2(data, "ctrl+c") || matchesKey2(data, "return")) {
+    if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c") || matchesKey(data, "return")) {
       this.close();
       return;
     }
     let offset = this.scrollOffset;
-    if (matchesKey2(data, "up"))
+    if (matchesKey(data, "up"))
       offset -= 1;
-    else if (matchesKey2(data, "down"))
+    else if (matchesKey(data, "down"))
       offset += 1;
-    else if (matchesKey2(data, "pageUp"))
+    else if (matchesKey(data, "pageUp"))
       offset -= this.viewportHeight;
-    else if (matchesKey2(data, "pageDown"))
+    else if (matchesKey(data, "pageDown"))
       offset += this.viewportHeight;
-    else if (matchesKey2(data, "home"))
+    else if (matchesKey(data, "home"))
       offset = 0;
-    else if (matchesKey2(data, "end"))
+    else if (matchesKey(data, "end"))
       offset = this.maxScrollOffset;
     else
       return;
@@ -56234,7 +56415,7 @@ class StatusDialogComponent {
     const frameWidth = BORDER_COLUMNS + PADDING_COLUMNS;
     const innerWidth = Math.max(1, width - frameWidth);
     const inner = renderPiStatusOverlay(this.detail, this.props.theme, innerWidth);
-    const rows = Math.max(0, this.props.tui.terminal.rows);
+    const rows = Math.max(0, piTerminalRows(this.props.tui));
     const header = inner.slice(0, 1);
     const footer = inner.slice(-1);
     const body = inner.slice(header.length, inner.length - footer.length);
@@ -57054,8 +57235,12 @@ The stored history boundaries no longer match this session branch (${ordinalAlig
   const unregister = setRawMessageProvider2(sessionId, provider);
   let holderId = "";
   try {
-    const contextLimit = resolvePiContextLimit(ctx, deps.db, sessionId);
-    const modelKey = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
+    const window = resolvePiWrapupWindow(ctx, deps.db, sessionId);
+    if (!window)
+      return `## Magic Wrapup — Skipped
+
+${WRAPUP_WINDOW_UNAVAILABLE}`;
+    const { contextLimit, modelKey } = window;
     const executeThresholdPercentage = resolveExecuteThreshold(deps.executeThresholdPercentage ?? 65, modelKey, 65, {
       tokensConfig: deps.executeThresholdTokens,
       contextLimit,
@@ -57285,9 +57470,14 @@ Wrapped up ${messagesWrapped} messages into ${compartmentsCreated} compartments;
       try {
         clearEmergencyRecovery(deps.db, sessionId);
       } catch {}
-      return `## Magic Wrapup
+      let message = `## Magic Wrapup
 
-Wrapped up ${messagesWrapped} messages into ${compartmentsCreated} compartments. The compacted history is queued and materializes on your next message.`;
+Wrapped up ${messagesWrapped} messages into ${compartmentsCreated} compartments.`;
+      if (compartmentsCreated > 0) {
+        signalPiPendingMaterialization(sessionId, "user_wrapup");
+        message += " The compacted history applies on your next message, or on the next rebuild if the host restarts first.";
+      }
+      return message;
     } finally {
       clearInterval(renewal);
       deps.shutdownSignal?.removeEventListener("abort", stopRenewal);
@@ -57297,20 +57487,28 @@ Wrapped up ${messagesWrapped} messages into ${compartmentsCreated} compartments.
     unregister();
   }
 }
-function resolvePiContextLimit(ctx, db, sessionId) {
-  const usage = ctx.getContextUsage?.();
-  let detectedContextLimit;
-  try {
-    const detected = getOverflowState(db, sessionId).detectedContextLimit;
-    if (detected > 0)
-      detectedContextLimit = detected;
-  } catch {}
-  return resolvePiUsableContextLimit({
-    rawContextWindow: usage?.contextWindow ?? ctx.model?.contextWindow,
-    rawContextWindowSource: "catalog",
-    model: ctx.model,
-    detectedContextLimit
-  }) ?? 128000;
+function resolvePiWrapupWindow(ctx, db, sessionId) {
+  const model = ctx.model;
+  if (!model)
+    return readPersistedWrapupWindow(db, sessionId);
+  const modelKey = `${model.provider}/${model.id}`;
+  const overflow = getOverflowState(db, sessionId, modelKey);
+  const window = {
+    model,
+    detectedContextLimit: overflow.detectedContextLimit
+  };
+  const provenInputTokens = resolvePiProvenInputFloor({
+    db,
+    sessionId,
+    modelKey,
+    readBranch: () => ctx.sessionManager.getBranch(),
+    providerInputLimit: piPressureEvidenceLimit(resolvePiWindowGeometry(window))
+  });
+  const contextLimit = resolvePiUsableContextLimit({
+    ...window,
+    provenInputTokens: provenInputTokens || undefined
+  });
+  return contextLimit === undefined ? readPersistedWrapupWindow(db, sessionId, modelKey) : { contextLimit, modelKey };
 }
 async function acquireCompartmentLeaseEventually(db, sessionId, renewWrapupMarker, maxWaitMs, signal) {
   const waitStartedAt = Date.now();

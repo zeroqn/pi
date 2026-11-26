@@ -33,7 +33,7 @@ import {
   LATEST_SUPPORTED_VERSION2,
   enforceSchemaFence2,
   applyContextJournalMode2
-} from "./index-nw2xkg5r.js";
+} from "./index-6gm43ppw.js";
 import"./index-3bb24eb6.js";
 import"./index-pqhc0k9d.js";
 import"./index-jhmz9tgv.js";
