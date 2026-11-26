@@ -220,8 +220,10 @@ describe("the guard's gate", () => {
 			{ before: () => { seen.push("guard"); return undefined; } },
 			{ before: () => { seen.push("egress"); return { allow: false, reason: "web-access: that fetches" }; } },
 		);
-		expect(gated.echoed?.("x")).rejects.toThrow("web-access: that fetches");
+		await expect(gated.echoed?.("x")).rejects.toThrow("web-access: that fetches");
 		// The order is the contract's: the session policy first, the subject policy second.
+		// Awaited above, because `guarded` is async: without it the loop has only asked the guard
+		// when the assertion runs, and the order this test exists to pin is read a tick too early.
 		expect(seen).toEqual(["guard", "egress"]);
 		expect(ran).toBe(0);
 	});
