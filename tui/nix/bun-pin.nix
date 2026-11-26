@@ -5,18 +5,18 @@
 # release asset and falls back to this pin's upstream URL, which is what CI needs before a release
 # exists.
 {
-  version = "canary-20261124";
+  version = "canary-20261126";
   upstream = "https://github.com/oven-sh/bun/releases/download/canary";
 
   archives = {
     x86_64-linux = {
       asset = "bun-linux-x64.zip";
-      hash = "sha256-S1LWNwfyYaqu8rGfPXzept5sHucg6G9zfl6UzrIqDIs=";
+      hash = "sha256-eKKdLzzTlEJEVGaa3PJPwHTj/etk6ytaoHdSD1WmzZA=";
       etag = "";
       lastModified = "";
     };
   };
 
   # Filled by the release workflow: the run that compiled pi with this pin and passed the gate.
-  verified = { run = "gh-pi-v1.6.0"; pi = "1.6.0"; };
+  verified = { run = "gh-pi-v1.6.1"; pi = "1.6.1"; };
 }
