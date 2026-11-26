@@ -33,9 +33,14 @@ must neither wait for it nor drag a half-finished client into a pi version.
 | the client | `tui-v<client version>` | `pi-tui-<client>-<platform>.tar.gz` (`rpi` and the `pi` wrapper) | `nix/manifest-tui.nix` |
 
 `tui-release.yml` runs on **dispatch only** — the client is under heavy development, so nothing is built on
-a push. A dispatch always builds both Linux legs and runs the client's `cargo test`; it publishes
+a push. A dispatch builds `x86_64-linux` and runs the client's `cargo test`; it publishes
 `tui-v<version>` (from `tui/Cargo.toml`) when `publish` is checked. `aot-release.yml` publishes the agent
 when pi's own release version changes, on a daily schedule.
+
+Both streams build `x86_64-linux` alone. An `aarch64-linux` leg was added to each and removed again
+(2026-11-26): it failed on `ubuntu-24.04-arm`, and no arm64 artifact has ever been published, so nothing
+downstream lost a binary. `flake.nix` still evaluates on both aarch64 systems, so a developer's own
+`nix develop` works there; only the release builds are x86_64-linux.
 
 Downstream, with this repository as an input (`extensions/` is the repository root, so the flake is in the
 `tui` subdirectory):
@@ -65,7 +70,7 @@ what it loads is the binding `../packages/onnxruntime-node` ships. Both exports 
 process — glibc reads `LD_LIBRARY_PATH` before any JavaScript runs — and the shim is a reference of the
 output, so installing the host installs the shim. Both exports exist on `x86_64-linux` only: the binding
 `packages/onnxruntime-node` vendors is `linux/x64`, so the shim's one declared platform is the only one with
-something to load it, and the aarch64 host `nix/manifest.nix` carries exports neither.
+something to load it, and a host released for any other platform carries neither export.
 `nix/onnxruntime-check.sh` is the gate: it builds vectors from the plugin's own transformers chunk on the
 shell's Bun and, with `--host`, inside the host's own process with the outer environment stripped.
 
@@ -77,7 +82,7 @@ only**:
 | Upstream event | Behaviour |
 |---|---|
 | a new pi release | published as `pi-v<version>`, with the AOT host and the Bun archive that host was compiled with |
-| a platform whose leg failed | the other platforms still publish; `nix/manifest.nix` names only the ones that passed |
+| a leg that failed | only the platforms that passed publish; `nix/manifest.nix` names only those |
 | nothing new | the run reports where the Bun pin stands and stops |
 | Bun's canary moves | nothing on its own schedule: Bun moves when a pi release is built, and travels inside that release |
 
@@ -114,7 +119,7 @@ If `nix develop` fails with a hash mismatch, the canary moved: run `nix/bun-pin-
    frames)`.
 
 A failing gate fails the run, and the pin, the manifest and the release page stay as they were. The manifest
-commit lands only after all three platforms passed, because it is what downstream flakes lock.
+commit lands only after the platform passed its gates, because it is what downstream flakes lock.
 
 ### Attestation
 

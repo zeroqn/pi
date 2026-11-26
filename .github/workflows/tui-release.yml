@@ -7,9 +7,10 @@ name: tui-release
 # Tag: `tui-v<version>`, where `<version>` is the workspace version in `tui/Cargo.toml`. Publishing is
 # version-driven: bump that version to release, the way pi's own releases work.
 #
-# It runs on dispatch only, and always builds both Linux platforms and runs the client's tests; it publishes
-# when `publish` is set, deriving `tui-v<version>` from `tui/Cargo.toml` unless a tag is given. Nothing is
-# built on a push: the client changes too often for that to be useful at this stage.
+# It runs on dispatch only, and builds `x86_64-linux` and runs the client's tests; it publishes when
+# `publish` is set, deriving `tui-v<version>` from `tui/Cargo.toml` unless a tag is given. Nothing is built on
+# a push: the client changes too often for that to be useful at this stage. The `aarch64-linux` leg was
+# removed on 2026-11-26 with the agent stream's: it failed on `ubuntu-24.04-arm`, and no arm64 release exists.
 #
 # What a release carries, per platform: `pi-tui-<version>-<platform>.tar.gz` - `rpi` and the `pi` wrapper
 # beside it - plus a build-provenance attestation (`gh attestation verify <asset> --repo <owner>/<repo>`).
@@ -109,8 +110,6 @@ jobs:
         include:
           - runner: ubuntu-24.04
             platform: x86_64-linux
-          - runner: ubuntu-24.04-arm
-            platform: aarch64-linux
     runs-on: ${{ matrix.runner }}
     defaults:
       run:

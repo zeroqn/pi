@@ -10,10 +10,12 @@ name: aot-release
 #    what keeps them installable. The Rust client is not here: it has its own stream, `tui-release.yml`, with
 #    its own version, because it changes far more often than pi does.
 #
-# Platforms: `x86_64-linux` and `aarch64-linux`. Darwin is not built: its leg was never able to start (a
-# `macos-14` job that reported `cancelled` one second after it was created, with no steps and no runner), and
-# nothing about the arm64 Linux leg depends on it. `aarch64-darwin` stays described but unreleased, so a
-# Darwin downstream gets no prebuilt and no wrong binary.
+# Platform: `x86_64-linux`. An `aarch64-linux` leg (`ubuntu-24.04-arm`) was added and removed again
+# (2026-11-26): it failed while nothing downstream used it, since `nix/manifest.nix` has never carried an
+# arm64 entry. Darwin is not built either: its leg was never able to start (a `macos-14` job that reported
+# `cancelled` one second after it was created, with no steps and no runner). `aarch64-darwin` stays described
+# but unreleased, so a Darwin downstream gets no prebuilt and no wrong binary. `flake.nix` keeps both aarch64
+# systems for a developer's own `nix develop`; only the release builds are x86_64-linux.
 #
 # Why Bun is copied rather than pointed at: upstream's `canary` assets are replaced daily and the old URLs
 # stop working, so a pin that names oven-sh's tag rots. Each release re-pins, downloads the archive it
@@ -176,10 +178,6 @@ jobs:
         include:
           - runner: ubuntu-24.04
             platform: x86_64-linux
-            end-to-end: true
-          - runner: ubuntu-24.04-arm
-            platform: aarch64-linux
-            end-to-end: false
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
@@ -226,7 +224,6 @@ jobs:
             --expect "${{ needs.watch.outputs.pi-version }}"
 
       - name: Gate 2 - the client drives it through a whole turn
-        if: matrix.end-to-end
         # The client is not released here, but it must still be able to drive this host: that is the whole
         # contract between the two streams. Built from source, cached, a couple of minutes.
         run: |

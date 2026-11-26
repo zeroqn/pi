@@ -44,7 +44,8 @@
       # *evaluating* the package on another platform is the failure this avoids: nixpkgs refuses it while the
       # derivation is built — `Refusing to evaluate package 'onnxruntime-shim-1.24.3' … because it is not
       # available on the requested hostPlatform` — before any attribute of it can be inspected, which is how
-      # the aarch64 leg of `aot-release.yml` broke once the shim entered the dev shell. Keep the two in step.
+      # an `aarch64-linux` dev shell broke once the shim entered it. That platform's release leg is gone, but
+      # this dev shell is still evaluated on arm64, so the list stays. Keep the two in step.
       hasShim = system: builtins.elem system [ "x86_64-linux" ];
 
       devShellFor =
