@@ -94,6 +94,11 @@
  * decimal rather than `sha256sum`/`awk`/`jq`), so both the first-six and the whole-array hashes move; the
  * description moves with the six new modules, the loss of "no match statements", and the scan's entry cap.
  * The measurement and its probe are `.scratch/toolchain-1.4.0/` (monty-delta.md §2, `probe/`).
+ * Then the monty-1.7.0 amendment of 2026-11-26: the beta resolved `await` in any scope, and the final
+ * release refuses it outside an `async def` with CPython's own `SyntaxError: 'await' outside async
+ * function`, while module-level `await` still runs. Guideline 5's rule is unchanged and its rationale
+ * becomes that refusal, so the first-six and the whole-array hashes move; the description and the
+ * snippet keep theirs. Measured at the pinned worker by `test/surface-claims.test.ts`.
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
@@ -113,8 +118,8 @@ describe("the base surface (acceptance check 2)", () => {
 		expect(BASE_SNIPPET).toBe("Run Python in a persistent kernel with host-bridged shell, search, image reads");
 	});
 
-	it("keeps the first six guidelines, in order (as of the await-in-a-plain-def amendment)", () => {
-		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("495d329315546bae230a0fc0745158e374101a7c6a94f1a73744a72beb58bd81");
+	it("keeps the first six guidelines, in order (as of the monty-1.7.0 amendment)", () => {
+		expect(sha(BASE_GUIDELINES.slice(0, 6).join("\n"))).toBe("901b679b7b6585c76de707eacf07751cc3091a3010e22bbad03ee1ec679f45df");
 		expect(BASE_GUIDELINES[0]).toStartWith("Use python for work that is stateful");
 	});
 
@@ -125,7 +130,7 @@ describe("the base surface (acceptance check 2)", () => {
 	// that had no business being in the foreground.
 	it("carries the four added guidelines, the only lines since the split", () => {
 		expect(BASE_GUIDELINES.length).toBe(10);
-		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("fd8b283131b83b77b9a190fafab018b9e32db81887840f6b336a4831fcfbfe77");
+		expect(sha(BASE_GUIDELINES.join("\n"))).toBe("e538d805f1bd59e792134e4401e961d0d866e247c933c50b208b6be1e6f32ae6");
 		expect(BASE_GUIDELINES[6]).toStartWith("In python, search file contents with");
 		expect(BASE_GUIDELINES[7]).toStartWith("In python, find paths with");
 		expect(BASE_GUIDELINES[8]).toStartWith("In python, path tests are `os.path.isdir(p)`");

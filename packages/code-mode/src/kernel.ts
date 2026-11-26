@@ -61,8 +61,9 @@ export const ROTATE_FAILURE_CAP = 3;
  * The protocol each monty release speaks and the oldest it still serves, read from
  * `crates/monty-proto/src/lib.rs` (`PROTOCOL_VERSION` / `MIN_SUPPORTED_PROTOCOL_VERSION`) at
  * each tag. The handshake is a *range*, not an equality: 1.4.0 serves 5-6, 1.5.0 serves 7,
- * 1.6.0 serves 7-8, 1.7.0-beta.1 serves 7-9 — so a 1.6.0 client (protocol 8) drives the beta's
- * worker, and the equality test this replaces refused exactly that pair.
+ * 1.6.0 serves 7-8, and 1.7.0-beta.1 serves 7-9 with the final 1.7.0 unchanged there (protocol 9,
+ * minimum 7) — so a 1.6.0 client (protocol 8) drives either 1.7.0 worker, and the equality test
+ * this replaces refused exactly that pair.
  *
  * Why a table and not a query: neither side publishes its protocol on the CLI or in the
  * JavaScript package (`--version` prints a release name only), so the numbers have to be
@@ -74,6 +75,7 @@ export const MONTY_PROTOCOLS: Record<string, { speaks: number; serves: number }>
 	"1.5.0": { speaks: 7, serves: 7 },
 	"1.6.0": { speaks: 8, serves: 7 },
 	"1.7.0-beta.1": { speaks: 9, serves: 7 },
+	"1.7.0": { speaks: 9, serves: 7 },
 };
 
 /**

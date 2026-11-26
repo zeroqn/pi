@@ -15,6 +15,7 @@ import { MONTY_PROTOCOLS, protocolProblem } from "../src/kernel";
 describe("the worker protocol rule", () => {
 	it("accepts every pair inside the worker's range", () => {
 		// The pair the devShell runs today, and the one the string test refused.
+		expect(protocolProblem("1.6.0", "monty-runtime 1.7.0")).toBeNull();
 		expect(protocolProblem("1.6.0", "monty-runtime 1.7.0-beta.1")).toBeNull();
 		expect(protocolProblem("1.6.0", "monty-runtime 1.6.0")).toBeNull();
 		// A 1.7.0-beta.1 client against its own worker, and a 1.5.0 client against it: the
@@ -46,11 +47,13 @@ describe("the worker protocol rule", () => {
 		expect(protocolProblem("1.6.0", "1.6.0")).toBeNull();
 	});
 
-	it("carries the four releases the workspace has pinned, with the measured numbers", () => {
-		// monty-proto at each tag: 1.4.0 -> 6/5, 1.5.0 -> 7/7, 1.6.0 -> 8/7, 1.7.0-beta.1 -> 9/7.
+	it("carries the five releases the workspace has pinned, with the measured numbers", () => {
+		// monty-proto at each tag: 1.4.0 -> 6/5, 1.5.0 -> 7/7, 1.6.0 -> 8/7, 1.7.0-beta.1 -> 9/7,
+		// and 1.7.0 -> 9/7 (the release the flake now pins).
 		expect(MONTY_PROTOCOLS["1.4.0"]).toEqual({ speaks: 6, serves: 5 });
 		expect(MONTY_PROTOCOLS["1.5.0"]).toEqual({ speaks: 7, serves: 7 });
 		expect(MONTY_PROTOCOLS["1.6.0"]).toEqual({ speaks: 8, serves: 7 });
+		expect(MONTY_PROTOCOLS["1.7.0"]).toEqual({ speaks: 9, serves: 7 });
 		expect(MONTY_PROTOCOLS["1.7.0-beta.1"]).toEqual({ speaks: 9, serves: 7 });
 	});
 });

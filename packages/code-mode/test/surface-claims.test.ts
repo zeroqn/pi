@@ -4,8 +4,10 @@
  * The description and guideline 5 name the language's limits, and prose cannot be tested
  * against prose: at monty 1.6.0 "no class inheritance" was true, and at 1.7.0-beta.1 it is
  * false — subclassing runs, `super()` raises a NameError, and only metaclasses and method
- * decorators are still refused. This file feeds each claim to the pinned worker and fails
- * when one of them moves, which is the signal to edit `surface.ts` in the same change.
+ * decorators are still refused. At the final 1.7.0 the same test moved again the other way:
+ * `await` outside an `async def` became CPython's SyntaxError. This file feeds each claim to
+ * the pinned worker and fails when one of them moves, which is the signal to edit `surface.ts`
+ * in the same change.
  *
  * Needs a worker, like every real-kernel test here:
  *
@@ -97,10 +99,16 @@ print(B().m(), B().v, C().m(), isinstance(D(), A))
 		}
 	});
 
-	// Guideline 5's other two claims: `await` in a plain `def` resolves, and a host call
-	// taken without `await` is an unfinished object rather than a result.
-	it("keeps await-in-a-plain-def and the unfinished-object rule", async () => {
-		expect(await feed("def f():\n  return await ping(1)\nprint(f())")).toEqual({ ok: true, out: "pong:1" });
+	// Guideline 5's rule: a helper that awaits a host function must be `async def`. At 1.7.0 that is
+	// CPython's rule too - `await` outside an async function is a compile-time SyntaxError, while
+	// module-level `await` still runs - and a host call taken without `await` is an unfinished object
+	// rather than a result.
+	it("refuses await outside an async def, and keeps the unfinished-object rule", async () => {
+		const plain = await feed("def f():\n  return await ping(1)\nprint(f())");
+		expect(plain.ok).toBe(false);
+		if (!plain.ok) expect(plain.error).toMatch(/SyntaxError: 'await' outside async function/);
+		expect(await feed("async def f():\n  return await ping(1)\nprint(await f())")).toEqual({ ok: true, out: "pong:1" });
+		expect(await feed("print(await ping(2))")).toEqual({ ok: true, out: "pong:2" });
 		const unawaited = await feed("x = ping(3)\nprint(type(x).__name__, str(x)[:22])");
 		expect(unawaited.ok).toBe(true);
 		if (unawaited.ok) expect(unawaited.out).toStartWith("coroutine");
