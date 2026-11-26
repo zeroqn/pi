@@ -3,7 +3,7 @@
     piAot = {
       version = "1.6.1";
       url = "https://github.com/zeroqn/pi/releases/download/pi-v1.6.1/pi-aot-1.6.1-x86_64-linux.tar.gz";
-      hash = "sha256-RIVFdTPxmRib1QuWj9YLtWzIJN/HLEM0eDzgkNuhM3Y=";
+      hash = "sha256-ouRDZ1Xu610CC0dFXumedjRncM8gKh2Xi8U9chbA5uE=";
     };
     bunAot = {
       version = "canary-20261126";
