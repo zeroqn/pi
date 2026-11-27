@@ -19,7 +19,7 @@ serveWorkerJobs(async (input, port) => {
   await main();
   async function main() {
     if (input.v2ArchiveReader) {
-      const { serveV2ArchiveReads } = await import("./v2-archive-reader-rjgsmd71.js");
+      const { serveV2ArchiveReads } = await import("./v2-archive-reader-qfq1kt9h.js");
       await serveV2ArchiveReads(port, openConnections);
       return;
     }
@@ -51,7 +51,7 @@ serveWorkerJobs(async (input, port) => {
         await runMessageFtsRowidMapBackfill(db);
         reply = { kind: "fts-rowid-backfill" };
       } else if (input.searchArchive) {
-        const { renderSearchArchive } = await import("./search-archive-t9g5yfny.js");
+        const { renderSearchArchive } = await import("./search-archive-mm9rx7xk.js");
         const { readRawSessionMessageIdOrdinalsForRangeFromDb } = await import("./read-session-raw-0tytrjye.js");
         const archive = input.searchArchive;
         let raw;
@@ -82,7 +82,7 @@ serveWorkerJobs(async (input, port) => {
         setHarness(input.harness ?? "opencode");
         const [{ indexMessageInShortChunks }, { applyContextJournalMode }] = await Promise.all([
           import("./message-index-bounded-sra4jpac.js"),
-          import("./storage-db-ggszcqq8.js")
+          import("./storage-db-m7rxh5pg.js")
         ]);
         applyContextJournalMode(db, input.path);
         const writer = db;

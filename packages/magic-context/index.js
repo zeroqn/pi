@@ -141,7 +141,7 @@ import {
   wakePlaneStatus,
   loadPiConfig,
   loadPiConfigDetailed,
-  unregisterPiProjectEmbeddings,
+  shutdownPiProjectEmbeddings,
   ensureProjectRegisteredFromPiDirectory,
   neutralizeOmpMentions,
   restoreOmpMentions,
@@ -177,8 +177,15 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-drmkw81y.js";
+} from "./index-wrrvnqva.js";
 import"./index-4knyh1kt.js";
+import {
+  piHarnessKindFromExecutable,
+  setStoragePrivatePermissionEnforcement,
+  ensureStorageDirectorySync,
+  writeStorageFileSync,
+  writeStorageFileAtomicSync
+} from "./index-8x8wtn3t.js";
 import {
   canonicalModelIdentity,
   piModelRefToCanonical,
@@ -206,9 +213,29 @@ import {
   createFailClosedController
 } from "./index-3bb24eb6.js";
 import {
+  inRootAsyncContext2,
+  Database2,
+  getSqliteDatabasePath2,
+  withSqliteTurnDeadline2,
+  withSqliteBackgroundWriter2,
+  withSqliteTransformPass2,
+  withoutSqliteTransformPass2,
+  guardSqliteTransformPass2,
+  assertTransformWrite2,
+  isTransientSqliteError2,
+  withAsyncPrivilegedWriter2
+} from "./index-2qtx0q6h.js";
+import {
+  EMBEDDING_WORKER_STOP_MAX_MS,
+  getCachedLocalEmbeddingPooling,
+  resolveLocalEmbeddingWorkerRuntime,
+  getLoadedLocalEmbeddingRuntimes
+} from "./index-ggyrh6mr.js";
+import {
   pruneMissingProjectIdentities,
   setHomeProjectPermission,
   ProjectIdentityError,
+  directoryFallback,
   resolveProjectIdentityStrict,
   isUserHomeDirectory,
   resolveProjectIdentity,
@@ -216,7 +243,7 @@ import {
   resolveProjectIdentityForSession,
   beginBootQuietPeriod,
   scheduleAfterBootQuiet
-} from "./index-453s1hj6.js";
+} from "./index-94z1xzmr.js";
 import {
   detectThinkingBindingMismatch,
   detectLatestTurnThinkingMismatch,
@@ -451,38 +478,6 @@ import {
   tagIdentityRevisionKey
 } from "./index-jhmz9tgv.js";
 import {
-  inRootAsyncContext2,
-  Database2,
-  getSqliteDatabasePath2,
-  withSqliteTurnDeadline2,
-  withSqliteBackgroundWriter2,
-  withSqliteTransformPass2,
-  withoutSqliteTransformPass2,
-  guardSqliteTransformPass2,
-  assertTransformWrite2,
-  isTransientSqliteError2,
-  withAsyncPrivilegedWriter2
-} from "./index-2qtx0q6h.js";
-import {
-  piHarnessKindFromExecutable,
-  getErrorMessage,
-  describeError,
-  startBootDeadline,
-  getSchemaFenceRejection2,
-  getMigrationOnOpenRefusal2,
-  LATEST_SUPPORTED_VERSION2,
-  getDatabasePath2,
-  getPersistedSchemaVersion2,
-  setSqlitePragmaConfig2,
-  applySqliteTuningPragmas2,
-  runSqliteOptimize2,
-  applyContextJournalMode2,
-  openDatabase2,
-  openCurrentDatabase2,
-  openDatabaseAsync2,
-  closeDatabase2
-} from "./index-cmhas8we.js";
-import {
   LkgRecoveryFenceError,
   clearLkgFenceProcessState,
   lkgFenceRequiresRebuild,
@@ -611,7 +606,7 @@ import {
   getSourceContents,
   recordSubagentInvocation,
   getLatestHistorianInvocationId
-} from "./index-xmgw5yy4.js";
+} from "./index-wq6rmj4b.js";
 import {
   resolveOpenCodeDbPath,
   assertOpenCodeStoreGeneration,
@@ -678,7 +673,7 @@ import {
   getLegacyProtectedTailStartOrdinal2,
   readSessionChunk2
 } from "./index-hpbdnbtf.js";
-import"./index-nvh6d3bz.js";
+import"./index-ddfjg278.js";
 import {
   formatSynapseLaneDescriptor
 } from "./index-5rcjs14a.js";
@@ -701,7 +696,7 @@ import {
   markGitSweepSuccessAndRelease,
   parkGitSweepNonIndexable,
   releaseGitSweepLease
-} from "./index-79xfn84y.js";
+} from "./index-ex9te7tc.js";
 import {
   embedPauseBySession,
   embedRunStateBySession,
@@ -719,6 +714,24 @@ import {
   matchedSearchSnippet
 } from "./index-0t9xfj3x.js";
 import {
+  getErrorMessage,
+  describeError,
+  startBootDeadline,
+  getSchemaFenceRejection2,
+  getMigrationOnOpenRefusal2,
+  LATEST_SUPPORTED_VERSION2,
+  getDatabasePath2,
+  getPersistedSchemaVersion2,
+  setSqlitePragmaConfig2,
+  applySqliteTuningPragmas2,
+  runSqliteOptimize2,
+  applyContextJournalMode2,
+  openDatabase2,
+  openCurrentDatabase2,
+  openDatabaseAsync2,
+  closeDatabase2
+} from "./index-nga30pdr.js";
+import {
   rememberV1HiddenRun
 } from "./index-6x556c2q.js";
 import {
@@ -732,7 +745,7 @@ import {
   expandWorkspaceIdentitySetWithAliases,
   sourceNameForMemory,
   computeWorkspaceEpochFingerprint
-} from "./index-pqhc0k9d.js";
+} from "./index-8svx4dwq.js";
 import {
   getNotes,
   addNote,
@@ -754,7 +767,7 @@ import {
   createPrimer,
   updatePrimerSupport,
   updatePrimerAnswer
-} from "./index-ay13n5s4.js";
+} from "./index-txks6dkf.js";
 import {
   setEmbeddingSessionBusy2,
   isEmbeddingHostBusy2
@@ -778,6 +791,7 @@ import {
   updateMemoryVerification2,
   setMemoryClassification2,
   archiveMemory2,
+  getMemoryCount2,
   getMemoryCountsByStatus2
 } from "./index-29nw7n1r.js";
 import {
@@ -785,12 +799,7 @@ import {
 } from "./index-yhzhdp3m.js";
 import {
   pushNotification2
-} from "./index-q1yc6bs0.js";
-import {
-  getCachedLocalEmbeddingPooling,
-  resolveLocalEmbeddingWorkerRuntime,
-  getLoadedLocalEmbeddingRuntimes
-} from "./index-bte6kzsd.js";
+} from "./index-7thk2cwt.js";
 import {
   describeShadowBackfillWriteRefusal2,
   contentSha2562,
@@ -809,7 +818,7 @@ import {
   embedSessionCompartmentChunks2,
   getEmbeddingCoverageStatus2,
   getAutoEmbeddingSessionCoverage2
-} from "./index-s2zjddb6.js";
+} from "./index-3bk6bva5.js";
 import {
   USER_FACING_FAILURES,
   renderUserFacingFailure,
@@ -844,8 +853,8 @@ import {
   scheduleClearAndReindex,
   clearSessionTracking,
   createAutoSearchDiagnostics
-} from "./index-pj9b2mmd.js";
-import"./index-t5pyexcf.js";
+} from "./index-e1jxkxzq.js";
+import"./index-m8t79zqf.js";
 import"./index-3s39a1md.js";
 import {
   DREAMER_PRIMER_INVESTIGATOR_ALLOWED_TOOLS,
@@ -878,7 +887,7 @@ import {
 } from "./index-pdrberjp.js";
 import"./index-71rg8j43.js";
 import"./index-8d2z6503.js";
-import"./index-88vqcr3d.js";
+import"./index-r1wxv5h3.js";
 import"./index-fvfq9gva.js";
 import {
   __toESM
@@ -890,9 +899,6 @@ import {
   computeNormalizedHash
 } from "./index-9x1f96r8.js";
 import {
-  sameProjectDirectory
-} from "./index-wrr9rp9a.js";
-import {
   closeQuietly,
   isKnownAutocommit
 } from "./index-nrzkqte4.js";
@@ -901,11 +907,8 @@ import {
   WriteTransactionSteps
 } from "./index-1ts77n1b.js";
 import {
-  setStoragePrivatePermissionEnforcement,
-  ensureStorageDirectorySync,
-  writeStorageFileSync,
-  writeStorageFileAtomicSync
-} from "./index-81nthk8j.js";
+  sameProjectDirectory
+} from "./index-wrr9rp9a.js";
 
 // src/index.ts
 import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
@@ -927,6 +930,7 @@ var CANONICAL_DREAM_TASKS = [
   "promote-primers",
   "refresh-primers"
 ];
+var MIN_POOL_TO_CLASSIFY = 10;
 function availableDreamTasks(smartNotesEnabled = true) {
   return CANONICAL_DREAM_TASKS.filter((task) => smartNotesEnabled || task !== "evaluate-smart-notes");
 }
@@ -3631,7 +3635,7 @@ function startHostStallProfilerSwitch() {
 // package.json
 var package_default = {
   name: "@cortexkit/pi-magic-context",
-  version: "0.49.79",
+  version: "0.49.86",
   type: "module",
   description: "Pi and OMP coding agent extension for Magic Context — cross-session memory and context management",
   main: "dist/index.js",
@@ -4371,6 +4375,91 @@ function backoffMs(failureCount) {
   return minutes * 60 * 1000;
 }
 
+// ../plugin/src/features/magic-context/dreamer/map-memories-retry.ts
+import { createHash as createHash3 } from "node:crypto";
+
+// ../plugin/src/features/magic-context/dreamer/storage-dream-state.ts
+var getDreamStateStatements = new WeakMap;
+var setDreamStateStatements = new WeakMap;
+var deleteDreamStateStatements = new WeakMap;
+function getGetDreamStateStatement(db) {
+  let stmt = getDreamStateStatements.get(db);
+  if (!stmt) {
+    stmt = db.prepare("SELECT value FROM dream_state WHERE key = ?");
+    getDreamStateStatements.set(db, stmt);
+  }
+  return stmt;
+}
+function getSetDreamStateStatement(db) {
+  let stmt = setDreamStateStatements.get(db);
+  if (!stmt) {
+    stmt = db.prepare("INSERT INTO dream_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+    setDreamStateStatements.set(db, stmt);
+  }
+  return stmt;
+}
+function getDeleteDreamStateStatement(db) {
+  let stmt = deleteDreamStateStatements.get(db);
+  if (!stmt) {
+    stmt = db.prepare("DELETE FROM dream_state WHERE key = ?");
+    deleteDreamStateStatements.set(db, stmt);
+  }
+  return stmt;
+}
+function getDreamState(db, key) {
+  const row = getGetDreamStateStatement(db).get(key);
+  return typeof row?.value === "string" ? row.value : null;
+}
+function setDreamState(db, key, value) {
+  getSetDreamStateStatement(db).run(key, value);
+}
+function deleteDreamState(db, key) {
+  getDeleteDreamStateStatement(db).run(key);
+}
+
+// ../plugin/src/features/magic-context/dreamer/map-memories-retry.ts
+function mapMemoryRetryKey(project) {
+  return `map-memories:retry:${project}`;
+}
+function readMapMemoryRetries(db, project) {
+  try {
+    const parsed = JSON.parse(getDreamState(db, mapMemoryRetryKey(project)) ?? "{}");
+    if (!isRecord(parsed))
+      return {};
+    const retries = {};
+    for (const [id, value] of Object.entries(parsed)) {
+      if (isRecord(value) && typeof value.content === "string" && typeof value.failures === "number" && typeof value.deferUntil === "number") {
+        retries[id] = {
+          content: value.content,
+          failures: value.failures,
+          deferUntil: value.deferUntil
+        };
+      }
+    }
+    return retries;
+  } catch {
+    return {};
+  }
+}
+function contentKey(memory) {
+  return createHash3("sha256").update(`${memory.category}
+${memory.content}`).digest("hex");
+}
+function isMapMemoryDeferred(memory, retries, now = Date.now()) {
+  const retry = retries[memory.id];
+  return !!retry && retry.deferUntil > now && retry.content === contentKey(memory);
+}
+function nextMapMemoryRetry(memory, prior) {
+  const content = contentKey(memory);
+  const failures = (prior?.content === content ? prior.failures : 0) + 1;
+  const maxWaitHours = 7 * 24;
+  return {
+    content,
+    failures,
+    deferUntil: failures < 2 ? 0 : Date.now() + Math.min(maxWaitHours, 2 ** (failures - 2)) * 3600000
+  };
+}
+
 // ../plugin/src/features/magic-context/dreamer/task-gates.ts
 function countActiveMemories(db, projectPath) {
   const row = db.prepare("SELECT COUNT(*) AS cnt FROM memories WHERE project_path = ? AND status IN ('active','permanent')").get(projectPath);
@@ -4387,16 +4476,24 @@ function countLiveMemories(db, projectPath, options = {}) {
   const row = options.category ? db.prepare(`${sql} AND category = ?`).get(projectPath, Date.now(), options.category) : db.prepare(sql).get(projectPath, Date.now());
   return row?.cnt ?? 0;
 }
+var UNMAPPED_LIVE_MEMORIES_SQL = `FROM memories m
+    WHERE m.project_path = ?
+      AND m.status IN ('active','permanent')
+      AND (m.expires_at IS NULL OR m.expires_at > ?)
+      AND NOT EXISTS (SELECT 1 FROM memory_verifications v WHERE v.memory_id = m.id)`;
 function countUnmappedActiveMemories(db, projectPath) {
-  const row = db.prepare(`SELECT COUNT(*) AS cnt
-               FROM memories m
-              WHERE m.project_path = ?
-                AND m.status IN ('active','permanent')
-                AND (m.expires_at IS NULL OR m.expires_at > ?)
-                AND NOT EXISTS (
-                    SELECT 1 FROM memory_verifications v WHERE v.memory_id = m.id
-                )`).get(projectPath, Date.now());
-  return row?.cnt ?? 0;
+  const now = Date.now();
+  const row = db.prepare(`SELECT COUNT(*) AS cnt ${UNMAPPED_LIVE_MEMORIES_SQL}`).get(projectPath, now);
+  const total = row?.cnt ?? 0;
+  if (total === 0)
+    return 0;
+  const retries = readMapMemoryRetries(db, projectPath);
+  const waitingIds = Object.entries(retries).filter(([, retry]) => retry.deferUntil > now).map(([id]) => id);
+  if (waitingIds.length === 0)
+    return total;
+  const waiting = db.prepare(`SELECT m.id, m.category, m.content ${UNMAPPED_LIVE_MEMORIES_SQL}
+             AND m.id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))`).all(projectPath, now, JSON.stringify(waitingIds));
+  return total - waiting.filter((memory) => isMapMemoryDeferred(memory, retries, now)).length;
 }
 function countCompartmentsSince(db, projectPath, since) {
   const row = db.prepare(`SELECT COUNT(*) AS cnt
@@ -4579,7 +4676,7 @@ function getDreamTaskBacklog(db, projectPath, task, options = {}) {
     case "classify-memories": {
       const total = countLiveMemories(db, projectPath);
       return {
-        pending: countLiveMemories(db, projectPath, { unclassifiedOnly: true }),
+        pending: total >= MIN_POOL_TO_CLASSIFY ? countLiveMemories(db, projectPath, { unclassifiedOnly: true }) : 0,
         total
       };
     }
@@ -4685,6 +4782,9 @@ function getDreamTaskBacklogs(db, projectPath, tasks = CANONICAL_DREAM_TASKS, op
       cache.eligibleProjects.clear();
     cache.eligibleProjects.set(projectPath, eligible);
   }
+  if (eligible && tasks.includes("map-memories")) {
+    eligible = !Object.values(readMapMemoryRetries(db, projectPath)).some(({ deferUntil }) => deferUntil > 0);
+  }
   const optionKey = (value) => value === undefined ? "omitted" : value === null ? "null" : `number:${value}`;
   const key = JSON.stringify([
     getHarness2(),
@@ -4720,7 +4820,7 @@ function evaluateTaskGate(task, ctx) {
     case "compress-cues":
       return countLiveMemories(db, project) > 0;
     case "classify-memories":
-      return countLiveMemories(db, project) > 0;
+      return countLiveMemories(db, project) >= MIN_POOL_TO_CLASSIFY;
     case "retrospective":
       return countProjectSessionsSince(db, project, ctx.retrospectiveWatermarkMs ?? null) > 0;
     case "maintain-docs":
@@ -4777,7 +4877,7 @@ function openOpenCodeDb() {
 }
 
 // ../plugin/src/features/magic-context/dreamer/task-executor.ts
-import { createHash as createHash11 } from "node:crypto";
+import { createHash as createHash12 } from "node:crypto";
 import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
 
 // ../plugin/src/agents/dreamer.ts
@@ -4916,7 +5016,7 @@ class HiddenCompletionRefusal extends Error {
   }
 }
 // ../plugin/src/features/magic-context/dreamer/provider-output-failure.ts
-import { createHash as createHash3 } from "node:crypto";
+import { createHash as createHash4 } from "node:crypto";
 var MAX_NEAR_ZERO_OUTPUT_TOKENS = 32;
 
 class DreamerProviderOutputFailureError extends Error {
@@ -4978,7 +5078,7 @@ function providerOutputFailureFromInvalidManifest(messages, responseText) {
     return null;
   if (!isAccountPoolQuotaNotice(responseText) && completion.outputTokens > MAX_NEAR_ZERO_OUTPUT_TOKENS)
     return null;
-  const fingerprint = createHash3("sha256").update(normalized).digest("hex").slice(0, 16);
+  const fingerprint = createHash4("sha256").update(normalized).digest("hex").slice(0, 16);
   return new DreamerProviderOutputFailureError(fingerprint, completion.outputTokens, completion.reasoningTokens, responseText);
 }
 
@@ -6457,7 +6557,7 @@ function parseFields(json) {
 }
 
 // ../plugin/src/features/magic-context/mural/compress-cues.ts
-import { createHash as createHash4 } from "node:crypto";
+import { createHash as createHash5 } from "node:crypto";
 
 // ../plugin/src/hooks/magic-context/compartment-runner-historian.ts
 import { mkdirSync, unlinkSync as unlinkSync2, writeFileSync } from "node:fs";
@@ -10485,45 +10585,6 @@ function sanitizeDumpName(value) {
   return value.replace(/[^a-zA-Z0-9._-]/g, "-");
 }
 
-// ../plugin/src/features/magic-context/dreamer/storage-dream-state.ts
-var getDreamStateStatements = new WeakMap;
-var setDreamStateStatements = new WeakMap;
-var deleteDreamStateStatements = new WeakMap;
-function getGetDreamStateStatement(db) {
-  let stmt = getDreamStateStatements.get(db);
-  if (!stmt) {
-    stmt = db.prepare("SELECT value FROM dream_state WHERE key = ?");
-    getDreamStateStatements.set(db, stmt);
-  }
-  return stmt;
-}
-function getSetDreamStateStatement(db) {
-  let stmt = setDreamStateStatements.get(db);
-  if (!stmt) {
-    stmt = db.prepare("INSERT INTO dream_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
-    setDreamStateStatements.set(db, stmt);
-  }
-  return stmt;
-}
-function getDeleteDreamStateStatement(db) {
-  let stmt = deleteDreamStateStatements.get(db);
-  if (!stmt) {
-    stmt = db.prepare("DELETE FROM dream_state WHERE key = ?");
-    deleteDreamStateStatements.set(db, stmt);
-  }
-  return stmt;
-}
-function getDreamState(db, key) {
-  const row = getGetDreamStateStatement(db).get(key);
-  return typeof row?.value === "string" ? row.value : null;
-}
-function setDreamState(db, key, value) {
-  getSetDreamStateStatement(db).run(key, value);
-}
-function deleteDreamState(db, key) {
-  getDeleteDreamStateStatement(db).run(key);
-}
-
 // ../plugin/src/features/magic-context/dreamer/lease.ts
 var LEASE_DURATION_MS = 2 * 60 * 1000;
 var DREAMING_LEASE_KEY = "dreaming";
@@ -11228,7 +11289,7 @@ async function applyCuesThroughModule(args, chunk, manifestText, signal) {
       log2(`[dreamer] compress-cues: skipped cue for memory ${entry.id} (${failure.reason}; rejection ${rejectionCount}/${CUE_REJECTION_LATCH_THRESHOLD})`);
     }
   }
-  const commandId = `mural-cues:${route.moduleCommandId}:${createHash4("sha256").update(chunk.map((candidate) => candidate.memory.id).join(",")).digest("hex").slice(0, 24)}`;
+  const commandId = `mural-cues:${route.moduleCommandId}:${createHash5("sha256").update(chunk.map((candidate) => candidate.memory.id).join(",")).digest("hex").slice(0, 24)}`;
   let response;
   try {
     response = await route.moduleClient.call({
@@ -11845,7 +11906,7 @@ function applyReviewVerdict(args, leaseKey, parsed, result) {
 }
 
 // ../plugin/src/features/magic-context/dreamer/classify.ts
-import { createHash as createHash5 } from "node:crypto";
+import { createHash as createHash6 } from "node:crypto";
 
 // ../plugin/src/plugin/rust-tool-backends.ts
 function isRustAuthorityDrainingError(error) {
@@ -12018,7 +12079,6 @@ async function readFailedChildMessages(client, sessionId, directory) {
 }
 
 // ../plugin/src/features/magic-context/dreamer/classify.ts
-var MIN_POOL_TO_CLASSIFY = 10;
 var FULL_POOL_CEILING = 100;
 var STAGE3_ANCHOR_COUNT = 30;
 var CLASSIFY_CHUNK_SIZE = 100;
@@ -12283,7 +12343,7 @@ async function runClassifyThroughModule(args, chunk, anchors, signal, runOnHost)
     if (entry.qualifier)
       modelVariants[entry.model] = entry.qualifier;
   }
-  const commandId = `classify:${args.moduleCommandId ?? Date.now()}:${createHash5("sha256").update(chunk.map((candidate) => candidate.id).join(",")).digest("hex").slice(0, 24)}`;
+  const commandId = `classify:${args.moduleCommandId ?? Date.now()}:${createHash6("sha256").update(chunk.map((candidate) => candidate.id).join(",")).digest("hex").slice(0, 24)}`;
   const runTask = (hostCompletion) => args.moduleClient?.call({
     sessionId: args.moduleSessionId,
     projectRoot: args.moduleProjectRoot,
@@ -12485,7 +12545,7 @@ function recordInvocation(args, startedAt, params) {
 
 // ../plugin/src/features/magic-context/dreamer/docs-proposals.ts
 import { execFileSync } from "node:child_process";
-import { createHash as createHash6 } from "node:crypto";
+import { createHash as createHash7 } from "node:crypto";
 import {
   existsSync as existsSync6,
   mkdirSync as mkdirSync2,
@@ -12500,7 +12560,7 @@ import {
 import { tmpdir } from "node:os";
 import { join as join8 } from "node:path";
 var FILES = ["ARCHITECTURE.md", "STRUCTURE.md"];
-var hash = (text) => createHash6("sha256").update(text).digest("hex");
+var hash = (text) => createHash7("sha256").update(text).digest("hex");
 var proposalDir = (projectDir) => join8(projectDir, ".cortexkit/magic-context/docs-update-proposals");
 function docsBaseHashes(projectDir) {
   return Object.fromEntries(FILES.map((name) => [
@@ -13571,7 +13631,7 @@ function throwIfAborted2(signal) {
 }
 
 // ../plugin/src/features/magic-context/smart-notes/compiler.ts
-import { createHash as createHash7 } from "node:crypto";
+import { createHash as createHash8 } from "node:crypto";
 
 // ../plugin/src/features/magic-context/smart-notes/compiler-prompt.ts
 var SMART_NOTE_COMPILER_SYSTEM_PROMPT = `You are the Magic Context smart-note compiler for the magic-context system.
@@ -14352,7 +14412,7 @@ function manifestAdvisoryWarnings(code, manifest) {
   return warnings;
 }
 function hashCheck(surfaceCondition, compiledCheck, manifest, checkCron) {
-  return createHash7("sha256").update(surfaceCondition ?? "").update("\x00").update(compiledCheck).update("\x00").update(JSON.stringify(manifest)).update("\x00").update(checkCron).digest("hex");
+  return createHash8("sha256").update(surfaceCondition ?? "").update("\x00").update(compiledCheck).update("\x00").update(JSON.stringify(manifest)).update("\x00").update(checkCron).digest("hex");
 }
 function extractJsonObject(output) {
   const fenced = output.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -15068,7 +15128,7 @@ function snapshotMaintainDocsFiles(docsDir) {
 }
 
 // ../plugin/src/features/magic-context/dreamer/map-memories.ts
-import { createHash as createHash8 } from "node:crypto";
+import { createHash as createHash9 } from "node:crypto";
 
 // ../plugin/src/features/magic-context/dreamer/map-memories-prompt.ts
 import { execFile as execFile2 } from "node:child_process";
@@ -15278,37 +15338,6 @@ var MAP_BATCH_SIZE = 5;
 var MAP_BATCH_FLOOR_MS = 240000;
 var CONSECUTIVE_TIMEOUT_LIMIT2 = 2;
 var MAX_INDEPENDENT_REQUEUE_PER_RUN = MAP_BATCH_SIZE;
-function retryKey(project) {
-  return `map-memories:retry:${project}`;
-}
-function readRetries(db, project) {
-  try {
-    const parsed = JSON.parse(getDreamState(db, retryKey(project)) ?? "{}");
-    if (!isRecord(parsed))
-      return {};
-    const retries = {};
-    for (const [id, value] of Object.entries(parsed)) {
-      if (isRecord(value) && typeof value.content === "string" && typeof value.failures === "number" && typeof value.deferUntil === "number") {
-        retries[id] = {
-          content: value.content,
-          failures: value.failures,
-          deferUntil: value.deferUntil
-        };
-      }
-    }
-    return retries;
-  } catch {
-    return {};
-  }
-}
-function contentKey(memory) {
-  return createHash8("sha256").update(`${memory.category}
-${memory.content}`).digest("hex");
-}
-function isDeferred(memory, retries) {
-  const retry = retries[memory.id];
-  return !!retry && retry.content === contentKey(memory) && retry.deferUntil > Date.now();
-}
 function assistantText(messages) {
   const joined = messages.filter((message) => isRecord(message) && (message.role === "assistant" || isRecord(message.info) && message.info.role === "assistant")).map((message) => extractLatestAssistantText([message]) ?? (isRecord(message) && Array.isArray(message.content) ? message.content.filter(isRecord).filter((part) => part.type === "text" && typeof part.text === "string").map((part) => part.text).join(`
 `) : "")).join(`
@@ -15377,8 +15406,8 @@ function selectMapMemoryInputs(db, projectIdentity, repoDir, includeDeferred = f
     if (requeue.length >= MAX_INDEPENDENT_REQUEUE_PER_RUN)
       break;
   }
-  const retries = readRetries(db, projectIdentity);
-  return [...unmappedInputs, ...requeue].filter((memory) => includeDeferred || !isDeferred(memory, retries));
+  const retries = readMapMemoryRetries(db, projectIdentity);
+  return [...unmappedInputs, ...requeue].filter((memory) => includeDeferred || !isMapMemoryDeferred(memory, retries));
 }
 async function mapMemories(args) {
   const result = {
@@ -15389,12 +15418,12 @@ async function mapMemories(args) {
     complete: true
   };
   const allInputs = selectMapMemoryInputs(args.db, args.projectIdentity, args.sessionDirectory, true);
-  const retries = readRetries(args.db, args.projectIdentity);
+  const retries = readMapMemoryRetries(args.db, args.projectIdentity);
   const activeIds = new Set(allInputs.map((memory) => String(memory.id)));
   for (const id of Object.keys(retries))
     if (!activeIds.has(id))
       delete retries[id];
-  const inputs = allInputs.filter((memory) => !isDeferred(memory, retries));
+  const inputs = allInputs.filter((memory) => !isMapMemoryDeferred(memory, retries));
   result.remaining = allInputs.length;
   result.complete = result.remaining === 0;
   if (inputs.length === 0) {
@@ -15411,6 +15440,7 @@ async function mapMemories(args) {
   try {
     let consecutiveTimeouts = 0;
     let timeoutStreakElapsedMs = [];
+    const countedMisses = new Set;
     for (let i = 0;i < batches.length; i += 1) {
       const remainingMs = Math.max(0, args.deadline - Date.now());
       if (remainingMs <= 0) {
@@ -15433,22 +15463,19 @@ async function mapMemories(args) {
       }
       const committed = outcome.mapped + outcome.independent;
       const committedIds = new Set(outcome.committedIds);
+      const missedIds = new Set(outcome.missedIds);
       runLeaseGuardedWrite(args.db, args.holderId, args.leaseKey, () => {
         for (const memory of batch.inputs) {
           if (committedIds.has(memory.id)) {
             delete retries[memory.id];
             continue;
           }
-          const content = contentKey(memory);
-          const prior = retries[memory.id];
-          const failures = (prior?.content === content ? prior.failures : 0) + 1;
-          retries[memory.id] = {
-            content,
-            failures,
-            deferUntil: failures < 2 ? 0 : Date.now() + Math.min(24, 2 ** (failures - 2)) * 3600000
-          };
+          if (missedIds.has(memory.id) && !countedMisses.has(memory.id)) {
+            countedMisses.add(memory.id);
+            retries[memory.id] = nextMapMemoryRetry(memory, retries[memory.id]);
+          }
         }
-        setDreamState(args.db, retryKey(args.projectIdentity), JSON.stringify(retries));
+        setDreamState(args.db, mapMemoryRetryKey(args.projectIdentity), JSON.stringify(retries));
       });
       result.mapped += outcome.mapped;
       result.independent += outcome.independent;
@@ -15460,7 +15487,7 @@ async function mapMemories(args) {
       if (outcome.requeue?.length) {
         if (!batch.isOmissionRetry) {
           batches.push({
-            inputs: outcome.requeue.filter((memory) => !isDeferred(memory, retries)),
+            inputs: outcome.requeue.filter((memory) => !isMapMemoryDeferred(memory, retries)),
             isOmissionRetry: true
           });
           log2(`[dreamer] map-memories: committed ${committed}/${batch.inputs.length} mapping(s); requeueing ${outcome.requeue.length} omitted id(s) in a targeted retry`);
@@ -15548,11 +15575,7 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
       stage = "apply";
       const outcome = await applyParsedBatchMappings(args, batch, run.validated, budgetFinalized, true);
       logBatchUsage(run.completion.messages ?? [], outcome.mapped + outcome.independent, startedAt);
-      const returnedIds = new Set(outcome.committedIds);
-      return {
-        ...outcome,
-        requeue: budgetFinalized ? [] : batch.filter((memory) => !returnedIds.has(memory.id))
-      };
+      return completedMapBatch(outcome, batch, run.validated, budgetFinalized);
     }
     const client = args.client;
     if (!client)
@@ -15606,11 +15629,7 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
     stage = "apply";
     const outcome = await applyParsedBatchMappings(args, batch, run.validated, budgetFinalized, true);
     logBatchUsage(run.output, outcome.mapped + outcome.independent, startedAt);
-    const returnedIds = new Set(outcome.committedIds);
-    return {
-      ...outcome,
-      requeue: budgetFinalized ? [] : batch.filter((memory) => !returnedIds.has(memory.id))
-    };
+    return completedMapBatch(outcome, batch, run.validated, budgetFinalized);
   } catch (error) {
     const desc = describeError(error);
     log2(`[dreamer] map-memories batch failed: ${desc.brief}`, desc.stackHead ? { stackHead: desc.stackHead } : undefined);
@@ -15651,6 +15670,17 @@ async function mapOneBatch(args, batch, sliceMs, signal) {
         log: log2
       });
   }
+}
+function completedMapBatch(outcome, batch, parsed, budgetFinalized) {
+  if (budgetFinalized)
+    return outcome;
+  const decided = new Set(parsed.map(({ id }) => id));
+  const committed = new Set(outcome.committedIds);
+  return {
+    ...outcome,
+    missedIds: batch.filter(({ id }) => !decided.has(id)).map(({ id }) => id),
+    requeue: batch.filter(({ id }) => !committed.has(id))
+  };
 }
 async function applyParsedBatchMappings(args, batch, parsed, budgetFinalized = false, allowPartial = false) {
   const batchIds = new Set(batch.map((memory) => memory.id));
@@ -15743,7 +15773,7 @@ async function applyParsedBatchMappings(args, batch, parsed, budgetFinalized = f
           name: "memory.set_mapping",
           arguments: {
             memory_project: args.projectIdentity,
-            command_id: `${args.moduleRoute.moduleCommandId}:${createHash8("sha256").update(rows.map((row) => row.memory_id).join(",")).digest("hex").slice(0, 16)}`,
+            command_id: `${args.moduleRoute.moduleCommandId}:${createHash9("sha256").update(rows.map((row) => row.memory_id).join(",")).digest("hex").slice(0, 16)}`,
             rows
           }
         }
@@ -16647,6 +16677,33 @@ ${buildFrictionGatePrompt({ userLines })}`;
 function retrospectiveGatePromptTokens(messages) {
   return estimateTokens(retrospectiveGatePrompt(messages));
 }
+function admitRetrospectiveCohorts(rows, firstUnreadTs, maxMessages, promptInputLimitTokens) {
+  const kept = [];
+  let start = 0;
+  for (let first = rows[start];first && first.ts < firstUnreadTs; first = rows[start]) {
+    const ts = first.ts;
+    let end = start + 1;
+    while (end < rows.length && rows[end]?.ts === ts)
+      end += 1;
+    const cohort = rows.slice(start, end);
+    const tooManyRows = end > maxMessages;
+    const tooManyTokens = !tooManyRows && promptInputLimitTokens !== undefined && retrospectiveGatePromptTokens([...kept, ...cohort]) > promptInputLimitTokens;
+    if (tooManyRows || tooManyTokens) {
+      return {
+        kept,
+        budgetTruncated: tooManyTokens,
+        ...kept.length === 0 ? { oversized: { ts, rows: cohort } } : {}
+      };
+    }
+    kept.push(...cohort);
+    start = end;
+  }
+  return { kept, budgetTruncated: false };
+}
+function logSkippedRetrospectiveCohort(sessionIds, ts, count, lowerBound) {
+  const sessions = [...new Set(sessionIds)].join(",");
+  log2(`[dreamer] retrospective: oversized timestamp cohort sessionIds=${sessions} timestamp=${ts} ${lowerBound ? "skippedAtLeast" : "skipped"}=${count}`);
+}
 async function readRetrospectiveScanWindow(provider, projectIdentity, watermarkMs, overlapUserCount, options) {
   const maxMessages = options?.maxMessagesPerRun ?? RETROSPECTIVE_MAX_MESSAGES_PER_RUN;
   const capPerSession = options?.capPerSession ?? RETROSPECTIVE_MAX_MESSAGES_PER_SESSION;
@@ -16676,59 +16733,57 @@ async function readRetrospectiveScanWindow(provider, projectIdentity, watermarkM
     if (sessionsToRead.length > 0) {
       sinceReads.push(...await Promise.all(sessionsToRead.map((session) => provider.readUserMessagesSince(session.sessionId, scanSinceMs, capPerSession))));
     }
-    let saturatedFrontier = Number.POSITIVE_INFINITY;
-    for (const read of sinceReads) {
-      const lastKept = read.truncated ? read.messages[read.messages.length - 1] : undefined;
-      if (lastKept)
-        saturatedFrontier = Math.min(saturatedFrontier, lastKept.ts - 1);
-    }
-    const allSince = sinceReads.flatMap((read) => read.messages).filter((message) => message.ts >= recencyCutoffMs).map(clampRetrospectiveMessage).sort((a, b) => a.ts - b.ts || a.ordinal - b.ordinal);
-    const countCandidates = allSince.slice(0, maxMessages);
-    const countDropped = allSince.slice(maxMessages);
-    const keptSince = [];
-    let budgetDropped = [];
-    if (promptInputLimitTokens === undefined) {
-      keptSince.push(...countCandidates);
-    } else {
-      for (let index = 0;index < countCandidates.length; index += 1) {
-        const row = countCandidates[index];
-        if (!row)
-          continue;
-        const candidate = [...keptSince, row];
-        if (retrospectiveGatePromptTokens(candidate) <= promptInputLimitTokens) {
-          keptSince.push(row);
-          continue;
-        }
-        budgetDropped = countCandidates.slice(index);
-        break;
+    const allSince = sinceReads.flatMap((read) => read.messages).filter((message) => message.ts > scanSinceMs).map(clampRetrospectiveMessage).sort((a, b) => a.ts - b.ts || a.ordinal - b.ordinal);
+    let unknownBoundary = !!firstExcludedSession && firstExcludedPendingTs === undefined;
+    let firstUnreadTs = firstExcludedPendingTs ?? Number.POSITIVE_INFINITY;
+    const oversizedSessions = new Map;
+    for (const [index, read] of sinceReads.entries()) {
+      if (!read.truncated)
+        continue;
+      const unreadTs = read.firstOmittedTs ?? read.messages.at(-1)?.ts;
+      if (unreadTs === undefined) {
+        unknownBoundary = true;
+        continue;
+      }
+      firstUnreadTs = Math.min(firstUnreadTs, unreadTs);
+      const sessionId = sessionsToRead[index]?.sessionId;
+      if (sessionId !== undefined && read.firstOmittedTs !== undefined && read.firstOmittedTs === oldestBySession?.get(sessionId)) {
+        oversizedSessions.set(sessionId, read.firstOmittedTs);
       }
     }
-    const droppedSince = [...budgetDropped, ...countDropped];
+    const {
+      kept: keptSince,
+      budgetTruncated,
+      oversized
+    } = admitRetrospectiveCohorts(allSince, unknownBoundary ? scanSinceMs : firstUnreadTs, maxMessages, promptInputLimitTokens);
+    const lastKept = keptSince.at(-1);
     let maxScannedTs = scanSinceMs;
-    if (oldestBySession && sinceReads.every((read) => read.messages.length === 0)) {
-      for (const { session } of eligibleSessions) {
-        maxScannedTs = Math.max(maxScannedTs, session.updatedAt ?? scanSinceMs);
+    if (!unknownBoundary) {
+      if (oversized) {
+        maxScannedTs = oversized.ts;
+        logSkippedRetrospectiveCohort(oversized.rows.map(({ sessionId }) => sessionId), maxScannedTs, oversized.rows.length, false);
+      } else if (lastKept) {
+        maxScannedTs = lastKept.ts;
+      } else if (Number.isFinite(firstUnreadTs)) {
+        const blockedSessions = sessions.filter(({ session }) => oldestBySession?.get(session.sessionId) === firstUnreadTs);
+        const hitSessionReadCap = blockedSessions.some(({ session }) => oversizedSessions.get(session.sessionId) === firstUnreadTs);
+        if (hitSessionReadCap || blockedSessions.length > sessionLimit) {
+          maxScannedTs = firstUnreadTs;
+          logSkippedRetrospectiveCohort(blockedSessions.map(({ session }) => session.sessionId), maxScannedTs, Math.max(blockedSessions.length, hitSessionReadCap ? capPerSession + 1 : 0), true);
+        } else {
+          maxScannedTs = Math.max(scanSinceMs, firstUnreadTs - 1);
+        }
+      } else if (oldestBySession && allSince.length === 0) {
+        for (const { session } of eligibleSessions) {
+          maxScannedTs = Math.max(maxScannedTs, session.updatedAt ?? scanSinceMs);
+        }
       }
     }
-    for (const row of keptSince) {
-      if (row.ts > maxScannedTs)
-        maxScannedTs = row.ts;
-    }
-    let frontier = saturatedFrontier;
-    const firstDropped = droppedSince[0];
-    if (firstDropped)
-      frontier = Math.min(frontier, firstDropped.ts - 1);
-    if (typeof firstExcludedPendingTs === "number") {
-      frontier = Math.min(frontier, firstExcludedPendingTs - 1);
-    } else if (typeof firstExcludedSession?.updatedAt === "number") {
-      frontier = Math.min(frontier, firstExcludedSession.updatedAt - 1);
-    }
-    maxScannedTs = Math.max(scanSinceMs, Math.min(maxScannedTs, frontier));
     const keptSessionIds = new Set(keptSince.map((message) => message.sessionId));
     const overlapSessions = sessionsToRead.filter((session) => keptSessionIds.has(session.sessionId));
     const overlapBatches = overlapUserCount > 0 && watermarkMs > 0 && watermarkMs >= recencyCutoffMs ? await Promise.all(overlapSessions.map((session) => provider.readUserMessagesBefore(session.sessionId, watermarkMs, overlapUserCount))) : [];
     const seen = new Set;
-    const merged = [];
+    const merged = [...keptSince];
     const appendUnique = (row) => {
       const key = `${row.sessionId}\x00${row.ts}\x00${row.role}\x00${row.toolName ?? ""}`;
       if (seen.has(key))
@@ -16737,9 +16792,7 @@ async function readRetrospectiveScanWindow(provider, projectIdentity, watermarkM
       merged.push(row);
       return true;
     };
-    for (const row of keptSince)
-      appendUnique(row);
-    const overlapRows = overlapBatches.flat().filter((message) => message.ts >= recencyCutoffMs).map(clampRetrospectiveMessage).sort((a, b) => a.ts - b.ts || a.ordinal - b.ordinal);
+    const overlapRows = overlapBatches.flat().filter((message) => message.ts >= recencyCutoffMs && message.ts <= watermarkMs).map(clampRetrospectiveMessage).sort((a, b) => a.ts - b.ts || a.ordinal - b.ordinal);
     for (const row of overlapRows) {
       const beforeLength = merged.length;
       if (!appendUnique(row))
@@ -16759,7 +16812,7 @@ async function readRetrospectiveScanWindow(provider, projectIdentity, watermarkM
       maxScannedTs,
       promptTokens,
       ...promptInputLimitTokens === undefined ? {} : { promptInputLimitTokens },
-      budgetTruncated: budgetDropped.length > 0
+      budgetTruncated
     };
   } finally {
     provider.dispose?.();
@@ -16792,7 +16845,12 @@ function readOpenCodeMessagesSince(db, sessionId, sinceMs, capPerSession) {
               LIMIT ?`).all(sessionId, sinceMs, limit + 1);
   const truncated = rows.length > limit;
   const kept = truncated ? rows.slice(0, limit) : rows;
-  return { messages: normalizeOpenCodeRows(db, sessionId, kept), truncated };
+  const firstOmitted = rows[limit];
+  return {
+    messages: normalizeOpenCodeRows(db, sessionId, kept),
+    truncated,
+    ...firstOmitted ? { firstOmittedTs: firstOmitted.time_created } : {}
+  };
 }
 function readOpenCodeOldestMessageTimesSince(db, sessionIds, sinceMs) {
   const result = new Map;
@@ -17025,7 +17083,7 @@ function insertDreamRun(db, run) {
 }
 
 // ../plugin/src/features/magic-context/dreamer/verify.ts
-import { createHash as createHash10 } from "node:crypto";
+import { createHash as createHash11 } from "node:crypto";
 
 // ../plugin/src/features/magic-context/dreamer/verify-diff.ts
 import { execFile as execFile3 } from "node:child_process";
@@ -17149,7 +17207,7 @@ Read only these changed line ranges if they may affect the claim.`
 import path12 from "node:path";
 
 // ../plugin/src/features/magic-context/dreamer/verify-state.ts
-import { createHash as createHash9 } from "node:crypto";
+import { createHash as createHash10 } from "node:crypto";
 import { readFile, realpath as realpath2 } from "node:fs/promises";
 import path11 from "node:path";
 function verificationMetadata(memory) {
@@ -17162,7 +17220,7 @@ function verificationMetadata(memory) {
 }
 async function verificationFilesFingerprint(directory, files) {
   const root = await resolveGitTopLevel(directory) ?? path11.resolve(directory);
-  const hash = createHash9("sha256");
+  const hash = createHash10("sha256");
   for (const file of [...new Set(files)].sort()) {
     const absolute = path11.resolve(root, file);
     const withinRoot = (candidate) => {
@@ -17175,7 +17233,7 @@ async function verificationFilesFingerprint(directory, files) {
     try {
       if (!withinRoot(await realpath2(absolute)))
         return null;
-      hash.update(createHash9("sha256").update(await readFile(absolute)).digest("hex"));
+      hash.update(createHash10("sha256").update(await readFile(absolute)).digest("hex"));
     } catch (error) {
       if (error.code !== "ENOENT")
         return null;
@@ -17980,7 +18038,7 @@ async function applyParsedVerifyManifest(args, batch, parsed, headAtPrompt, budg
           name: "memory.set_verification",
           arguments: {
             memory_project: args.projectIdentity,
-            command_id: `${args.moduleRoute.moduleCommandId}:${createHash10("sha256").update(rows.map((row) => row.memory_id).join(",")).digest("hex").slice(0, 16)}`,
+            command_id: `${args.moduleRoute.moduleCommandId}:${createHash11("sha256").update(rows.map((row) => row.memory_id).join(",")).digest("hex").slice(0, 16)}`,
             rows
           }
         }
@@ -18894,7 +18952,7 @@ function parseFrictionGateVerdict(verdict) {
 }
 function computeRetrospectiveWindowKey(flagged) {
   const anchors = flagged.map((message) => `${message.sessionId}:${message.ts}`).sort().join("|");
-  return createHash11("sha256").update(anchors).digest("hex").slice(0, 32);
+  return createHash12("sha256").update(anchors).digest("hex").slice(0, 32);
 }
 function renderFrictionWindow(messages, flaggedOrdinals, radius = 2) {
   const flagged = new Set(flaggedOrdinals);
@@ -19013,6 +19071,13 @@ async function runRetrospectiveTask(config, ctx, helpers) {
   const recencyDays = Math.max(1, Math.floor(config.retrospectiveRecencyDays ?? 30));
   const recencyCutoffMs = helpers.invocationStartedAt - recencyDays * RETROSPECTIVE_DAY_MS;
   const scan = await readRetrospectiveScanWindow(provider, projectIdentity, watermarkMs, RETROSPECTIVE_OVERLAP_USER_LINES, { usableInputTokens, recencyCutoffMs });
+  ctx.onRetrospectiveScan?.({
+    watermarkMs,
+    maxScannedTs: scan.maxScannedTs,
+    usableInputTokens,
+    recencyCutoffMs,
+    budgetTruncated: scan.budgetTruncated
+  });
   const clearedTaskStateJson = activeOverflow ? writeRetrospectiveOverflowState(taskState.root, null) : undefined;
   const completedWindow = (retrospectiveWatermarkMs, noOpReason) => ({
     retrospectiveWatermarkMs,
@@ -19386,11 +19451,7 @@ async function runAgenticTask(config, ctx, helpers) {
     if (task === "maintain-docs" && hasCurrentDocsProposal(docsDir)) {
       const reason = "pending proposal matches current docs";
       helpers.recordRun("completed", null, { progress: reason });
-      return {
-        status: "completed",
-        detail: reason,
-        ...changes ? { schedulePatch: { taskStateJson: JSON.stringify({ head: changes.head }) } } : {}
-      };
+      return { status: "completed", detail: reason };
     }
     const curateChunks = curateMemories ? chunkCurateMemories(curateMemories, Math.max(4000, Math.floor(resolveRetrospectiveUsableInputTokens(config, deps) * 2))) : [];
     const batches = task === "curate" ? curateChunks : [{ memories: [], crossChunkCandidates: [] }];
@@ -19804,6 +19865,7 @@ async function runDomainGroup(deps, group, cb) {
         }
       }
       let outcome;
+      const diagnostics = {};
       const startedAt = Date.now();
       try {
         outcome = await executor(due.config, {
@@ -19811,7 +19873,12 @@ async function runDomainGroup(deps, group, cb) {
           projectIdentity,
           holderId,
           leaseKey,
-          leaseAcquisition: acquisition
+          leaseAcquisition: acquisition,
+          ...due.config.task === "retrospective" ? {
+            onRetrospectiveScan: (scan) => {
+              diagnostics.retrospectiveScan = scan;
+            }
+          } : {}
         });
       } catch (error) {
         outcome = { status: "failed", transient: true, error: String(error) };
@@ -19822,6 +19889,11 @@ async function runDomainGroup(deps, group, cb) {
         cb?.onSkipped?.(due.config.task, outcome.detail);
       } else if (outcome.status === "completed") {
         advanceAfterRun(db, projectIdentity, due, finishedAt, "completed", null, outcome.schedulePatch, startedAt);
+        const scan = diagnostics.retrospectiveScan;
+        if (scan) {
+          const stored = readRetrospectiveWatermark(db, projectIdentity, due.config.task);
+          log2(`[dreamer] retrospective: watermark start=${scan.watermarkMs} maxScannedTs=${scan.maxScannedTs} patch=${outcome.schedulePatch?.retrospectiveWatermarkMs ?? "none"} stored=${stored ?? "none"} usableInputTokens=${scan.usableInputTokens} recencyCutoffMs=${scan.recencyCutoffMs} budgetTruncated=${scan.budgetTruncated}`, { projectIdentity });
+        }
         cb?.onRan?.(due.config.task, outcome.detail, outcome.backlog);
       } else if (outcome.transient) {
         recordTransientFailure(db, projectIdentity, due, finishedAt, outcome.error ?? null, outcome.schedulePatch);
@@ -23032,9 +23104,11 @@ class PiRetrospectiveRawProvider {
   async readUserMessagesSince(sessionId, sinceMs, capPerSession) {
     const limit = Math.max(1, Math.floor(capPerSession));
     const messages = await this.selectUserEntries(sessionId, (ts) => ts > sinceMs, limit + 1, false, sinceMs);
+    const firstOmitted = messages[limit];
     return {
       messages: messages.slice(0, limit),
-      truncated: messages.length > limit
+      truncated: messages.length > limit,
+      ...firstOmitted ? { firstOmittedTs: firstOmitted.ts } : {}
     };
   }
   async readOldestMessageTimesSince(sessionIds, sinceMs) {
@@ -24356,6 +24430,79 @@ function commitPiCompactionModeRecord(db, sessionId, record) {
 
 // src/context-handler.ts
 import * as crypto3 from "node:crypto";
+
+// ../plugin/src/features/magic-context/memory/identity-merge-command.ts
+var IDENTITY_MERGE_COMMAND = "npx @cortexkit/magic-context@latest doctor merge-identities";
+var IDENTITY_MERGE_PREVIEW_HINT = "It shows what would move. Add --apply to move them.";
+function shellArg(value, platform) {
+  if (/^[\w.:/-]+$/.test(value))
+    return value;
+  return platform === "win32" ? `"${value}"` : `'${value.replaceAll("'", "'\\''")}'`;
+}
+function identityMergeCommand(from, to, platform = process.platform) {
+  return `${IDENTITY_MERGE_COMMAND} --from ${shellArg(from, platform)} --to ${to ? shellArg(to, platform) : '"DESTINATION_IDENTITY"'}`;
+}
+
+// ../plugin/src/features/magic-context/memory/project-binding-notice.ts
+var observedBindings = new WeakMap;
+function bindingLog(harness, directory, old, identity, memories) {
+  return `project binding changed harness=${harness} cwd=${directory || "unknown"} old=${old ?? "none"} new=${identity} memories=${memories}`;
+}
+function observeSessionProjectBinding(db, sessionId, identity, directory, notify) {
+  const change = recordSessionProjectIdentity(db, sessionId, identity);
+  const harness = getHarness2();
+  let observations = observedBindings.get(db);
+  if (!observations) {
+    observations = new BoundedSessionMap(1000);
+    observedBindings.set(db, observations);
+  }
+  const key = `${harness}\x00${sessionId}`;
+  const last = observations.get(key);
+  const noticed = last?.noticed ?? new Set;
+  const observation = {
+    directory,
+    noticed,
+    warning: change ? undefined : last?.warning
+  };
+  observations.set(key, observation);
+  const old = change?.previousProjectPath;
+  if (!change || !old && harness !== "pi" && harness !== "omp")
+    return;
+  const memories = old ? getMemoryCount2(db, old) : 0;
+  const binding = bindingLog(harness, directory, old, identity, memories);
+  if (!old || !memories) {
+    sessionLog2(sessionId, binding);
+    return;
+  }
+  const oldDirectory = [last?.directory, directory].find((path) => path && directoryFallback(path) === old);
+  const location = oldDirectory ? `the old folder (${oldDirectory})` : `the old project (${old})`;
+  let guidance;
+  if (old.startsWith("dir:") && /^(dir|git):/.test(identity)) {
+    guidance = `Review the merge first:
+${identityMergeCommand(oldDirectory ?? old, identity)}
+${IDENTITY_MERGE_PREVIEW_HINT}`;
+  } else if (old.startsWith("git:") && identity.startsWith("dir:")) {
+    guidance = "A repository's memories cannot be merged into a folder project.";
+  } else {
+    guidance = "Run `npx @cortexkit/magic-context@latest doctor` to see how these memories can be merged.";
+  }
+  const count = `${memories} ${memories === 1 ? "memory" : "memories"}`;
+  observation.warning = `${count} stayed under this session's previous project. Nothing was moved.
+${guidance}`;
+  if (noticed.has(old)) {
+    sessionLog2(sessionId, binding);
+    return;
+  }
+  noticed.add(old);
+  const notice = `This session changed projects. ${count} stayed with ${location}; nothing moved. ${guidance}`;
+  sessionLog2(sessionId, `${binding} notice=${JSON.stringify(notice)}`);
+  try {
+    notify?.(notice);
+  } catch {}
+}
+function getProjectBindingWarning(db, sessionId) {
+  return observedBindings.get(db)?.peek(`${getHarness2()}\x00${sessionId}`)?.warning;
+}
 
 // ../plugin/src/hooks/magic-context/event-resolvers.ts
 var DEFAULT_CONTEXT_LIMIT = 200000;
@@ -28873,7 +29020,7 @@ function recoveryReasoningPrefixes(messages, partsKey) {
 }
 
 // ../plugin/src/shared/tag-transcript.ts
-import { createHash as createHash12 } from "node:crypto";
+import { createHash as createHash13 } from "node:crypto";
 function buildPersistedDropTargets(transcript, tags, options = {}) {
   const targets = new Map;
   const tools = new Map(tags.filter((tag) => tag.type === "tool").map((tag) => [makeToolCompositeKey(tag.toolOwnerMessageId ?? "", tag.messageId), tag]));
@@ -28956,7 +29103,7 @@ function buildPersistedDropTargets(transcript, tags, options = {}) {
   return targets;
 }
 function textIdentityDigest(value) {
-  return createHash12("sha256").update(value).digest("hex");
+  return createHash13("sha256").update(value).digest("hex");
 }
 function buildContentDerivedTextIds(messageId, parts) {
   const sources = parts.filter((part) => part.kind === "text").map((part) => stripTagPrefix(part.getText() ?? ""));
@@ -32770,7 +32917,7 @@ function clearPiCtxReduceCallableSession(sessionId) {
 import { randomUUID as randomUUID3 } from "node:crypto";
 
 // src/tail-hygiene-walk-pi.ts
-import { createHash as createHash13 } from "node:crypto";
+import { createHash as createHash14 } from "node:crypto";
 
 // src/provider-visible-parts-pi.ts
 function isRecord4(value) {
@@ -32899,7 +33046,7 @@ function memoizedContent(kind, content) {
 function contentMemoKey(kind, content) {
   if (content.length <= INLINE_CONTENT_KEY_CHARS)
     return `${kind}\x00=${content}`;
-  const digest = createHash13("sha256").update(content, "utf16le").digest("base64");
+  const digest = createHash14("sha256").update(content, "utf16le").digest("base64");
   return `${kind}\x00#${content.length}\x00${digest}`;
 }
 function measuredContent(kind, content) {
@@ -34350,7 +34497,7 @@ function extractToastTitle(text) {
 }
 async function sendStatusNotification(_client, sessionId, text, params) {
   try {
-    const { pushNotification } = await importPluginModule(() => import("./rpc-notifications-gm1mdpwh.js"));
+    const { pushNotification } = await importPluginModule(() => import("./rpc-notifications-889zvhn2.js"));
     pushNotification("toast", {
       title: extractToastTitle(text),
       message: text,
@@ -37543,9 +37690,9 @@ function authorizePiToolRemoval(args) {
 }
 
 // src/native-replay-tag-provenance-pi.ts
-import { createHash as createHash14 } from "node:crypto";
+import { createHash as createHash15 } from "node:crypto";
 function nativeResponseTagStripKey(id, phase, text) {
-  return createHash14("sha256").update(JSON.stringify([id, phase, text])).digest("hex");
+  return createHash15("sha256").update(JSON.stringify([id, phase, text])).digest("hex");
 }
 
 // src/native-replay-tags-pi.ts
@@ -40857,7 +41004,7 @@ function piDispatchMismatchDiagnostic(payload, prepared, mismatch) {
 }
 
 // src/pi-foreign-session-index.ts
-import { createHash as createHash15 } from "node:crypto";
+import { createHash as createHash16 } from "node:crypto";
 
 // src/pi-foreign-omp-kinds.ts
 var PI_FOREIGN_RENDERED_CONTENT_KINDS = [
@@ -41690,7 +41837,7 @@ function fingerprint(text, index, wire = false) {
     index.stats.wireHashes++;
   else
     index.stats.hashes++;
-  return createHash15("sha256").update(stableStringify([{ type: "text", text }])).digest("hex");
+  return createHash16("sha256").update(stableStringify([{ type: "text", text }])).digest("hex");
 }
 function protectSession(index, message, roleOverride, trackEntry = false) {
   const rendering = texts(index, message, roleOverride, trackEntry);
@@ -42583,7 +42730,7 @@ function piExpandChainedRequest(payload, chained, anchor, prepared, pass) {
 }
 
 // src/pi-dispatch-cursor.ts
-import { createHash as createHash16 } from "node:crypto";
+import { createHash as createHash17 } from "node:crypto";
 var MAX_BYTES = 32 * 1024 * 1024;
 var MAX_ENTRIES = 1e5;
 function object14(value) {
@@ -42710,7 +42857,7 @@ Today: ${day}; current working directory: '${cwd.replace(/\\/gu, "/")}'. Do not 
     const hash = (content) => {
       const json = JSON.stringify({ role: "user", content });
       if (json.length <= MAX_BYTES)
-        roots.add(createHash16("sha256").update(json).digest("hex"));
+        roots.add(createHash17("sha256").update(json).digest("hex"));
     };
     hash(parts);
     if (reminder) {
@@ -45100,7 +45247,7 @@ function createPiFallbackIndex() {
 }
 
 // src/pi-fit-reclaim.ts
-import { createHash as createHash17, randomUUID as randomUUID4 } from "node:crypto";
+import { createHash as createHash18, randomUUID as randomUUID4 } from "node:crypto";
 var pendingInput = new Set;
 var KEY3 = "piUpperEstimateReclaim";
 function piFitOverflowPossible(args) {
@@ -45136,7 +45283,7 @@ function piUpperReclaimCursor(args) {
     sessionId: args.sessionId,
     modelKey: args.modelKey,
     contextWindow: args.contextWindow ?? null,
-    head: head ? createHash17("sha256").update(JSON.stringify([
+    head: head ? createHash18("sha256").update(JSON.stringify([
       Buffer.from(head.cachedM0Bytes ?? []).toString("base64"),
       Buffer.from(head.cachedM1Bytes ?? []).toString("base64"),
       head.cachedM0MuralDataUrl ?? null
@@ -45223,7 +45370,7 @@ async function waitForPiHistorianInTurn(sessionId, remainingMs, wait) {
 }
 
 // src/pi-lkg-fit-envelope.ts
-import { createHash as createHash18 } from "node:crypto";
+import { createHash as createHash19 } from "node:crypto";
 function readPiLkgFitEnvelope(ctx, pi, modelKey, frozen, wireSchema) {
   try {
     if (!modelKey || typeof pi.getAllTools !== "function")
@@ -45285,7 +45432,7 @@ function readPiLkgFitEnvelope(ctx, pi, modelKey, frozen, wireSchema) {
       refusalToolDefinitionTokens,
       toolDefinitionsMeasured: refusalToolDefinitionTokens !== undefined,
       envelopeBytes: Buffer.byteLength(envelopeJson),
-      envelopeSignature: activeNames ? createHash18("sha256").update(envelopeJson).update(JSON.stringify(activeNames)).digest("hex") : undefined,
+      envelopeSignature: activeNames ? createHash19("sha256").update(envelopeJson).update(JSON.stringify(activeNames)).digest("hex") : undefined,
       calibration,
       ...piModelAcceptsImages(ctx.model) ? {} : { modelAcceptsImages: false }
     };
@@ -45295,13 +45442,13 @@ function readPiLkgFitEnvelope(ctx, pi, modelKey, frozen, wireSchema) {
 }
 
 // src/pi-message-identity.ts
-import { createHash as createHash21 } from "node:crypto";
+import { createHash as createHash22 } from "node:crypto";
 
 // src/pi-tool-identity.ts
-import { createHash as createHash20 } from "node:crypto";
+import { createHash as createHash21 } from "node:crypto";
 
 // src/served-array-ledger.ts
-import { createHash as createHash19 } from "node:crypto";
+import { createHash as createHash20 } from "node:crypto";
 import {
   closeSync as closeSync2,
   fstatSync,
@@ -45579,7 +45726,7 @@ function getPiLastServedArray(sessionId) {
   return previous ? `[${previous.serializedMessages.join(",")}]` : undefined;
 }
 function sha256(value) {
-  return createHash19("sha256").update(value).digest("hex");
+  return createHash20("sha256").update(value).digest("hex");
 }
 function safeSessionFileStem(sessionId) {
   const readable = sessionId.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 96);
@@ -45914,7 +46061,7 @@ function readPiServedCachedArray(sessionId) {
   const memory = getPiLastServedArray(sessionId);
   const slot = memory === undefined ? getSlot(sessionId) : undefined;
   const jsonPrefix = memory ?? slot?.jsonPrefix;
-  if (jsonPrefix === undefined || createHash20("sha256").update(jsonPrefix).digest("hex") !== getPiLastServedDigest(sessionId))
+  if (jsonPrefix === undefined || createHash21("sha256").update(jsonPrefix).digest("hex") !== getPiLastServedDigest(sessionId))
     return;
   let parsed;
   try {
@@ -45938,7 +46085,7 @@ function piMessageEntryFingerprint(message) {
   const m = message;
   if (typeof m.role !== "string")
     return null;
-  const contentHash = createHash21("sha256").update(stableStringify(m.content)).digest("hex");
+  const contentHash = createHash22("sha256").update(stableStringify(m.content)).digest("hex");
   return JSON.stringify([
     typeof m.responseId === "string" ? m.responseId : null,
     typeof m.timestamp === "number" || typeof m.timestamp === "string" ? m.timestamp : null,
@@ -48840,7 +48987,7 @@ function trackSessionForProject(projectIdentity, sessionId) {
 function isContextHandlerSessionActive(sessionId) {
   return activeContextHandlerSessions.has(sessionId);
 }
-function updateSessionProjectTracking(sessionId, projectIdentity, db, observedCwd) {
+function updateSessionProjectTracking(sessionId, projectIdentity, db, observedCwd, notify) {
   if (!projectIdentity)
     return;
   const prev = lastSeenProjectIdentityBySession.get(sessionId);
@@ -48853,11 +49000,8 @@ function updateSessionProjectTracking(sessionId, projectIdentity, db, observedCw
   }
   if (db && persistedProjectIdentityBySession.get(sessionId) !== projectIdentity) {
     try {
-      const change = recordSessionProjectIdentity(db, sessionId, projectIdentity);
+      observeSessionProjectBinding(db, sessionId, projectIdentity, observedCwd ?? "", notify);
       persistedProjectIdentityBySession.set(sessionId, projectIdentity);
-      if (change) {
-        sessionLog2(sessionId, `project binding changed harness=${getHarness2()} cwd=${observedCwd ?? "unknown"} old=${change.previousProjectPath ?? "none"} new=${change.projectPath}`);
-      }
     } catch (error) {
       const now = Date.now();
       const lastLoggedAt = sessionProjectBindingFailureLogAtBySession.get(sessionId);
@@ -50578,7 +50722,7 @@ function registerPiContextHandler(pi, baseOptions) {
       }));
       assertCurrentPass();
       const historyHead = sessionMetaForUsage.isSubagent ? undefined : options.injection;
-      updateSessionProjectTracking(sessionId, projectIdentity, options.db, projectDirectory);
+      updateSessionProjectTracking(sessionId, projectIdentity, options.db, projectDirectory, ctx.hasUI ? (text) => ctx.ui.notify(text, "warning") : undefined);
       const lkgInputIdByRef = new Map;
       for (const input of lkgPassSnapshot.inputs)
         lkgInputIdByRef.set(event.messages[input.messageIndex], input.id);
@@ -55533,6 +55677,10 @@ function renderUserStatusSummary(summary, style) {
   for (const warning of summary.hiddenVariantWarnings ?? []) {
     lines.push(style === "markdown" ? `- **Warning:** ${warning}` : `Warning: ${warning}`);
   }
+  if (summary.projectBindingWarning) {
+    const label = style === "markdown" ? "- **Warning:**" : "Warning:";
+    lines.push(`${label} ${summary.projectBindingWarning}`);
+  }
   for (const warning of summary.warnings) {
     lines.push(style === "markdown" ? `- **Warning:** ${renderUserFacingFailure(warning)}` : `Warning: ${renderUserFacingFailure(warning)}`);
   }
@@ -55715,6 +55863,7 @@ function checkStatusViewSource(candidate) {
     compactionEnabled: optional.read("compactionEnabled", isBoolean),
     warnings: optional.readArray("warnings", isUserFacingFailureKey),
     hiddenVariantWarnings: optional.readArray("hiddenVariantWarnings", isString),
+    projectBindingWarning: optional.read("projectBindingWarning", isString),
     unconfirmedMigrationHolders: optional.read("unconfirmedMigrationHolders", isUnconfirmedMigrationHolders)
   };
   return { ok: true, source, ignoredFields: optional.ignored };
@@ -56182,6 +56331,7 @@ function warningBlock(source) {
       }
     ] : [],
     ...(source.hiddenVariantWarnings ?? []).map((text) => ({ text, tone: "warning" })),
+    ...source.projectBindingWarning ? [{ text: source.projectBindingWarning, tone: "warning" }] : [],
     ...source.configReloadFailure ? [
       {
         text: `Config reload failed ${source.configReloadFailure.path}: ${source.configReloadFailure.message}`,
@@ -56484,6 +56634,7 @@ function formatPiStatusSummary(s) {
       tokens: s.tailHygiene?.u ?? 0
     },
     memoryCount: s.memoryCount,
+    projectBindingWarning: s.projectBindingWarning,
     noteCount: s.sessionNoteCount + s.readySmartNoteCount,
     embedding: s.embedding,
     warnings: piStatusWarnings(s),
@@ -56916,6 +57067,7 @@ function buildStatusDetail(pi, ctx, deps, sessionId, state, host = readStatusHos
       return last ? `${last.startMessage}-${last.endMessage}` : null;
     })(),
     memoryCount: memoryImportanceHistogram.total,
+    projectBindingWarning: getProjectBindingWarning(deps.db, sessionId),
     memoryBlockCount,
     memoryImportanceHistogram,
     sessionNoteCount: safeRead(() => getNotes(deps.db, {
@@ -58568,7 +58720,10 @@ var __test = {
   clearPiStartupMaintenanceClaim,
   formatProtectedTagsDeprecationNotice,
   claimProtectedTagsDeprecationNoticeOnce,
-  resetClaimedProtectedTagsDeprecationNoticeForTesting
+  resetClaimedProtectedTagsDeprecationNoticeForTesting,
+  forgetActivePiRuntimes() {
+    activePiRuntimes.clear();
+  }
 };
 function formatTokens(value) {
   return value.toLocaleString();
@@ -59951,7 +60106,7 @@ async function startPiMagicContextRuntime(pi, database, dbPath) {
     } catch {}
     activePiRuntimes.delete(dreamerRegistrationOwner);
     if (activePiRuntimes.size === 0)
-      unregisterPiProjectEmbeddings(db);
+      await withTimeout(shutdownPiProjectEmbeddings(db), EMBEDDING_WORKER_STOP_MAX_MS + 1000);
   });
   let switchOutgoingSessionId;
   const readSessionId = (ctx) => {

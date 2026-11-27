@@ -27,11 +27,11 @@ serveWorkerJobs(async (initial, port) => {
     { Database, registerSqliteDiagnosticSink },
     { log }
   ] = await Promise.all([
-    import("./embedding-backfill-6f2berym.js"),
+    import("./embedding-backfill-a4s05kta.js"),
     import("./embedding-cache-7rp4gqzr.js"),
     import("./storage-memory-0ndn65fm.js"),
-    import("./project-embedding-registry-zwd2g1vj.js"),
-    import("./search-gg9g9qm1.js"),
+    import("./project-embedding-registry-stbqjam2.js"),
+    import("./search-m2wmftyk.js"),
     import("./compartment-chunk-embedding-avkyp2df.js"),
     import("./embedding-activity-ew6dshfd.js"),
     import("./harness-9872e0ym.js"),
