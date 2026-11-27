@@ -119,6 +119,7 @@ describe("the vendored onnxruntime-node is the one that gets loaded", () => {
       "README.md",
       "package.json",
       "vendor.sh",
+      "verify.mjs", // the health check, which loads this member's binding and needs no model
       "test/vendored.test.ts",
       ".gitignore", // re-includes dist/, which the root .gitignore ignores
     ]);
