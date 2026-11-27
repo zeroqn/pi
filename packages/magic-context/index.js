@@ -177,7 +177,7 @@ import {
   createTodowriteTool,
   syncCtxMemoryToolEnabled,
   registerMagicContextTools
-} from "./index-nrwaxwkd.js";
+} from "./index-drmkw81y.js";
 import"./index-4knyh1kt.js";
 import {
   canonicalModelIdentity,
@@ -481,7 +481,7 @@ import {
   openCurrentDatabase2,
   openDatabaseAsync2,
   closeDatabase2
-} from "./index-6gm43ppw.js";
+} from "./index-cmhas8we.js";
 import {
   LkgRecoveryFenceError,
   clearLkgFenceProcessState,
@@ -611,7 +611,7 @@ import {
   getSourceContents,
   recordSubagentInvocation,
   getLatestHistorianInvocationId
-} from "./index-tksyex8e.js";
+} from "./index-xmgw5yy4.js";
 import {
   resolveOpenCodeDbPath,
   assertOpenCodeStoreGeneration,
@@ -878,7 +878,7 @@ import {
 } from "./index-pdrberjp.js";
 import"./index-71rg8j43.js";
 import"./index-8d2z6503.js";
-import"./index-qhdmqkan.js";
+import"./index-88vqcr3d.js";
 import"./index-fvfq9gva.js";
 import {
   __toESM

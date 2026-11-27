@@ -8,7 +8,7 @@ import"./index-tm11k42a.js";
 import {
   LATEST_SUPPORTED_VERSION2,
   getPersistedSchemaVersion2
-} from "./index-6gm43ppw.js";
+} from "./index-cmhas8we.js";
 import"./index-3bb24eb6.js";
 import"./index-8sqebjzk.js";
 import"./index-wfqysrwq.js";
