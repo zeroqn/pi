@@ -132,6 +132,35 @@ else asks for `libonnxrtabi24.so.1`, so `zg` and every other consumer resolve th
 library through its own `RUNPATH` again. The same naming freedom is why the shim can
 carry a version node — `VERS_1.24.3` — that no released ONNX Runtime ever had.
 
+## Checking it, without pi
+
+`verify.mjs` answers "does the native stack work here?" in one command, with a JSON verdict and
+an exit code:
+
+```
+bun packages/onnxruntime-node/verify.mjs                 # both rows
+bun packages/onnxruntime-node/verify.mjs --row member     # the in-pi arrangement only
+ONNXRUNTIME_LIB_PATH=<dir>/lib bun …/verify.mjs           # any candidate ORT
+```
+
+It has two rows because this repo loads ONNX Runtime two ways. `member` is the shipping
+arrangement — this member's binding, the `libonnxrtabi24.so.1` shim, and whatever
+`ONNXRUNTIME_LIB_PATH` names (the devShell's `pkgs.onnxruntime` by default). `vendor` is Magic
+Context's own tree, whose npm `onnxruntime-node@1.30.0` ships its own library beside its binding.
+Each row loads the binding, reports every `libonnx*` file the process mapped, and runs one session
+over a cached MiniLM model with the options Magic Context passes (`executionProviders: ["cpu"]`),
+so a pass means a real inference, not only a load. The rows run in separate processes: an earlier
+row's mapped `libonnxruntime.so.1` shares its SONAME with what the later binding asks for, and in
+one process the earlier copy refuses the later one.
+
+Two failures are worth recognising by sight, and the verdict names each:
+
+* `libonnxrtabi24.so.1: cannot open shared object file` — the shim is not on `LD_LIBRARY_PATH`;
+  it comes from `shell/onnxruntime-shim`.
+* ``version `VERS_1.30.0' not found`` on the `vendor` row — a `libonnxruntime.so.1` earlier on
+  `LD_LIBRARY_PATH` outranks the binding's own `$ORIGIN` copy, the same ordering that made Magic
+  Context's suites fail on this box until they ran with `LD_LIBRARY_PATH` at the gcc lib only.
+
 ## Bumping
 
 Re-extract the tarball for the new version with `./vendor.sh <tarball>` (it applies
